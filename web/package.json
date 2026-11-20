@@ -1,6 +1,6 @@
 {
   "name": "toolkit-web",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "ToolKit web UI \u2014 a module shell over the ADO prompt-engineering module. React + Fluent UI, backed by the FastAPI agent.",
   "private": true,
   "license": "MIT",
@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "lint": "eslint src && prettier --check src",
     "lint:fix": "eslint src --fix",
-    "lint:md": "cd .. && markdownlint-cli2 \"README.md\" \"*.md\" \"docs/**/*.md\" \"design/*.md\" \"spec/*.md\" \"web/README.md\" \"agent/README.md\"",
+    "lint:md": "cd .. && markdownlint-cli2 \"README.md\" \"*.md\" \"docs/**/*.md\" \"design/*.md\" \"spec/*.md\" \"changelog.d/*.md\" \"web/README.md\" \"web/COMPONENTS.md\" \"agent/README.md\"",
     "format": "prettier --write src",
     "format:check": "prettier --check src",
     "type-check": "tsc --noEmit",

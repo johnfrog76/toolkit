@@ -36,6 +36,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot   = Split-Path $scriptDir -Parent
@@ -81,19 +82,19 @@ try {
         New-Item -ItemType Directory -Path $d -Force | Out-Null
     }
 
-    git -C $outer init -q 2>$null
+    $null = Invoke-P20TestGit -C $outer init -q
     Set-Content -LiteralPath (Join-Path $outer 'readme.md') -Value 'outer' -Encoding utf8
     # A TRACKED subfolder, so the reader's question has a true case to answer.
     Set-Content -LiteralPath (Join-Path $trackedSub 'card.md') -Value '# card' -Encoding utf8
-    git -C $outer add -A 2>$null | Out-Null
-    git -C $outer -c user.email=t@t -c user.name=t commit -qm 'outer' 2>$null | Out-Null
-    git -C $ownRepo init -q 2>$null
+    $null = Invoke-P20TestGit -C $outer add -A
+    $null = Invoke-P20TestGit -C $outer -c user.email=t@t -c user.name=t commit -qm 'outer'
+    $null = Invoke-P20TestGit -C $ownRepo init -q
 
-    $headBefore  = (git -C $outer rev-parse HEAD 2>$null)
+    $headBefore  = ((Invoke-P20TestGit -C $outer rev-parse HEAD).Out | Select-Object -First 1)
     # TRACKED changes only. This test copies a Toolkit into the repository on
     # purpose, so untracked files are its own scaffolding; what must not move is
     # anything the repository is actually keeping.
-    $dirtyBefore = (git -C $outer status --porcelain --untracked-files=no 2>$null | Out-String)
+    $dirtyBefore = ((Invoke-P20TestGit -C $outer status --porcelain --untracked-files=no).Out | Out-String)
 
     Write-Host ""
     Write-Host "-- the two questions ------------------------------------" -ForegroundColor Cyan
@@ -153,14 +154,14 @@ try {
     Assert-True 'and git stderr never reaches the message as a branch name' `
         ($updateOut -notmatch 'ambiguous argument') $updateOut
 
-    $headAfter  = (git -C $outer rev-parse HEAD 2>$null)
-    $dirtyAfter = (git -C $outer status --porcelain --untracked-files=no 2>$null | Out-String)
+    $headAfter  = ((Invoke-P20TestGit -C $outer rev-parse HEAD).Out | Select-Object -First 1)
+    $dirtyAfter = ((Invoke-P20TestGit -C $outer status --porcelain --untracked-files=no).Out | Out-String)
     Assert-True "the enclosing repository's HEAD is unchanged" ($headBefore -eq $headAfter) "$headBefore -> $headAfter"
     Assert-True "no tracked file in the enclosing repository moved" ($dirtyBefore -eq $dirtyAfter) "[$dirtyBefore] -> [$dirtyAfter]"
     Assert-True 'and nothing was staged there' `
-        (0 -eq @(git -C $outer diff --cached --name-only 2>$null | Where-Object { $_ }).Count)
+        (0 -eq @((Invoke-P20TestGit -C $outer diff --cached --name-only).Out | Where-Object { $_ }).Count)
     Assert-True 'and it grew no commits' `
-        (1 -eq [int](git -C $outer rev-list --count HEAD 2>$null))
+        (1 -eq [int]((Invoke-P20TestGit -C $outer rev-list --count HEAD).Out | Select-Object -First 1))
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { TestHealth } from "./TestHealth";
 
-// The card's Space badge reads `active_space`, the name the route serves
+// The panel names the Space from `active_space`, the name the route serves
 // since the Space rename. It read `active_org`, which never arrives, so the
-// badge and the foot's "in the X Space" were never drawn.
+// foot's "in the X Space" was never drawn. On ListPanel the Space is said in
+// the foot only: the kind has no header badge.
 
 const response = {
   machine: "PC",
@@ -75,10 +76,9 @@ jest.mock("./api.ado", () => ({
   useRunCommandMutation: () => [jest.fn(), { isLoading: false }],
 }));
 
-describe("TestHealth's Space badge", () => {
-  it("shows the Space the route names in active_space", () => {
+describe("TestHealth's Space", () => {
+  it("names the Space the route gives in active_space, in the foot", () => {
     render(<TestHealth />);
-    expect(screen.getByTitle("The Space the last run was in: toolkit").textContent).toBe("toolkit");
     expect(screen.getByText(/in the toolkit Space/)).toBeTruthy();
   });
 });

@@ -136,8 +136,9 @@ Only after every comment has a logged decision:
 After the user commits:
 
 1. Run `tkThreadHash` from the code repository. It adds the commit to the card's **Git / Commits**
-   section and fills the `[commit]` placeholders in take and modify replies. With no repository to
-   run it in, `tkThreadHash -Hash <hash>` threads one commit by hand.
+   section and fills the `[commit]` placeholders in take and modify replies with the newest commit
+   it adds. With no repository to run it in, `tkThreadHash -Hash <hash>` threads one commit by hand
+   and fills them with that one. A run that adds nothing leaves them, and says so.
 2. Check no `[commit]` placeholder is left in a reply; fill any that is by hand.
 3. **Pre-flight check** — before posting, scan every comment block and confirm:
    - `Decision:` is `take`, `reject`, or `modify` (not the empty placeholder)

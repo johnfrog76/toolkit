@@ -49,7 +49,7 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defaultPython, launchChromium, moduleSourceUrl } from "./smokeStack.mjs";
+import { boardLanesCheck, defaultPython, launchChromium, moduleSourceUrl } from "./smokeStack.mjs";
 import { runA11y } from "./smokeA11y.mjs";
 import { runMatrix } from "./smokeMatrix.mjs";
 import { runStudio } from "./smokeStudio.mjs";
@@ -325,31 +325,12 @@ async function runViewport(viewportName) {
   await checkNoSidewaysScroll("/");
   await shoot("/");
 
-  // 1a. The board's FIRST lane is Backlog, and the fixture's planned card
-  // (test/backlog/Task403-...) is in it: /api/status reads backlog/ beside
-  // current/, and a card from there is Backlog whatever its text says. The
-  // board is /board beside Focus, or / when it is Home's only tab.
-  for (const route of ["/board", "/"]) {
-    await open(route);
-    const hasBoard = await page
-      .waitForSelector('section[aria-label="Board"] [role="group"]', { timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-    if (!hasBoard) continue;
-    await page.waitForFunction(() => document.body.innerText.includes("Cache the thumbnails"), null, { timeout: 15000 }).catch(() => {});
-    const lanes = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('section[aria-label="Board"] [role="group"]')).map((g) => ({
-        label: g.getAttribute("aria-label") ?? "",
-        text: g.textContent ?? "",
-      })),
-    );
-    check(
-      `${route} draws five lanes, Backlog first, holding the planned card`,
-      lanes.length === 5 && lanes[0].label.startsWith("Backlog") && lanes[0].text.includes("Cache the thumbnails"),
-      JSON.stringify(lanes.map((l) => l.label)),
-    );
-    break;
-  }
+  // 1a. The board's lanes, by the Space's tracker, and the fixture's planned
+  // card (test/backlog/Task403-...) in the first one: five lanes with Backlog
+  // first on a GitHub or local Space, four with Active first on an Azure
+  // DevOps one -- which the fixture's Space is. boardLanesCheck is shared
+  // with --matrix, the mode CI runs, which holds both shapes.
+  await boardLanesCheck({ page, base, open, check });
 
   // 1b. Home is named tabs, not pages. The
   // fixture's tier decides how many tabs there are, so the assertions hold for
@@ -533,9 +514,11 @@ async function runViewport(viewportName) {
 
     // 5. The retro session's send button -- READ-ONLY. Its presence and its
     // disabled reason are the assertion; the button is never pressed, because a
-    // press posts to a real webhook. A disabled button that names the variable is
-    // the whole design: the alternative is a live button that fails on click and
-    // only then tells you something is unset.
+    // press posts to a real webhook. A disabled button that says why is the whole
+    // design: the alternative is a live button that fails on click and only then
+    // tells you something is unset. Its reason is the recipient's state in a few
+    // neutral words -- sending off on a server started as a test run, which is
+    // what this one is, or no webhook set on any other -- and never the variable.
     const session = await open("/communication/sessions/2026-02-05.md");
     const sendBtn = await page.evaluate(() => {
       const el = Array.from(document.querySelectorAll("button")).find((b) => /send/i.test(b.textContent ?? ""));
@@ -544,8 +527,13 @@ async function runViewport(viewportName) {
     check("the retro session has a send button", sendBtn.found, session.slice(0, 300));
     check("the send button is disabled", sendBtn.disabled, "an enabled send button means a configured live webhook -- stop");
     check(
-      "the send button names TEAMS_WEBHOOK_MANAGER",
-      session.includes("TEAMS_WEBHOOK_MANAGER"),
+      "the send button says why: sending is off on this server, or no webhook is set",
+      session.includes("Sending off on this server") || session.includes("Webhook not set"),
+      session.slice(0, 400),
+    );
+    check(
+      "the send button's reason is not an instruction to set a variable",
+      !/Set TEAMS_WEBHOOK_[A-Z_]+ to/.test(session),
       session.slice(0, 400),
     );
     await checkNoSidewaysScroll("/communication/sessions/2026-02-05.md");
@@ -554,13 +542,32 @@ async function runViewport(viewportName) {
     // 6. The page the send button is on can be REACHED. Once nothing
     // in the UI led to /communication/sessions/<file>: the card's rows and the
     // read view both went elsewhere, and a built, tested feature was findable
-    // only by typing its URL. The row carries an "Edit / send" control, and the
-    // read view's own "Edit / send" lands on the session page.
+    // only by typing its URL. Each entry's `...` menu carries "Edit or send", and
+    // the read view's own "Edit / send" lands on the session page.
+    // 7 is read in the same pass. A complete session offers Archive, the move
+    // that closes it -- READ-ONLY. Presence only: choosing it and confirming
+    // runs MeetingAgenda -Close through the bridge, which MOVES the fixture file
+    // into manager/archive/, and the fixture hub is the committed one. The retro
+    // session is the only complete one of the three.
     await open("/communication");
-    const rowEditSend = await page.evaluate(
-      () => document.querySelectorAll('button[aria-label="Edit / send"]').length,
-    );
-    check("each meeting row offers Edit / send", rowEditSend >= 3, `found ${rowEditSend}`);
+    const meetingMenus = page
+      .locator('[data-panel-kind="list"]')
+      .filter({ has: page.locator('[role="group"][aria-label="Filter meetings"]') })
+      .locator('button[aria-label^="Actions for "]');
+    const meetingRows = await meetingMenus.count();
+    let rowEditSend = 0;
+    let closeOffers = 0;
+    for (let i = 0; i < meetingRows; i += 1) {
+      await meetingMenus.nth(i).click();
+      const menu = page.getByRole("menu");
+      await menu.waitFor({ timeout: 5000 }).catch(() => {});
+      if ((await menu.getByRole("menuitem", { name: /^Edit or send/ }).count()) > 0) rowEditSend += 1;
+      if ((await menu.getByRole("menuitem", { name: /^Archive/ }).count()) > 0) closeOffers += 1;
+      await page.keyboard.press("Escape");
+      await menu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    }
+    check("each meeting entry's menu offers Edit or send", rowEditSend >= 3, `found ${rowEditSend} of ${meetingRows}`);
+    check("exactly the complete session offers Archive", closeOffers === 1, `found ${closeOffers}`);
     await open("/communication/1on1/2026-02-05.md");
     const clicked = await page.evaluate(() => {
       const el = Array.from(document.querySelectorAll("button")).find((b) => /Edit \/ send/.test(b.textContent ?? ""));
@@ -575,16 +582,6 @@ async function runViewport(viewportName) {
       page.url().includes("/communication/sessions/2026-02-05.md"),
       page.url(),
     );
-
-    // 7. A complete session offers Close -- READ-ONLY. Presence only: pressing
-    // it runs MeetingAgenda -Close through the bridge, which MOVES the fixture
-    // file into manager/archive/, and the fixture hub is the committed one.
-    // The retro session is the only complete one of the three.
-    await open("/communication");
-    const closeButtons = await page.evaluate(
-      () => document.querySelectorAll('button[aria-label="Close this meeting"]').length,
-    );
-    check("exactly the complete session offers Close", closeButtons === 1, `found ${closeButtons}`);
   }
 
   check(`no page errors across the ${routesVisited.length} routes`, pageErrors.length === 0, pageErrors.join(" | "));

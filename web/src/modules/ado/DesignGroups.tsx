@@ -115,6 +115,42 @@ export function archivedByOutcome(rows: Design[], outcome: string): Design[] {
   return rows.filter((d) => d.outcome === outcome);
 }
 
+/** What each outcome chip counts: the archived designs, whole, by what became of them. */
+export function outcomeCountsOf(archived: Design[]): {
+  all: number;
+  none: number;
+  byOutcome: Record<string, number>;
+} {
+  const byOutcome: Record<string, number> = {};
+  for (const o of DESIGN.outcomes) byOutcome[o] = archivedByOutcome(archived, o).length;
+  return {
+    all: archived.length,
+    none: archivedByOutcome(archived, NO_OUTCOME).length,
+    byOutcome,
+  };
+}
+
+/** The line under a list about the files that are not designs, with Learn more. */
+export function NotShownLine({
+  notShown,
+  stampHint,
+}: {
+  notShown: DesignNotShown[];
+  stampHint: string;
+}) {
+  const styles = useStyles();
+  const line = notShownLine(notShown, stampHint);
+  if (!line) return null;
+  return (
+    <Caption1 role="status" className={styles.notShown}>
+      {line}{" "}
+      <Link href={DESIGN_LEARN_MORE} target="_blank" rel="noopener noreferrer">
+        Learn more
+      </Link>
+    </Caption1>
+  );
+}
+
 export function DesignGroups({
   designs,
   notShown,
@@ -128,7 +164,6 @@ export function DesignGroups({
   const [outcome, setOutcome] = useState<string>(ALL_OUTCOMES);
   const groups = groupByState(designs);
   const totals = counted ? groupByState(counted) : groups;
-  const line = notShownLine(notShown, stampHint);
   const archivedState = DESIGN.states[3];
   return (
     <>
@@ -137,6 +172,10 @@ export function DesignGroups({
         const open = !collapsible || searching || !!opened[state];
         const isArchived = state === archivedState;
         const shown = isArchived ? archivedByOutcome(rows, outcome) : rows;
+        // Each chip counts the whole Archived group, so a chip says what choosing it leaves.
+        const outcomeCounts = outcomeCountsOf(
+          totals.find((t) => t.state === state)?.designs ?? rows,
+        );
         return (
           <section key={state} className={styles.group} aria-label={`${state} designs`}>
             <div className={styles.groupHeader}>
@@ -161,7 +200,8 @@ export function DesignGroups({
                 <div role="radiogroup" aria-label="Archived outcome" className={styles.outcomes}>
                   <FilterBadge
                     label="any outcome"
-                    appearance="pink"
+                    count={outcomeCounts.all}
+                    appearance="tabColorOne"
                     active={outcome === ALL_OUTCOMES}
                     onClick={() => setOutcome(ALL_OUTCOMES)}
                   />
@@ -169,14 +209,16 @@ export function DesignGroups({
                     <FilterBadge
                       key={o}
                       label={o}
-                      appearance="pink"
+                      count={outcomeCounts.byOutcome[o] ?? 0}
+                      appearance="tabColorOne"
                       active={outcome === o}
                       onClick={() => setOutcome(outcome === o ? ALL_OUTCOMES : o)}
                     />
                   ))}
                   <FilterBadge
                     label="nothing said"
-                    appearance="pink"
+                    count={outcomeCounts.none}
+                    appearance="tabColorOne"
                     active={outcome === NO_OUTCOME}
                     onClick={() => setOutcome(outcome === NO_OUTCOME ? ALL_OUTCOMES : NO_OUTCOME)}
                   />
@@ -190,14 +232,7 @@ export function DesignGroups({
           </section>
         );
       })}
-      {line ? (
-        <Caption1 role="status" className={styles.notShown}>
-          {line}{" "}
-          <Link href={DESIGN_LEARN_MORE} target="_blank" rel="noopener noreferrer">
-            Learn more
-          </Link>
-        </Caption1>
-      ) : null}
+      <NotShownLine notShown={notShown} stampHint={stampHint} />
     </>
   );
 }

@@ -271,6 +271,18 @@ class ReviewsTests(_RoutesCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn("nosuchorg", r.json()["detail"])
 
+    def test_generate_answers_a_refused_second_run_as_a_400(self):
+        said = {"error": "A review for this range already exists at reviews/test/x/review.md."}
+        from agent.growth import reviews
+
+        with mock.patch.object(reviews, "run_cli_json", mock.AsyncMock(return_value=said)):
+            r = self.client.post(
+                "/api/review/generate",
+                json={"start_date": "2026-04-01", "end_date": "2026-04-30", "slugs": ["test"]},
+            )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("already exists", r.json()["detail"])
+
     def test_generate_refuses_a_date_that_is_not_a_date(self):
         r = self.client.post(
             "/api/review/generate",

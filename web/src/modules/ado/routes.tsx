@@ -8,6 +8,7 @@ import {
   Tab,
   TabList,
   makeStyles,
+  mergeClasses,
   tokens,
 } from "@fluentui/react-components";
 import { AddRegular } from "@fluentui/react-icons";
@@ -24,8 +25,9 @@ import {
   useOpenSettings,
   useShellFilters,
   useShellSlot,
+  useSystemTabs,
 } from "../../shell/cards";
-import { homeTabFor } from "../../shell/registry";
+import { homeTabFor, systemTabFor } from "../../shell/registry";
 import { HOME_BANNER_SLOT } from "../../shell/slots";
 import type { HomeTabId } from "../../shell/registry";
 import { ActionDialog } from "./ActionDialog";
@@ -42,6 +44,8 @@ import { FilterDrawer } from "./FilterDrawer";
 import { drawerSections } from "./homeTabs";
 import { trackerName } from "./TrackerBadge";
 import { GH_EXPLAIN } from "./ghExplain";
+import { TabRows } from "../../shared/TabRows";
+import { controlRowsSpace } from "../../shell/layoutTokens";
 
 const useStyles = makeStyles({
   // The row above Home's cards spans the whole centre block: the tabs at its
@@ -50,31 +54,14 @@ const useStyles = makeStyles({
   // is the earlier row's; the pager that sat at the right is gone -- a tab
   // has all its cards. The tabs never move, so nothing reflows when the toggle
   // is absent.
-  // The row the tab strip sits in, and where its 0.5rem of inset lives -- on the
-  // WRAPPER, not on the TabList (the owner: "probably put that on wrapper
-  // obviously"). Everything on the row moves together, and the strip keeps the
-  // one adjustment that is about Fluent rather than about layout.
-  viewBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: tokens.spacingHorizontalM,
-    marginBottom: tokens.spacingVerticalS,
-    paddingLeft: tokens.spacingHorizontalS,
-  },
-  // The tab strip's TEXT starts flush with the cards and the explain line: a
-  // small Fluent tab insets its label by the tab's inline padding (SNudge) plus
-  // the content's (XXS), so the list is pulled back by exactly that. It was
-  // spacingHorizontalM, a medium tab's figure, and overshot by 4px.
-  // With the wrapper's inset, the label then lands level with the intro line
-  // underneath. The strip is not a shared component -- it is
-  // Home's -- but it lines up with one.
-  tabs: {
-    marginLeft: `calc(-1 * (${tokens.spacingHorizontalSNudge} + ${tokens.spacingHorizontalXXS}))`,
-  },
   // The explain line, then the button that belongs to it -- "New card button
   // always follows the explain text".
+  // Home's head: the filter drawer and the first-run banner, in one column
+  // whose gap spaces them. It owns the space under them only when no tab strip
+  // follows -- the strip's wrapper (TabRows) owns that space when it is there --
+  // so nothing above or below carries a margin for it.
+  head: { display: "flex", flexDirection: "column", rowGap: controlRowsSpace },
+  headAlone: { paddingBottom: controlRowsSpace },
   explainRow: {
     display: "flex",
     alignItems: "center",
@@ -268,22 +255,30 @@ export function AdoHome() {
 
   return (
     <>
-      {showDrawer ? (
-        <FilterDrawer
-          value={filters.filterValue}
-          onChange={filters.setFilterValue}
-          activeRepo={filters.activeRepo}
-          onRepoChange={filters.setActiveRepo}
-          stateFilter={filters.stateFilter}
-          onStateChange={filters.setStateFilter}
-          stateOptions={filters.stateOptions}
-          stateLabel={laneLabel}
-          typeFilter={filters.typeFilter}
-          onTypeChange={filters.setTypeFilter}
-          linkFilter={filters.linkFilter}
-          onLinkChange={filters.setLinkFilter}
-          sections={sections}
-        />
+      {showDrawer || (banner.length > 0 && !archiveLoading) ? (
+        <div
+          className={mergeClasses(styles.head, !(showStrip && !archiveLoading) && styles.headAlone)}
+          data-home-head=""
+        >
+          {showDrawer ? (
+            <FilterDrawer
+              value={filters.filterValue}
+              onChange={filters.setFilterValue}
+              activeRepo={filters.activeRepo}
+              onRepoChange={filters.setActiveRepo}
+              stateFilter={filters.stateFilter}
+              onStateChange={filters.setStateFilter}
+              stateOptions={filters.stateOptions}
+              stateLabel={laneLabel}
+              typeFilter={filters.typeFilter}
+              onTypeChange={filters.setTypeFilter}
+              linkFilter={filters.linkFilter}
+              onLinkChange={filters.setLinkFilter}
+              sections={sections}
+            />
+          ) : null}
+          {archiveLoading ? null : banner}
+        </div>
       ) : null}
       {archiveLoading ? (
         <div className={styles.pageSpinner}>
@@ -292,11 +287,9 @@ export function AdoHome() {
         </div>
       ) : (
         <>
-          {banner}
           {showStrip ? (
-            <div className={styles.viewBar}>
+            <TabRows>
               <TabList
-                className={styles.tabs}
                 size="small"
                 aria-label="Home"
                 selectedValue={tabId}
@@ -311,7 +304,7 @@ export function AdoHome() {
                   </Tab>
                 ))}
               </TabList>
-            </div>
+            </TabRows>
           ) : null}
           {/* ONE view at a time. The owner's rule: "you toggle views, ADO or sprint
               lanes -- seeing both [is] too much ... users have limited ability to
@@ -396,7 +389,39 @@ const EXPLAIN: Partial<Record<HomeTabId, string>> = {
   actions: "ADO actions: commands that belong to no one card.",
 };
 
-/** `/system` -- the shell's page of system cards, nothing else. */
+/** `/system` and `/system/agents` -- the shell's system cards under in-page
+ *  tabs, the same TabRows / TabList Home's strip uses. One tab, no strip. */
 export function AdoSystem() {
-  return <ModuleCardGrid kind="system" />;
+  const tabs = useSystemTabs();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tab = systemTabFor(location.pathname, tabs);
+  // An address for a tab this System page does not have goes to the first.
+  if (!tab && tabs.length > 0 && location.pathname !== "/system") {
+    return <Navigate to="/system" replace />;
+  }
+  return (
+    <>
+      {tabs.length > 1 ? (
+        <TabRows>
+          <TabList
+            size="small"
+            aria-label="System"
+            selectedValue={tab?.id ?? tabs[0].id}
+            onTabSelect={(_e, d) => {
+              const next = tabs.find((t) => t.id === d.value);
+              if (next) navigate(next.path);
+            }}
+          >
+            {tabs.map((t) => (
+              <Tab key={t.id} value={t.id}>
+                {t.label}
+              </Tab>
+            ))}
+          </TabList>
+        </TabRows>
+      ) : null}
+      <ModuleCardGrid kind="system" />
+    </>
+  );
 }

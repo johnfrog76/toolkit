@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
 import { CounterBadge, makeStyles, mergeClasses, tokens } from "@fluentui/react-components";
 import { Enter, Space } from "@fluentui/keyboard-keys";
+import { chipToken } from "../shell/themeList";
+import type { ChipAppearance } from "../shell/themeList";
+
+// A selected chip's border, in the colour its appearance has in the theme in force.
+const border = (a: ChipAppearance) => {
+  const c = `var(--${chipToken(a)})`;
+  return { borderTopColor: c, borderRightColor: c, borderBottomColor: c, borderLeftColor: c };
+};
 
 const useStyles = makeStyles({
   root: {
@@ -23,31 +31,21 @@ const useStyles = makeStyles({
       backgroundColor: tokens.colorNeutralBackground1Hover,
     },
   },
-  pink: {
-    borderTopColor: tokens.colorPaletteBerryBorderActive,
-    borderRightColor: tokens.colorPaletteBerryBorderActive,
-    borderBottomColor: tokens.colorPaletteBerryBorderActive,
-    borderLeftColor: tokens.colorPaletteBerryBorderActive,
-  },
-  purple: {
-    borderTopColor: tokens.colorPaletteCornflowerBorderActive,
-    borderRightColor: tokens.colorPaletteCornflowerBorderActive,
-    borderBottomColor: tokens.colorPaletteCornflowerBorderActive,
-    borderLeftColor: tokens.colorPaletteCornflowerBorderActive,
-  },
-  orange: {
-    borderTopColor: tokens.colorPalettePeachBorderActive,
-    borderRightColor: tokens.colorPalettePeachBorderActive,
-    borderBottomColor: tokens.colorPalettePeachBorderActive,
-    borderLeftColor: tokens.colorPalettePeachBorderActive,
-  },
+  tabColorOne: border("tabColorOne"),
+  tabColorTwo: border("tabColorTwo"),
+  tabColorThree: border("tabColorThree"),
+  tabColorFour: border("tabColorFour"),
 });
 
-export type FilterBadgeAppearance = "pink" | "purple" | "orange";
+/** The named appearances (shell/themeList.ts CHIP_APPEARANCES): the name is the call site's,
+ *  the colour is the theme's. */
+export type FilterBadgeAppearance = ChipAppearance;
 
-interface FilterBadgeProps {
+export interface FilterBadgeProps {
   label: string;
-  count?: number;
+  /** Required, so a missing count is a compile error. A number is drawn, zero included;
+   *  `null` says "no count" on purpose, for a chip that is a tab and not a filter. */
+  count: number | null;
   active: boolean;
   onClick: () => void;
   appearance?: FilterBadgeAppearance;
@@ -63,7 +61,7 @@ export function FilterBadge({
   count,
   active,
   onClick,
-  appearance = "purple",
+  appearance = "tabColorOne",
   children,
   multi = false,
 }: FilterBadgeProps) {
@@ -87,8 +85,8 @@ export function FilterBadge({
     >
       {label}
       {children}
-      {count != null && (
-        <CounterBadge count={count} appearance="filled" color="informative" size="small" />
+      {count !== null && (
+        <CounterBadge count={count} showZero appearance="filled" color="informative" size="small" />
       )}
     </div>
   );

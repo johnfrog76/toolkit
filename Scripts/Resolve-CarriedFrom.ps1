@@ -113,10 +113,10 @@ function Get-P20CarriedFromCheck {
     param([string]$Path, [string[]]$Folders, [string[]]$Also = @())
     $names = @($Also)
     foreach ($dir in $Folders) {
-        if (-not (Test-Path $dir)) { continue }
-        foreach ($f in (Get-ChildItem -Path $dir -Filter '*.md' -File)) { $names += $f.Name }
+        if (-not (Test-Path -LiteralPath $dir)) { continue }
+        foreach ($f in (Get-ChildItem -LiteralPath $dir -Filter '*.md' -File)) { $names += $f.Name }
     }
-    $lines = @(Get-Content -Path $Path -Encoding UTF8)
+    $lines = @(Get-Content -LiteralPath $Path -Encoding UTF8)
     return (Resolve-P20CarriedFrom -SessionName (Split-Path $Path -Leaf) -Heading (Get-P20CarriedFromHeading $lines) -Names $names)
 }
 
@@ -141,8 +141,8 @@ function Get-P20NextSessionPath {
     $best = $null
     $bestDate = $null
     foreach ($dir in $Folders) {
-        if (-not (Test-Path $dir)) { continue }
-        foreach ($f in (Get-ChildItem -Path $dir -Filter '*.md' -File)) {
+        if (-not (Test-Path -LiteralPath $dir)) { continue }
+        foreach ($f in (Get-ChildItem -LiteralPath $dir -Filter '*.md' -File)) {
             $r = Get-P20SessionNameParts $f.Name
             if (-not $r -or $r.Series -ne $Series -or $r.Date -le $Date) { continue }
             if (-not $bestDate -or $r.Date -lt $bestDate) { $bestDate = $r.Date; $best = $f.FullName }

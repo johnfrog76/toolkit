@@ -10,6 +10,8 @@
         case, is not added twice; several arguments or one with commas
       - -Remove takes tags off, in any case; the last one off leaves the template's
         `Tags: (None)`
+      - a line Azure DevOps wrote with semicolons reads as separate tags, and the line
+        Tag rewrites comes back with commas
       - a call that changes no tag exits 0, says "nothing written", and writes nothing
       - a card with no Tags: line gets one under Priority:, else under ## Work Item Info;
         a CRLF card stays CRLF
@@ -158,6 +160,22 @@ try {
     $none = [System.IO.File]::ReadAllText($spike[0].FullName)
     Assert-True 'the last one off leaves the template''s placeholder' ($out -match 'LAST-EXIT=0' -and @(Get-TagLines $none)[0] -ceq "$tagsToken (None)" -and @(Get-P20CardTags $none).Count -eq 0) $none
     Assert-Equal 'which is the card it was born as' $original $none
+
+    Write-Host ""
+    Write-Host "-- An Azure DevOps line, with semicolons --------------" -ForegroundColor Cyan
+
+    # A card made from an Azure DevOps work item carries its tags as Azure DevOps
+    # writes them, `a; b`. Every reader splits either separator; Tag rewrites the
+    # line it changes with commas.
+    $semi = $original.Replace("$tagsToken (None)", "$tagsToken enhancement; sev3; size-s")
+    [System.IO.File]::WriteAllText($spike[0].FullName, $semi)
+    Assert-Equal 'the one reader reads a semicolon line as separate tags' 'enhancement|sev3|size-s' ((@(Get-P20CardTags $semi)) -join '|')
+    $out = Invoke-Verbs ("${prefix}Tag K7M2 sev3 -Remove; 'SEMI-EXIT=' + `$LASTEXITCODE")
+    $semiOut = [System.IO.File]::ReadAllText($spike[0].FullName)
+    Assert-True '-Remove finds one tag of a semicolon line, and the line comes back with commas' ($out -match 'SEMI-EXIT=0' -and $out -match 'K7M2 is no longer tagged sev3' -and @(Get-TagLines $semiOut)[0] -ceq "$tagsToken enhancement, size-s") $semiOut
+    $out = Invoke-Verbs ("${prefix}Tag K7M2 Enhancement; 'SEMI-SAME-EXIT=' + `$LASTEXITCODE")
+    Assert-True 'a tag the line already carries is not added twice' ($out -match 'SEMI-SAME-EXIT=0' -and $out -match 'already carries Enhancement -- nothing written') $out
+    [System.IO.File]::WriteAllText($spike[0].FullName, $original)
 
     Write-Host ""
     Write-Host "-- A card with no Tags: line gets one where it belongs " -ForegroundColor Cyan

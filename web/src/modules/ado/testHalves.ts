@@ -1,5 +1,6 @@
 import { TESTS } from "../../shell/consts";
 import type { HalfResult, TestHistoryResponse } from "./api.ado";
+import { formatCount, formatRatio } from "../../shared/formatCount";
 
 /**
  * What the Health card draws for a machine's three halves: one tile a
@@ -41,12 +42,12 @@ export function halfTiles(
       tiles.push({ half, label, count: "Skipped", tone: "skip", detail: rec.reason || "Skipped" });
       continue;
     }
-    const parts = [`${rec.passed} passed`, `${rec.failed} failed`];
-    if (rec.skipped > 0) parts.push(`${rec.skipped} skipped`);
+    const parts = [`${formatCount(rec.passed)} passed`, `${formatCount(rec.failed)} failed`];
+    if (rec.skipped > 0) parts.push(`${formatCount(rec.skipped)} skipped`);
     tiles.push({
       half,
       label,
-      count: `${rec.passed}/${rec.passed + rec.failed}`,
+      count: formatRatio(rec.passed, rec.passed + rec.failed),
       tone: rec.result === "pass" ? "pass" : "fail",
       detail: parts.join(", "),
     });

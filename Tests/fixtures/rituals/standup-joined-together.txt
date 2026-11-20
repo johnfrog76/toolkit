@@ -7,17 +7,18 @@ Waiting on you
 
 Fable
   Yesterday  nothing closed
-  Today      #142 Port the cast atoms
   Today      #145 Verify the clock fix
   Blockers   #146 Verify the Studio tab draws on the PC (verify-close)
 Opus
-  Yesterday  #143 Rename the slug
-  Today      #141 Build the foyer counts
+  Yesterday  nothing closed
   Today      #144 Seed the GitHub demo
   Blockers   no blockers
 Widgets
+  Yesterday  #143 Rename the slug
   Yesterday  198 Fix the export
   Yesterday  Q3R9 Photo import
+  Today      #141 Build the foyer counts
+  Today      #142 Port the cast atoms
   Today      K7M2 Wire the board
   Blockers   no blockers
 

@@ -1,27 +1,21 @@
 import { useState } from "react";
 import { useParams } from "react-router";
-import {
-  Badge,
-  Button,
-  Caption1,
-  Link,
-  Subtitle2,
-  makeStyles,
-  tokens,
-} from "@fluentui/react-components";
-import { CheckmarkRegular, CopyRegular, SparkleRegular } from "@fluentui/react-icons";
+import { Badge, Caption1, Link, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
+import { SparkleRegular } from "@fluentui/react-icons";
 import { BackButton } from "../../shared/BackButton";
+import { CardActions, ROW } from "../../shared/CardActions";
 import { copyText } from "../../shared/copyText";
 import { EmptyState } from "../../shared/EmptyState";
 import { FilePath } from "../../shared/FilePath";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { useGetPromptQuery } from "./api.studio";
+import { promptReference } from "./PromptsCard";
 import { groupLabel, senderLabel, workflowLabel } from "./prompts";
 
 // The reading room for ONE agentic prompt -- the house's reading page,
-// the frame a hub design is read in (DesignNotePage): PageCard, the back arrow
+// the frame a hub design is read in (DesignNotePage): PanelFrame, the back arrow
 // and the name on the left, compact controls on the right, the file's address,
 // and ONE MarkdownViewer. Read-only: a prompt is changed in its file.
 //
@@ -55,11 +49,11 @@ export function PromptPage() {
   const ref = params["*"] ?? "";
   const { data, isLoading, isFetching, error, refetch } = useGetPromptQuery(ref);
   const readable = !!data && !error;
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"prompt" | "reference" | null>(null);
   const copy = async () => {
     if (!data) return;
     await copyText(data.body);
-    setCopied(true);
+    setCopied("prompt");
   };
 
   const missing = error && "status" in error && error.status === 404;
@@ -82,7 +76,7 @@ export function PromptPage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         loading={isLoading}
         loadingLabel="Reading the prompt..."
         empty={empty}
@@ -100,7 +94,7 @@ export function PromptPage() {
                   >
                     {groupLabel(data.group)}
                   </Badge>
-                  <Badge appearance="outline" size="small" color="subtle">
+                  <Badge appearance="tint" size="small" color="subtle">
                     {data.category}
                   </Badge>
                   <Badge appearance="outline" size="small" color="informative">
@@ -138,14 +132,19 @@ export function PromptPage() {
         headerRight={
           readable ? (
             <>
-              <Button
-                size="small"
-                appearance="primary"
-                icon={copied ? <CheckmarkRegular /> : <CopyRegular />}
-                onClick={() => void copy()}
-              >
-                {copied ? "Copied" : "Copy prompt"}
-              </Button>
+              {copied ? <Caption1 className={styles.copied}>Copied the {copied}</Caption1> : null}
+              <CardActions
+                primaryAction={ROW.copy.action({ detail: "prompt", onClick: () => void copy() })}
+                menuLabel={`Actions for ${data.name}`}
+                secondaryActions={[
+                  ROW.copy.action({
+                    detail: "reference",
+                    onClick: () => {
+                      void copyText(promptReference(data)).then(() => setCopied("reference"));
+                    },
+                  }),
+                ]}
+              />
               <RefreshButton onClick={refetch} isFetching={isFetching} />
             </>
           ) : undefined
@@ -164,7 +163,7 @@ export function PromptPage() {
             />
           </>
         )}
-      </PageCard>
+      </PanelFrame>
     </div>
   );
 }

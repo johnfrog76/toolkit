@@ -57,7 +57,7 @@ if ($Help) {
 $pkgRoot   = Split-Path -Parent $PSScriptRoot
 $sourcePath = Join-Path $pkgRoot 'AGENTS.md'
 
-if (-not (Test-Path $sourcePath)) {
+if (-not (Test-Path -LiteralPath $sourcePath)) {
     Write-CliError -Message "AGENTS.md not found at $sourcePath" -Hint "The adapters are generated from it; restore it from git."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
@@ -164,7 +164,7 @@ foreach ($a in $adapters) {
         }
         $drift += "$($a.Name) ($($t.Where))"
         $dir = Split-Path $t.Path -Parent
-        if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+        if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
         Write-CardText -Path $t.Path -Content $rendered -New
         Write-Host "  [OK]   wrote $($a.Name) ($($t.Where))" -ForegroundColor Green
     }

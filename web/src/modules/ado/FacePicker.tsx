@@ -1,6 +1,6 @@
 import { Body1Strong, Caption2, Subtitle2, tokens } from "@fluentui/react-components";
 import { makeStyles, mergeClasses } from "@griffel/react";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { FACES } from "../../shared/faces";
 import { useFacePref } from "../../hooks/useFacePref";
 import { useWornTheme } from "../../hooks/useWornTheme";
@@ -124,7 +124,7 @@ export function FacePicker() {
   return (
     // No count badge: the card lives in the Lounge (spec D-L24), where no
     // numeral stands, and a count of faces was a number for its own sake.
-    <PageCard headerLeft={<Subtitle2>Face</Subtitle2>}>
+    <PanelFrame headerLeft={<Subtitle2>Face</Subtitle2>}>
       <Body1Strong className={styles.hint}>
         Your ToolKit&apos;s got moods. Pick the one that matches yours today!
       </Body1Strong>
@@ -139,6 +139,6 @@ export function FacePicker() {
           />
         ))}
       </div>
-    </PageCard>
+    </PanelFrame>
   );
 }

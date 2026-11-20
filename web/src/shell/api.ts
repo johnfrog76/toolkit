@@ -1,3 +1,4 @@
+import { AGENT } from "./consts";
 import type { WorkflowEntry } from "./settingsWorkflows";
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
@@ -156,6 +157,8 @@ export interface EnvStatus {
     promptsFolder: string;
     activeSpace: string;
     spaces: SpaceInfo[];
+    /** Slugs the avatar menu's switcher lists: `spaces` less a retired Space you are not in. Only the switcher reads it. */
+    switcherSpaces?: string[];
     /** {contract word: display name} for the active org's four lanes. Display only. */
     laneNames?: Record<string, string>;
     /** `isDemoDismissed`: `spaces` above already leaves the demo Spaces out; this says why. */
@@ -214,12 +217,14 @@ export interface SpaceVisibility {
 /** Where the agent's routes are mounted (agent/core/config.py API_PREFIX). The
  *  slice's base, and the one prefix a URL built outside it -- an image the
  *  reading room serves through /docs/asset -- starts with. */
-export const API_BASE = "/api";
+export const API_BASE = AGENT.apiPrefix;
 
 export const api = createApi({
   reducerPath: "api",
   baseQuery: fetchBaseQuery({ baseUrl: API_BASE, timeout: 120_000 }),
-  tagTypes: ["Env", "Surfaces"],
+  // "Standup" is Team Agile's read, named here because a configuration write (the ado
+  // module's) must be able to invalidate it: the room is sized by a setting.
+  tagTypes: ["Env", "Surfaces", "Standup"],
   endpoints: (builder) => ({
     // GET /api/env
     getEnv: builder.query<EnvStatus, void>({

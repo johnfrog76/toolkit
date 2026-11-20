@@ -21,6 +21,8 @@ import re
 import subprocess
 import threading
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC
 
 from fastapi import APIRouter, HTTPException
@@ -32,6 +34,7 @@ from ..core.clock import local_stamp
 from ..core.config import (
     ACTIVE_LEDGER_KEY,
     ISSUE_LIMIT_ALL,
+    ISSUE_LIMIT_LABELS,
     ISSUE_LIMIT_OPEN,
     REPO_ROOT,
     hub_root,
@@ -41,6 +44,7 @@ from ..core.config import (
     tracker_repos,
 )
 from ..core.consts import (
+    gh_repo_missing_markers,
     rituals_worker_label_prefix,
     visibility_private,
     visibility_public,
@@ -309,19 +313,71 @@ WORKER_LABEL_PREFIX = rituals_worker_label_prefix()
 REPO_UNREADABLE = (
     "gh cannot read this repository -- it does not exist yet, or it is private to an account this gh login is not"
 )
-_REPO_MISSING_MARKERS = ("could not resolve to a repository", "not found (http 404)", "http 404")
+# The words are the contract's (consts.json ghReads.repoMissing): the ritual
+# reads, in both halves, find the same refusal by them.
+_REPO_MISSING_MARKERS = gh_repo_missing_markers()
+
+
+def repo_missing(why: str) -> bool:
+    """Whether gh's line says the repository is not there for this login."""
+    return any(m in (why or "").lower() for m in _REPO_MISSING_MARKERS)
 
 
 def gh_repo_reason(repo: str, why: str) -> str:
     """A failed gh read of ``repo``, as the sentence a card shows."""
     text = (why or "").strip() or "gh returned an error"
-    if any(m in text.lower() for m in _REPO_MISSING_MARKERS):
+    if repo_missing(text):
         text = REPO_UNREADABLE
     return f"{repo}: {text}"
 
 
-def _gh_issues(repo: str, all_items: bool, state: str = "open", body: bool = False) -> tuple[list[dict], str | None]:
-    # A closed history is longer than an open backlog, so the opt-in reads further.
+@dataclass(frozen=True)
+class GhFailure:
+    """One failed gh list read of ``repo``: ``kind`` is ``missing`` (no gh to
+    run), ``raised`` (it timed out, or its output could not be read -- ``exc``),
+    ``exit`` (it refused -- ``line``, its first stderr line, may be empty) or
+    ``json`` (it answered something that is not JSON)."""
+
+    repo: str
+    kind: str
+    line: str = ""
+    exc: BaseException | None = None
+
+
+GhSay = Callable[[GhFailure], str]
+
+
+def _say_card(f: GhFailure) -> str:
+    """The sentence a card shows for a failed gh list read."""
+    if f.kind in ("missing", "raised"):
+        return f"{f.repo}: {did_not_answer('gh', f.exc or RuntimeError())}"
+    if f.kind == "exit":
+        return gh_repo_reason(f.repo, f.line)
+    return f"{f.repo}: gh answered with something that is not JSON"
+
+
+def _gh_rows(cmd: list[str], repo: str, say: GhSay | None) -> tuple[list[dict], str | None]:
+    """One gh list read: (rows, None), or ([], the sentence ``say`` gives the
+    failure -- a card's by default)."""
+    say = say or _say_card
+    try:
+        result = run_read(cmd, 30)
+    except FileNotFoundError as exc:
+        return [], say(GhFailure(repo, "missing", exc=exc))
+    except Exception as exc:  # noqa: BLE001 -- the clock ran out, or its output unreadable: a reason, never a raise
+        return [], say(GhFailure(repo, "raised", exc=exc))
+    if result.returncode != 0:
+        why = (result.stderr or "").strip().splitlines()
+        return [], say(GhFailure(repo, "exit", line=why[0].strip() if why else ""))
+    try:
+        return json.loads(result.stdout or "[]"), None
+    except ValueError:
+        return [], say(GhFailure(repo, "json"))
+
+
+def _gh_issues(
+    repo: str, all_items: bool, state: str = "open", body: bool = False, say: GhSay | None = None
+) -> tuple[list[dict], str | None]:
     limit = str(ISSUE_LIMIT_OPEN if state == "open" else ISSUE_LIMIT_ALL)
     fields = "number,title,state,labels,assignees,milestone,updatedAt,closedAt,url,isPinned"
     # The standup's work grain reads the design card an issue's body names; its
@@ -331,38 +387,19 @@ def _gh_issues(repo: str, all_items: bool, state: str = "open", body: bool = Fal
     cmd = ["gh", "issue", "list", "--repo", repo, "--state", state, "--limit", limit, "--json", fields]
     if not all_items:
         cmd += ["--assignee", "@me"]
-    try:
-        result = run_read(cmd, 30)
-    except Exception as exc:  # noqa: BLE001 -- gh missing, the clock ran out, or its output unreadable: a reason, never a raise
-        return [], f"{repo}: {did_not_answer('gh', exc)}"
-    if result.returncode != 0:
-        why = (result.stderr or "").strip().splitlines()
-        return [], gh_repo_reason(repo, why[0] if why else "")
-    try:
-        return json.loads(result.stdout or "[]"), None
-    except ValueError:
-        return [], f"{repo}: gh answered with something that is not JSON"
+    return _gh_rows(cmd, repo, say)
 
 
-def _gh_labels(repo: str) -> tuple[list[dict], str | None]:
+def _gh_labels(repo: str, say: GhSay | None = None) -> tuple[list[dict], str | None]:
     """``gh label list`` -- name and description, the data the worker rule reads.
 
     The standup (agent/solitaire/standup.py) finds its workers here: a label
     whose description starts with WORKER_LABEL_PREFIX. Same timeout, same
-    failure sentences as ``_gh_issues``.
+    failure sentences as ``_gh_issues``; ``say`` words a failure otherwise
+    (the rituals' Tracker line, ``agent/solitaire/tracker.py``).
     """
-    cmd = ["gh", "label", "list", "--repo", repo, "--limit", "200", "--json", "name,description"]
-    try:
-        result = run_read(cmd, 30)
-    except Exception as exc:  # noqa: BLE001 -- gh missing, the clock ran out, or its output unreadable: a reason, never a raise
-        return [], f"{repo}: {did_not_answer('gh', exc)}"
-    if result.returncode != 0:
-        why = (result.stderr or "").strip().splitlines()
-        return [], gh_repo_reason(repo, why[0] if why else "")
-    try:
-        return json.loads(result.stdout or "[]"), None
-    except ValueError:
-        return [], f"{repo}: gh answered with something that is not JSON"
+    cmd = ["gh", "label", "list", "--repo", repo, "--limit", str(ISSUE_LIMIT_LABELS), "--json", "name,description"]
+    return _gh_rows(cmd, repo, say)
 
 
 def _worker_of(labels: list[dict]) -> str:
@@ -561,10 +598,8 @@ def github_milestone_rows(repo: str) -> tuple[list[Milestone], str | None]:
     """One repo's milestones, every state, in ONE ``gh api`` call: (rows, None),
     or ([], the reason). The one reader both ``GET /api/milestones`` and Team
     Agile's ``GET /api/ritual/milestones`` (agent/solitaire/milestones.py) use."""
-    # Query parameters go as flags, never in the URL: on Windows the call runs
-    # through cmd.exe (shell=True, for az.cmd), and an unquoted `&` splits the
-    # command -- "'per_page' is not recognized as an internal or external
-    # command". _gh_json refuses such an argument before it runs.
+    # Query parameters go as flags, never in the URL. _gh_json refuses such an
+    # argument before it runs.
     rows, why = _gh_json(
         ["gh", "api", "--method", "GET", f"repos/{repo}/milestones", "-f", "state=all", "-F", "per_page=100"]
     )
@@ -658,9 +693,8 @@ CMD_METACHARS = "&|<>"
 
 
 def unsafe_for_shell(cmd: list[str]) -> str | None:
-    """The first argument cmd.exe would split, or None. The gh calls run
-    through a shell on Windows (az.cmd needs it), so a `&` in a URL is a
-    second command there. Query parameters travel as -f/-F flags."""
+    """The first argument that puts a query in a URL, or None. Query parameters
+    travel as -f/-F flags, on every host."""
     for arg in cmd:
         if any(ch in arg for ch in CMD_METACHARS):
             return arg
@@ -672,7 +706,7 @@ def _gh_json(cmd: list[str], timeout: int = 30):
     failure sentences every gh read in this file speaks."""
     bad = unsafe_for_shell(cmd)
     if bad is not None:
-        return None, f"refused before running: argument {bad!r} would be split by cmd.exe on Windows"
+        return None, f"refused before running: argument {bad!r} belongs in a -f field, not the URL"
     try:
         result = run_read(cmd, timeout)
     except Exception as exc:  # noqa: BLE001 -- gh missing, the clock ran out, or its output unreadable: a reason, never a raise

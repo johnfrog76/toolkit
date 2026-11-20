@@ -82,7 +82,9 @@ beforeEach(() => {
   })) as unknown as typeof window.matchMedia;
 });
 
-const dialog = () => screen.findByRole("dialog", { hidden: true });
+const dialog = () => screen.findByRole("dialog");
+// "No dialog" and the count below pass `hidden: true`: none, or one, in the tree
+// at all, not merely among those a screen reader can see.
 const none = async () => {
   await act(async () => {
     await new Promise((r) => setTimeout(r, 0));
@@ -91,7 +93,7 @@ const none = async () => {
 };
 async function closeByButton() {
   const d = await dialog();
-  const bs = await within(d).findAllByRole("button", { name: "Close", hidden: true });
+  const bs = await within(d).findAllByRole("button", { name: "Close" });
   fireEvent.click(bs.find((b) => b.textContent === "Close")!);
 }
 async function closeByEscape() {

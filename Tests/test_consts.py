@@ -47,6 +47,8 @@ EXPECTED = {
     # A card's two planning lines, each its own: Plan -Milestone and Plan -Sprint write them.
     ("stamps", "milestone"): "**Milestone:**",
     ("stamps", "sprint"): "**Sprint:**",
+    # Who did the work on a card an agent worked: its model id, beside the Assigned line.
+    ("stamps", "agent"): "**Agent:**",
     ("stamps", "started"): "**Started:**",
     ("stamps", "outcome"): "**Outcome:**",
     ("stamps", "review"): "**Review:**",
@@ -75,15 +77,29 @@ EXPECTED = {
     ("folders", "backlog"): "backlog",
     ("reviews", "fileName"): "review.md",
     ("reviews", "slugSetSeparator"): "+",
-    ("features", "spaceScoped"): ["sprintAwareness", "trainingHoursPerQuarter", "suggestions"],
+    ("features", "spaceScoped"): ["sprintAwareness", "trainingHoursPerQuarter", "suggestions", "teamSize"],
     ("env", "activeSpace"): "P20_ACTIVE_SPACE",
     ("env", "promptsRoot"): "PROMPTS_ROOT",
     ("env", "agentCacheDir"): "P20_AGENT_CACHE_DIR",
+    ("env", "testHistoryDir"): "P20_TEST_HISTORY_DIR",
     ("env", "features"): "P20_FEATURES",
     ("env", "agentPort"): "P20_AGENT_PORT",
     ("env", "teamsWebhookPrefix"): "TEAMS_WEBHOOK_",
     ("env", "testRunMarker"): "P20_TEST_RUN",
+    ("env", "standupAsOf"): "P20_STANDUP_AS_OF",
     ("agent", "bindHost"): "127.0.0.1",
+    ("agent", "apiPrefix"): "/api",
+    ("agent", "responseHeaders"): {
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; frame-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'",  # noqa: E501
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+    },
+    ("agent", "framablePrefix"): "/lounge/",
+    ("agent", "framableHeaders"): {
+        "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'",  # noqa: E501
+        "X-Frame-Options": "SAMEORIGIN",
+    },
     ("stamps", "sent"): "Sent to",
     ("stamps", "due"): "**Due:**",
     ("stamps", "source"): "**Source:**",
@@ -96,11 +112,47 @@ EXPECTED = {
     ("assets", "coverExtensions"): ["png", "jpg", "jpeg", "webp", "gif"],
     ("assets", "coverMaxBytes"): 5242880,
     ("regex", "dueLine"): r"(?m)^\*\*Due:\*\*[ \t]*(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?",
+    # A card's Tags: line splits on a comma or an Azure DevOps semicolon.
+    ("regex", "tagSeparator"): "[,;]",
+    # The shapes of an Azure DevOps git remote and of its address (the checkout resolver, both halves).
+    (
+        "regex",
+        "adoOriginHttps",
+    ): r"^https://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)/([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$",
+    (
+        "regex",
+        "adoOriginVisualStudio",
+    ): r"^https://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com/(?:DefaultCollection/)?([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$",
+    (
+        "regex",
+        "adoOriginSsh",
+    ): r"^(?:ssh://(?:[^/@\s]+@)?(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com)(?::\d+)?/|(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):)v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
+    ("regex", "adoOrgDev"): r"^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)",
+    ("regex", "adoOrgVisualStudio"): r"^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)",
+    # A commit's Co-Authored-By trailer, the key in any case: group 1 the name (commit_co_authors).
+    ("regex", "coAuthorTrailer"): r"(?mi)^[ \t]*Co-Authored-By:[ \t]*([^<\r\n]*?)[ \t]*<[^>\r\n]*>",
     ("reminders", "buckets"): ["overdue", "today", "upcoming"],
     ("reminders", "snooze"): ["1h", "tomorrow", "nextweek"],
+    # A Teams recipient's type: the engine posts the first list and skips the second.
+    ("communication", "webhookRecipientTypes"): ["channel", "chat"],
+    ("communication", "deferredRecipientTypes"): ["person"],
     # The three halves a test run covers: Test writes them, log.py serves them.
     ("tests", "halves"): ["agent", "cli", "web"],
     ("tests", "legacyHalf"): "cli",
+    # Where a machine keeps its test history (Tests/fixtures/test-history/paths.json).
+    ("tests", "summaryFile"): "test-summary.{machine}.json",
+    ("tests", "resultsFile"): "test-results.{machine}.log",
+    ("tests", "historyBase"): {"windows": "LOCALAPPDATA", "linux": "XDG_STATE_HOME"},
+    ("tests", "historyFallback"): {
+        "windows": "AppData/Local",
+        "macos": "Library/Application Support",
+        "linux": ".local/state",
+    },
+    ("tests", "historyPath"): {
+        "windows": "ToolKit/TestHistory",
+        "macos": "ToolKit/TestHistory",
+        "linux": "toolkit/test-history",
+    },
     ("visibility", "public"): "public",
     ("visibility", "private"): "private",
     ("visibility", "unknown"): "unknown",
@@ -125,10 +177,11 @@ EXPECTED = {
         "design",
         "cardLineRegex",
     ): r"(?m)^>[ \t]*(Design|Spec):[ \t]*(?:\[([^\]\r\n]*)\]\(([^)\r\n]*)\))?[ \t]*([^\r\n]*?)[ \t]*\r?$",
-    ("studio", "threadRegex"): r"(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/(\d+))\s*$",
+    ("studio", "threadRegex"): r"(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/([0-9]{1,9}))\s*$",
     ("rituals", "route"): "/api/ritual/standup",
     ("rituals", "triageRoute"): "/api/ritual/triage",
     ("rituals", "milestonesRoute"): "/api/ritual/milestones",
+    ("rituals", "orgRoute"): "/api/ritual/org",
     ("rituals", "assignMe"): "me",
     ("rituals", "ceremoniesFile"): "Config/ceremonies.json",
     ("rituals", "vocabularyFile"): "Config/standup-vocabulary.json",
@@ -159,7 +212,10 @@ EXPECTED = {
         "twelve",
     ],
     ("rituals", "workHeadRegex"): r"^(?:[A-Za-z]+:\s+)?(.+?)(?:\s+--\s+|:\s+|$)",
-    ("rituals", "workThreadRegex"): r"(?m)^>\s*GitHub:\s*<?(?:https://github\.com/[^/\s>]+/[^/\s>]+/issues/|#)(\d+)",
+    (
+        "rituals",
+        "workThreadRegex",
+    ): r"(?m)^>\s*GitHub:\s*<?(?:https://github\.com/[^/\s>]+/[^/\s>]+/issues/|#)([0-9]{1,9})(?![0-9])",
     ("rituals", "workDesignRegex"): r"design/([A-Za-z0-9][A-Za-z0-9_-]*)\.md",
     ("rituals", "workSmallWordRegex"): r"^[a-z]{1,3}$",
     # The also-ons fold (D-SA9): the most groups a folded sentence names.
@@ -187,6 +243,27 @@ EXPECTED = {
     ("rituals", "suggestShapes"): ["start", "delegate", "route", "place"],
     ("rituals", "suggestOwnerSeat"): "fable",
     ("rituals", "cornerShapes"): ["oneLeft", "manyLeft", "reached", "nothingInReach"],
+    # The standup room's sizes, the chair included, and what unset reads as.
+    ("rituals", "teamSizes"): [3, 6, 9],
+    ("rituals", "teamSizeDefault"): 9,
+    # The standup's room: the nine windows in grid order (a cast id and its plate),
+    # the chair's, the windows three labels keep, and the engineer's.
+    ("rituals", "room"): {
+        "windows": [
+            {"id": "dev-hero", "plate": "DEV-HERO"},
+            {"id": "ops-dev", "plate": "OPS-DEV"},
+            {"id": "minimalist", "plate": "MINIMALIST"},
+            {"id": "new-hire", "plate": "NEW HIRE"},
+            {"id": "vibemancer", "plate": "AI VIBEMANCER"},
+            {"id": "ultrawide", "plate": "ULTRAWIDE OVERLORD"},
+            {"id": "qa", "plate": "QA ALCHEMIST"},
+            {"id": "pm", "plate": "PM (TREADMILL)"},
+            {"id": "designer", "plate": "DESIGNER"},
+        ],
+        "chair": "pm",
+        "kept": {"fable": "dev-hero", "opus": "vibemancer", "sonnet": "minimalist"},
+        "engineer": "dev-hero",
+    },
     ("rituals", "suggestExclusions"): ["notBillable", "waiting", "inFlight", "theirs", "dismissed"],
     ("rituals", "text"): {
         "title": "Standup -- {date}",
@@ -198,7 +275,7 @@ EXPECTED = {
         "yesterday": "Yesterday",
         "today": "Today",
         "blockers": "Blockers",
-        "mug": "Mug",
+        "mug": "Status",
         "yesterdayEmpty": "nothing closed",
         "todayEmpty": "nothing in flight",
         "blockersEmpty": "no blockers",
@@ -206,6 +283,19 @@ EXPECTED = {
         "noWorkers": "No worker labels in this Space.",
         "adoTracker": "Azure DevOps is the human team's board, and its standup is the one the team holds; "
         "Team Agile reads a GitHub Space's issues and cards, or a local Space's cards.",
+        "trackerNotGitHub": "This Space's tracker is not GitHub -- {ritual} reads a GitHub Space's issues.",
+        "trackerNotAsked": "This Space is {status}, so its tracker is not asked.",
+        "trackerTier": "The tracker is not reachable from here (tier {tier}).",
+        "trackerNoRepo": "This GitHub Space names no repository -- "
+        "give its address a repository, or add one to its projects.",
+        "trackerManyRepos": "Issue numbers are per-repository, and this board has {n}: {repos}.",
+        "trackerGhMissing": "gh is not installed, so the tracker was not asked.",
+        "trackerGhNoAnswer": "gh did not answer for {repo}: {error}",
+        "trackerGhSilent": "gh did not answer for {repo}",
+        "trackerRepoUnreadable": "gh cannot read {repo} -- "
+        "it does not exist yet, or it is private to an account this gh login is not",
+        "trackerNotJson": "gh answered for {repo} with something that is not JSON",
+        "trackerReadFailed": "The tracker read failed: {error}",
         "check": "Check",
         "checkCardArchived": "{item} -- the card is archived, but the issue is still open.",
         "checkIssueClosed": "{item} -- the issue is closed, but the card is not archived.",
@@ -241,6 +331,7 @@ EXPECTED = {
         "suggestNounCard": "card",
         "suggestNounIssue": "issue",
         "suggestCommandStart": "StartWork {arg}",
+        "suggestCommandLaunch": "StartWork {arg} -Launch",
         "suggestCommandRoute": "Route {arg} -Assign <me|size>",
         "suggestCommandPlace": "Route {arg} -Milestone <title>",
         "suggestCommandPlaceCard": "Plan {arg} -Milestone <title>",
@@ -267,7 +358,25 @@ EXPECTED = {
         "proseTodayAlso": "I'm also on",
         "proseBlockers": "Blocked on",
         "proseBlockersAlso": "Also blocked on",
-        "proseBlockersNone": "Nothing blocked.",
+        "proseBlockersNone": "No blockers.",
+        "proseYesterdayNone": "Yesterday I picked up where I left off.",
+        "proseYesterdayWorked": "Yesterday I worked on {refs}.",
+        "proseYesterdayWorkedMany": "Yesterday I worked on {n} items.",
+        "proseTodayNone": "Today I'll pick up the next item from the board.",
+        "turnOpen": "Good morning.",
+        "turnClose": "That's it for me.",
+        "chairYesterday": "Yesterday I walked {refs}.",
+        "chairYesterdayMany": "Yesterday I did {n} walks.",
+        "chairToday": "Today I'll {body}.",
+        "chairTodayNone": "Today I'll keep the board moving.",
+        "chairWalk": "walk {refs}",
+        "chairWalkMany": "do {n} walks",
+        "chairDecide": "decide {refs}",
+        "chairDecideMany": "make {n} decisions",
+        "chairLook": "look at {refs}",
+        "chairLookMany": "look at {n} items",
+        "chairClauseSeparator": ", ",
+        "chairClauseLast": ", and ",
         "proseWalk": "Waiting on you to walk",
         "proseWalkAlso": "Also to walk",
         "proseDecide": "Waiting on you to decide",
@@ -294,6 +403,7 @@ EXPECTED = {
         "countsClosed": "{n} closed",
         "countsStarted": "{n} started",
         "countsInProgress": "{n} in progress",
+        "countsUndated": "({n} undated)",
     },
     # StartWork's hand-off block (D-AR5): the CLI types these four, the web's copy
     # box finds the block's title by the first; Tests/fixtures/start-work/ holds
@@ -305,9 +415,34 @@ EXPECTED = {
     ("startWork", "howWeWorkNote"): "agentic/how-we-work.md",
     # The line HowWeWork prints for a repository's AGENTS.md; the web finds it by this shape.
     ("startWork", "howWeWorkLine"): "How we work here: {path}",
+    # The gh read limits both halves share (Standup/Triage and their routes).
+    ("ghReads", "openIssues"): 500,
+    ("ghReads", "allIssues"): 500,
+    ("ghReads", "labels"): 500,
+    ("ghReads", "repoMissing"): ["could not resolve to a repository", "not found (http 404)", "http 404"],
     # Claude Code usage: /env's flag (the inventory row's key) and the burn route.
     ("usage", "envFlag"): "claudeUsage",
     ("usage", "burnRoute"): "/api/usage/burn",
+    # The statuses a reply may set, per tracker.
+    ("replyStatuses", "ado"): ["fixed", "active", "pending", "byDesign", "wontFix", "closed"],
+    ("replyStatuses", "github"): ["fixed", "closed", "active"],
+    # The typed plan readings' subfolder of usage/: the CLI writes it, the agent fingerprints it.
+    ("usage", "readingsFolder"): "readings",
+    # The words a cost line puts before the models it leaves out: the CLI and the web read them.
+    ("usage", "unpricedPhrase"): "not counting",
+    # The org chart's hub file: the agent reads it through org_file().
+    ("org", "file"): "org.json",
+    # The model map a card's Agent id is looked up in: the agent reads it through models_file().
+    ("models", "file"): "Config/models.json",
+    # The order a card's agent is worked out in: the agent reads it through model_agent_sources().
+    ("models", "agentSources"): ["line", "assigned", "trailer", "none"],
+    # Daily's window: the billing script, the CLI's Daily and GET /api/billing refuse
+    # a window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
+    ("billing", "text"): {
+        "halfWindow": "-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.",
+        "notADay": "{name} '{value}' is not a day: yyyy-MM-dd.",
+        "backwards": "-Since {since} is after -Until {until}.",
+    },
     ("startWork", "text"): {
         "head": "# Start work: {kind} {id} -- {title}",
         "howWeWork": "## How we work in {space} ({source})",
@@ -327,9 +462,11 @@ class TheFileParses(unittest.TestCase):
             "regex",
             "status",
             "folders",
+            "ghReads",
             "reviews",
             "features",
             "reminders",
+            "communication",
             "env",
             "docs",
             "visibility",
@@ -338,8 +475,11 @@ class TheFileParses(unittest.TestCase):
             "design",
             "rituals",
             "startWork",
+            "billing",
             "assets",
             "tests",
+            "org",
+            "models",
             "agent",
         ):
             self.assertIn(group, raw)
@@ -360,7 +500,7 @@ class TheFileParses(unittest.TestCase):
 # The product's version, typed once in consts.json. The module manifest and the
 # web package carry their own literal, so each is held to it here by name.
 # MUST match Tests/Test-Consts.ps1's and web/src/shell/consts.test.ts's.
-EXPECTED_VERSION = "1.5.0"
+EXPECTED_VERSION = "1.6.0"
 
 
 class OneVersion(unittest.TestCase):
@@ -462,6 +602,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_route(), EXPECTED[("rituals", "route")])
         self.assertEqual(C.rituals_triage_route(), EXPECTED[("rituals", "triageRoute")])
         self.assertEqual(C.rituals_milestones_route(), EXPECTED[("rituals", "milestonesRoute")])
+        self.assertEqual(C.rituals_org_route(), EXPECTED[("rituals", "orgRoute")])
         self.assertEqual(C.rituals_ceremonies_file(), EXPECTED[("rituals", "ceremoniesFile")])
         self.assertEqual(C.rituals_vocabulary_file(), EXPECTED[("rituals", "vocabularyFile")])
         self.assertEqual(C.rituals_worker_label_prefix(), EXPECTED[("rituals", "workerLabelPrefix")])
@@ -485,10 +626,30 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_suggest_exclusions(), tuple(EXPECTED[("rituals", "suggestExclusions")]))
         self.assertEqual(C.rituals_suggest_owner_seat(), EXPECTED[("rituals", "suggestOwnerSeat")])
         self.assertEqual(C.rituals_corner_shapes(), tuple(EXPECTED[("rituals", "cornerShapes")]))
+        self.assertEqual(C.rituals_team_sizes(), tuple(EXPECTED[("rituals", "teamSizes")]))
+        self.assertEqual(C.rituals_team_size_default(), EXPECTED[("rituals", "teamSizeDefault")])
+        self.assertEqual(C.rituals_room(), EXPECTED[("rituals", "room")])
         self.assertEqual(C.startwork_launch_env_flag(), EXPECTED[("startWork", "launchEnvFlag")])
         self.assertEqual(C.startwork_how_we_work_note(), EXPECTED[("startWork", "howWeWorkNote")])
+        self.assertEqual(C.gh_read_limit_open_issues(), EXPECTED[("ghReads", "openIssues")])
+        self.assertEqual(C.gh_read_limit_all_issues(), EXPECTED[("ghReads", "allIssues")])
+        self.assertEqual(C.gh_read_limit_labels(), EXPECTED[("ghReads", "labels")])
+        self.assertEqual(list(C.gh_repo_missing_markers()), EXPECTED[("ghReads", "repoMissing")])
         self.assertEqual(C.usage_env_flag(), EXPECTED[("usage", "envFlag")])
         self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
+        self.assertEqual(C.usage_readings_folder(), EXPECTED[("usage", "readingsFolder")])
+        self.assertEqual(C.org_file(), EXPECTED[("org", "file")])
+        self.assertEqual(C.models_file(), EXPECTED[("models", "file")])
+        self.assertEqual(C.model_agent_sources(), tuple(EXPECTED[("models", "agentSources")]))
+        self.assertEqual(C.re_co_author_trailer().pattern, EXPECTED[("regex", "coAuthorTrailer")])
+        trailer = "Fix\n\nCo-Authored-By: Claude Opus 5.5 <a@b>\r\nco-authored-by:  A Person  <p@q>\n"
+        trailer += "Co-Authored-By: no email"
+        names = [n.strip() for n in C.re_co_author_trailer().findall(trailer)]
+        self.assertEqual(names, ["Claude Opus 5.5", "A Person"])
+        self.assertEqual(C.stamp_agent(), EXPECTED[("stamps", "agent")])
+        self.assertEqual(C.billing_text(), EXPECTED[("billing", "text")])
+        self.assertEqual(C.webhook_recipient_types(), tuple(EXPECTED[("communication", "webhookRecipientTypes")]))
+        self.assertEqual(C.deferred_recipient_types(), tuple(EXPECTED[("communication", "deferredRecipientTypes")]))
 
     def test_the_worker_rule_reads_the_contract(self):
         """The pane's worker chips and the standup read one prefix, not two."""
@@ -547,6 +708,7 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("reviews.fileName", "review.md"),
         ("env.agentPort", "P20_AGENT_PORT"),
         ("env.testRunMarker", "P20_TEST_RUN"),
+        ("env.standupAsOf", "P20_STANDUP_AS_OF"),
         ("env.activeSpace", "P20_ACTIVE_SPACE"),
         ("env.features", "P20_FEATURES"),
         ("stamps.due", "**Due:**"),
@@ -555,6 +717,7 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("stamps.outcome", "**Outcome:**"),
         ("stamps.from", "**From:**"),
         ("stamps.milestone", "**Milestone:**"),
+        ("stamps.agent", "**Agent:**"),
         ("studio.threadLine", "GitHub:\\s*(https"),
         ("rituals.workerLabelPrefix", "Routed to"),
         ("rituals.text.queueHeading", "Waiting on you"),
@@ -567,7 +730,15 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("studio.promptsRoute", "/api/studio/prompts"),
         ("studio.ledgerRoute", "/api/studio/ledger"),
         ("rituals.text.workBlockers", "{n} to walk"),
-        ("rituals.text.proseBlockersNone", "Nothing blocked."),
+        ("rituals.text.proseBlockersNone", "No blockers."),
+        # A slot with nothing beside one with something: standup.py reads the lines from rituals.text.
+        ("rituals.text.proseYesterdayNone", "Yesterday I picked up where I left off."),
+        ("rituals.text.proseTodayNone", "Today I'll pick up the next item from the board."),
+        # The turn's frame: standup.py reads it from rituals.text.
+        ("rituals.text.turnOpen", "Good morning."),
+        ("rituals.text.turnClose", "That's it for me."),
+        # The chair's own turn: standup.py reads it from rituals.text.
+        ("rituals.text.chairTodayNone", "Today I'll keep the board moving."),
         ("rituals.text.proseYesterday", "Yesterday I closed"),
         ("visibility.publicLine", "This repository is public"),
         # The /env field for StartWork's launch: served through startwork_launch_env_flag().
@@ -576,7 +747,27 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("startWork.howWeWorkNote", "agentic/how-we-work.md"),
         # Claude Code usage: served through usage_env_flag() and usage_burn_route().
         ("usage.envFlag", "claudeUsage"),
+        # The org chart's file name: served through org_file(), never typed.
+        ("org.file", "org.json"),
+        # The model map's path: served through models_file(), never typed.
+        ("models.file", "Config/models.json"),
+        # The trailer's key: read through re_co_author_trailer(), never typed into a pattern.
+        ("regex.coAuthorTrailer", "Authored-By:"),
+        # The gh read limits: served through gh_read_limit_*(), never typed as a --limit.
+        ("ghReads.labels", '"--limit", "200"'),
+        ("ghReads.openIssues", '"--limit", "100"'),
+        ("ghReads.allIssues", '"--limit", "300"'),
         ("usage.burnRoute", "/api/usage/burn"),
+        ("usage.unpricedPhrase", "not counting"),
+        # Daily's window sentences: the route reads them through billing_text().
+        ("billing.text.halfWindow", "-Since and -Until go together"),
+        ("billing.text.notADay", "is not a day: yyyy-MM-dd"),
+        # The Tracker line's sentences: agent/solitaire/tracker.py reads them through rituals_text().
+        ("rituals.text.trackerTier", "The tracker is not reachable from here"),
+        ("rituals.text.trackerNotGitHub", "reads a GitHub Space's issues"),
+        ("rituals.text.trackerReadFailed", "The tracker read failed"),
+        # A repository gh cannot read: accounting.py reads the words through gh_repo_missing_markers().
+        ("ghReads.repoMissing", "could not resolve to a repository"),
     ]
 
     # The allowlist, and why each entry is on it:
@@ -602,6 +793,47 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
                     if value in line and re.search(r"[=(\[]|\bin\b|re\.", line):
                         offenders.append(f"{rel}:{i}  ({key})  {code[:80]}")
         self.assertEqual(offenders, [], "\n".join(offenders))
+
+
+class TheDockerPageCarriesTheAgentsHeaders(unittest.TestCase):
+    """The agent adds consts.json's headers itself; nginx repeats them for the
+    page the Docker image serves, in a template that cannot read the file."""
+
+    def test_the_nginx_template_states_each_one_word_for_word(self):
+        template = (PKG_ROOT / "web" / "nginx.conf.template").read_text(encoding="utf-8")
+        for name, value in C.consts()["agent"]["responseHeaders"].items():
+            self.assertIn(f'add_header {name} "{value}" always;', template)
+
+    def test_a_skin_is_framable_by_its_own_origin_and_the_page_by_nothing(self):
+        """Skins are only drawn in an iframe; everything else refuses to be framed."""
+        template = (PKG_ROOT / "web" / "nginx.conf.template").read_text(encoding="utf-8")
+        agent = C.consts()["agent"]
+        start = template.index(f"location {agent['framablePrefix']} {{")
+        skin = template[start : template.index("}", start)]
+        page = template[template.index("location / {") :]
+        for name, value in {**agent["responseHeaders"], **agent["framableHeaders"]}.items():
+            self.assertIn(f'add_header {name} "{value}" always;', skin)
+        self.assertIn("frame-ancestors 'self'", agent["framableHeaders"]["Content-Security-Policy"])
+        self.assertEqual(agent["framableHeaders"]["X-Frame-Options"], "SAMEORIGIN")
+        self.assertIn('add_header X-Frame-Options "DENY" always;', page)
+        self.assertIn("frame-ancestors 'none'", page)
+
+    def test_the_template_drops_a_name_that_is_not_this_machine(self):
+        template = (PKG_ROOT / "web" / "nginx.conf.template").read_text(encoding="utf-8")
+        self.assertIn("listen 5173 default_server;\n    return 444;", template)
+
+    def test_a_refresh_of_a_route_that_is_also_a_folder_draws_the_app(self):
+        """/lounge is a route and a real folder (the skins). A try_files that
+        names $uri/ redirects it to add a slash, then refuses the folder; and an
+        absolute redirect names the port nginx listens on in the container, not
+        the one the host publishes. No route is a folder with an index."""
+        template = (PKG_ROOT / "web" / "nginx.conf.template").read_text(encoding="utf-8")
+        code = "\n".join(line.split("#", 1)[0] for line in template.splitlines())
+        rules = re.findall(r"try_files[^;]*;", code)
+        self.assertEqual(rules, ["try_files $uri /index.html;"] * 2)
+        self.assertIn("absolute_redirect off;", code)
+        public = PKG_ROOT / "web" / "public"
+        self.assertEqual(sorted(str(p.relative_to(public)) for p in public.rglob("index.html")), [])
 
 
 class TheAgentListensOnTheLoopbackOnly(unittest.TestCase):

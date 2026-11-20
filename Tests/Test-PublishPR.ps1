@@ -105,7 +105,8 @@ function global:gh {
 function global:Invoke-RestMethod {
     param(`$Uri, `$Headers, `$Method, `$Body)
     `$line = "REST `$Method `$Uri"
-    if (`$Body) { `$line += " `$Body" }
+    `$text = if (`$Body -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString(`$Body) } else { [string]`$Body }
+    if (`$Body) { `$line += " `$text" }
     Add-Content -Path '$calls' -Value `$line
     if ("`$Method" -eq 'Get') { return [pscustomobject]@{ pullRequestId = 77; status = 'active'; isDraft = (-not `$env:P20_TEST_PR_READY) } }
     return [pscustomobject]@{ pullRequestId = 77; status = 'active'; isDraft = `$false }
@@ -184,6 +185,19 @@ try {
     Assert-True 'and the card is not written' ((Get-Bytes $shipped) -eq $once)
     Assert-True 'and the refusal is said once, not wrapped in a generic error' ((@([regex]::Matches($r.Text, '(?m)^Error: ')).Count -eq 1) -and -not ($r.Text -match 'exit code 2')) $r.Text
 
+    # -- Refusal: a line that is not this Space's organisation --------------------
+    # The token goes to the Space's organisation or nowhere.
+    foreach ($row in @(
+            @{ Id = 'Q3AX'; Url = 'https://evil.example/p/_git/r/pullrequest/1' }
+            @{ Id = 'Q4AX'; Url = 'https://dev.azure.com/other-org/p/_git/r/pullrequest/1' }
+            @{ Id = 'Q6AX'; Url = 'https://dev.azure.com/acme-org.evil.example/p/_git/r/pullrequest/1' }
+        )) {
+        New-ShippedCard -Space 'board' -FileName "Task$($row.Id)-a-forged-line.prompt.md" -Heading "Task $($row.Id): A forged line" -PrUrl $row.Url | Out-Null
+        $r = Invoke-Publish "${cfgPrefix}PublishPR $($row.Id)"
+        Assert-True "not this Space's organisation is refused: $($row.Url)" ($r.Text -match "not on this Space's tracker" -and $r.Text -match 'EXIT=2') $r.Text
+        Assert-True 'and no token is asked for and no REST call made' ((Get-TokenCalls $r.Calls).Count -eq 0 -and (Get-RestCalls $r.Calls).Count -eq 0) ($r.Calls -join ' | ')
+    }
+
     # -- Refusal: no PR URL: line -------------------------------------------------
     $noPrBytes = Get-Bytes $noPr
     $r = Invoke-Publish "${cfgPrefix}PublishPR M3PX"
@@ -205,6 +219,13 @@ try {
     Assert-True 'and the hint is gh pr ready <url>' ($r.Text.Contains("gh pr ready $ghPrUrl")) $r.Text
     Assert-True 'and nothing is called on either tracker' ((Get-RestCalls $r.Calls).Count -eq 0 -and -not (@($r.Calls) -match '^gh pr ')) ($r.Calls -join ' | ')
     Assert-True 'and the card is not written' ((Get-Bytes $gh) -eq $ghBytes)
+
+    # An Azure DevOps address under a GitHub Space's own owner: the Space has no
+    # Azure DevOps token to send, so no token is read and nothing goes to github.com.
+    New-ShippedCard -Space 'widgets' -FileName 'TaskQ7AX-a-forged-line.prompt.md' -Heading 'Task Q7AX: A forged line' -PrUrl 'https://github.com/acme/p/_git/r/pullrequest/1' | Out-Null
+    $r = Invoke-Publish "${cfgPrefix}PublishPR Q7AX"
+    Assert-True "an Azure DevOps address on a GitHub Space is refused" ($r.Text -match "not on this Space's tracker" -and $r.Text -match 'EXIT=2') $r.Text
+    Assert-True 'and no token is asked for and no REST call made' ((Get-TokenCalls $r.Calls).Count -eq 0 -and (Get-RestCalls $r.Calls).Count -eq 0) ($r.Calls -join ' | ')
 
     # -- The help -----------------------------------------------------------------
     $r = Invoke-Publish "${cfgPrefix}PublishPR -Help"

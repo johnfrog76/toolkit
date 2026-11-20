@@ -26,8 +26,9 @@ import {
 import { ArrowRightRegular, SendRegular } from "@fluentui/react-icons";
 import { BackButton } from "../../shared/BackButton";
 import { HairlineDivider } from "../../shared/HairlineDivider";
+import { InfoTip } from "../../shared/InfoTip";
 import { MarkdownBlock } from "../../shared/MarkdownBlock";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { useGetEnvQuery } from "../../shell/api";
 import { STAMPS } from "../../shell/consts";
 import { extractSection, hasContent, sendButtonState } from "./sendButton";
@@ -288,7 +289,7 @@ export function ManagerSessionPage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         loading={isLoading}
         loadingLabel="Loading session..."
         empty={
@@ -456,8 +457,18 @@ export function ManagerSessionPage() {
                         live button that fails on click and only then mentions
                         an environment variable. */}
                     {!send.enabled && (
-                      <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                      <Caption1
+                        style={{
+                          color: tokens.colorNeutralForeground3,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: tokens.spacingHorizontalXS,
+                        }}
+                      >
                         {send.reason}
+                        {/* How to set the recipient up, and the variable's
+                            name, are here and not in the reason. */}
+                        {send.info && <InfoTip label="About sending" content={send.info} />}
                       </Caption1>
                     )}
                     {sendOutcome && (
@@ -511,7 +522,7 @@ export function ManagerSessionPage() {
             </div>
           </div>
         )}
-      </PageCard>
+      </PanelFrame>
     </div>
   );
 }

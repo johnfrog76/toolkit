@@ -108,11 +108,16 @@ $realProjects = @($cfg.Projects | Where-Object { $_.hasRepo -ne $false } | ForEa
 $queryProject = if ($realProjects.Count -gt 0) { $realProjects[0] }
                 elseif ($projects.Count -gt 0) { $projects[0] }
                 else { $null }
-$result = az boards query `
-    --org $org `
-    --project $queryProject `
-    --wiql $wiql `
-    --output json 2>$null | ConvertFrom-Json
+$query = Invoke-P20TrackerRead 'az' @('boards', 'query', '--org', $org, '--project', $queryProject, '--wiql', $wiql, '--output', 'json')
+if ($query.Code -ne 0) {
+    # Said as the GitHub path says it, not read as "no work items".
+    $p = if (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue) { Get-CliPrefix } else { '' }
+    $said = @($query.Lines | Where-Object { "$_".Trim() })[0]
+    Write-Host "Azure DevOps did not answer the work item query in $org$(if ($said) { ": $said" } else { '.' }) ${p}Env shows the tier." -ForegroundColor Yellow
+    return
+}
+$result = $null
+if (($query.Out -join '').Trim()) { $result = ($query.Out -join "`n") | ConvertFrom-Json }
 
 if ($result) {
     $result | ForEach-Object {

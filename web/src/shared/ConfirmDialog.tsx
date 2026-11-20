@@ -14,6 +14,23 @@ import {
 } from "@fluentui/react-components";
 import { DialogDismiss } from "./DialogDismiss";
 
+export interface ConfirmDialogProps {
+  open: boolean;
+  /** The act, named: "Close issue #<n>." */
+  what: ReactNode;
+  onConfirm: () => void;
+  onCancel: () => void;
+  title?: string;
+  confirmLabel?: string;
+  /** The act is running: Submit spins and neither button can be pressed. */
+  busy?: boolean;
+  /** Submit cannot be pressed yet -- or at all, after a refused preview -- while
+   *  Cancel still can. Unlike `busy`, nothing spins. */
+  confirmDisabled?: boolean;
+  /** A stated refusal, in the verb's own words -- shown under the act. */
+  message?: ReactNode;
+}
+
 /**
  * "Are you sure?" -- the one step between a person and an act they may regret.
  *
@@ -41,22 +58,7 @@ export function ConfirmDialog({
   busy = false,
   confirmDisabled = false,
   message,
-}: {
-  open: boolean;
-  /** The act, named: "Close issue #<n>." */
-  what: ReactNode;
-  onConfirm: () => void;
-  onCancel: () => void;
-  title?: string;
-  confirmLabel?: string;
-  /** The act is running: Submit spins and neither button can be pressed. */
-  busy?: boolean;
-  /** Submit cannot be pressed yet -- or at all, after a refused preview -- while
-   *  Cancel still can. Unlike `busy`, nothing spins. */
-  confirmDisabled?: boolean;
-  /** A stated refusal, in the verb's own words -- shown under the act. */
-  message?: ReactNode;
-}) {
+}: ConfirmDialogProps) {
   return (
     <Dialog
       open={open}

@@ -11,6 +11,8 @@ until the release folds them in here.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-09
+
 ### Added
 
 - `Burn` now shows your current Claude Code burn: today, and this week from when the allocation resets -- Friday 05:00 by default, or another day and time with `Config -Set burn.weekStarts="Monday 09:00"` -- this machine's session files read live, plus the day records your other machines logged with `Burn -Log` -- as tokens by model and a cost marked as derived, never a share of your plan. `Burn -AsJson` gives the same as JSON, `Burn -At <time>` the burn as it stood at a past moment, and the System page has a **Claude Code burn** tile with the same figures, kept for an hour, with a Refresh; it appears only on a machine that has Claude Code session files. Haiku is priced at its lower rate card, and every cost says so.
@@ -30,6 +32,10 @@ until the release folds them in here.
 - `GetPRComments` now works on a GitHub Space: it reads a pull request's inline review comments, its conversation and its reviews' summaries through `gh`, and appends them to the card exactly as it does for Azure DevOps -- safe to re-run, a reviewer's follow-ups included. The card's own `PR URL:` line tells it which repository to read, so it works from the browser with no checkout.
 - A work review's row on the Reviews card now offers **Archive** and **Delete**, and the new `WorkReview` command does the same from the terminal: Archive moves the review under `reviews/archive/` with a closed date in its `review.md`, Delete removes a draft for good after asking, and the list's new **Archived** filter shows the reviews you put away. A review's row also no longer shows its raw `orgs: [...]` line as its summary.
 - `NewPrompt -Title ... -Description <text>` fills a new card's Context or Summary with that text instead of leaving it `(TBD)`; the New ToolKit Card dialog has a matching description field.
+- `Backlog` prints the cards waiting in a Space's backlog as one table, ranked by each milestone's
+  order, with the milestone's cards already in play shown in their place, and `-Milestone`, `-Tag`
+  and `-Type` to narrow it. The agent serves the same rows at `GET /api/backlog`. On an Azure DevOps
+  Space it says the backlog is in Azure DevOps and points at `MyWork`.
 
 ### Changed
 
@@ -38,6 +44,14 @@ until the release folds them in here.
 - **Create PR** from the browser now works from the card's own code checkout when one is on this machine (a clone of the board's GitHub repository at `<wsRoot>/<repo>` or a nav shortcut's path): the repository comes from that checkout, a card with no `## Branch` uses the checkout's branch when it is the card's, and a branch that was never pushed is refused with the exact `git push` to run in that checkout. With no checkout found, it reads the card as before.
 - Completing a hub-kept design (`MoveDesign -Hub -Space`) also finds the Space's repository at `<wsRoot>/<repo>`.
 - Every list's row menu now uses one vocabulary: the same move has the same word, icon and tooltip on every page, and the link out is always last, reading "Open on GitHub" or "Open on Azure DevOps" behind one icon. A goal's Retire, a reminder's Done and a card's Move to Done now read Archive, a design's two archives read Archive as shipped and Archive as dropped, a card's exposed action opens the card, and Remove cover reads Delete the cover.
+- The deck player has two bars now. Watching a deck, the bar keeps Exit on the left, the arrows around the slide counter in the middle -- or around a play ring in Audiobook, where the deck reads itself aloud and turns its own slides -- and settings, fullscreen and the sound on the right, at every width. The gear opens a short Voice sheet with Narration, the mode (Paging or Audiobook) and the voice, on a phone too, and a deck you switch to Audiobook opens that way next time in the same browser. Presenting with `?present=1` shows Exit, the arrows, the counter, the speaker notes and fullscreen, and the deck window stays silent; a phone always gets the viewer's bar.
+- `Test` and the CI check fail the web half when Jest force-exits a worker because a test left a timer or a handle open, and the failure says to run `npx jest --runInBand --detectOpenHandles` to find it.
+- A changelog entry for the next release is now a file of its own under `changelog.d/`, named `<id>.<kind>.md`, so pull requests built side by side no longer conflict on `CHANGELOG.md`; the release folds the folder into `## [Unreleased]` with `Scripts/Fold-Changelog.ps1`. Entries already under `## [Unreleased]` stay where they are.
+- On Windows, the agent now runs `gh` directly rather than through the command shell.
+- The local agent now accepts requests only from its own pages and the origins you configure, and picture uploads are limited as they arrive.
+- A shortcut's name must now be a plain name: a letter, then letters, digits, `-` or `_` (a command prefix has its own, narrower rule, below). `Config -Set` refuses anything else, and a name already in your file is skipped with a warning naming it: rename it in `config.local.json` to keep it.
+- A `commandPrefix` is a letter, then letters or digits, and `Config` now refuses a dash or an underscore in one. A shell with such a prefix used to register no commands at all, so nothing that worked is lost: it now starts with the shipped `tk` prefix and a warning naming the setting.
+- `Land` and `PublishPR` read the pull request from your Space's own tracker: a card's `PR URL:` line that names another organisation is refused, with the reason.
 
 ### Fixed
 
@@ -55,6 +69,30 @@ until the release folds them in here.
 - Completing a design that a Space keeps in the hub (`MoveDesign -Hub -Space <slug> -To Complete -Doc <path>`, or the Move dialog) now looks for the document in the Space's own repository instead of the hub, so it no longer refuses every such spec; with no clone of that repository on the machine, the path is accepted as written and a note says so.
 - The test suite's check for a raw, unredirected `git`/`gh`/`az` call now catches one written inside a double-quoted string's `$(...)`, a shape it previously missed entirely; the handful of real call sites it found this way now go through the same safe helper as the rest of the CLI.
 - `Sync` (and the System page's Sync the hub) now states a failed pull or push once, instead of printing its own warning and then a generic exit-code block on top.
+- A card whose `Tags:` line separates its tags with semicolons (`Tags: enhancement; sev3`), as a card made from an Azure DevOps work item or a GitHub issue is written, now reads them as separate tags, so the board's Tag filter finds it by either tag, the standup's suggestion sees its severity, and `Tag <id> sev3 -Remove` takes one off. `Tag` still writes commas.
+- `NewPrompt -OutputFolder backlog` (or `current`, or `archive`) now writes the card into the active Space's folder of that name, the one `NewPrompt` uses by default, instead of a folder of that name at the root of your prompt store, where no Space looks and the board never showed it. A path such as `<space>/backlog` and an absolute path work as before, and with no Space active a bare name still means the store's own folder.
+- A deck's text beside its picture no longer runs past the right edge of the window; at 1440 wide the played standup's lines were cut off mid-sentence.
+- In the Docker image, refreshing the Lounge, or opening a link to it, draws the room again. It used to send the browser to a port nothing answered on.
+- With the growth module off, the Space summary no longer shows a Reviews tile that could only read 0.
+- `Land` on a card still in `backlog/` now commits the card's whole move, so the hub is left clean instead of holding an uncommitted deletion from `backlog/`.
+- `Env` leaves the exit code at 0 when run outside a git repository, so a script that checks it no longer reads a failure that did not happen.
+- Test Health groups the digits in large counts (`12,661/12,661`) in its tiles, its suite rows and its chart, and the chart's axis no longer cuts off five-digit labels.
+- A verb the agent runs that passes its timeout now ends everything it started, and a change to how you work in a Space reaches the web UI's commands with no restart.
+- On Windows PowerShell 5.1, `NewPR` and `MeetingAgenda` no longer garble the accented letters and dashes in a card or a session they update, a hub in a folder whose name has an accent is found, and `Route -Assign` takes a size. In a Windows terminal, a review comment `GetPRComments` fetches keeps its punctuation.
+- On Windows PowerShell 5.1, a work item, a pull request, a comment or a reply with an accent or a dash in it reaches Azure DevOps as you wrote it, and an AI code review of a diff holding one no longer fails: every request body is now sent as UTF-8.
+- When a Space's Azure DevOps address carries a user name and password, the refusal that stops the token being sent no longer prints them.
+- `Land` takes a card's ID or filename in the active Space and refuses a path, so it can no longer close this Space's issue for another Space's card. On a GitHub Space it refuses a `PR URL:` line from another repository, and reads the issue number from a card's link only when the link is one of the Space's repositories. `Plan` keeps a milestone's order by the card's own Space's tracker. `PublishPR` no longer reads a token on a GitHub Space, and an Azure DevOps token is sent only to the Space's `https://` address.
+- `Dashboard` shows its local view below Tier 1 instead of a full view of empty answers, and counts recent errors from the log the toolkit actually writes. `SwitchSpace` matches a Space's name exactly and refuses a name two Spaces share, where a shared name or a `*` could leave the active Space unreadable.
+- One issue with a very long number in its text can no longer stop the standup: the number is read as no thread, and the standup goes on.
+- `NewWorkReview` no longer writes over a review someone has edited or written up when a date range is run twice, from the terminal or the web; an untouched scaffold is still written again with fresh history. `NewPrompt` and `GetPRComments` no longer risk replacing a card when its name reads like a date or a path holds `[`.
+- A hub, a package or a home folder whose name holds `[` or `]` now works: before, the Spaces in its `hub.json` went unknown, `Status` found no cards and `Archive` could not move one.
+- A second `LogPeerReview` of the same pull request on the same day adds its notes to the record instead of replacing the first one's.
+- `GetPRComments` keeps one side record per pull request and repository, so the same PR number in two repositories no longer collides, and a second fetch the same day adds to the record instead of replacing it.
+- `GetPRComments` now says plainly that it wrote nothing when the card it would add to cannot be read, instead of a generic error.
+- `StartWork -Launch` no longer leaves the card's text in the repository it launches from: the hand-off block and the session's logs go in the repository's own git folder, the block is removed once the session has read it, and the session's worktree stays out of `git status`.
+- `Sync` no longer commits and pushes a hub that is in the middle of a rebase, merge or cherry-pick, where it could publish conflict markers inside cards, and it no longer reports success when its auto-commit was refused: both are now stated refusals that leave the hub as it was.
+- `ThreadHash` fills a review reply's `[commit]` with the newest commit it adds, so a second review round names the fix instead of the branch's first commit, and it leaves the placeholder, and says so, when there is no new commit to name.
+- A tracker verb no longer reports success when `gh` or `az` is missing or cannot be started: `EditItem`, `CloseItem`, `NewPR`'s issue comment and `MyPRs` now say so instead of printing a result for a call that never ran. `MyWork` and `Dashboard` on Azure DevOps, and `Dashboard` and `MyPRs` on GitHub, read their answers the same way.
 
 ## [1.5.0] - 2026-10-26
 

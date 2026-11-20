@@ -54,7 +54,10 @@ The core -- cards, the board, Daily and the Studio -- is not an add-on and has n
 7. **The file shape** -- what it writes into the hub, or a link to the `docs/hub/` document that owns it;
    and **how status is read from the file**, rule by rule, because that is what regresses.
 8. **The tests** -- which suite holds which promise, and what no suite can (the manual runbook).
-9. **Known gaps** -- this add-on's, each with its issue.
+9. **Known gaps** -- this add-on's. Each one links its block in [Known gaps](../KNOWN-GAPS.md), which
+   carries what you see and the issue; a block's "Where you meet it" names this section or the one that
+   describes the behaviour. What the add-on does on purpose goes under a `### True by design` heading
+   inside the section, and is on no list.
 
 A document may end with an optional **History** section after the nine: a few dated bullets for the
 changes a maintainer needs to know about (a rename, a rule people's files were written against). The
@@ -104,7 +107,9 @@ component import creeps back in. The smoke test's off mode asserts that no modul
 `spaces[]` entry -- and an org cannot override them. A training you took does not stop having
 happened when you switch org, and a 1:1 history spans engagements, so a module that flickered as
 you moved between an active engagement and an archived one would be wrong. The exceptions are the
-ADO core's own flags, which describe one org's board: `sprintAwareness` is the only one. The
+Space-scoped switches, which describe one Space: `sprintAwareness`, the ADO core's own flag for
+one org's board, and `suggestions`, both read from `spaces[].features`; and `spaces[].howIWork`, the
+Space's answer to how you work there, which turns Team Agile on or off in that Space. The
 rule, and where each half reads it, is
 [Flags have a scope](../ARCHITECTURE.md#the-shell-owns-the-chrome-a-module-owns-the-rest) in [the web UI overview](../ARCHITECTURE.md#the-web-ui);
 `Tests/test_features.py` pins it.
@@ -140,7 +145,7 @@ generated work reviews, and the resume.
 Its three folders are **hub-root siblings** of the per-org folders, not children of one, for the
 same reason the flag is the engineer's -- resolved through the same `PROMPTS_ROOT`-first rule every
 module follows (`Get-P20PromptsRoot` / `hub_root()`). The one thing it writes that **is**
-org-scoped is `LogPeerReview`'s output, in the active Space's `pr-comments/`. Its nine routes are all
+org-scoped is `LogPeerReview`'s output, in the active Space's `pr-comments/`. Its routes are all
 Tier 2 or lower and all 404 with the flag off; two of them (`GET /api/reviews/{folder}`,
 `GET /api/review-preview`) are read by `ReviewPage`, which **stays an ADO card** (decision D-RP
 (a)) rather than moving here. [`docs/modules/growth.md`](growth.md) has the routes table, the pages,
@@ -156,7 +161,7 @@ tests. The module decides where it surfaces and what gates it.
 | --- | --- |
 | Flag | `features.communication` -- top-level, engineer-scoped |
 | Verbs | `SendTeams`, `NewMeeting`, `MeetingAgenda`. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
-| Agent | `agent/communication/` -- `manager.py` (the routes) and `comms.py` (the engine, carried whole with its 21 tests) |
+| Agent | `agent/communication/` -- `manager.py` (the routes) and `comms.py` (the engine, carried whole with its tests) |
 | Web UI | `web/src/modules/communication/index.tsx`, export `communicationModule` |
 | Hub folder | `manager/current/` and `manager/archive/`, a hub-root sibling -- [`docs/hub/manager.md`](../hub/manager.md) is the session-file contract |
 | Everything else | [`docs/modules/communication.md`](communication.md) |
@@ -170,8 +175,9 @@ webhook URL itself is never in config -- config names the variable, the environm
 
 > **`POST /api/comms/send` and `SendTeams` post for real.** Exercise the path with `-WhatIf` or
 > `"dryRun": true`: every gate runs and the payload comes back unsent (AGENTS.md, "The webhook
-> variables"). Two of the module's six routes -- `POST`/`PUT /manager` -- are the only writes in the
-> whole API that do not go through the CLI, because they save a form someone is typing into;
+> variables"). One of the module's routes -- `PUT /manager/{f}` -- is the only write in the whole API
+> that does not go through the CLI, because it saves a form someone is typing into (`POST /manager`
+> runs `NewMeeting` through the bridge);
 > [`docs/modules/communication.md`](communication.md#the-backend) says why that is not a second
 > implementation to drift from, and has the full route and page tables, the `/env` shape, and the
 > fixtures.
@@ -184,8 +190,8 @@ Where the things a person keeps in order live; reminders is its first surface. B
 | --- | --- |
 | Flag | `features.organize` -- top-level, engineer-scoped |
 | Verbs | `NewReminder`, `Reminders` (`-Snooze`, `-Due`, `-NoDue`, `-Title`, `-Source`, `-Ref`, `-Archive`, `-All`). Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
-| Agent | `agent/organize/` -- `reminders.py`, one gated router, `GET /api/reminders`, **reads only** |
-| Web UI | `web/src/modules/organize/index.tsx`, export `organizeModule` -- the `Organize` tab at `/organize`: the Meetings card through the `organize` slot when communication is on, then the Reminders card |
+| Agent | `agent/organize/` -- `reminders.py` and `reference.py`, one gated router, `GET /api/reminders`, `GET /api/reference` and `GET /api/reference/{name}`, **reads only** |
+| Web UI | `web/src/modules/organize/index.tsx`, export `organizeModule` -- the `Organize` tab at `/organize`, under in-page tabs **Reminders** (the Meetings card through the `organize` slot when communication is on, then the Reminders card) and **Reference** (`/organize/reference`, the hub's reference documents) |
 | Hub folder | `reminders/current/` and `reminders/archive/`, a hub-root sibling -- [`docs/hub/reminders.md`](../hub/reminders.md) is the file contract |
 | Everything else | [`docs/modules/organize.md`](organize.md) |
 
@@ -222,10 +228,10 @@ no file of its own in the hub.
 | | |
 | --- | --- |
 | Flag | `features.solitaireAgile` -- top-level, engineer-scoped; on only where the Space you are in answers `agents` to "How do you want to work in \<Space>?" (`spaces[].howIWork` -- asked on a GitHub Space, derived elsewhere) |
-| Verbs | `Standup` (`-Space`, `-AsJson`); `Triage` (`-Space`, `-AsJson`), the open issues by milestone; `Route` (`-Size`, `-Assign`, `-Milestone`, `-Severity`, `-DeepWater`, `-Space`, `-WhatIf`), the module's one write -- labels, an assignee and a milestone on the tracker, or a card's `**Assigned:**` line; `StartWork <id>` (`-Clip`, `-Prompt`, `-Space`, `-Launch`, `-WhatIf`), the hand-off block a cold agent starts from, writing nothing -- or, with `-Launch`, handed to a session in a new worktree of the Space's repository. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs) |
+| Verbs | `Standup` (`-Space`, `-AsJson`); `Triage` (`-Space`, `-AsJson`), the open issues by milestone; `Route` (`-Size`, `-Assign`, `-Milestone`, `-Severity`, `-DeepWater`, `-Space`, `-WhatIf`), the module's one write -- labels, an assignee and a milestone on the tracker, or a card's `**Assigned:**` line; `StartWork <id>` (`-Clip`, `-Prompt`, `-Space`, `-Launch`, `-WhatIf`), the hand-off block a cold agent starts from, writing nothing -- or, with `-Launch`, handed to a session in a new worktree of the Space's repository. Each answers `-Help`; flags are in [the command reference](../CLI.md#the-opt-in-modules-verbs); `OrgChart` (`-Tree`, `-AsJson`), the org's tree from the hub's `org.json` ([the file](../hub/org.md)), a read that writes nothing and is absent wherever Team Agile is off |
 | Agent | `agent/solitaire/` -- `standup.py`, `triage.py` and `milestones.py`, one gated router, `GET /api/ritual/standup`, `GET /api/ritual/triage` and `GET /api/ritual/milestones`, **reads only**; `Route` runs through the bridge |
 | Web UI | `web/src/modules/solitaireAgile/` -- the Team Agile tab, after the Studio's and before the Lounge's: the standup's text, its issue numbers linked; each list row's **Start work** opens the hand-off block in a copy box, through `POST /api/cmd/StartWork` |
-| Data | `Config/ceremonies.json` and `Config/standup-vocabulary.json`, read by both halves; `consts.json` `rituals` |
+| Data | `Config/ceremonies.json` and `Config/standup-vocabulary.json`, read by both halves; `consts.json` `rituals`; the hub's `org.json` (name: `consts.json` `org.file`) |
 | Everything else | [`docs/modules/solitaire-agile.md`](solitaire-agile.md) |
 
 The worker is the tracker's own label -- its description says `Routed to <Name> -- ...` -- never a list in
@@ -263,8 +269,8 @@ time, so the same entry reads correctly under any prefix and under two at once.
 
 A help entry has five keys, and the last two are optional: `category`, `description`, `usage`,
 `examples`, plus **`switches`** (a map of switch name to one line) and **`notes`** (free text under
-the examples). `Web` and `Agent` carry both, because they are the verbs with real switch surface, and
-a script's comment-based help is not where `-Help` looks.
+the examples). A verb with real switch surface carries `switches` -- `Web` and `Agent` among the core verbs, and
+module verbs too -- because a script's comment-based help is not where `-Help` looks.
 Two more tokens are expanded alongside `{cliPrefix}`: **`{agentPort}`** and **`{devPort}`**, read
 from `web.agentPort` and `web/vite.config.ts`, so a URL in a help line is right on a machine that
 moved the port. The `Menu` suite asserts that every switch the script declares is described, that
@@ -282,11 +288,14 @@ the core wrappers in `utilities.psm1` -- resolve the invoked name, answer `-Help
    **with the path** and skip the module;
 2. if `(Get-P20Features).<Feature>` is not `$true`: do nothing at all -- no row, no alias, no help,
    no menu line;
-3. if any name in `Commands` is already in `$script:ModuleState.CommandMap`: warn with the colliding name and
+3. if the sibling `.ps1` is missing: warn **with its path** and skip the module. This is checked
+   before collisions, so a module with both faults is reported for the missing file alone;
+4. if any name in `Commands` is already in `$script:ModuleState.CommandMap`: warn with the colliding name and
    skip **the whole module**. A core command is never overwritten, and a half-merged module is worse
    than an unloaded one;
-4. if the sibling `.ps1` is missing: warn and skip;
-5. dot-source the `.ps1`, append the rows to `$script:ModuleState.CommandMap` in `Order`, and merge `Help` into
+5. dot-source the `.ps1`. If it throws while loading: warn with its path and the error, and skip
+   the module;
+6. append the rows to `$script:ModuleState.CommandMap` in `Order`, and merge `Help` into
    the in-memory table.
 
 A wrapper in the `.ps1` is a `function global:` body, so it finds the package root with
@@ -300,7 +309,7 @@ so a module verb gets its prefixed alias, its menu line and its **bridge entry**
 its allowlist from that and nothing else -- so a module verb is callable from the browser with no
 backend change. `Get-P20ModuleCommands` reports which modules contributed what, as JSON; with
 growth and communication on it answers
-`{"communication":["SendTeams","NewMeeting","MeetingAgenda"],"growth":["NewGrowth","NewWorkReview","PublishWorkReview","LogPeerReview","UpdateResume"]}`.
+`{"communication":["SendTeams","NewMeeting","MeetingAgenda"],"growth":["NewGrowth","NewWorkReview","PublishWorkReview","WorkReview","LogPeerReview","UpdateResume"]}`.
 Its two readers are the `ModuleCommands` suite and `Test-Menu`'s
 orphan check, which compares registered aliases against `config.default.json` and would otherwise
 flag every module verb as an orphan on a machine that has a module switched on.

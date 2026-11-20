@@ -23,8 +23,9 @@ function script:Get-MachineName {
 # to merge machines, so redirecting the writer alone would leave the readers
 # pointed at the real log. Unset means the repo root, exactly as before.
 #
-# test-results.{machine}.log deliberately does NOT follow it. The Health card
-# reading real test results is the point of that file.
+# test-results.{machine}.log deliberately does NOT follow it: it lives in the
+# machine's test-history folder (Scripts/Get-TestHistoryDir.ps1), which has an
+# override of its own that the test runners set.
 # Global, so Setup (a script the module launches) can ask where the log goes
 # and prove it writable (Setup's C8) instead of retyping the rule.
 function global:Get-P20ToolkitLogDir {
@@ -64,21 +65,29 @@ function global:Write-P20TestResult {
         [Parameter(Mandatory)][int]$Passed,
         [Parameter(Mandatory)][int]$Total,
         [string]$Detail = 'ok',
-        [string]$Org = ''
+        [string]$Org = '',
+        # The test-history folder to append to. Unset, this process's own
+        # (Get-P20TestHistoryDir); a runner passes the one it resolved before it
+        # pointed its children at a scratch folder. None at all -- a marked run
+        # with no override -- writes nothing.
+        [string]$Dir
     )
+    if (-not $PSBoundParameters.ContainsKey('Dir')) { $Dir = Get-P20TestHistoryDir }
+    if (-not $Dir) { return }
     $timestamp = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
     $machine = Get-MachineName
     # Detail is a non-terminal tab-delimited column (org follows it); a tab or a
     # line break would bleed into the org field or forge a second result line.
     $safeDetail = ($Detail -replace '[\t\r\n\x0b\x0c\x1c-\x1e\x85\u2028\u2029]', ' ')
     $entry = "$timestamp`t$Suite`t$Result`t$Passed`t$Total`t$safeDetail`t$Org"
-    $logPath = Join-Path $PSScriptRoot "test-results.$machine.log"
+    $logPath = Join-Path $Dir (Get-P20TestHistoryFileName -Kind results -Machine $machine)
     # A byte-level append, as Write-ToolkitLog's: under Windows PowerShell 5.1,
     # Add-Content -Encoding UTF8 on a file something still holds for a moment (a
     # scanner, the write just before this one) throws "Stream was not readable",
     # and the line was lost behind the warning below. UTF-8 with no BOM, and the
     # host's line ending, as Add-Content wrote it; every reader takes either.
     try {
+        if (-not (Test-Path -LiteralPath $Dir)) { New-Item -ItemType Directory -Path $Dir -Force | Out-Null }
         [System.IO.File]::AppendAllText($logPath, $entry + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding $false))
     }
     catch {
@@ -115,13 +124,14 @@ if ($PSVersionTable.PSEdition -eq 'Desktop') {
 # While the marker is set, .env is not read at all: no
 # suite reads a value from it, and none should see a key it holds.
 . (Join-Path $toolkitRoot 'Scripts/Get-Consts.ps1')
+. (Join-Path $toolkitRoot 'Scripts/Get-TestHistoryDir.ps1')
 $dotEnvSkip = [bool][System.Environment]::GetEnvironmentVariable((Get-P20Consts).env.testRunMarker)
 foreach ($dotEnvPath in @(
     (Join-Path $toolkitRoot '.env')
 )) {
     if ($dotEnvSkip) { break }
-    if (-not (Test-Path $dotEnvPath)) { continue }
-    Get-Content $dotEnvPath | Where-Object { $_ -match '^\s*[^#]\S+=.+' } | ForEach-Object {
+    if (-not (Test-Path -LiteralPath $dotEnvPath)) { continue }
+    Get-Content -LiteralPath $dotEnvPath -Encoding UTF8 | Where-Object { $_ -match '^\s*[^#]\S+=.+' } | ForEach-Object {
         $parts = $_ -split '=', 2
         $key   = $parts[0].Trim()
         $value = $parts[1].Trim().Trim('"').Trim("'")
@@ -183,15 +193,15 @@ $script:ModuleState = @{
 }
 $script:ModuleState.PackageRoot = $toolkitRoot
 
-$defaultConfig = Get-Content (Join-Path $toolkitRoot 'config.default.json') -Raw | ConvertFrom-Json
+$defaultConfig = Get-Content -LiteralPath (Join-Path $toolkitRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $localConfigPath = Join-Path $toolkitRoot 'config.local.json'
 # The one warning for a config.local.json that will not parse, said once per
 # process; the readers below and in Scripts/ call it too.
 . (Join-Path $toolkitRoot 'Scripts/Write-ConfigParseWarning.ps1')
 
-if (Test-Path $localConfigPath) {
+if (Test-Path -LiteralPath $localConfigPath) {
     try {
-        $localConfig = Get-Content $localConfigPath -Raw | ConvertFrom-Json
+        $localConfig = Get-Content -LiteralPath $localConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
     }
     catch {
         $msg = $_.Exception.Message
@@ -483,6 +493,20 @@ $script:ModuleState.Config = @{
     BurnWeekStarts = if ($localConfig.burn -and $localConfig.burn.weekStarts) { [string]$localConfig.burn.weekStarts }
     elseif ($defaultConfig.burn -and $defaultConfig.burn.weekStarts) { [string]$defaultConfig.burn.weekStarts }
     else { '' }
+    # How long a typed plan reading is taken as current (burn.cacheHours), as
+    # written: Burn reads it through Get-P20BurnCacheHours
+    # (Scripts/Read-BurnReadings.ps1) and refuses one it cannot read.
+    BurnCacheHours = if ($localConfig.burn -and $null -ne $localConfig.burn.cacheHours) { [string]$localConfig.burn.cacheHours }
+    elseif ($defaultConfig.burn -and $null -ne $defaultConfig.burn.cacheHours) { [string]$defaultConfig.burn.cacheHours }
+    else { '' }
+    # The plan's buckets and product (burn.buckets, burn.product): a plan's
+    # buckets are the plan's, so they are configuration.
+    BurnBuckets = if ($localConfig.burn -and $localConfig.burn.buckets) { @($localConfig.burn.buckets) }
+    elseif ($defaultConfig.burn -and $defaultConfig.burn.buckets) { @($defaultConfig.burn.buckets) }
+    else { @() }
+    BurnProduct = if ($localConfig.burn -and $localConfig.burn.product) { [string]$localConfig.burn.product }
+    elseif ($defaultConfig.burn -and $defaultConfig.burn.product) { [string]$defaultConfig.burn.product }
+    else { '' }
     AiModel = if ($localConfig.ai -and $localConfig.ai.model) { [string]$localConfig.ai.model }
     elseif ($defaultConfig.ai -and $defaultConfig.ai.model) { [string]$defaultConfig.ai.model }
     else { '' }
@@ -605,8 +629,9 @@ if ($script:ModuleState.Config.WsRoot) {
 # came to print 'tktkHub'.
 #
 $script:ModuleState.CommandPrefix = Get-P20DefaultPrefix
-if ($defaultConfig -and $defaultConfig.commandPrefix) { $script:ModuleState.CommandPrefix = $defaultConfig.commandPrefix }
-if ($localConfig   -and $localConfig.commandPrefix)   { $script:ModuleState.CommandPrefix = $localConfig.commandPrefix }
+if ($defaultConfig -and $defaultConfig.commandPrefix) { $script:ModuleState.CommandPrefix = Select-P20CommandPrefix -Value $defaultConfig.commandPrefix -Fallback $script:ModuleState.CommandPrefix -Path 'config.default.json' }
+if ($localConfig   -and $localConfig.commandPrefix)   { $script:ModuleState.CommandPrefix = Select-P20CommandPrefix -Value $localConfig.commandPrefix -Fallback $script:ModuleState.CommandPrefix -Path 'config.local.json' }
+$global:P20Config.CommandPrefix = $script:ModuleState.CommandPrefix
 
 # -- Build navigation aliases from config -------------------------------------
 # A nav alias key is stored BARE -- 'Home', never 'tkHome' -- exactly as a
@@ -779,7 +804,6 @@ function global:Update-P20StaleConfig {
 # data (Register-PromptAlias), and declared BEFORE the import-time call below --
 # a module body runs top to bottom, so the order here is the contract.
 function script:Register-P20NavAliases {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingInvokeExpression', '', Justification = 'Generates one navigation function per configured shortcut; the path is the only value spliced in, and it is single-quoted with its quotes doubled.')]
     param([Parameter(Mandatory = $true)][string]$Prefix)
     foreach ($alias in $script:ModuleState.NavAliases.GetEnumerator()) {
         if (-not $alias.Value.display) { continue }
@@ -790,15 +814,17 @@ function script:Register-P20NavAliases {
         # Get-P20Menu's 'nav' empty state.
         if ([string]::IsNullOrWhiteSpace($targetPath)) { continue }
 
+        # A key is a name, never code: a closure holds the path, and a key that is
+        # not a command name is skipped, by name. Config -Set refuses one, but a
+        # file can already hold it.
+        if (-not (Test-P20CommandName $alias.Key)) {
+            Write-Warning "aliases.$($alias.Key) is not a command name (a letter, then letters, digits, '-' or '_'); skipped."
+            continue
+        }
+
         $aliasName = $Prefix + $alias.Key
         $funcName = "Navigate-$aliasName"
-        $funcBody = @"
-function global:$funcName {
-    Set-Location -Path '$($targetPath -replace "'", "''")'
-    Get-ChildItem
-}
-"@
-        Invoke-Expression $funcBody
+        Set-Item -Path "function:global:$funcName" -Value { Set-Location -LiteralPath $targetPath; Get-ChildItem }.GetNewClosure()
         Set-Alias -Name $aliasName -Value $funcName -Scope Global
     }
 }
@@ -858,7 +884,7 @@ foreach ($alias in $mergedAliases.GetEnumerator()) {
 # the log by its own entries wants.
 function global:Get-P20CommandScores {
     param([string[]]$CommandNames = @(), [string]$Prefix = '')
-    $logFiles = Get-ChildItem -Path (Get-P20ToolkitLogDir) -Filter 'usage.*.log' -ErrorAction SilentlyContinue
+    $logFiles = Get-ChildItem -LiteralPath (Get-P20ToolkitLogDir) -Filter 'usage.*.log' -ErrorAction SilentlyContinue
     if (-not $logFiles) { return @{} }
 
     $now = Get-Date
@@ -867,9 +893,9 @@ function global:Get-P20CommandScores {
     # Check for reset marker in config.local.json
     $localCfgPath = Join-Path $PSScriptRoot 'config.local.json'
     $resetTimestamp = $null
-    if (Test-Path $localCfgPath) {
+    if (Test-Path -LiteralPath $localCfgPath) {
         try {
-            $localCfg = Get-Content $localCfgPath -Raw | ConvertFrom-Json
+            $localCfg = Get-Content -LiteralPath $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
         }
         catch { $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message; $localCfg = $null }
         # The file parsed; a value that is not a date says which key it is.
@@ -879,7 +905,7 @@ function global:Get-P20CommandScores {
     }
 
     $logFiles | ForEach-Object {
-        Get-Content $_.FullName -Encoding UTF8 | ForEach-Object {
+        Get-Content -LiteralPath $_.FullName -Encoding UTF8 | ForEach-Object {
             $parts = $_ -split "`t"
             if ($parts.Count -lt 4) { return }
             if ($parts[1] -ne 'CMD') { return }
@@ -915,12 +941,18 @@ function global:Get-P20CommandScores {
 }
 
 # -- Tier detection (calls {cliPrefix}Env inline, caches in $global:P20Env) ---------
+# The import works out no tier: probing the tracker is a network call, and
+# loading a module must not make one. The first verb that needs the tier asks
+# here, the probe runs once, and $global:P20Env holds the answer for the
+# session -- until a Space switch or a config re-read empties it again.
 function script:Get-CurrentTier {
     if ($global:P20Env -and $global:P20Env.Tier) {
         return $global:P20Env.Tier
     }
-    # Not yet populated -- run detection silently
-    & "$toolkitRoot\Scripts\Get-Environment.ps1" -Startup
+    # Not yet populated -- run detection silently. -Quiet alone probes and fills
+    # $global:P20Env with no output: the verb that asked states any refusal
+    # itself, once, and a bridge child's stdout stays clean.
+    & "$toolkitRoot\Scripts\Get-Environment.ps1" -Quiet
     if ($global:P20Env -and $global:P20Env.Tier) {
         return $global:P20Env.Tier
     }
@@ -981,15 +1013,15 @@ function script:Test-AdoAvailable {
 }
 
 function script:Get-RecentErrors {
-    $logFiles = Get-ChildItem -Path (Get-P20ToolkitLogDir) -Filter 'usage.*.log' -ErrorAction SilentlyContinue
+    $logFiles = Get-ChildItem -LiteralPath (Get-P20ToolkitLogDir) -Filter 'usage.*.log' -ErrorAction SilentlyContinue
     if (-not $logFiles) { return 0 }
     $cutoff = (Get-Date).AddHours(-24).ToString('yyyy-MM-ddTHH:mm:ss')
 
     # If errors were acknowledged, use the ack timestamp as a floor
     $localCfgPath = Join-Path $PSScriptRoot 'config.local.json'
-    if (Test-Path $localCfgPath) {
+    if (Test-Path -LiteralPath $localCfgPath) {
         try {
-            $localCfg = Get-Content $localCfgPath -Raw | ConvertFrom-Json
+            $localCfg = Get-Content -LiteralPath $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
         }
         catch { $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message; $localCfg = $null }
         # The file parsed; a value that is not a date says which key it is.
@@ -1004,7 +1036,7 @@ function script:Get-RecentErrors {
 
     $count = 0
     $logFiles | ForEach-Object {
-        Get-Content $_.FullName -Encoding UTF8 | ForEach-Object {
+        Get-Content -LiteralPath $_.FullName -Encoding UTF8 | ForEach-Object {
             $parts = $_ -split "`t"
             if ($parts.Count -ge 2 -and $parts[1] -eq 'ERR' -and $parts[0] -gt $cutoff) { $count++ }
         }
@@ -1076,21 +1108,21 @@ function global:Resolve-P20PackageLink {
         [string]$Fallback = ''
     )
     if (-not $TargetPath -or -not $FromDirectory) { return $Fallback }
-    if (-not (Test-Path $TargetPath) -or -not (Test-Path $FromDirectory)) { return $Fallback }
+    if (-not (Test-Path -LiteralPath $TargetPath) -or -not (Test-Path -LiteralPath $FromDirectory)) { return $Fallback }
     # No relative path exists between two drives, or onto a network share, and
     # Resolve-Path -Relative then answers with the ABSOLUTE path (spelled
     # ".\<drive>:\..." by Windows PowerShell 5.1). That names a machine, and a
     # card is synced to others, so it is the caller's -Fallback instead: the
     # roots are compared first, and the answer is checked after.
     try {
-        $targetRoot = [System.IO.Path]::GetPathRoot((Convert-Path $TargetPath))
-        $fromRoot = [System.IO.Path]::GetPathRoot((Convert-Path $FromDirectory))
+        $targetRoot = [System.IO.Path]::GetPathRoot((Convert-Path -LiteralPath $TargetPath))
+        $fromRoot = [System.IO.Path]::GetPathRoot((Convert-Path -LiteralPath $FromDirectory))
     }
     catch { return $Fallback }
     if (-not [string]::Equals($targetRoot, $fromRoot, [System.StringComparison]::OrdinalIgnoreCase)) { return $Fallback }
-    Push-Location $FromDirectory
+    Push-Location -LiteralPath $FromDirectory
     try {
-        $rel = (Resolve-Path $TargetPath -Relative -ErrorAction Stop).Replace([char]92, [char]47)
+        $rel = (Resolve-Path -LiteralPath $TargetPath -Relative -ErrorAction Stop).Replace([char]92, [char]47)
         if ($rel.StartsWith('./')) { $rel = $rel.Substring(2) }
         if ($rel -match '^(?:[A-Za-z]:/|/)') { return $Fallback }
         return $rel
@@ -1197,8 +1229,8 @@ function script:Get-HelpPorts {
     if ($script:ModuleState.Config -and $script:ModuleState.Config.AgentPort) { $agentPort = [int]$script:ModuleState.Config.AgentPort }
     $devPort = 5174
     $viteConfig = Join-Path $toolkitRoot 'web/vite.config.ts'
-    if (Test-Path $viteConfig) {
-        $m = [regex]::Match((Get-Content $viteConfig -Raw -ErrorAction SilentlyContinue), 'port:\s*(\d+)')
+    if (Test-Path -LiteralPath $viteConfig) {
+        $m = [regex]::Match((Get-Content -LiteralPath $viteConfig -Raw -ErrorAction SilentlyContinue -Encoding UTF8), 'port:\s*(\d+)')
         if ($m.Success) { $devPort = [int]$m.Groups[1].Value }
     }
     return @{ AgentPort = $agentPort; DevPort = $devPort }
@@ -1428,10 +1460,10 @@ function global:Reset-P20MenuScoring {
     if (-not $Name) { $Name = "$($s.CommandPrefix)Menu" }
     $root = $s.PackageRoot
     $localCfgPath = Join-Path $root 'config.local.json'
-    if (Test-Path $localCfgPath) {
+    if (Test-Path -LiteralPath $localCfgPath) {
         # A file that will not parse is left exactly as it is: writing the marker
         # into what was read (nothing) would replace the person's settings.
-        try { $null = Get-Content $localCfgPath -Raw | ConvertFrom-Json }
+        try { $null = Get-Content -LiteralPath $localCfgPath -Raw -Encoding UTF8 | ConvertFrom-Json }
         catch {
             $null = Write-P20ConfigParseWarning -Path $localCfgPath -Message $_.Exception.Message
             Write-WrapperRefusal -Name $Name -Message "config.local.json will not parse, so the menu scores were not reset." `
@@ -2029,7 +2061,8 @@ function global:Get-P20ToolkitLog {
 # Burn: Claude Code usage. Alone (or -AsJson, which the agent's
 # GET /api/usage/burn reads), the current burn -- today and this week, this
 # machine's session files plus the other machines' records in the hub; with
-# -Log, the day's record written into the hub (usage/). Core, no flag: the
+# -Log, the day's record written into the hub (usage/); with -Reading, a typed
+# plan reading appended to the week's record (usage/readings/). Core, no flag: the
 # inventory names whether this machine has session files to read.
 function global:Invoke-P20Burn {
     [CmdletBinding()]
@@ -2038,6 +2071,7 @@ function global:Invoke-P20Burn {
         [string]$Date,
         [switch]$AsJson,
         [string]$At,
+        [string[]]$Reading,
         [switch]$Help
     )
     if ($Help) { Show-CommandHelp 'Burn'; return }
@@ -2076,6 +2110,22 @@ function global:Set-P20CardBillable {
     )
     $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'Billable'
     Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Set-CardBillable.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix
+}
+
+# Daily: the week's timesheet from the cards -- the web UI's Daily page, as the
+# text its Copy All copies. This week, -LastWeek, or -Since/-Until. Read-only.
+function global:Get-P20Daily {
+    [CmdletBinding()]
+    param(
+        [switch]$LastWeek,
+        [string]$Since,
+        [string]$Until,
+        [switch]$Compact,
+        [switch]$Help
+    )
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'Daily'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Get-Daily.ps1" -Parameters $PSBoundParameters `
         -Name $inv.Name -Prefix $inv.Prefix
 }
 
@@ -2123,6 +2173,20 @@ function global:Set-P20CardTags {
     )
     $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'Tag'
     Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Set-CardTags.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix
+}
+
+function global:Get-P20Backlog {
+    <# Backlog -- the Space's waiting cards as one ranked table: backlog/, milestone by milestone, in each milestone's order. -Milestone, -Tag and -Type filter. Read-only; refuses on an Azure DevOps Space. #>
+    [CmdletBinding()]
+    param(
+        [string]$Milestone,
+        [string]$Tag,
+        [string]$Type,
+        [switch]$Help
+    )
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'Backlog'
+    Invoke-ToolkitScript -Path "$toolkitRoot\Scripts\Get-Backlog.ps1" -Parameters $PSBoundParameters `
         -Name $inv.Name -Prefix $inv.Prefix
 }
 
@@ -2435,7 +2499,12 @@ function global:Test-P20Toolkit {
     $forwardArgs = @()
     if ($Help) { $forwardArgs += '-Help' }
     if ($Rest) { $forwardArgs += $Rest }
-    & pwsh -NoProfile -File "$toolkitRoot\Tests\Test-Toolkit.ps1" @forwardArgs
+    # The runner starts in the host this verb was typed in: typed in Windows
+    # PowerShell 5.1, the suites run in 5.1. Get-P20TestHost is the one thing
+    # that names the running host, the same one the runner starts each suite with.
+    . "$toolkitRoot\Tests\Get-TestHost.ps1"
+    $runnerHost = Get-P20TestHost
+    & $runnerHost -NoProfile -File "$toolkitRoot\Tests\Test-Toolkit.ps1" @forwardArgs
 }
 
 # All three halves -- the agent's pytest, this runner, the web UI's npm test --
@@ -2447,6 +2516,8 @@ function global:Invoke-P20TestAll {
         [ValidateSet('cli', 'agent', 'web')]
         [string]$Half,
         [switch]$Fast,
+        [switch]$Isolated,
+        [switch]$Keep,
         [switch]$Help
     )
     if ($Help) { Show-CommandHelp 'Test'; return }
@@ -2466,7 +2537,10 @@ $global:P20Config = $script:ModuleState.Config
 $script:ModuleState.ConfigWatch = @($localConfigPath, $(if ($script:HubRoot) { Join-Path $script:HubRoot 'hub.json' } else { '' }))
 $script:ModuleState.ConfigStamp = Get-P20ConfigStamp -Paths $script:ModuleState.ConfigWatch
 
-# -- Startup: detect environment tier (silent on Tier 1) ----------------------
+# -- Startup: what is known without the network ------------------------------
+# The import asks no tracker anything (no gh, no az): Env -Startup says only
+# what the config and the PATH can tell, and the tier waits for the first verb
+# that needs it (Get-CurrentTier).
 # TOOLKIT_QUIET_STARTUP is set by non-interactive callers (e.g. the agent) that
 # parse a command's stdout as JSON; the startup banner would otherwise corrupt it.
 # Startup banner is opt-out: config quietStart, or TOOLKIT_QUIET_STARTUP for a
@@ -2476,11 +2550,9 @@ if ($defaultConfig -and $null -ne $defaultConfig.quietStart) { $script:QuietStar
 if ($localConfig   -and $null -ne $localConfig.quietStart)   { $script:QuietStart = [bool]$localConfig.quietStart }
 if ($env:TOOLKIT_QUIET_STARTUP) { $script:QuietStart = $true }
 & "$toolkitRoot\Scripts\Get-Environment.ps1" -Startup -Quiet:$script:QuietStart
-# The startup probe runs native commands (az) that may fail against the committed
-# template org, leaving $LASTEXITCODE non-zero in the importing session. Every
-# wrapper guard reads that variable after its script returns; without this
-# reset the first verb after Import-Module reports "exit code 1" for a failure
-# that was never its own.
+# Every wrapper guard reads $LASTEXITCODE after its script returns, so the
+# import leaves it at 0: whatever the importing session held before, the first
+# verb after Import-Module must not report an "exit code 1" that was never its own.
 $global:LASTEXITCODE = 0
 
 # -- Command registration (prefix-driven) --------------------------------------
@@ -2494,10 +2566,12 @@ $script:ModuleState.CommandMap = [ordered]@{
     'Archive'          = 'Move-P20PromptToArchive'
     'Status'           = 'Get-P20PromptStatus'
     'Billable'         = 'Set-P20CardBillable'
+    'Daily'            = 'Get-P20Daily'            # the week's timesheet, as the Daily page copies it
     'Cover'            = 'Set-P20CardCover'
     'Move'             = 'Move-P20CardLane'
     'Plan'             = 'Set-P20CardSprint'
     'Tag'              = 'Set-P20CardTags'
+    'Backlog'          = 'Get-P20Backlog'
     'GetPRComments'    = 'Get-P20PRComments'
     'ReplyPR'          = 'Send-P20PRReply'
     'Env'              = 'Get-P20Environment'
@@ -2594,13 +2668,17 @@ function global:Register-PromptAlias {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true, Position = 0)]
-        [ValidatePattern('^[A-Za-z][A-Za-z0-9]*$')]
         [string]$Prefix,
 
         [string[]]$Commands,
 
         [switch]$Force
     )
+    # The one rule, the one Config and every reader of commandPrefix apply, so
+    # what Config accepts here always registers.
+    if (-not (Test-P20CommandPrefix $Prefix)) {
+        throw "Register-PromptAlias: '$Prefix' is not a command prefix (a letter, then letters or digits)."
+    }
     $s = Get-P20ModuleState
 
     $names = $Commands
@@ -2705,7 +2783,7 @@ $script:repoRoot = $toolkitRoot
 $script:ModuleState.ModuleCommandsLoaded = [ordered]@{}
 
 $moduleCommandDir = Join-Path $toolkitRoot 'Config'
-if (Test-Path $moduleCommandDir) {
+if (Test-Path -LiteralPath $moduleCommandDir) {
     # In the autoload discovery shell, read the COMMITTED config only. The
     # manifest that shell produces is committed and shared between machines, so
     # a module verb may only be in it when config.default.json itself turns the
@@ -2714,11 +2792,11 @@ if (Test-Path $moduleCommandDir) {
     # whichever machine did not last generate it. Exactly the fix the personal
     # nav aliases already have, applied to the same question one level up.
     $enabledFeatures = Get-P20Features -CommittedOnly:$script:ModuleState.SkipNavAliases
-    $moduleFiles = @(Get-ChildItem -Path $moduleCommandDir -Filter '*.commands.psd1' -File -ErrorAction SilentlyContinue | Sort-Object Name)
+    $moduleFiles = @(Get-ChildItem -LiteralPath $moduleCommandDir -Filter '*.commands.psd1' -File -ErrorAction SilentlyContinue | Sort-Object Name)
     foreach ($moduleFile in $moduleFiles) {
         $moduleData = $null
         try {
-            $moduleData = Import-PowerShellDataFile -Path $moduleFile.FullName -ErrorAction Stop
+            $moduleData = Import-PowerShellDataFile -LiteralPath $moduleFile.FullName -ErrorAction Stop
         }
         catch {
             Write-Warning "Module commands: $($moduleFile.FullName) is not a readable data file ($($_.Exception.Message)) -- module skipped"
@@ -2731,7 +2809,7 @@ if (Test-Path $moduleCommandDir) {
         if (-not $enabledFeatures[$moduleData.Feature]) { continue }
 
         $moduleScript = Join-Path $moduleFile.DirectoryName ($moduleFile.BaseName + '.ps1')
-        if (-not (Test-Path $moduleScript)) {
+        if (-not (Test-Path -LiteralPath $moduleScript)) {
             Write-Warning "Module commands: $($moduleFile.FullName) has no wrapper file at $moduleScript -- module skipped"
             continue
         }

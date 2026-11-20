@@ -21,6 +21,7 @@
 #>
 
 $pkgRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 $script:passed = 0
 $script:failed = 0
@@ -146,7 +147,7 @@ $base = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-start-" + [System.Guid
 $pkg = Join-Path $base 'pkg'
 New-Item -ItemType Directory -Path $pkg -Force | Out-Null
 $files = @()
-if (Get-Command git -ErrorAction SilentlyContinue) { $files = @(& git -C $pkgRoot ls-files --cached --others --exclude-standard 2>$null) }
+if (Get-Command git -ErrorAction SilentlyContinue) { $files = @((Invoke-P20TestGit -C $pkgRoot ls-files --cached --others --exclude-standard).Out) }
 if ($files.Count -eq 0) {
     $files = @(Get-ChildItem $pkgRoot -Recurse -File | Where-Object { $_.FullName -notmatch '[\\/](node_modules|\.git|dist|__pycache__)[\\/]' } |
         ForEach-Object { $_.FullName.Substring($pkgRoot.Length + 1) })
@@ -194,6 +195,9 @@ try {
     Assert-True 'it exits 0' ($r.ExitCode -eq 0) $r.Output
     Assert-True 'the sample hub is copied out, whole' ((Test-Path (Join-Path $hub 'hub.json')) -and (Test-Path (Join-Path $hub 'demo/current')) -and (Test-Path (Join-Path $hub 'README.md')))
     Assert-True 'not nested a level down' (-not (Test-Path (Join-Path $hub 'hub/hub.json')))
+    $hubAttributes = Join-Path $hub '.gitattributes'
+    Assert-True 'the hub gets a .gitattributes that checks every text file out LF' `
+        ((Test-Path -LiteralPath $hubAttributes) -and ((Get-Content -LiteralPath $hubAttributes -Raw -Encoding UTF8) -match '(?m)^\* text=auto eol=lf\r?$'))
     # The Studio is dressed out of the box: the four design folders travel with the sample hub, and every
     # design file in them carries the id the lifecycle reads, so StampDesign has nothing to do and nothing is 'not shown'.
     $designFolders = @('design', 'design/archive', 'spec', 'spec/archive')

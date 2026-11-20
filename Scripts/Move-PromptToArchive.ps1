@@ -315,7 +315,7 @@ $ext = $Matches[2]
 # reads it: the scan used to run first and wrote a red Get-ChildItem error to
 # the console on a first archive, then succeeded anyway. Under -WhatIf nothing
 # is created and the scan below finds no prior rounds, which is the truth.
-if (-not $WhatIfPreference -and -not (Test-Path $archiveDir)) {
+if (-not $WhatIfPreference -and -not (Test-Path -LiteralPath $archiveDir)) {
     New-Item -ItemType Directory -Path $archiveDir -Force | Out-Null
 }
 
@@ -329,8 +329,8 @@ $stem = if ($baseName -match '^(.+)-r\d+$') { $Matches[1] } else { $baseName }
 $roundIdPattern = Get-P20CardIdPattern -WorkItemTypes (Get-P20WorkItemTypes -Config $cfg)
 $thisCardId = Get-P20CardId -Name $fileName -Pattern $roundIdPattern
 $existingRounds = @()
-if (Test-Path $archiveDir) {
-    $existingRounds = @(Get-ChildItem -Path $archiveDir -File | Where-Object {
+if (Test-Path -LiteralPath $archiveDir) {
+    $existingRounds = @(Get-ChildItem -LiteralPath $archiveDir -File | Where-Object {
         ($_.Name -match "^$([regex]::Escape($stem))(-r\d+)?$([regex]::Escape($ext))$") -or
         ($thisCardId -and $_.Name -match "$([regex]::Escape($ext))$" -and
             (Get-P20CardId -Name ($_.Name -replace '-r\d+(?=\.prompt\.md$)', '') -Pattern $roundIdPattern) -eq $thisCardId)
@@ -359,7 +359,7 @@ if ($existingRounds -and $existingRounds.Count -gt 0) {
         $plainStem = $Matches[1]
     }
     $renameFailure = $null
-    if ($plainArchive -and (Test-Path $plainArchive)) {
+    if ($plainArchive -and (Test-Path -LiteralPath $plainArchive)) {
         $r1Name = "$plainStem-r1$ext"
         $r1Path = Join-Path $archiveDir $r1Name
         $r1Rel = $r1Path.Replace('\', '/')
@@ -371,9 +371,9 @@ if ($existingRounds -and $existingRounds.Count -gt 0) {
         if ($plainRel.StartsWith($rootNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
             $plainRel = $plainRel.Substring($rootNorm.Length + 1)
         }
-        Push-Location $promptsRoot
+        Push-Location -LiteralPath $promptsRoot
         try {
-            Rename-Item -Path $plainArchive -NewName $r1Name
+            Rename-Item -LiteralPath $plainArchive -NewName $r1Name
             if ($storeIsGit) {
                 # archive/ as a directory: the prior round may never have been committed.
                 $null = Invoke-P20TrackerRead 'git' @('add', '-A', '--', $archiveDirRel)
@@ -411,10 +411,10 @@ if ($PSCmdlet.ShouldProcess("$fileName", "Move to archive and commit")) {
     # belt to that braces. Without either, Move-Item fails non-terminating, the
     # "Moved:" line below still prints, and the card silently stays in
     # current/ -- found through the web bridge against the fixture hub.
-    if (-not (Test-Path $archiveDir)) {
+    if (-not (Test-Path -LiteralPath $archiveDir)) {
         New-Item -ItemType Directory -Path $archiveDir -Force | Out-Null
     }
-    Move-Item -Path $sourcePath -Destination $destPath -ErrorAction Stop
+    Move-Item -LiteralPath $sourcePath -Destination $destPath -ErrorAction Stop
     Write-Host "Moved: $currentRel -> $archiveRel" -ForegroundColor Green
 
     # Stamp the closed date into the file. The commit below records "when"
@@ -430,20 +430,39 @@ if ($PSCmdlet.ShouldProcess("$fileName", "Move to archive and commit")) {
     $null = Repair-P20CardLinks -Path $destPath
 
     # Stage and commit
-    Push-Location $promptsRoot
+    Push-Location -LiteralPath $promptsRoot
     try {
         if (-not $storeIsGit) {
             Write-Host "Archived. Store is not git (storeSync='$($cfg.StoreSync)') -- nothing committed." -ForegroundColor DarkGray
         }
         else {
             $gitFailure = $null
-            $add = Invoke-P20TrackerRead 'git' @('add', '-A', '--', $currentDirRel, $archiveDirRel)
+            # The card may have crossed a lane just before this, uncommitted: Land
+            # puts a backlog card in play (backlog/ to current/) and then archives
+            # it. Its old path in the other lane is staged too, so the commit
+            # records the whole move and leaves the hub clean -- only that path,
+            # only when git still tracks it and it is gone from disk, so no other
+            # card's change rides along.
+            $pathspecs = @($currentDirRel, $archiveDirRel)
+            foreach ($lane in @($currentDir, $backlogDir)) {
+                if (-not $lane) { continue }
+                $laneRel = $lane.Replace('\', '/')
+                if ($laneRel.StartsWith($rootNorm, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    $laneRel = $laneRel.Substring($rootNorm.Length).TrimStart('/')
+                }
+                if ($laneRel -eq $currentDirRel) { continue }
+                $oldPath = "$laneRel/$fileName"
+                if (Test-Path -LiteralPath (Join-Path $lane $fileName)) { continue }
+                $tracked = Invoke-P20TrackerRead 'git' @('ls-files', '--', $oldPath)
+                if ($tracked.Code -eq 0 -and ($tracked.Out -join '').Trim()) { $pathspecs += $oldPath }
+            }
+            $add = Invoke-P20TrackerRead 'git' (@('add', '-A', '--') + $pathspecs)
             if ($add.Code -ne 0) {
                 $gitFailure = "git add failed: $(@($add.Lines | Where-Object { $_ })[0])"
             }
             else {
                 # Nothing staged (the move left no difference git can see) is not a failure.
-                $staged = Invoke-P20TrackerRead 'git' @('diff', '--cached', '--quiet', '--', $currentDirRel, $archiveDirRel)
+                $staged = Invoke-P20TrackerRead 'git' (@('diff', '--cached', '--quiet', '--') + $pathspecs)
                 if ($staged.Code -eq 0) {
                     Write-Host "Nothing to commit." -ForegroundColor DarkGray
                 }

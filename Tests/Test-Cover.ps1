@@ -66,6 +66,7 @@ function Assert-Equal {
     }
 }
 
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 . $libScript
 $consts = Get-P20Consts
 $coverStamp = [string]$consts.stamps.cover
@@ -297,12 +298,12 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $gitHub 'demo/current/Task7-paginate.prompt.md'), $cardText, $utf8)
     Push-Location $gitHub
     try {
-        git init --quiet 2>&1 | Out-Null
-        git config user.email 'test@example.invalid' 2>&1 | Out-Null
-        git config user.name 'Cover test' 2>&1 | Out-Null
-        git config core.autocrlf false 2>&1 | Out-Null
-        git add -A 2>&1 | Out-Null
-        git commit --quiet -m 'seed' 2>&1 | Out-Null
+        $null = Invoke-P20TestGit init --quiet
+        $null = Invoke-P20TestGit config user.email 'test@example.invalid'
+        $null = Invoke-P20TestGit config user.name 'Cover test'
+        $null = Invoke-P20TestGit config core.autocrlf false
+        $null = Invoke-P20TestGit add -A
+        $null = Invoke-P20TestGit commit --quiet -m 'seed'
     }
     finally { Pop-Location }
     $gitPreamble = "`$env:PSModulePath = '$pkgRoot'; `$env:PROMPTS_ROOT = '$gitHub'; `$env:P20_ACTIVE_SPACE = 'cover-test'; `$env:P20_USAGE_LOG_DIR = '$log'; " +
@@ -310,9 +311,9 @@ try {
         "Import-Module '$pkgRoot/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
     $out = (& pwsh -NoProfile -NonInteractive -Command ($gitPreamble + "${prefix}Cover 7 ./after.png; 'GIT-EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n"
     Assert-True "'Cover 7' on a git hub exits 0 and says Committed." ($out -match 'GIT-EXIT=0' -and $out -match 'Committed\.') $out
-    $names = @(git -C $gitHub show --name-only --format= HEAD 2>$null)
+    $names = @((Invoke-P20TestGit -C $gitHub show --name-only --format= HEAD).Out)
     Assert-True 'one commit carries the picture and the card' (($names -contains 'demo/assets/Task7/cover.png') -and ($names -contains 'demo/current/Task7-paginate.prompt.md')) ($names -join ', ')
-    $status = @(git -C $gitHub status --porcelain 2>$null)
+    $status = @((Invoke-P20TestGit -C $gitHub status --porcelain).Out)
     Assert-True 'and leaves nothing uncommitted' ($status.Count -eq 0) ($status -join '; ')
 
     # A pre-commit hook that refuses: the picture and the card are written, the

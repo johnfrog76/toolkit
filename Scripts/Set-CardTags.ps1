@@ -9,7 +9,7 @@
 
     `NewPrompt` writes it at birth -- the work item's tags, or the template's
     `Tags: (None)` -- and the suggestion and the board's tag filter read it (the
-    line split on commas and trimmed: Get-P20CardTags, card_tags). This verb writes it
+    line split on commas or semicolons and trimmed: Get-P20CardTags, card_tags). This verb writes it
     on a card that already exists, through `Set-P20CardLine`, so the card keeps its
     own bytes and line endings (AGENTS.md, "One byte contract for a card"):
 

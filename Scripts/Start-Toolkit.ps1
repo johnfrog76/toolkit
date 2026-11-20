@@ -267,7 +267,7 @@ Write-Host "  This machine now points at it, with Demo as the active Space and t
 # shipped org. Re-import so THIS shell, and the UI it is about to start, see the
 # hub that was just written.
 $manifest = Join-Path (Join-Path $pkgRoot 'Prompt20Toolkit') 'Prompt20Toolkit.psd1'
-if ((Get-Module | Where-Object { $_.Path -like "$pkgRoot*" }) -and (Test-Path $manifest)) {
+if ((Get-Module | Where-Object { $_.Path -like "$pkgRoot*" }) -and (Test-Path -LiteralPath $manifest)) {
     try { Import-Module $manifest -Force -Global -WarningAction SilentlyContinue -ErrorAction Stop 3>$null 6>$null }
     catch { Write-Host "  Open a new shell before using the other verbs ($($_.Exception.Message))." -ForegroundColor Yellow }
 }

@@ -9,10 +9,10 @@ Fable
   Today      nothing in flight
   Blockers   no blockers
 Opus
-  Yesterday  #161 (1 commit) Ship the foyer
-  Today      nothing in flight
-  Blockers   no blockers
+  Status     "Yesterday I swapped my laptop dock; no more flicker."
+  Status     "Today I'll update my operating system and restart everything once."
 Widgets
+  Yesterday  #161 (1 commit) Ship the foyer
   Yesterday  W4X9 (2 commits) Ship the docs
   Today      nothing in flight
   Blockers   no blockers

@@ -9,7 +9,7 @@ import { docsRoomPath, repoLinkBase } from "./docRooms";
 import { CardSpinner } from "../../shared/CardSpinner";
 import { EmptyState } from "../../shared/EmptyState";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { ALL, docMatches, filterSummary, useDocsFilters } from "./docFilters";
 
 // The Docs tab (D-S12): what the product IS, beside Design's what it
@@ -143,7 +143,7 @@ export function DocsLanding() {
   };
 
   return (
-    <PageCard
+    <PanelFrame
       loading={loading}
       loadingLabel="Reading the README..."
       empty={listEmpty}
@@ -179,6 +179,6 @@ export function DocsLanding() {
       ) : (
         (readmeEmpty ?? null)
       )}
-    </PageCard>
+    </PanelFrame>
   );
 }

@@ -31,6 +31,7 @@ sys.path.insert(0, str(PKG_ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # Tests/, for _skipguard
 
 from _skipguard import skip_module  # noqa: E402
+from _tracker_cli import unreachable  # noqa: E402
 
 try:
     from fastapi.testclient import TestClient
@@ -120,6 +121,7 @@ class HubSyncCase(unittest.TestCase):
 class UnderNone(HubSyncCase):
     store_sync = "none"
 
+    @unreachable("az")
     def test_env_says_off_and_carries_no_numbers(self):
         block = self.env_block()
         self.assertEqual(block["state"], "off")
@@ -127,6 +129,7 @@ class UnderNone(HubSyncCase):
         for key in ("ahead", "behind", "checkedAt", "checkFailed", "error"):
             self.assertIsNone(block[key], key)
 
+    @unreachable("az")
     def test_nothing_runs_not_even_on_a_check(self):
         self.env_block()
         self.assertEqual(self.check(refresh=1)["state"], "off")
@@ -134,6 +137,7 @@ class UnderNone(HubSyncCase):
 
 
 class UnderGit(HubSyncCase):
+    @unreachable("az")
     def test_env_reports_ahead_and_has_not_checked_yet(self):
         block = self.env_block()
         self.assertEqual(block["state"], "on")
@@ -143,12 +147,14 @@ class UnderGit(HubSyncCase):
         self.assertIsNone(block["checkedAt"])
         self.assertFalse(block["checking"])
 
+    @unreachable("az")
     def test_env_never_fetches(self):
         for _ in range(3):
             self.env_block()
         self.env_block(refresh=1)
         self.assertEqual(self.run.fetches, 0, "/env must never run git fetch")
 
+    @unreachable("az")
     def test_env_holds_the_local_read_for_the_ttl(self):
         self.env_block()
         self.env_block()
@@ -156,6 +162,7 @@ class UnderGit(HubSyncCase):
         self.env_block(refresh=1)
         self.assertEqual(self.run.local_reads, 2, "refresh=1 reads again")
 
+    @unreachable("az")
     def test_check_fetches_and_stamps_the_time(self):
         block = self.check()
         self.assertEqual(self.run.fetches, 1)
@@ -202,6 +209,7 @@ class UnderGit(HubSyncCase):
         self.assertIsNone(block["checkedAt"])
         self.assertIn("TimeoutExpired", block["checkFailed"])
 
+    @unreachable("az")
     def test_a_local_error_is_reported_not_raised(self):
         self.run.ahead = None
         with mock.patch.object(
@@ -212,6 +220,7 @@ class UnderGit(HubSyncCase):
         self.assertIsNone(block["ahead"])
         self.assertIn("no upstream", block["error"])
 
+    @unreachable("az")
     def test_the_bridge_forgets_the_ahead_count_after_a_verb(self):
         self.env_block()
         hub_sync.local_cache_clear()
@@ -269,6 +278,18 @@ class TheScriptAgainstARealRemote(unittest.TestCase):
         self.assertFalse(out["fetched"])
         self.assertTrue(out["fetchError"])
         self.assertEqual(out["ahead"], 0)
+
+    def test_a_hub_with_a_space_in_its_path_and_a_separator_at_its_end_reads(self):
+        # Under Windows PowerShell 5.1, `...\\my hub\\` reached git with its
+        # closing quote read into the path. The script takes the separator off
+        # and the reader escapes for that host; elsewhere this passes either way.
+        spaced = self.tmp / "my hub"
+        subprocess.run(["git", "clone", "-q", "-b", "main", str(self.remote), str(spaced)], check=True)
+        self.git(spaced, "commit", "-q", "--allow-empty", "-m", "mine")
+        out = hub_sync._run(str(spaced) + os.sep, fetch=True)
+        self.assertIsNone(out["error"])
+        self.assertTrue(out["fetched"])
+        self.assertEqual((out["ahead"], out["behind"]), (1, 0))
 
     def test_a_folder_that_is_not_the_root_says_so(self):
         sub = self.hub / "sub"

@@ -18,16 +18,20 @@ import {
   CopyRegular,
   DismissRegular,
   GridRegular,
+  PeopleSettingsRegular,
   PeopleTeamRegular,
   PlayRegular,
   TextBulletListLtrRegular,
 } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
 import { copyText } from "../../shared/copyText";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
+import { TabRows } from "../../shared/TabRows";
 import { usePersistedValue } from "../../shared/usePersistedState";
 import { useGetEnvQuery } from "../../shell/api";
+import { useOpenSettings } from "../../shell/cards";
 import { RITUALS } from "../../shell/consts";
+import { WORKFLOW_ENTRIES, entryAnchor, entryQuestion } from "../../shell/settingsWorkflows";
 import { lazyPart } from "../../shell/lazy";
 import {
   useAttendStandupMutation,
@@ -41,7 +45,7 @@ import { isIssue } from "./itemRef";
 import { AgendaLanes } from "./AgendaLanes";
 import { AGENDA_SENTENCE, AGENDA_VIEWS, WORK_IT_NOW } from "./agenda";
 import { ROUTES } from "./paths";
-import { SEATS, plateFor } from "./stage/seats";
+import { dealRoom, memberPlate } from "./stage/seats";
 import { SURFACE_CHAIR, dismissRef, dismissedRefs } from "./suggestDismiss";
 import { chairSuggestion, suggestionArg } from "./suggestion";
 import { briefSansCorner, cornerOf } from "./corner";
@@ -110,7 +114,7 @@ export const startWorkArg = (i: RitualItem): string =>
 // The PM Corner (AR-4; docs/modules/solitaire-agile.md, "The PM Corner: the line,
 // the chevron, the confetti") sits at the head of the page: the response's `corner.line`
 // verbatim, its chevron -- the same hand-off box every Start work opens -- and, when it
-// reads reached, a link to the Milestones tab, where the award is (PmCorner.tsx). The agent puts
+// reads reached, a link to the Releases tab, where the award is (PmCorner.tsx). The agent puts
 // the same line last in the brief; the page draws it at the head instead, so the brief
 // below stops above it, and Copy still copies the brief as the agent rendered it.
 //
@@ -239,17 +243,22 @@ export function issueUrls(data: StandupResponse): Map<number, string> {
   return urls;
 }
 
-/** The worker chip, `ROLE · PERSONA (label)`, when the worker sits in a seat; else nothing.
+/** The worker chip: the plate the worker wears on the stage today, `PERSONA (label)` --
+ *  the same deal the played view seats (stage/seats.ts) -- when the worker is in the
+ *  room; nothing for a worker who is out today, or one the response does not name.
  *  `who` is what the item names: the worker's label or its name. */
 export function workerChip(data: StandupResponse, who: string): string | undefined {
-  const w = (data.workers ?? []).find(
-    (x) =>
-      x.label.toLowerCase() === who.toLowerCase() || x.name.toLowerCase() === who.toLowerCase(),
+  const at = who.toLowerCase();
+  const m = dealRoom(data).members.find(
+    (x) => !x.cast && (x.worker.label.toLowerCase() === at || x.worker.name.toLowerCase() === at),
   );
-  if (!w) return undefined;
-  const seat = SEATS.find((s) => s.kind === "worker" && s.workerLabel === w.label.toLowerCase());
-  return seat ? plateFor(seat, w.label) : undefined;
+  return m ? m.worker.plate || memberPlate(m, m.worker.label) : undefined;
 }
+
+/** The settings entry the door beside Play opens the drawer at: how many are in the standup. */
+export const TEAM_SIZE_ENTRY = WORKFLOW_ENTRIES.find((e) => e.id === "team-size");
+/** The door's own word, beside Play. */
+export const TEAM_SIZE_DOOR = "Team size";
 
 /** The state a row's slot already says (the agent's rule, Standup-Rules.ps1): yesterday
  *  is closed in the window; today, blockers and the queue are open. Any other kind: none. */
@@ -338,8 +347,13 @@ export function linkIssues(
 export function StandupPage() {
   const styles = useStyles();
   const navigate = useNavigate();
+  const openSettings = useOpenSettings();
   const { data: env, isLoading: envLoading } = useGetEnvQuery();
   const space = env?.config?.activeSpace ?? "";
+  // The door to the room's size: the drawer's own entry, opened at its anchor -- the
+  // drawer is the one writer, so the page has no control of its own.
+  const spaceName = env?.config?.spaces?.find((s) => s.slug === space)?.name || space;
+  const teamSizeAt = TEAM_SIZE_ENTRY ? entryAnchor(TEAM_SIZE_ENTRY, space) : undefined;
   const { data, isLoading, error } = useGetStandupQuery(space, { skip: envLoading });
   const readable = !!data && !error;
   // One read for the popovers' severity and milestone: the Triage page's own,
@@ -449,7 +463,7 @@ export function StandupPage() {
   return (
     <div className={styles.page}>
       {corner && <PmCorner corner={corner} onStart={(arg) => setStartFor(arg)} />}
-      <PageCard
+      <PanelFrame
         loading={envLoading || isLoading}
         loadingLabel="Checking the tracker..."
         empty={empty}
@@ -471,29 +485,41 @@ export function StandupPage() {
               >
                 Play
               </Button>
+              {TEAM_SIZE_ENTRY && teamSizeAt && (
+                <Button
+                  appearance="subtle"
+                  icon={<PeopleSettingsRegular />}
+                  aria-label={`${TEAM_SIZE_DOOR}: ${entryQuestion(TEAM_SIZE_ENTRY, spaceName)}`}
+                  onClick={() => openSettings(teamSizeAt)}
+                >
+                  {TEAM_SIZE_DOOR}
+                </Button>
+              )}
             </>
           ) : undefined
         }
       >
         {readable && (
           <>
-            <TabList
-              size="small"
-              aria-label="Standup"
-              selectedValue={onAgenda ? AGENDA : grain}
-              onTabSelect={(_e, d) => {
-                const v = String(d.value);
-                setTab(v);
-                if (isGrain(v)) setGrain(v);
-              }}
-            >
-              <Tab value={AGENDA}>Agenda</Tab>
-              {GRAINS.map((g) => (
-                <Tab key={g} value={g}>
-                  {grainLabel(g)}
-                </Tab>
-              ))}
-            </TabList>
+            <TabRows>
+              <TabList
+                size="small"
+                aria-label="Standup"
+                selectedValue={onAgenda ? AGENDA : grain}
+                onTabSelect={(_e, d) => {
+                  const v = String(d.value);
+                  setTab(v);
+                  if (isGrain(v)) setGrain(v);
+                }}
+              >
+                <Tab value={AGENDA}>Agenda</Tab>
+                {GRAINS.map((g) => (
+                  <Tab key={g} value={g}>
+                    {grainLabel(g)}
+                  </Tab>
+                ))}
+              </TabList>
+            </TabRows>
             {onAgenda && (
               <>
                 <div className={styles.agendaHead}>
@@ -561,7 +587,7 @@ export function StandupPage() {
             {!onAgenda && grain === BRIEF && suggestionRow}
           </>
         )}
-      </PageCard>
+      </PanelFrame>
       {startFor !== null && <StartWorkBox id={startFor} onClose={() => setStartFor(null)} />}
     </div>
   );

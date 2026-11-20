@@ -1,5 +1,6 @@
 import type { CommunicationEnv, ManagerDetailResponse } from "./api.communication";
 import { FOLDERS } from "../../shell/consts";
+import { RECIPIENT_STATE_LABEL, recipientHowTo, recipientState } from "./recipientState";
 
 /**
  * Whether the retro send button is offered, and whether it can be pressed.
@@ -16,11 +17,14 @@ import { FOLDERS } from "../../shell/consts";
  *             closed (in archive/): the file is the record, and the PUT that
  *             records a send will not write there, so a send from a closed
  *             session is one the file could never say happened.
- *   disabled  The send exists but cannot happen -- gate 2 unmet, wrong stage,
- *             nothing to send, or it already went. A disabled button that SAYS
- *             WHY is the whole point: the alternative is a live button that
- *             fails on click and only then tells you a variable is unset -- or
- *             one that posts a second, different message to a real person.
+ *   disabled  The send exists but cannot happen -- no webhook, sending off on
+ *             this server, wrong stage, nothing to send, or it already went. A
+ *             disabled button that SAYS WHY is the whole point: the alternative
+ *             is a live button that fails on click and only then tells you a
+ *             variable is unset -- or one that posts a second, different
+ *             message to a real person. The recipient's reason is its state, in
+ *             the Environment card's words (recipientState.ts); how to set it
+ *             up is `info`, drawn behind an info icon.
  *   enabled   Retro stage, recipient configured, an Agenda with content, and
  *             no send recorded under ## Sent.
  */
@@ -30,6 +34,9 @@ export interface SendButtonState {
   enabled: boolean;
   /** Why it is disabled, in words the page can show. Empty when enabled. */
   reason: string;
+  /** How to set the recipient up, for the info icon beside the reason. Empty
+   *  unless the recipient is what holds the send back. */
+  info: string;
   /** The recipient key the send would go to. */
   recipient: string;
 }
@@ -58,29 +65,34 @@ export function sendButtonState(
 
   // No /env block means the module is off, and an off module has no button.
   if (!env || !env.postRetroSummary) {
-    return { shown: false, enabled: false, reason: "", recipient };
+    return { shown: false, enabled: false, reason: "", info: "", recipient };
   }
 
   // A closed session is the record. GET serves it; PUT will not write it; so
   // a send from here could post and never be recorded, which is exactly the
   // shape that invites a second press. Not disabled -- absent.
   if (session?.folder === FOLDERS.archive) {
-    return { shown: false, enabled: false, reason: "", recipient };
+    return { shown: false, enabled: false, reason: "", info: "", recipient };
   }
 
   // Every reason the send cannot happen, not the first one found. The recipient
-  // is checked FIRST and always: gate 2 is the one a person has to leave the
-  // page to fix, so its variable is named from the moment the page opens rather
-  // than revealed at the Retro stage, when it is needed.
+  // is checked FIRST and always: it is the one a person has to leave the page
+  // to fix, so it is said from the moment the page opens rather than revealed
+  // at the Retro stage, when it is needed.
   const reasons: string[] = [];
+  let info = "";
 
   const entry = env.recipients.find((r) => r.key === recipient);
   if (!entry) {
     reasons.push(`No recipient '${recipient}' is configured.`);
-  } else if (!entry.configured) {
-    // Name the variable. "Not configured" sends someone reading source; the
-    // variable's name sends them to a shell.
-    reasons.push(`Set ${entry.webhookEnv} to this recipient's webhook URL.`);
+  } else {
+    // The state's own words, the ones the Environment card's row reads. The
+    // variable's name is in the how-to, not in the reason.
+    const state = recipientState(entry, env.sendingOff);
+    if (state !== "ready") {
+      reasons.push(`${RECIPIENT_STATE_LABEL[state]}.`);
+      info = recipientHowTo(entry, state);
+    }
   }
 
   const stage = session?.session_stage ?? "";
@@ -102,7 +114,13 @@ export function sendButtonState(
     reasons.push("The Agenda is empty -- nothing to send.");
   }
 
-  return { shown: true, enabled: reasons.length === 0, reason: reasons.join(" "), recipient };
+  return {
+    shown: true,
+    enabled: reasons.length === 0,
+    reason: reasons.join(" "),
+    info,
+    recipient,
+  };
 }
 
 /**

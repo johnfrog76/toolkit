@@ -3,12 +3,12 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { RITUALS } from "../../shell/consts";
 import type { Corner } from "./api.solitaireAgile";
 import { resetCelebrateMemory } from "./celebrate";
-import { PmCorner, SEE_MILESTONES } from "./PmCorner";
+import { PmCorner, SEE_RELEASES } from "./PmCorner";
 import { ROUTES } from "./paths";
 
 // The PM Corner (AR-4): the agent's line verbatim, the chevron where it names a pick --
 // and NO confetti, ever. A reached line says where the celebration is instead: a link
-// to the Milestones tab, whose award dialog is the module's one celebration. The
+// to the Releases tab, whose award dialog is the module's one celebration. The
 // package is stood in for by a marker, so a burst would be seen if one were drawn.
 
 const bursts: unknown[] = [];
@@ -52,7 +52,7 @@ function draw(corner: Corner, onStart: (arg: string) => void = () => undefined) 
     <MemoryRouter initialEntries={[ROUTES.home]}>
       <Routes>
         <Route path={ROUTES.home} element={<PmCorner corner={corner} onStart={onStart} />} />
-        <Route path={ROUTES.milestones} element={<p>the milestones tab</p>} />
+        <Route path={ROUTES.releases} element={<p>the releases tab</p>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -74,7 +74,7 @@ describe("PmCorner", () => {
     expect(screen.getByRole("button", { name: "Work it now: #5" }).textContent).toBe(
       RITUALS.text.cornerChevron,
     );
-    expect(screen.queryByRole("link", { name: SEE_MILESTONES })).toBeNull();
+    expect(screen.queryByRole("link", { name: SEE_RELEASES })).toBeNull();
   });
 
   it("a card's pick is its id; one left carries the chevron too", () => {
@@ -102,19 +102,19 @@ describe("PmCorner", () => {
     };
     draw(nothing);
     expect(screen.queryByRole("button", { name: /Start work/ })).toBeNull();
-    expect(screen.queryByRole("link", { name: SEE_MILESTONES })).toBeNull();
+    expect(screen.queryByRole("link", { name: SEE_RELEASES })).toBeNull();
   });
 
-  it("reached: the line, then 'see Milestones' linking the tab -- no chevron", () => {
+  it("reached: the line, then 'see Releases' linking the tab -- no chevron", () => {
     draw(reached);
     expect(screen.getByTestId("pm-corner").textContent).toBe(
-      `milestone B reached: ${SEE_MILESTONES}`,
+      `milestone B reached: ${SEE_RELEASES}`,
     );
     expect(screen.queryByRole("button", { name: /Start work/ })).toBeNull();
-    const link = screen.getByRole("link", { name: SEE_MILESTONES });
-    expect(link.getAttribute("href")).toBe(ROUTES.milestones);
+    const link = screen.getByRole("link", { name: SEE_RELEASES });
+    expect(link.getAttribute("href")).toBe(ROUTES.releases);
     fireEvent.click(link);
-    expect(screen.getByText("the milestones tab")).toBeTruthy();
+    expect(screen.getByText("the releases tab")).toBeTruthy();
   });
 
   it("the corner never fires confetti: not on first sight, not on the transition, not with no mark", () => {

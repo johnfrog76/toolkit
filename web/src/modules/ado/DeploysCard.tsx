@@ -16,7 +16,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { RocketRegular } from "@fluentui/react-icons";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { CardSpinner } from "../../shared/CardSpinner";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { EmptyState } from "../../shared/EmptyState";
@@ -46,7 +46,7 @@ export function DeploysCard() {
   const { data, isLoading, isFetching, refetch } = useGetDeploysQuery();
   if (data && !data.supported) return null;
   return (
-    <PageCard
+    <PanelFrame
       headerLeft={
         <>
           <RocketRegular />
@@ -91,6 +91,6 @@ export function DeploysCard() {
           </div>
         ))
       )}
-    </PageCard>
+    </PanelFrame>
   );
 }

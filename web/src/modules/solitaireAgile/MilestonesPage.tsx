@@ -13,16 +13,16 @@ import { FlagRegular, OpenRegular, TrophyRegular } from "@fluentui/react-icons";
 import { useGetEnvQuery } from "../../shell/api";
 import { lazyPart } from "../../shell/lazy";
 import { EmptyState } from "../../shared/EmptyState";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import type { Milestone } from "../ado/api.ado";
 import { milestoneProgress, milestoneStage, orderMilestones } from "../ado/milestones";
 import { useGetRitualMilestonesQuery } from "./api.solitaireAgile";
 import type { AwardStage } from "./award";
 import { awardKey, awardStage, dayWords, markAwarded, pickAwards } from "./award";
 
-// The Milestones tab (docs/modules/solitaire-agile.md, "Milestones: the tab and the
-// award"): Team Agile's third page, after Standup and Triage. One row per milestone
-// of the Space's tracker, each with a bar -- closed over total issues, the tracker's
+// The Releases tab (docs/modules/solitaire-agile.md, "Milestones: the tab and the
+// award"): Team Agile's third page, after Standup and Triage. One row per GitHub
+// milestone of the Space's tracker, each with a bar -- closed over total issues, the tracker's
 // own numbers through GET /api/ritual/milestones --, the due date where there is one,
 // and its state: open, reached, or awarded (this browser has shown its dialog).
 //
@@ -70,6 +70,8 @@ const useStyles = makeStyles({
     columnGap: tokens.spacingHorizontalM,
     color: tokens.colorNeutralForeground3,
   },
+  source: { color: tokens.colorNeutralForeground3 },
+  subtitle: { color: tokens.colorNeutralForeground3, alignSelf: "center" },
 });
 
 /** What a row's state badge says. */
@@ -87,6 +89,9 @@ const STAGE_COLOR: Record<AwardStage, "brand" | "success" | "informative" | "sub
   empty: "subtle",
 };
 
+/** What the panel and each row call their source until releases are read from tags. */
+export const SOURCE_WORDS = "GitHub milestone";
+
 /** "5 of 8 closed" -- the tracker's own two numbers. */
 export const countWords = (m: Milestone): string => `${m.closed} of ${m.open + m.closed} closed`;
 
@@ -100,6 +105,9 @@ function MilestoneRow({ m, stage }: { m: Milestone; stage: AwardStage }) {
           <Body1>
             <strong>{m.title}</strong>
           </Body1>
+          <Caption1 className={styles.source} data-testid="milestone-source">
+            {SOURCE_WORDS}
+          </Caption1>
           <Badge
             appearance={stage === "awarded" ? "filled" : "tint"}
             color={STAGE_COLOR[stage]}
@@ -186,28 +194,31 @@ export function MilestonesPage() {
     ) : list.length === 0 ? (
       <EmptyState
         icon={icon}
-        title="No milestones yet"
-        detail="Milestones are made on the tracker; each one shows here with how far along it is."
+        title="No GitHub milestones yet"
+        detail="GitHub milestones are made on the tracker; each one shows here with its progress."
       />
     ) : undefined;
 
   return (
     <div className={styles.body}>
-      <PageCard
+      <PanelFrame
         loading={envLoading || isLoading}
         loadingLabel="Reading the milestones..."
         empty={empty}
         headerLeft={
           <>
             {icon}
-            <Subtitle2 as="h1">Milestones</Subtitle2>
+            <Subtitle2 as="h1">Releases</Subtitle2>
+            <Caption1 className={styles.subtitle} data-testid="releases-subtitle">
+              {SOURCE_WORDS}s, with how far along each is
+            </Caption1>
           </>
         }
       >
         {list.map((m) => (
           <MilestoneRow key={`${m.repo}-${m.number}`} m={m} stage={stageOf(m)} />
         ))}
-      </PageCard>
+      </PanelFrame>
       {awarding.length > 0 && (
         <AwardDialog
           milestones={awarding}

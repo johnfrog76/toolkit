@@ -79,7 +79,7 @@ $env:TOOLKIT_QUIET_STARTUP = '1'
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $manifest = Join-Path (Join-Path $repoRoot 'Prompt20Toolkit') 'Prompt20Toolkit.psd1'
 
-if (-not (Test-Path $manifest)) {
+if (-not (Test-Path -LiteralPath $manifest)) {
     [Console]::Error.WriteLine("bridge.ps1: no toolkit manifest at $manifest")
     exit 2
 }

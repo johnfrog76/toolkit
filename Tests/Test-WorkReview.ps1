@@ -21,6 +21,7 @@ param([switch]$Help)
 if ($Help) { Get-Help $MyInvocation.MyCommand.Path -Detailed; return }
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot = Split-Path -Parent $scriptDir
 
@@ -77,7 +78,7 @@ function New-ScratchReview {
 function Invoke-Git {
     param([string[]]$GitArgs)
     Push-Location $hub
-    try { return ((& git @GitArgs 2>&1 | ForEach-Object { "$_" }) -join "`n") } finally { Pop-Location }
+    try { return ((Invoke-P20TestGit @GitArgs).Lines -join "`n") } finally { Pop-Location }
 }
 
 function Invoke-Verbs {

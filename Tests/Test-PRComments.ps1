@@ -33,6 +33,8 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+# Children start in the host this suite runs in (Tests/Get-TestHost.ps1).
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 # Package root is the parent of Tests/, from this file's own location:
@@ -223,6 +225,26 @@ Assert-True "Vote-event thread (921, human name) is dropped" (-not (Test-IsActio
 Assert-True "Policy-status thread (922, human name) is dropped" (-not (Test-IsActionableThread $policyThread))
 Assert-True "PR-status thread (923, human name) is dropped" (-not (Test-IsActionableThread $statusThread))
 
+# One matching comment is one object, not a list, and Windows PowerShell 5.1 gives
+# a lone object no .Count: these two read "no match" there unless the filter
+# counts a list. Each is a case where that count alone decides.
+$buildServiceOnFile = [PSCustomObject]@{
+    id            = 903
+    status        = 'closed'
+    threadContext = [PSCustomObject]@{ filePath = '/src/build.yml' }
+    properties    = $null
+    comments      = @(New-Comment -DisplayName 'Project Collection Build Service (Org)' -Content 'Build succeeded.')
+}
+$botReviewMarked = [PSCustomObject]@{
+    id            = 904
+    status        = 'active'
+    threadContext = $null
+    properties    = [PSCustomObject]@{ CodeReviewThreadType = [PSCustomObject]@{ '$type' = 'System.String'; '$value' = 'Review' } }
+    comments      = @(New-Comment -DisplayName 'PR Assistant' -Content '<small>PR Assistant / AI Code Review</small> found an issue.')
+}
+Assert-True "a one-comment Build Service thread on a file is dropped (PowerShell $($PSVersionTable.PSVersion.Major))" (-not (Test-IsActionableThread $buildServiceOnFile))
+Assert-True "a one-comment bot review on a marked thread is kept (PowerShell $($PSVersionTable.PSVersion.Major))" (Test-IsActionableThread $botReviewMarked)
+
 $allThreads = @($fileAnchoredThread, $fileLessHumanThread, $systemThread, $buildServiceThread, $botReviewThread, $voteThread, $policyThread, $statusThread)
 $actionable = @($allThreads | Where-Object { Test-IsActionableThread $_ })
 Assert-True "End-to-end filter keeps exactly 3 of 8 threads" ($actionable.Count -eq 3)
@@ -271,6 +293,46 @@ Assert-True "Re-running does not duplicate PR URL: line (idempotent)"   (($repea
 
 Remove-Item $tmpFile -ErrorAction SilentlyContinue
 
+# A card is read as UTF-8 on every host. Get-Content with no -Encoding reads a
+# file with no BOM in the ANSI code page under Windows PowerShell 5.1, and NewPR
+# wrote what it read back through the card writer, so an accented name or an em
+# dash became two or three characters for good. The first row is the host's own
+# default, stated so the reason stays visible; the rest are the reader every
+# card read goes through. The text is built from code points, so this file's own
+# encoding is not what is tested.
+. (Join-Path $pkgRoot 'Scripts/Write-CardText.ps1')
+$u8Text = '# Bug 7: caf' + [char]0x00E9 + ' ' + [char]0x2014 + ' na' + [char]0x00EF + 've' + "`n`n## Summary`nr" + [char]0x00E9 + 'sum' + [char]0x00E9 + "`n"
+$u8Card = Join-Path ([System.IO.Path]::GetTempPath()) ("cardread-" + [guid]::NewGuid().ToString('N') + '.prompt.md')
+try {
+    [System.IO.File]::WriteAllText($u8Card, $u8Text, (New-Object System.Text.UTF8Encoding($false)))
+    $bare = Get-Content -LiteralPath $u8Card -Raw
+    if ($PSVersionTable.PSEdition -eq 'Desktop') {
+        Assert-True "PowerShell 5.1: Get-Content with no -Encoding misreads a UTF-8 card (the reason for the reader)" ($bare -ne $u8Text)
+    }
+    else {
+        Assert-True "PowerShell $($PSVersionTable.PSVersion.Major): Get-Content with no -Encoding reads a UTF-8 card as UTF-8" ($bare -eq $u8Text)
+    }
+    Assert-True "Read-CardText reads a UTF-8 card as itself (PowerShell $($PSVersionTable.PSVersion.Major))" ((Read-CardText -Path $u8Card) -ceq $u8Text)
+    $before = [System.IO.File]::ReadAllBytes($u8Card)
+    Write-CardText -Path $u8Card -Content (Read-CardText -Path $u8Card)
+    $after = [System.IO.File]::ReadAllBytes($u8Card)
+    Assert-True "and a card read and written back keeps every byte" (($before.Length -eq $after.Length) -and (@(for ($i = 0; $i -lt $before.Length; $i++) { if ($before[$i] -ne $after[$i]) { $i } }).Count -eq 0))
+    $lines = Read-CardText -Path $u8Card -Lines
+    Assert-True "Read-CardText -Lines gives the lines, with no empty last one" (($lines.Count -eq 4) -and ($lines[0] -ceq ('# Bug 7: caf' + [char]0x00E9 + ' ' + [char]0x2014 + ' na' + [char]0x00EF + 've')) -and ($lines[3] -ceq ('r' + [char]0x00E9 + 'sum' + [char]0x00E9)))
+    [System.IO.File]::WriteAllText($u8Card, "one`r`ntwo`rstill two`r`n", (New-Object System.Text.UTF8Encoding($false)))
+    $crLines = Read-CardText -Path $u8Card -Lines
+    Assert-True "Read-CardText -Lines splits CRLF and keeps a bare CR inside its line" (($crLines.Count -eq 2) -and ($crLines[1] -ceq "two`rstill two"))
+    [System.IO.File]::WriteAllText($u8Card, 'only', (New-Object System.Text.UTF8Encoding($false)))
+    $oneLine = Read-CardText -Path $u8Card -Lines
+    Assert-True "a one-line card is an array of one line, not its characters" (($oneLine.Count -eq 1) -and ($oneLine[0] -ceq 'only'))
+    [System.IO.File]::WriteAllText($u8Card, ('caf' + [char]0x00E9), (New-Object System.Text.UTF8Encoding($true)))
+    Assert-True "Read-CardText leaves a BOM out of the text" ((Read-CardText -Path $u8Card) -ceq ('caf' + [char]0x00E9))
+}
+catch {
+    Assert-True 'the card reader rows ran to the end' $false $_.Exception.Message
+}
+finally { Remove-Item -LiteralPath $u8Card -Force -ErrorAction SilentlyContinue }
+
 # The side record a fetch leaves in pr-comments/ is a hub file the tool creates, so it
 # carries the card byte contract: UTF-8 with no byte-order mark, LF. Run the real
 # Write-P20PRCommentsRecord against a scratch hub and read the bytes back.
@@ -293,7 +355,26 @@ try {
         Assert-True "the record has no byte-order mark" (-not ($recBytes.Length -ge 3 -and $recBytes[0] -eq 0xEF -and $recBytes[1] -eq 0xBB -and $recBytes[2] -eq 0xBF))
         Assert-True "the record has no carriage return" (-not ($recBytes -contains 13))
         Assert-True "the record carries the fetched count" ([System.Text.Encoding]::UTF8.GetString($recBytes) -match 'Comments: 3')
+        Assert-True "the record's name carries the repository, since a PR number is per repository" ($recFiles[0].Name -match '^\d{4}-\d{2}-\d{2}-repo-PR42\.md$') $recFiles[0].Name
     }
+    # Nothing overwrites a record: a second fetch the same day adds to it.
+    Write-P20PRCommentsRecord -PullRequestId 42 -Title 'A title' -Url 'https://example.test/pr/42' -Repository 'repo' -Count 5 | Out-Null
+    $recFiles = @(Get-ChildItem -LiteralPath (Join-Path $recHub 'org/pr-comments') -Filter '*-PR42.md' -ErrorAction SilentlyContinue)
+    $recAgain = if ($recFiles.Count -eq 1) { [System.IO.File]::ReadAllText($recFiles[0].FullName) } else { '' }
+    Assert-True "a second fetch the same day adds to the record: one file, the first count kept and the second added" (
+        $recFiles.Count -eq 1 -and $recAgain -match 'Comments: 3' -and $recAgain -match 'Comments: 5' -and
+        ([regex]::Matches($recAgain, '(?m)^Fetched: ').Count -eq 2) -and $recAgain -match '(?m)^# PR 42 - A title$') $recAgain
+    $recAgainBytes = if ($recFiles.Count -eq 1) { [System.IO.File]::ReadAllBytes($recFiles[0].FullName) } else { [byte[]]@() }
+    Assert-True "and the record is still LF only, no byte-order mark" (
+        $recAgainBytes.Length -gt 0 -and -not ($recAgainBytes -contains 13) -and
+        -not ($recAgainBytes.Length -ge 3 -and $recAgainBytes[0] -eq 0xEF -and $recAgainBytes[1] -eq 0xBB -and $recAgainBytes[2] -eq 0xBF))
+    # The same PR number in another repository is another record.
+    Write-P20PRCommentsRecord -PullRequestId 42 -Title 'Other' -Url 'https://example.test/other/pr/42' -Repository 'acme/other' -Count 1 | Out-Null
+    $recNames = @(Get-ChildItem -LiteralPath (Join-Path $recHub 'org/pr-comments') -Filter '*-PR42.md' | ForEach-Object { $_.Name } | Sort-Object)
+    Assert-True "PR 42 in a second repository the same day is a second record, named for that repository" (
+        $recNames.Count -eq 2 -and @($recNames | Where-Object { $_ -match '-acme-other-PR42\.md$' }).Count -eq 1) ($recNames -join ', ')
+    $firstAfter = [System.IO.File]::ReadAllText((Join-Path (Join-Path $recHub 'org/pr-comments') ($recNames | Where-Object { $_ -match '-repo-PR42\.md$' })))
+    Assert-True "and the first repository's record is untouched by it" ($firstAfter -eq $recAgain)
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
@@ -916,7 +997,7 @@ else {
         $cmd = "`$env:PSModulePath = '$pkg'; `$env:PROMPTS_ROOT = '$verbHub'; " +
             "Import-Module '$pkg/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; " +
             "${prefix}Archive -Relink; 'EXIT=' + `$LASTEXITCODE"
-        $verbOut = (& pwsh -NoProfile -NonInteractive -Command $cmd 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $verbOut = (Invoke-P20TestHost -NonInteractive -Command $cmd | ForEach-Object { "$_" }) -join "`n"
         Assert-True 'Archive -Relink as a verb exits 0 on the other drive' ($verbOut -match 'EXIT=0') $verbOut
         $verbTpl = [regex]::Match([System.IO.File]::ReadAllText($absCard), '(?m)^> Template: [^\r\n]*').Value
         Assert-True "and the card's absolute template link became the file's name ($verbTpl)" ($verbTpl -eq $wantTpl)
@@ -968,7 +1049,7 @@ try {
     $cmd = "`$env:PSModulePath = '$pkg'; `$env:PROMPTS_ROOT = '$allOrgHub'; " +
         "Import-Module '$pkg/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; " +
         "${prefix}Archive -Relink; 'EXIT=' + `$LASTEXITCODE"
-    $out = (& pwsh -NoProfile -NonInteractive -Command $cmd 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $out = (Invoke-P20TestHost -NonInteractive -Command $cmd | ForEach-Object { "$_" }) -join "`n"
     Assert-True "Archive -Relink as a verb exits 0" ($out -match 'EXIT=0') $out
     foreach ($c in @('alpha/archive/1-legacy.prompt.md', 'beta/archive/2-legacy.prompt.md')) {
         $cardDir = Split-Path (Join-Path $allOrgHub $c) -Parent
@@ -1080,6 +1161,75 @@ Assert-True 'the linked issues are NewPR''s Issue: line and closing keywords, no
     (((Get-P20GitHubLinkedIssues "Adds export.`n`nIssue: #41`nFixes #8, and see #99 for context") -join ',') -eq '41,8')
 
 Write-Host ""
+Write-Host "-- GitHub: ReplyPR's answer is read back into the thread it answers (pure) --" -ForegroundColor Cyan
+# The conversation tab has no "reply to", so ReplyPR posts a new comment that
+# opens with the reply lead. One row per case the fold tells apart.
+
+$ghUrl = 'https://github.com/acme/widgets/pull/12'
+$leadConv = New-P20GitHubReplyLead -Url "$ghUrl#issuecomment-3300000001" -Id 3300000001
+$leadSum = New-P20GitHubReplyLead -Url "$ghUrl#pullrequestreview-2900000001" -Id 2900000001
+$leadBare = New-P20GitHubReplyLead -Url '' -Id 3300000005
+Assert-True 'the lead names the URL, or the bare id when there is none' `
+    ($leadConv -eq "In reply to $ghUrl#issuecomment-3300000001:" -and $leadBare -eq 'In reply to comment 3300000005:') "$leadConv | $leadBare"
+$rtConv = ConvertFrom-P20GitHubReplyLead -Body "$leadConv`n`nThanks."
+$rtSum = ConvertFrom-P20GitHubReplyLead -Body "$leadSum`n`nLoop fixed."
+$rtBare = ConvertFrom-P20GitHubReplyLead -Body "$leadBare`n`nOk."
+Assert-True 'round trip: the reader gives back what the writer named, kind and id' `
+    ($rtConv.Kind -eq 'conversation' -and $rtConv.Id -eq 3300000001 -and $rtConv.Rest -eq 'Thanks.' -and
+     $rtSum.Kind -eq 'summary' -and $rtSum.Id -eq 2900000001 -and
+     $rtBare.Kind -eq '' -and $rtBare.Id -eq 3300000005) (($rtConv, $rtSum, $rtBare) | ConvertTo-Json -Compress)
+$rtCrlf = ConvertFrom-P20GitHubReplyLead -Body "$leadConv`r`n`r`nThanks."
+Assert-True 'a CRLF body reads the same' ($rtCrlf.Id -eq 3300000001 -and $rtCrlf.Rest -eq 'Thanks.') ($rtCrlf | ConvertTo-Json -Compress)
+Assert-True 'prose that merely starts "In reply to" is not a lead' `
+    ($null -eq (ConvertFrom-P20GitHubReplyLead -Body 'In reply to your question, yes.') -and
+     $null -eq (ConvertFrom-P20GitHubReplyLead -Body "Thanks.`n$leadConv") -and
+     $null -eq (ConvertFrom-P20GitHubReplyLead -Body "In reply to $ghUrl#discussion_r2412345678:`n`nx"))
+
+$fIssue = @(
+    [PSCustomObject]@{ id = 3300000001; user = (New-GhUser 'reviewer-a'); body = 'Overall: close, see inline.'; created_at = '2026-10-01T09:00:00Z' },
+    [PSCustomObject]@{ id = 3300000002; user = (New-GhUser 'ci-bot[bot]' 'Bot'); body = 'Coverage 81%'; created_at = '2026-10-01T09:05:00Z' },
+    [PSCustomObject]@{ id = 3300000010; user = (New-GhUser 'author-b'); body = "$leadConv`n`nThanks -- inline answers below."; created_at = '2026-10-02T09:00:00Z' },
+    [PSCustomObject]@{ id = 3300000011; user = (New-GhUser 'author-b'); body = "$leadSum`n`nLoop fixed."; created_at = '2026-10-02T09:01:00Z' },
+    [PSCustomObject]@{ id = 3300000012; user = (New-GhUser 'author-b'); body = "In reply to comment 3300000001:`r`n`r`nAnd one more."; created_at = '2026-10-02T09:02:00Z' },
+    [PSCustomObject]@{ id = 3300000013; user = (New-GhUser 'author-b'); body = "In reply to $ghUrl#issuecomment-3300009999:`n`nIts comment was deleted."; created_at = '2026-10-02T09:03:00Z' },
+    [PSCustomObject]@{ id = 3300000014; user = (New-GhUser 'author-b'); body = "In reply to $ghUrl#issuecomment-3300000002:`n`nAbout the coverage."; created_at = '2026-10-02T09:04:00Z' },
+    [PSCustomObject]@{ id = 3300000015; user = (New-GhUser 'reviewer-a'); body = "In reply to $ghUrl#issuecomment-3300000010:`n`nThanks for the answers."; created_at = '2026-10-02T09:05:00Z' },
+    [PSCustomObject]@{ id = 3300000016; user = (New-GhUser 'reviewer-a'); body = 'In reply to your question: yes, ship it.'; created_at = '2026-10-02T09:06:00Z' }
+)
+# Served out of date order, as a paginated read may: the fold reads them in date order.
+$fIssue = @($fIssue[8], $fIssue[7], $fIssue[0], $fIssue[2], $fIssue[1], $fIssue[3], $fIssue[4], $fIssue[5], $fIssue[6])
+$fReviews = @([PSCustomObject]@{ id = 2900000001; state = 'CHANGES_REQUESTED'; user = (New-GhUser 'reviewer-a'); body = 'Please fix the loop before merge.'; submitted_at = '2026-10-01T10:01:00Z' })
+$ft = ConvertTo-P20GitHubThreads -IssueComments $fIssue -Reviews $fReviews
+$ftIds = @($ft.Threads | ForEach-Object { [long]$_.id })
+$ftBy = @{}; foreach ($t in $ft.Threads) { $ftBy[[string]$t.id] = $t }
+$convIds = @($ftBy['3300000001'].comments | ForEach-Object { [long]$_.id })
+Assert-True 'a reply to a conversation comment is a follow-up in its thread, not a thread of its own' `
+    (-not ($ftIds -contains 3300000010) -and $convIds -contains 3300000010) ($ftIds -join ',')
+Assert-True 'a reply by the bare "comment <id>" lead folds the same way' (-not ($ftIds -contains 3300000012) -and $convIds -contains 3300000012) ($convIds -join ',')
+Assert-True 'a reply to a folded reply lands in the same root thread' (-not ($ftIds -contains 3300000015) -and $convIds -contains 3300000015) ($convIds -join ',')
+Assert-True 'the thread reads in date order: the opener, then each reply' (($convIds -join ',') -eq '3300000001,3300000010,3300000012,3300000015') ($convIds -join ',')
+Assert-True 'a folded reply keeps its whole body, lead included, and is marked' `
+    ($ftBy['3300000001'].comments[1].content -match '^In reply to https://github\.com/acme/widgets/pull/12#issuecomment-3300000001:' -and $ftBy['3300000001'].comments[1].foldedReply -eq $true -and -not $ftBy['3300000001'].comments[0].PSObject.Properties['foldedReply'])
+Assert-True 'a reply to a review summary is a follow-up in the summary''s thread' `
+    (-not ($ftIds -contains 3300000011) -and (($ftBy['2900000001'].comments | ForEach-Object { [long]$_.id }) -join ',') -eq '2900000001,3300000011') ($ftIds -join ',')
+Assert-True 'a reply whose comment is gone stays a thread of its own, as before' ($ftIds -contains 3300000013 -and $ftBy['3300000013'].status -eq 'conversation')
+Assert-True 'a reply to a Bot comment (not a thread here) stays a thread of its own' ($ftIds -contains 3300000014)
+Assert-True 'prose that starts "In reply to" stays a thread of its own' ($ftIds -contains 3300000016)
+Assert-True 'Total counts threads, not the replies folded into them' ($ft.Total -eq 6 -and ($ftIds -join ',') -eq '3300000001,2900000001,3300000013,3300000014,3300000016') "total $($ft.Total); $($ftIds -join ',')"
+
+# The delta: a folded reply is a follow-up a card does not have yet -- unless the
+# card already holds it as a thread of its own, which every run before the fold wrote.
+$d = Get-P20ThreadDelta -Thread $ftBy['3300000001'] -Recorded (Get-P20RecordedComments -FileContent "### Comment 1 (Thread 3300000001)`n")
+Assert-True 'a card with the conversation thread gets each folded reply as a follow-up' `
+    ($d.Kind -eq 'follow-up' -and ((@($d.FollowUps) | ForEach-Object { $_.Id }) -join ',') -eq '3300000010,3300000012,3300000015') ((@($d.FollowUps) | ForEach-Object { $_.Id }) -join ',')
+$legacy = "### Comment 1 (Thread 3300000001)`n### Comment 2 (Thread 3300000010)`n### Comment 3 (Thread 3300000012)`n### Comment 4 (Thread 3300000015)`n"
+$d = Get-P20ThreadDelta -Thread $ftBy['3300000001'] -Recorded (Get-P20RecordedComments -FileContent $legacy)
+Assert-True 'a card that already holds each reply as its own thread gets nothing: no reply twice' ($d.Kind -eq 'known') $d.Kind
+$d = Get-P20ThreadDelta -Thread $ftBy['3300000001'] -Recorded (Get-P20RecordedComments -FileContent "### Comment 1 (Thread 3300000001)`n### Comment 2 (Thread 3300000010)`n")
+Assert-True '...and one that holds some of them gets only the others' `
+    ($d.Kind -eq 'follow-up' -and ((@($d.FollowUps) | ForEach-Object { $_.Id }) -join ',') -eq '3300000012,3300000015') ((@($d.FollowUps) | ForEach-Object { $_.Id }) -join ',')
+
+Write-Host ""
 Write-Host "-- GitHub: the write side's rules (pure) --" -ForegroundColor Cyan
 # ReplyPR's -Status on GitHub, what a -ThreadId is, the GraphQL node lookup,
 # and AddPRReview's line positioning -- one row per case each rule tells apart.
@@ -1096,6 +1246,22 @@ foreach ($stName in @('byDesign', 'pending', 'wontFix')) {
     $plan = Get-P20GitHubReplyStatus -Status $stName
     Assert-True "-Status $stName is refused by name: GitHub keeps no reason" (-not $plan.Action -and $plan.Error -match [regex]::Escape("-Status $stName has no equivalent on GitHub") -and $plan.Hint -match 'Nothing was posted') $plan.Error
 }
+
+# The words -Status takes are ONE list, the contract's (consts.json
+# replyStatuses.ado): the script checks against it, types no list of its own,
+# and has Azure DevOps' number for every word on it. GitHub's three are a
+# subset, so a word the page offers there is one the verb accepts.
+$replySrc = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Send-PRReply.ps1'))
+. (Join-Path $pkgRoot 'Scripts/Get-Consts.ps1')
+$contractStatuses = @((Get-P20Consts).replyStatuses.ado)
+Assert-True 'Send-PRReply.ps1 reads -Status'' words from consts.json replyStatuses.ado' ($replySrc -match '\(Get-P20Consts\)\.replyStatuses\.ado')
+Assert-True '...and declares no ValidateSet of its own' ($replySrc -notmatch '\[ValidateSet\(')
+foreach ($stName in $contractStatuses) {
+    Assert-True "the Azure DevOps status table has a number for the contract's '$stName'" ($replySrc -cmatch "(?m)^\s+$([regex]::Escape($stName))\s+=\s+\d+\s*$")
+}
+$mapWords = @([regex]::Matches(([regex]::Match($replySrc, '(?s)\$statusMap = @\{(.*?)\}').Groups[1].Value), '(?m)^\s+(\w+)\s+=') | ForEach-Object { $_.Groups[1].Value })
+Assert-True 'and no word the contract does not list' ($mapWords.Count -eq $contractStatuses.Count -and @($mapWords | Where-Object { $_ -cnotin $contractStatuses }).Count -eq 0) ($mapWords -join ',')
+Assert-True 'every status GitHub keeps is one the verb accepts' (@((Get-P20Consts).replyStatuses.github | Where-Object { $_ -cnotin $contractStatuses }).Count -eq 0)
 
 $rcRoot = [PSCustomObject]@{ id = 2412345678; pull_request_url = 'https://api.github.com/repos/acme/widgets/pulls/12'; html_url = 'https://github.com/acme/widgets/pull/12#discussion_r2412345678' }
 $rcReply = [PSCustomObject]@{ id = 2412345690; in_reply_to_id = 2412345678; pull_request_url = 'https://api.github.com/repos/acme/widgets/pulls/12' }
@@ -1256,15 +1422,23 @@ Import-Module '$p/utilities.psm1' -Force -DisableNameChecking *>`$null
 "@
     $runner = Join-Path $ghRoot ("run-" + [guid]::NewGuid().ToString('N').Substring(0, 8) + ".ps1")
     [System.IO.File]::WriteAllText($runner, ($pre + "`n" + $Snippet + "`n; `"EXIT=`$LASTEXITCODE`"`n"), $utf8NoBom)
-    $out = & pwsh -NoProfile -File $runner 2>&1
+    $out = Invoke-P20TestHost -File $runner
     $text = (($out | ForEach-Object { $_.ToString() }) -join "`n")
     $argv = @()
-    if (Test-Path $ghCalls) { $argv = @(Get-Content $ghCalls | ForEach-Object { , @($_ | ConvertFrom-Json) }) }
+    # Each call's argv, enumerated: Windows PowerShell 5.1's ConvertFrom-Json hands a
+    # JSON array on as ONE object, so @($_ | ConvertFrom-Json) was an array holding
+    # the array, and every call read as one argument named System.Object[].
+    if (Test-Path $ghCalls) {
+        $argv = @(Get-Content $ghCalls -Encoding UTF8 | ForEach-Object {
+                $parsed = ConvertFrom-Json -InputObject $_
+                , @(foreach ($x in $parsed) { $x })
+            })
+    }
     $sentBodies = @()
     if (Test-Path $ghInputs) { $sentBodies = @(Get-Content $ghInputs | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json }) }
     return [pscustomobject]@{ Text = $text; Calls = $argv; Inputs = $sentBodies }
 }
-# The tracker calls the verb made. The module's own probe at import (`gh auth
+# The tracker calls the verb made. The module's own tier probe (`gh auth
 # status`, a read of the sign-in) is not the verb's and is left out.
 function Get-GhCalls($r) { return @($r.Calls | Where-Object { $_[0] -eq 'gh' -and -not ($_[1] -eq 'auth' -and $_[2] -eq 'status') }) }
 function Format-Calls($r) { return (@($r.Calls | ForEach-Object { $_ -join ' ' }) -join ' | ') }
@@ -1386,6 +1560,28 @@ try {
     $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 99"
     Assert-True 'a PR GitHub does not have is refused, exit 2, in one block' ($r.Text -match 'Error: PR #99 not found on acme/widgets' -and $r.Text -match 'EXIT=2' -and ([regex]::Matches($r.Text, '(?m)^Error: ')).Count -eq 1 -and -not ($r.Text -match 'exit code 2')) $r.Text
 
+    # -- 5b. A bracket in the path is a name, not a pattern ----------------------
+    # Read as a pattern it says "no file", and the file would be replaced by the
+    # new comments alone.
+    $bracketed = Join-Path $ghRoot 'notes[1].md'
+    [System.IO.File]::WriteAllText($bracketed, "# Worked on`n`nA day of notes.`n", $utf8NoBom)
+    Set-GhSpace 'widgets'
+    $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 12 -OutputFile '$($bracketed -replace "'", "''")'"
+    $bracketedAfter = [System.IO.File]::ReadAllText($bracketed)
+    Assert-True 'a bracket in the path keeps the file: what it held is still there' ($bracketedAfter -match 'A day of notes') $bracketedAfter
+    Assert-True 'and the comments are added to it' ($bracketedAfter -match 'PR Review Comments') $r.Text
+
+    # -- 5c. A card that is there and cannot be read is a stated refusal ----------
+    # Before, the read threw into the generic block. Nothing is written either way;
+    # now the verb says so, once, with exit 2.
+    $unreadable = Join-Path $ghRoot 'notes-folder.md'
+    [void][System.IO.Directory]::CreateDirectory($unreadable)
+    $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 12 -OutputFile '$($unreadable -replace "'", "''")'"
+    Assert-True 'a card that cannot be read: refused once, exit 2, saying nothing was written' (
+        $r.Text -match 'EXIT=2' -and $r.Text -match 'could not be read, so nothing was written' -and
+        $r.Text -notmatch 'exit code' -and ([regex]::Matches($r.Text, 'Error:').Count -eq 1)) $r.Text
+    Assert-True 'and nothing was written into it' (@(Get-ChildItem -LiteralPath $unreadable -Force).Count -eq 0)
+
     # -- 6. An owner-grained Space with two repositories --------------------------
     Set-GhSpace 'acme'
     $gCard = New-GhCard -Space 'acme' -FileName '7-gadget-fix.prompt.md' -Heading 'Bug 7: Gadget fix' -PrUrl 'https://github.com/acme/gadgets/pull/12'
@@ -1451,6 +1647,15 @@ try {
             ((Get-GhCalls $r).Count -eq 0 -and @($r.Calls | Where-Object { $_[0] -eq 'git' }).Count -eq 0 -and [System.IO.File]::ReadAllText($wCard) -eq $before) (Format-Calls $r)
     }
 
+    # -- R1b. A word that is no status at all: the verb's own list is the contract's
+    #    (consts.json replyStatuses.ado), stated once, before anything is asked.
+    $before = [System.IO.File]::ReadAllText($wCard)
+    $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 2412345690 -Reply 'Not this time.' -Status resolved"
+    Assert-True 'ReplyPR -Status <not a status>: refused, exit 2, one block naming the word and the contract''s six' `
+        ($r.Text -match 'Error: -Status resolved is not a thread status' -and $r.Text -match [regex]::Escape("Use one of $($contractStatuses -join ', ')") -and $r.Text -match 'consts\.json replyStatuses\.ado' -and $r.Text -match 'EXIT=2' -and ([regex]::Matches($r.Text, '(?m)^Error: ')).Count -eq 1) $r.Text
+    Assert-True '...and nothing was asked or posted: no gh call, the card untouched' `
+        ((Get-GhCalls $r).Count -eq 0 -and [System.IO.File]::ReadAllText($wCard) -eq $before) (Format-Calls $r)
+
     # -- R2. A reply in an inline thread, -Status fixed: REST reply, GraphQL resolve --
     $replyText = 'Fixed in "abc1234" -- see a && b.'
     $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 2412345690 -Reply '$replyText' -Status fixed"
@@ -1489,6 +1694,7 @@ try {
     Assert-True 'a conversation id: the review-comment lookup misses, the conversation one answers, a new comment is posted' `
         (($paths -join ',') -eq 'repos/acme/widgets/pulls/comments/3300000001,repos/acme/widgets/issues/comments/3300000001,repos/acme/widgets,repos/acme/widgets/issues/12/comments' -and $r.Text -match 'EXIT=0') (Format-Calls $r)
     Assert-True 'opening with a link to the comment it answers' (@($r.Inputs).Count -eq 1 -and $r.Inputs[0].body -eq "In reply to https://github.com/acme/widgets/pull/12#issuecomment-3300000001:`n`nThanks -- inline answers below.") ((@($r.Inputs) | ConvertTo-Json -Compress))
+    $r4Body = [string]@($r.Inputs)[0].body
     Assert-True 'no GraphQL at all, and -Status is said not to apply' ((Get-GqlCalls $r).Count -eq 0 -and $r.Text -match '-Status fixed not applied: on GitHub a conversation comment has no thread to resolve') $r.Text
     $after = [System.IO.File]::ReadAllText($wCard)
     Assert-True 'the card''s slot for that comment is filled, its Status left as it was' ($after -match "\(Thread 3300000001\)[\s\S]*?Status: conversation\r\nComment: [^\r]*\r\nCode suggestion: \(none\)\r\nDecision: [^\r]*\r\nReply: Thanks -- inline answers below\.") $after
@@ -1498,6 +1704,38 @@ try {
     $paths = @(Get-GhCalls $r | ForEach-Object { @($_ | Where-Object { $_ -like 'repos/*' })[0] } | Where-Object { $_ })
     Assert-True 'a review summary id: found third, answered on the conversation tab' `
         ($paths[-1] -eq 'repos/acme/widgets/issues/12/comments' -and $paths -contains 'repos/acme/widgets/pulls/12/reviews/2900000001' -and $r.Inputs[0].body -match '^In reply to https://github\.com/acme/widgets/pull/12#pullrequestreview-2900000001:' -and $r.Text -match 'EXIT=0') (Format-Calls $r)
+
+    $r5Body = [string]@($r.Inputs)[0].body
+
+    # -- R4/R5 read back: GetPRComments folds each answer into the thread it answers --
+    $replyLines = @(
+        (@{ id = 3300000099; user = @{ login = 'you'; type = 'User' }; body = $r4Body; created_at = '2026-10-03T10:00:00Z' } | ConvertTo-Json -Compress),
+        (@{ id = 3300000100; user = @{ login = 'you'; type = 'User' }; body = $r5Body; created_at = '2026-10-03T10:01:00Z' } | ConvertTo-Json -Compress)
+    )
+    Set-GhFixture 'repos/acme/widgets/issues/12/comments' ($issueLines + $replyLines)
+    $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 12"
+    $after = [System.IO.File]::ReadAllText($wCard)
+    Assert-True 'GetPRComments reads ReplyPR''s answer to a conversation comment back as a follow-up of that thread' `
+        ($r.Text -match 'EXIT=0' -and $after -match '### Comment \d+ \(Thread 3300000001\)\r\nFollow-up: \(Thread 3300000001 / Comment 3300000099\)') $after
+    Assert-True '...and its answer to a review summary as a follow-up of the summary''s thread' ($after -match '### Comment \d+ \(Thread 2900000001\)\r\nFollow-up: \(Thread 2900000001 / Comment 3300000100\)') $after
+    Assert-True 'neither answer is a thread of its own' (-not ($after -match '\(Thread 3300000099\)') -and -not ($after -match '\(Thread 3300000100\)')) $after
+    Assert-True 'the answer reads as GitHub has it, lead and all' ($after -match 'Comment: In reply to https://github\.com/acme/widgets/pull/12#issuecomment-3300000001:\s+Thanks -- inline answers below\.') $after
+    $once = [System.IO.File]::ReadAllText($wCard)
+    $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 12"
+    Assert-True 're-run after the fold: no new comments, and the card is byte-for-byte as it was' ($r.Text -match 'No new comments' -and $r.Text -match 'EXIT=0' -and [System.IO.File]::ReadAllText($wCard) -eq $once) $r.Text
+
+    # A card written before the fold holds each answer as a thread of its own: it keeps them, once.
+    $legacyCard = Join-Path $ghRoot 'legacy-fold.md'
+    $legacyText = (@('## PR Review Comments (PR 12)', 'PR URL: https://github.com/acme/widgets/pull/12', 'Round: 1',
+            'Non-actionable threads (bot comments on the conversation tab -- recorded for dedup, not for triage): (Thread 3300000002)', '',
+            '### Comment 1 (Thread 2412345678)', '### Comment 2 (Thread 2412345678)', 'Follow-up: (Thread 2412345678 / Comment 2412345690) -- a later comment in this thread',
+            '### Comment 3 (Thread 2412345700)', '### Comment 4 (Thread 2900000001)', '### Comment 5 (Thread 3300000001)',
+            '### Comment 6 (Thread 3300000099)', '### Comment 7 (Thread 3300000100)', '') -join "`n")
+    [System.IO.File]::WriteAllText($legacyCard, $legacyText, $utf8NoBom)
+    $r = Invoke-GhVerb "${cfgPrefix}GetPRComments 12 -OutputFile '$($legacyCard -replace "'", "''")'"
+    Assert-True 'a card that already holds the answers as threads of their own: nothing new, nothing shown twice' `
+        ($r.Text -match 'No new comments' -and $r.Text -match 'EXIT=0' -and [System.IO.File]::ReadAllText($legacyCard) -eq $legacyText) $r.Text
+    Set-GhFixture 'repos/acme/widgets/issues/12/comments' $issueLines
 
     # -- R6. An id the pull request does not have ------------------------------------
     $r = Invoke-GhVerb "${cfgPrefix}ReplyPR 12 4444444444 -Reply 'Hello?'"
@@ -1524,7 +1762,7 @@ try {
     $fxq = $ghFx -replace "'", "''"
     $modelStub = @"
 `$env:ANTHROPIC_API_KEY = 'sk-test-not-a-key'
-function global:Invoke-RestMethod { param(`$Uri, `$Method, `$Headers, `$Body) [System.IO.File]::WriteAllText('$fxq/model-request.json', [string]`$Body); return [pscustomobject]@{ content = @([pscustomobject]@{ text = [System.IO.File]::ReadAllText('$fxq/model-reply.json') }) } }
+function global:Invoke-RestMethod { param(`$Uri, `$Method, `$Headers, `$Body) `$isBytes = (`$Body -is [byte[]]); [System.IO.File]::WriteAllText('$fxq/model-request.json', `$(if (`$isBytes) { [System.Text.Encoding]::UTF8.GetString(`$Body) } else { [string]`$Body })); [System.IO.File]::WriteAllText('$fxq/model-body-type.txt', `$(if (`$isBytes) { 'bytes' } else { 'string' })); return [pscustomobject]@{ content = @([pscustomobject]@{ text = [System.IO.File]::ReadAllText('$fxq/model-reply.json') }) } }
 "@
     $r = Invoke-GhVerb "$modelStub`n${cfgPrefix}AddPRReview 12"
     $paths = @(Get-GhCalls $r | ForEach-Object { @($_ | Where-Object { $_ -like 'repos/*' })[0] } | Where-Object { $_ })
@@ -1534,6 +1772,8 @@ function global:Invoke-RestMethod { param(`$Uri, `$Method, `$Headers, `$Body) [S
         (($paths -join ',') -eq 'repos/acme/widgets/pulls/12,repos/acme/widgets/pulls/12,repos/acme/widgets,repos/acme/widgets/pulls/12/reviews' -and (@(Get-GhCalls $r)[1] -contains 'Accept: application/vnd.github.diff')) (Format-Calls $r)
     $modelSent = [System.IO.File]::ReadAllText((Join-Path $ghFx 'model-request.json'))
     Assert-True 'the model is sent the diff GitHub gave' ($modelSent -match [regex]::Escape('+  use(x);')) $modelSent
+    $modelBodyType = [System.IO.File]::ReadAllText((Join-Path $ghFx 'model-body-type.txt'))
+    Assert-True 'and the model request goes as UTF-8 bytes, so a diff with an accent is valid JSON text on every host' ($modelBodyType -eq 'bytes') $modelBodyType
     $sent = @($r.Inputs)
     Assert-True 'the review is event COMMENT, sent as a file' ($sent.Count -eq 1 -and $sent[0].event -eq 'COMMENT' -and (@(Get-GhCalls $r)[3] -contains '--input')) ((@($r.Inputs) | ConvertTo-Json -Compress -Depth 5))
     Assert-True 'the finding on a diff line is inline: path, new-side line, RIGHT, the marker' `

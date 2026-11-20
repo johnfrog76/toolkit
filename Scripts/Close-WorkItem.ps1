@@ -86,14 +86,14 @@ if ($Help) { Show-Help; return }
 if ($Id -eq 0) {
     $folders = Get-PromptFolders
     $currentDir = $folders.Current
-    if (Test-Path $currentDir) {
+    if (Test-Path -LiteralPath $currentDir) {
         # The one id rule (Scripts/Resolve-CardName.ps1), not a private regex: this
         # used to know about "US-" and "Task" and nothing a team had configured.
         # Only a NUMBER is a work item -- a card with no work item (K7M2) has
         # nothing on a board to close, so it is not a candidate here.
         . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
         $idPattern = Get-P20CardIdPattern -WorkItemTypes (Get-P20WorkItemTypes -Config $global:P20Config)
-        $candidates = @(Get-ChildItem -Path $currentDir -Filter "*.prompt.md" |
+        $candidates = @(Get-ChildItem -LiteralPath $currentDir -Filter "*.prompt.md" |
             ForEach-Object { Get-P20CardId -Name $_.Name -Pattern $idPattern } |
             Where-Object { Test-P20IsWorkItemId $_ } |
             ForEach-Object { [int]$_ })
@@ -226,12 +226,12 @@ if (-not $tokenRead.Ok) {
 }
 $adoToken = $tokenRead.Token
 
-$headers = Get-P20AdoHeaders -Token $adoToken -ContentType 'application/json-patch+json'
+$headers = Get-P20AdoHeaders -Token $adoToken -OrgUrl $org -ContentType 'application/json-patch+json'
 
 # --- Fetch current work item state ---
 try {
     $wiUri = "$org/_apis/wit/workitems/$($Id)?api-version=7.1"
-    $wi = Invoke-RestMethod -Uri $wiUri -Headers @{ Authorization = "Bearer $adoToken" } -Method Get
+    $wi = Invoke-RestMethod -Uri $wiUri -Headers (Get-P20AdoHeaders -Token $adoToken -OrgUrl $org) -Method Get
     $currentState = $wi.fields.'System.State'
     $title = $wi.fields.'System.Title'
     $workItemType = $wi.fields.'System.WorkItemType'
@@ -333,7 +333,7 @@ else {
 
     try {
         $patchUri = "$org/_apis/wit/workitems/$($Id)?api-version=7.1"
-        Invoke-RestMethod -Uri $patchUri -Headers $headers -Method Patch -Body $patchBody | Out-Null
+        Invoke-RestMethod -Uri $patchUri -Headers $headers -Method Patch -Body (ConvertTo-P20Utf8Body $patchBody) | Out-Null
         Write-Host "[+] Set state to $targetState ($adoReason)" -ForegroundColor Green
     }
     catch {
@@ -350,16 +350,13 @@ else {
 }
 
 # --- Post comment ---
-$commentHeaders = @{
-    Authorization  = "Bearer $adoToken"
-    "Content-Type" = "application/json"
-}
+$commentHeaders = Get-P20AdoHeaders -Token $adoToken -OrgUrl $org
 
 try {
     $project = $wi.fields.'System.TeamProject'
     $commentUri = "$org/$([Uri]::EscapeDataString($project))/_apis/wit/workItems/$Id/comments?api-version=7.1-preview"
     $commentBody = @{ text = $Comment } | ConvertTo-Json -Depth 3
-    Invoke-RestMethod -Uri $commentUri -Headers $commentHeaders -Method Post -Body $commentBody | Out-Null
+    Invoke-RestMethod -Uri $commentUri -Headers $commentHeaders -Method Post -Body (ConvertTo-P20Utf8Body $commentBody) | Out-Null
     Write-Host "[+] Posted comment to discussion" -ForegroundColor Green
 }
 catch {

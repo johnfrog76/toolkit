@@ -17,15 +17,15 @@ cannot tell it is there.
 
 - [The flag, and why it is the engineer's](#the-flag-and-why-it-is-the-engineers)
 - [What the module owns](#what-the-module-owns)
+- [Turning it on](#turning-it-on)
 - [The verbs](#the-verbs)
+- [D-CM: how any module contributes commands](#d-cm-how-any-module-contributes-commands)
 - [The routes](#the-routes)
 - [The web UI](#the-web-ui)
 - [The file shape](#the-file-shape)
-- [Turning it on](#turning-it-on)
+- [How a review decides what is in it](#how-a-review-decides-what-is-in-it)
 - [The tests](#the-tests)
 - [Known gaps](#known-gaps)
-- [D-CM: how any module contributes commands](#d-cm-how-any-module-contributes-commands)
-- [How a review decides what is in it](#how-a-review-decides-what-is-in-it)
 
 ---
 
@@ -44,8 +44,9 @@ A feature flag has a scope, and the default scope is the person. A training you
 took does not stop having happened when you switch org, and a resume is not an
 engagement's -- so if this flag lived on an org, Growth would appear and
 disappear as you moved between an active engagement and an archived one. The
-exception is the ADO core's own flags, which describe one org's board:
-`sprintAwareness` is read from `spaces[].features` and is the only one.
+exceptions are the Space-scoped switches, which describe one Space:
+`sprintAwareness`, the ADO core's own flag for one org's board, and
+`suggestions`, both read from `spaces[].features`.
 
 One more key lives on the Space, and it is a number rather than a flag:
 `spaces[].features.trainingHoursPerQuarter`, the hours of training a Space's
@@ -58,7 +59,7 @@ Both halves answer this the same way and are held to it:
 | Half | Implementation |
 | --- | --- |
 | CLI | `Get-P20Features` in `utilities.psm1` |
-| Agent | `ORG_FEATURES` / `effective_features` in `agent/core/config.py` |
+| Agent | `SPACE_FEATURES` / `effective_features` in `agent/core/config.py` |
 | Web UI | `/api/env`'s `features` map, which the agent builds with the above |
 
 `Get-P20Features -CommittedOnly` answers the same question about
@@ -94,6 +95,45 @@ two halves must not disagree about where the store is.
 `pr-comments/` is the one thing this module writes that is **org**-scoped:
 reviewing a colleague's PR happens inside one engagement, so `LogPeerReview`
 writes under `<promptsRoot>/<promptsFolder>/pr-comments/`.
+
+---
+
+## Turning it on
+
+```jsonc
+// config.local.json -- gitignored, per machine
+{
+  "promptsRoot": "/path/to/your/hub",
+  "features": { "growth": true }
+}
+```
+
+Then, in a fresh shell:
+
+```powershell
+Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -Force
+tkMenu -All          # the six verbs appear under Growth and Reviews
+tkNewGrowth -Help
+```
+
+and for the web half:
+
+```powershell
+tkWeb -Dev           # the agent and the dev server
+```
+
+`/growth` lists what is in the hub's `growth/current/`, `/skills` renders
+`resume/resume.md`, and the Growth nav entry is there. Switch the flag off and
+all three are gone, with no restart of anything but the shell (an open shell keeps its verbs until it re-imports: [Configuration](../CONFIGURATION.md), "A module flag and an open shell").
+
+### Autoload
+
+A module verb **is not in the autoload manifest**, which is generated from the
+committed config where every module flag is off, so it resolves after
+`Import-Module` rather than in a profile-less shell. A flag set only in
+`config.local.json` never reaches the manifest: the alias-discovery shell reads
+`Get-P20Features -CommittedOnly`. The whole rule is
+[Module verbs and autoload](README.md#module-verbs-and-autoload).
 
 ---
 
@@ -179,6 +219,14 @@ groups by folder, and writes
 the output folder is the **sorted** set joined by `+`, so `"b,a"` and `"a,b"`
 write to the same place. Omitted, it uses the active Space.
 
+**It never writes over a review.** The prose pass writes into this same `review.md`, so a
+second run for a range answers `{ error }`, a 400 from the route, and the file is left as
+it is -- unless it is still the scaffold this verb wrote, untouched: the frontmatter carries
+`generator: scaffold` and a `scaffold:` fingerprint of the body, and a file whose body still
+matches is written again with the history as it reads now. An edit, a write-up, or a scaffold
+from before the fingerprint is refused. There is no switch: to start an edited range over,
+move or delete the file, as with a card.
+
 Answers in JSON on stdout -- `{ review, file_path, files_scanned, files_included }`
 or `{ error }` -- because the agent parses it. It therefore never prints prose
 on the success path and never exits non-zero for a user error.
@@ -255,10 +303,51 @@ tkLogPeerReview <PullRequestId> [-Title <string>] [-Notes <string>] [-Help]
 Writes `pr-comments/reviewed-YYYY-MM-DD-PR<id>.md` under the active Space. This is
 the half of review work that otherwise leaves no trace in your own record: the
 PR carries your comments, and nothing else says you spent the afternoon on it.
-The year-end review reads these. A missing id or an unusable prompt store is a
+The year-end review reads these, and counts one file as one review. **Nothing
+overwrites a record:** a second `LogPeerReview` of the same PR the same day adds
+its `Notes:` (and a `Title:`, where the first had none) to the record already
+there, and one with nothing to add leaves it as it is. A missing id or an unusable prompt store is a
 stated refusal (exit 2). Script: `Scripts/Write-PeerReviewLog.ps1` --
 a script rather than a function body in `utilities.psm1`, so file writing stays
 out of the command table's own file and within reach of the suites.
+
+---
+
+## D-CM: how any module contributes commands
+
+Growth contributes its verbs (`NewGrowth`, `NewWorkReview`, `PublishWorkReview`,
+`WorkReview`, `LogPeerReview`, `UpdateResume`) the way every module does:
+`Config/growth.commands.psd1` is the data file (`Feature = 'growth'`, the
+`Commands` rows, `Order`, `Help`), and `Config/growth.commands.ps1` holds one
+wrapper per row, in the pattern of the core wrappers in `utilities.psm1`:
+
+```powershell
+function global:New-P20GrowthItem {
+    [CmdletBinding()]
+    param(
+        [ValidateSet('training', 'presentation', 'goal')]
+        [string]$Type = 'training',
+        [string]$Title,
+        # ... the rest of the verb's parameters ...
+        [switch]$Help
+    )
+    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'NewGrowth'
+    if ($Help) { Show-CommandHelp 'NewGrowth'; return }
+    $pkgRoot = (Get-P20ModuleState).PackageRoot
+    Invoke-ToolkitScript -Path "$($pkgRoot)/Scripts/New-GrowthItem.ps1" -Parameters $PSBoundParameters `
+        -Name $inv.Name -Prefix $inv.Prefix -Detail $Type
+}
+```
+
+The package root is read inside the function, from `(Get-P20ModuleState).PackageRoot`,
+never from a free `$repoRoot`: a `function global:` reached from a script the module
+launched resolves a free name against that script (AGENTS.md, "Traps worth knowing").
+`Invoke-ToolkitScript` is the one guard every wrapper goes through, so the refusal
+contract holds for a module verb as it does for a core one. `Resolve-InvokedCommand` reads the prefix back
+off the alias the user actually typed, so nothing names it. The contract -- the
+data file's keys, why it is a plain hashtable, what the loader does and in which
+order, and how to add a module -- is
+[How a module contributes commands (D-CM)](README.md#how-a-module-contributes-commands-d-cm).
 
 ---
 
@@ -295,6 +384,10 @@ command table, parameters as argv. There is no second `pwsh -Command` builder
 beside the bridge with its own quoting: a comma-separated slug list needs no
 hand-added quotes to survive argv.
 
+**`GET /api/engagement/{slug}/reviews` is in `agent/ado/reporting.py`, and gated all the same.** It
+carries the module's own dependency, so with the flag off it is a 404, and the engagement summary's
+review count is 0.
+
 **`GET /api/engagement/{slug}/skills` is NOT here.** It counts tags across one
 org's `archive/` -- card data -- and it already lives in `agent/ado/reporting.py`.
 Moving it would buy a tidier folder and a worse boundary. `SkillsSnapshot`
@@ -320,7 +413,10 @@ and two components by name, `ReviewArchive` and `SkillsSnapshot`, which the ADO
 module's archive-mode home imports (`web/src/modules/ado/index.tsx`). A module
 may import another module's card; it may not fork one. They are gated there on
 the same flag their routes are, so an install without growth shows the two ADO
-cards and nothing breaks.
+cards and nothing breaks. The ADO module's **Space** card on Home follows the same flag for its
+**Reviews** tile: work reviews are growth's, so with growth off, or not configured, the card draws
+no Reviews tile rather than one that can only read 0 (`summaryTiles.ts`; [`docs/SCENARIOS.md`](../SCENARIOS.md),
+"The Space summary's tiles, by the growth flag").
 
 `api.growth.ts` injects the endpoints into the shell's single slice and adds its
 tag types -- `Growth`, `Resume`, `Reviews` -- with `enhanceEndpoints`, so the
@@ -330,17 +426,30 @@ those tags exist.
 
 `GrowthPage` is `ReviewArchive` + `Goals`, under the quarter line when there is one.
 
-**A review's row** shows its Spaces as chips -- one `Badge` per Space, by the Space's name -- and a
+**Both panels are list panels** (`ListPanel`, [`web/COMPONENTS.md`](../../web/COMPONENTS.md)): one
+fixed height beside each other and the deck launcher, every entry the same height with its text cut
+by an ellipsis, one **Open** button and the rest in the entry's `...` menu, and a page in the foot
+sized to the room the list has. Neither file draws an entry or a pager of its own; the dialogs they
+open are files beside them (`NewGrowthDialog.tsx`, `ReviewDialogs.tsx`). **Goals** splits its list
+with a row of status chips -- All, New, Active, Complete, each with its count -- and an entry shows
+the item's status beside its title, its facts as the file has them on the line under it (a
+training's provider and hours, then the dates), and its type and due date on the last line.
+**Reviews** splits its list with a row of chips -- All, Reviews, Resume, Archived -- and narrows the
+reviews to one Space with the **Space** select in its header; the resume is the engineer's and not
+a Space's, so it shows while no Space is picked. What a review is and how one is made is the panel's
+info icon, beside its title.
+
+**A review's entry** shows its Spaces as badges -- one per Space, by the Space's name -- and a
 summary that is the review's first line of prose, never its frontmatter (it used to print the raw
-`orgs: [...]` line). Its menu offers the row vocabulary's **Archive** and **Delete**, each
+`orgs: [...]` line), as plain words on two lines at most. Its menu offers the row vocabulary's **Archive** and **Delete**, each
 `WorkReview` through the bridge (`POST /api/cmd/WorkReview`, argv `buildWorkReviewParams`, the
 review's name from the row's `review` field). Archive runs at once, as the vocabulary's archive does
 on a row that only moves a file; Delete asks first, through the house's one confirm
-(`shared/ConfirmDialog`), which names the review's range and its Spaces. A refusal is shown in the
-verb's own words. A legacy review with no slug-set folder has no name the verb takes, so its row has
-no menu. **Archived reviews are their own filter value**: the default list (`GET
-/api/engagement/{slug}/reviews`) never reads `reviews/archive/`, and the filter's *Archived* option
-reads only it (`?archived=true`), where a row offers Delete and opens the review as before. The 1:1s are the communication
+(`shared/ConfirmDialog`), which names the review's range and its Spaces. A refused Archive is said
+once, on the panel over the list, in the verb's own words; a refused Delete stays in the confirm. A legacy review with no slug-set folder has no name the verb takes, so its entry has
+no menu. **Archived reviews are their own chip**: the default list (`GET
+/api/engagement/{slug}/reviews`) never reads `reviews/archive/`, and the *Archived* chip
+reads only it (`?archived=true`), where an entry offers Delete and opens the review as before. The 1:1s are the communication
 module's ([`communication.md`](communication.md)).
 
 `ReviewArchive` -- the **Reviews** card -- writes into the hub (a generated review is a file in
@@ -424,108 +533,6 @@ row above is pinned, case by case, in `Tests/test_growth_status.py`; the long ve
 
 ---
 
-## Turning it on
-
-```jsonc
-// config.local.json -- gitignored, per machine
-{
-  "promptsRoot": "/path/to/your/hub",
-  "features": { "growth": true }
-}
-```
-
-Then, in a fresh shell:
-
-```powershell
-Import-Module ./Prompt20Toolkit/Prompt20Toolkit.psd1 -Force
-tkMenu -All          # the six verbs appear under Growth and Reviews
-tkNewGrowth -Help
-```
-
-and for the web half:
-
-```powershell
-tkWeb -Dev           # the agent and the dev server
-```
-
-`/growth` lists what is in the hub's `growth/current/`, `/skills` renders
-`resume/resume.md`, and the Growth nav entry is there. Switch the flag off and
-all three are gone, with no restart of anything but the shell (an open shell keeps its verbs until it re-imports: [Configuration](../CONFIGURATION.md), "A module flag and an open shell").
-
-### Autoload
-
-A module verb **is not in the autoload manifest**, which is generated from the
-committed config where every module flag is off, so it resolves after
-`Import-Module` rather than in a profile-less shell. A flag set only in
-`config.local.json` never reaches the manifest: the alias-discovery shell reads
-`Get-P20Features -CommittedOnly`. The whole rule is
-[Module verbs and autoload](README.md#module-verbs-and-autoload).
-
----
-
-## The tests
-
-| Suite | What it guards |
-| --- | --- |
-| `tkTestToolkit -ModuleCommands` | D-CM end to end: off means absent, the prefix is data, help comes from the module's own file, a colliding name refuses the module whole, a malformed or `[ordered]` data file is skipped by path, `Order` decides registration order, a data file cannot run code, and a locally-enabled module stays out of the autoload manifest; and `NewGrowth -Close` / `-Complete` against a scratch hub: Complete rewrites only the goal's Outcome Status line, byte for byte, `-WhatIf` writes nothing, and a training or a goal with no Status line is a stated refusal |
-| `tkTestToolkit -Review` | `Generate-Review.ps1` against a scratch git hub: the bare-date regression, what the scan includes and excludes, the scaffold's sections, multi-org slug sets, edge cases, and the publish preview |
-| `pytest Tests/test_growth.py` | the routes against the fixture hub, the 404 gate, and the heading reader: an empty provider is `None`, not the writer's `---`, and a file made from the template reads its comments as nothing |
-| `tkTestToolkit -WorkReview` | `WorkReview` typed in a fresh shell over a scratch git hub: off means no verb, `-Help` names both moves, `-WhatIf` writes nothing, `-Archive` moves the folder with `**Closed:**` in `review.md`, `-Delete` removes it, `storeSync: git` commits that review's paths only, every refusal exit 2 |
-| `pytest Tests/test_reviews_multi_org.py` | a review folder's membership is split-on-`+` SET membership, not a substring search; `reviews/archive/` is off the default scan and the only thing `archived=True` reads; a summary is never the frontmatter |
-| `npm test -- ReviewArchive.rows` | a review's row offers Archive and Delete through `WorkReview`, Delete only after the confirm naming the range and Spaces, and archived reviews only under the Archived filter |
-| `npm test -- GoalActions` | a goal's row and page offer Complete and Archive while it is not complete and Archive alone once it is; a training or a talk keeps Archive alone; Complete asks, then runs `NewGrowth -Complete <file>`, and Archive `NewGrowth -Close <file>` |
-| `npm test -- Goals.create` | the New Growth Item dialog runs `NewGrowth` through the bridge with the dialog's fields as argv, opens the file the verb names, and keeps a refusal or an "Already there" in the dialog |
-| `npm test -- registry.growth` | the module contributes routes and nav only when the flag is true, and no home cards of its own |
-| `pytest Tests/test_growth_status.py` | the status rules in "The file shape", one row per input the rule distinguishes |
-| `npm run smoke` | with everything off, no Growth nav, no growth page, no growth data fetched, no page errors |
-
-Each suite's count is in [Testing](../TESTING.md). Two clauses are worth singling out, because each is a bug that would otherwise
-be invisible until it mattered:
-
-- **the bare-date regression.** `git log --after=2026-05-11` means "after
-  2026-05-11 at the current wall-clock time", so the same scan returned
-  different files in the morning and the evening. The script pins
-  `T00:00:00` / `T23:59:59` and the suite asserts it still does.
-- **substring membership.** A review folder named `first+second` must surface
-  for `first` and `second` and nobody else, and `first` must not drag in
-  `firstclass`. A substring implementation passes every happy-path example and
-  quietly puts one engagement's review in another's list.
-
----
-
-## Known gaps
-
-| # | Gap | What you see |
-| --- | --- | --- |
-| GR4 | The quarter line reads `growth/current/` only, shows the current quarter only, and has no history of the last four quarters | A training moved to `growth/archive/` stops counting toward the quarter it was dated in. Nothing archives a growth item from the UI yet |
-| GR3 | `ReviewPage` ownership settled as (a): it stays an ADO card and this module serves its routes | `/review` says "No reviews yet" when growth is off. Not an error, and not a bug |
-
----
-
-## D-CM: how any module contributes commands
-
-Growth contributes its five verbs the way every module does:
-`Config/growth.commands.psd1` is the data file (`Feature = 'growth'`, the
-`Commands` rows, `Order`, `Help`), and `Config/growth.commands.ps1` holds one
-wrapper per row, in the pattern of the core wrappers in `utilities.psm1`:
-
-```powershell
-function global:New-P20GrowthItem {
-    [CmdletBinding()]
-    param([string]$Title, [switch]$Help)
-    $inv = Resolve-InvokedCommand $MyInvocation.InvocationName 'NewGrowth'
-    if ($Help) { Show-CommandHelp 'NewGrowth'; return }
-    & "$repoRoot/Scripts/New-GrowthItem.ps1" @PSBoundParameters
-}
-```
-
-`$repoRoot` and `$toolkitRoot` both resolve to the package root; the loader sets
-`$repoRoot` before dot-sourcing. `Resolve-InvokedCommand` reads the prefix back
-off the alias the user actually typed, so nothing names it. The contract -- the
-data file's keys, why it is a plain hashtable, what the loader does and in which
-order, and how to add a module -- is
-[How a module contributes commands (D-CM)](README.md#how-a-module-contributes-commands-d-cm).
-
 ## How a review decides what is in it
 
 **A card is in a review when it was open at some point in the window**: `**Created:**` on or before
@@ -551,3 +558,50 @@ as work too.
 The Review suite holds both paths: its unstamped fixture cards go through git, and a stamped hub
 runs twice -- as a repository whose history is deliberately misleading, and with no git at all --
 with the same bullets word for word.
+
+---
+
+## The tests
+
+| Suite | What it guards |
+| --- | --- |
+| `tkTestToolkit -ModuleCommands` | D-CM end to end: off means absent, the prefix is data, help comes from the module's own file, a colliding name refuses the module whole, a malformed or `[ordered]` data file is skipped by path, `Order` decides registration order, a data file cannot run code, and a locally-enabled module stays out of the autoload manifest; and `NewGrowth -Close` / `-Complete` against a scratch hub: Complete rewrites only the goal's Outcome Status line, byte for byte, `-WhatIf` writes nothing, and a training or a goal with no Status line is a stated refusal |
+| `tkTestToolkit -Review` | `Generate-Review.ps1` against a scratch git hub: the bare-date regression, what the scan includes and excludes, the scaffold's sections, multi-org slug sets, edge cases, and the publish preview |
+| `pytest Tests/test_growth.py` | the routes against the fixture hub, the 404 gate, and the heading reader: an empty provider is `None`, not the writer's `---`, and a file made from the template reads its comments as nothing |
+| `tkTestToolkit -WorkReview` | `WorkReview` typed in a fresh shell over a scratch git hub: off means no verb, `-Help` names both moves, `-WhatIf` writes nothing, `-Archive` moves the folder with `**Closed:**` in `review.md`, `-Delete` removes it, `storeSync: git` commits that review's paths only, every refusal exit 2 |
+| `pytest Tests/test_reviews_multi_org.py` | a review folder's membership is split-on-`+` SET membership, not a substring search; `reviews/archive/` is off the default scan and the only thing `archived=True` reads; a summary is never the frontmatter |
+| `npm test -- ReviewArchive.rows` | a review's entry offers Archive and Delete through `WorkReview`, a refused Archive said on the panel, Delete only after the confirm naming the range and Spaces, and archived reviews only under the Archived chip |
+| `npm test -- filters.names` | Goals' status chips and Reviews' chips are named groups, and Reviews' Space select has a name |
+| `npm test -- GoalActions` | a goal's row and page offer Complete and Archive while it is not complete and Archive alone once it is; a training or a talk keeps Archive alone; Complete asks, then runs `NewGrowth -Complete <file>`, and Archive `NewGrowth -Close <file>` |
+| `npm test -- Goals.create` | the New Growth Item dialog runs `NewGrowth` through the bridge with the dialog's fields as argv, opens the file the verb names, and keeps a refusal or an "Already there" in the dialog |
+| `npm test -- registry.growth` | the module contributes routes and nav only when the flag is true, and no home cards of its own |
+| `pytest Tests/test_growth_status.py` | the status rules in "The file shape", one row per input the rule distinguishes |
+| `npm run smoke` | with everything off, no Growth nav, no growth page, no growth data fetched, no page errors |
+
+Each suite's count is in [Testing](../TESTING.md). Two clauses are worth singling out, because each is a bug that would otherwise
+be invisible until it mattered:
+
+- **the bare-date regression.** `git log --after=2026-05-11` means "after
+  2026-05-11 at the current wall-clock time", so the same scan returned
+  different files in the morning and the evening. The script pins
+  `T00:00:00` / `T23:59:59` and the suite asserts it still does.
+- **substring membership.** A review folder named `first+second` must surface
+  for `first` and `second` and nobody else, and `first` must not drag in
+  `firstclass`. A substring implementation passes every happy-path example and
+  quietly puts one engagement's review in another's list.
+
+---
+
+## Known gaps
+
+| # | Gap | What you see | Known gap |
+| --- | --- | --- | --- |
+| GR4 | The quarter line reads `growth/current/` only, shows the current quarter only, and has no history of the last four quarters | A training moved to `growth/archive/` stops counting toward the quarter it was dated in, and *Archive* in the UI (`NewGrowth -Close`) moves it there | [An archived training leaves its quarter's count](../KNOWN-GAPS.md#an-archived-training-leaves-its-quarters-count) |
+
+### True by design
+
+This one is a choice, not an omission, and is not on [Known gaps](../KNOWN-GAPS.md):
+
+| # | Choice | What you see |
+| --- | --- | --- |
+| GR3 | `ReviewPage` ownership settled as (a): it stays an ADO card and this module serves its routes | `/review` says "No reviews yet" when growth is off. Not an error, and not a bug |

@@ -19,7 +19,8 @@
  * configured`.
  */
 import { Body1, Caption1, Subtitle2, tokens } from "@fluentui/react-components";
-import { PageCard } from "../../shared/PageCard";
+import { InfoTip } from "../../shared/InfoTip";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { useGetEnvQuery } from "../../shell/api";
 import type { EnvStatus } from "../../shell/api";
 import { modules } from "../../shell/registry";
@@ -50,29 +51,36 @@ function SurfaceRow({ label, state, setting }: { label: string; state: string; s
 export function ModulesCard({ className }: { className?: string }) {
   const { data: env, isLoading } = useGetEnvQuery();
   return (
-    <PageCard
+    <PanelFrame
       className={className}
       loading={isLoading}
       loadingLabel="Reading the add-ons..."
-      headerLeft={<Subtitle2>Modules</Subtitle2>}
-      footerLeft={
-        <Caption1>
-          Add-ons for ToolKit. Off means absent: no tab, no verb, nothing fetched.
-        </Caption1>
+      headerLeft={
+        <>
+          <Subtitle2>Modules</Subtitle2>
+          {/* What the panel holds is said behind the info icon, never in its body or foot. */}
+          <InfoTip
+            label="About Modules"
+            content="Add-ons for ToolKit. Off means absent: no tab, no verb, nothing fetched."
+          />
+        </>
       }
-    >
-      <div style={{ marginTop: tokens.spacingVerticalS }}>
-        {modules
-          .filter((m) => m.feature)
-          .map((m) => (
-            <SurfaceRow
-              key={m.id}
-              label={`${m.id.charAt(0).toUpperCase()}${m.id.slice(1)} module`}
-              state={surfaceState(env, m.feature as string)}
-              setting={`features.${m.feature}`}
-            />
-          ))}
-      </div>
-    </PageCard>
+      body={
+        <>
+          <div style={{ marginTop: tokens.spacingVerticalS }}>
+            {modules
+              .filter((m) => m.feature)
+              .map((m) => (
+                <SurfaceRow
+                  key={m.id}
+                  label={`${m.id.charAt(0).toUpperCase()}${m.id.slice(1)} module`}
+                  state={surfaceState(env, m.feature as string)}
+                  setting={`features.${m.feature}`}
+                />
+              ))}
+          </div>
+        </>
+      }
+    />
   );
 }

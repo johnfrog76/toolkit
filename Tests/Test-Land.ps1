@@ -40,6 +40,9 @@ $logDir = Join-Path $root 'log'
 $stateDir = Join-Path $root 'tracker'
 $callLog = Join-Path $root 'calls.log'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
+# Children start in the host this suite runs in, with stderr read as text on 5.1
+# (Tests/Get-TestHost.ps1).
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 function New-LandSandbox {
     New-Item -ItemType Directory -Path $pkgDir, $hubDir, $logDir, $stateDir -Force | Out-Null
@@ -60,8 +63,9 @@ function New-LandSandbox {
     foreach ($f in @('widgets', 'board', 'solo')) { New-Item -ItemType Directory -Path (Join-Path $hubDir "$f/current") -Force | Out-Null }
 }
 
-function Set-ActiveSpace([string]$slug) {
+function Set-ActiveSpace([string]$slug, [string]$StoreSync = '') {
     $local = [ordered]@{ quietStart = $true; promptsRoot = $hubDir; activeSpace = $slug }
+    if ($StoreSync) { $local.storeSync = $StoreSync }
     [System.IO.File]::WriteAllText((Join-Path $pkgDir 'config.local.json'), ($local | ConvertTo-Json -Depth 4), $utf8)
 }
 
@@ -126,7 +130,8 @@ function global:az {
 function global:Invoke-RestMethod {
     param(`$Uri, `$Headers, `$Method, `$Body)
     `$line = "REST `$Method `$Uri"
-    if (`$Body) { `$line += " " + (`$Body -replace '\s+', ' ') }
+    `$text = if (`$Body -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString(`$Body) } else { [string]`$Body }
+    if (`$Body) { `$line += " " + (`$text -replace '\s+', ' ') }
     Add-Content -Path '$calls' -Value `$line
     if ("`$Method" -eq 'Get') {
         `$st = if (Test-Path (Join-Path '$state' 'wi-closed')) { 'Closed' } else { 'Active' }
@@ -147,7 +152,7 @@ function Invoke-Land {
     if ($PrState) { $pre = "`$env:P20_TEST_PR_STATE = '$PrState'`n" + $pre }
     if ($AdoStatus) { $pre = "`$env:P20_TEST_ADO_STATUS = '$AdoStatus'`n" + $pre }
     [System.IO.File]::WriteAllText($runner, ($pre + "`n" + $Snippet + "`n; `"EXIT=`$LASTEXITCODE`"`n"), $utf8)
-    $out = & pwsh -NoProfile -File $runner 2>&1
+    $out = Invoke-P20TestHost -File $runner
     $text = (($out | ForEach-Object { $_.ToString() }) -join "`n")
     $calls = if (Test-Path $callLog) { @(Get-Content $callLog) } else { @() }
     return [pscustomobject]@{ Text = $text; Calls = $calls }
@@ -272,6 +277,89 @@ try {
     Assert-True 'the issue step is skipped, and said' ($r.Text -match '\[2/3\] Skipped: this Space has no tracker') $r.Text
     Assert-True 'and the card is recorded and archived' ((Test-Path (Join-Path $hubDir "solo/archive/$nameS")) -and ([System.IO.File]::ReadAllText((Join-Path $hubDir "solo/archive/$nameS")) -match '- c84c6e3 #178 squash-merged to main 2026-10-30')) $r.Text
 
+    # -- The card's line names the pull request, never where to go -------------
+    Set-ActiveSpace 'board'
+    $n = 5100
+    foreach ($bad in @(
+            'https://x&calc&.visualstudio.com/pullrequest/1',
+            'https://dev.azure.com/x&calc&/pullrequest/1',
+            'https://dev.azure.com/other-org/p/_git/r/pullrequest/1',
+            'https://evil.example/acme-org/_git/r/pullrequest/1',
+            'https://evil.example#.visualstudio.com/pullrequest/1',
+            'https://dev.azure.com/acme-org.evil.example/p/_git/r/pullrequest/1',
+            'https://github.com/o/r/pull/1'
+        )) {
+        $n++
+        $name = "$n-a-forged-line.prompt.md"
+        New-Card -Space 'board' -FileName $name -Heading "Bug ${n}: A forged line" -PrUrl $bad | Out-Null
+        $r = Invoke-Land "tkLand $n"
+        Assert-True "a line off this Space's tracker is refused: $bad" ($r.Text -match 'EXIT=2' -and $r.Text -match "not on this Space's tracker") $r.Text
+        Assert-True 'and nothing was asked' (@($r.Calls | Where-Object { $_ -match '^(az repos|gh pr|REST)' }).Count -eq 0) ($r.Calls -join ' | ')
+    }
+
+    # The same on a GitHub Space: the line's repository is the Space's, or nothing
+    # is asked and no issue of the Space's is touched.
+    Set-ActiveSpace 'widgets'
+    $n = 5200
+    foreach ($bad in @(
+            'https://github.com/someone/else/pull/1',
+            'https://github.com/acme/other/pull/1',
+            'https://github.com/acme/widgets.evil/pull/1',
+            'https://dev.azure.com/acme-org/p/_git/r/pullrequest/1'
+        )) {
+        $n++
+        $name = "$n-a-forged-line.prompt.md"
+        New-Card -Space 'widgets' -FileName $name -Heading "Bug ${n}: A forged line" -PrUrl $bad | Out-Null
+        $r = Invoke-Land "tkLand $n"
+        Assert-True "on a GitHub Space, a line off its repository is refused: $bad" ($r.Text -match 'EXIT=2' -and ($r.Text -match "not on this Space's tracker")) $r.Text
+        Assert-True 'and nothing was asked or closed' (@($r.Calls | Where-Object { $_ -match '^(az repos|gh pr|gh issue|REST)' }).Count -eq 0) ($r.Calls -join ' | ')
+        $r = Invoke-Land "tkLand $n -Pr 7"
+        Assert-True '-Pr does not send a number to that repository' ($r.Text -match 'EXIT=2' -and -not (@($r.Calls) -match 'gh pr view 7 --repo (?!acme/widgets)')) (($r.Calls -join ' | ') + $r.Text)
+    }
+
+    # A line that is no pull request at all: -Pr names the number on the Space's own
+    # repository, and the line stays out of the public closing comment.
+    New-Card -Space 'widgets' -FileName '5301-a-stray-line.prompt.md' -Heading 'Bug 5301: A stray line' -PrUrl 'https://stray.example.test/landing' | Out-Null
+    $r = Invoke-Land 'tkLand 5301 -Pr 9'
+    Assert-True 'a stray line asks the Space''s own repository' (@($r.Calls) -match 'gh pr view 9 --repo acme/widgets') ($r.Calls -join ' | ')
+    Assert-True 'and never reaches the closing comment' ($r.Text -notmatch 'stray\.example' -and -not (@($r.Calls) -match 'stray\.example')) (($r.Calls -join ' | ') + $r.Text)
+
+    # A card's link gives the issue number only when it is this Space's: on GitHub,
+    # one of the Space's repositories, not another repository of the same owner.
+    $k = 0
+    foreach ($elsewhereLink in @(
+            'https://github.com/someone/else/issues/77',
+            'https://github.com/acme/other/issues/77',
+            'https://github.com/acme/widgets.evil/issues/77',
+            'https://github.com/acme/widgets/pull/77'
+        )) {
+        $k++
+        New-Card -Space 'widgets' -FileName "Task530$k-a-linked-card.prompt.md" -Heading "Task 530${k}: A linked card" `
+            -PrUrl 'https://github.com/acme/widgets/pull/12' -Link $elsewhereLink | Out-Null
+        $r = Invoke-Land "tkLand 530$k"
+        Assert-True "a link off the Space's repositories does not name the issue: $elsewhereLink" (-not (@($r.Calls) -match 'gh issue \w+ 77')) ($r.Calls -join ' | ')
+    }
+    New-Card -Space 'widgets' -FileName 'Task5309-a-linked-card.prompt.md' -Heading 'Task 5309: A linked card' `
+        -PrUrl 'https://github.com/acme/widgets/pull/12' -Link 'https://github.com/acme/widgets/issues/78' | Out-Null
+    $r = Invoke-Land 'tkLand 5309'
+    Assert-True "and a link on the Space's repository does" (@($r.Calls) -match 'gh issue \w+ 78') ($r.Calls -join ' | ')
+
+    # Land takes an id or a filename in the active Space, never a path: a path could
+    # name another Space's card and close this Space's issue of the same number.
+    $elsewhere = New-Card -Space 'board' -FileName '5310-in-another-space.prompt.md' -Heading 'Bug 5310: In another Space' `
+        -PrUrl 'https://github.com/acme/widgets/pull/12'
+    $here = New-Card -Space 'widgets' -FileName '5311-in-this-space.prompt.md' -Heading 'Bug 5311: In this Space' `
+        -PrUrl 'https://github.com/acme/widgets/pull/12'
+    foreach ($cardPath in @($elsewhere, $here)) {
+        $before = Get-Bytes64 $cardPath
+        $r = Invoke-Land "tkLand '$cardPath'"
+        Assert-True "a path is refused, said once: $(Split-Path $cardPath -Leaf)" ($r.Text -match 'EXIT=2' -and $r.Text -match 'not a path' -and ([regex]::Matches($r.Text, 'Error:')).Count -eq 1) $r.Text
+        Assert-True 'and nothing was asked, closed or written' (@($r.Calls | Where-Object { $_ -match '^(az repos|gh pr|gh issue|REST)' }).Count -eq 0 -and (Get-Bytes64 $cardPath) -eq $before) ($r.Calls -join ' | ')
+    }
+    $r = Invoke-Land 'tkLand 5311-in-this-space.prompt.md'
+    Assert-True 'the same card by its filename lands' ($r.Text -match 'EXIT=0') $r.Text
+    Set-ActiveSpace 'board'
+
     # -- Azure DevOps, merged ---------------------------------------------------
     Set-ActiveSpace 'board'
     $nameA = '4242-a-board-bug.prompt.md'
@@ -297,6 +385,201 @@ try {
     $bB = Get-Bytes64 $pB
     $r = Invoke-Land 'tkLand 4243' -AdoStatus 'abandoned'
     Assert-True 'an abandoned Azure DevOps pull request is refused (exit 2), named, nothing written' ($r.Text -match 'is abandoned, not merged' -and $r.Text -match 'EXIT=2' -and (Get-Bytes64 $pB) -eq $bB -and -not (@($r.Calls) -match '^REST ')) $r.Text
+
+    # -- What reaches a .cmd ------------------------------------------------------
+    # PowerShell quotes an argument holding a space, and nothing else. One row each.
+    . (Join-Path $pkgRoot 'Scripts/Invoke-TrackerRead.ps1')
+    foreach ($row in @(
+            @{ Arg = 'plain'; Ok = $true }
+            @{ Arg = 'https://dev.azure.com/acme-org'; Ok = $true }
+            @{ Arg = 'System.Tags=a; b'; Ok = $true }
+            @{ Arg = 'R&D work'; Ok = $true }
+            @{ Arg = '100% of it'; Ok = $true }
+            @{ Arg = 'repos/acme/widgets/branches/you%2Fa-widget'; Ok = $true }
+            @{ Arg = 'a%2Fb%2Fc'; Ok = $true }
+            @{ Arg = '%2F%2F'; Ok = $true }
+            @{ Arg = '100% of 50% done'; Ok = $true }
+            @{ Arg = 'about 50% done'; Ok = $true }
+            @{ Arg = "[State] <> 'Closed'"; Ok = $true }
+            @{ Arg = ''; Ok = $true }
+            @{ Arg = 'https://x&calc&.visualstudio.com'; Ok = $false }
+            @{ Arg = 'a|b'; Ok = $false }
+            @{ Arg = 'a<b'; Ok = $false }
+            @{ Arg = 'a>b'; Ok = $false }
+            @{ Arg = 'a^b'; Ok = $false }
+            @{ Arg = '%PATH%'; Ok = $false }
+            @{ Arg = '%CD%'; Ok = $false }
+            @{ Arg = '%CD%00'; Ok = $false }
+            @{ Arg = '%ADO_PAT%00'; Ok = $false }
+            @{ Arg = 'a b %PATH%'; Ok = $false }
+            @{ Arg = 'a b %=ExitCode%'; Ok = $false }
+            @{ Arg = 'a b %=C:%'; Ok = $false }
+            @{ Arg = '%ProgramFiles(x86)%'; Ok = $false }
+            @{ Arg = '%C3%A9'; Ok = $false }
+            @{ Arg = '100%'; Ok = $false }
+            @{ Arg = 'say "hi" there'; Ok = $false }
+            @{ Arg = '"'; Ok = $false }
+            @{ Arg = "two`nlines"; Ok = $false }
+        )) {
+        Assert-True "a .cmd may take [$($row.Arg)]: $($row.Ok)" ($row.Ok -eq (Test-P20CmdArgument $row.Arg))
+    }
+    # A tool that is not there, or will not start, is a failure with its own
+    # code -- never the 0 a write that never ran would read as done.
+    $missing = Invoke-P20TrackerRead 'p20-no-such-tool' @('issue', 'close', '5')
+    Assert-True 'a tool that is not found is Code 127, with a sentence' ($missing.Code -eq 127 -and "$($missing.Lines)" -match 'not installed, or not on the PATH' -and $LASTEXITCODE -eq 127) "$($missing.Code): $($missing.Lines)"
+    Assert-True 'and its sentence is in Err, with no Out' (@($missing.Out).Count -eq 0 -and "$($missing.Err)" -match 'not installed') "$($missing.Err)"
+    # Past every host's limit for one argument (Linux 128 KB, macOS 1 MB in all,
+    # Windows 32 KB for the line): the process never starts.
+    $tooLong = Invoke-P20TrackerRead 'git' @('--version', ('x' * 1500000))
+    Assert-True 'a tool that cannot be started is Code 126, with the reason' ($tooLong.Code -eq 126 -and "$($tooLong.Lines)" -match 'could not be started' -and $LASTEXITCODE -eq 126) "$($tooLong.Code): $(("$($tooLong.Lines)").Substring(0, [Math]::Min(200, "$($tooLong.Lines)".Length)))"
+    $fine = Invoke-P20TrackerRead 'git' @('--version')
+    Assert-True 'and the same tool with a normal argument runs, Code 0' ($fine.Code -eq 0 -and "$($fine.Out)" -match 'git version') "$($fine.Code): $($fine.Lines)"
+
+    # -- The bytes a tool writes ---------------------------------------------------
+    # gh writes UTF-8 to a pipe, and PowerShell decodes a native command's output
+    # with the console's encoding: on Windows the OEM code page, so a review
+    # comment's em dash reached the card as three other characters. The console is
+    # set to Latin-1 for this call, which is what that code page does to the same
+    # bytes, so the row bites on every host; the tool is this host, writing raw
+    # UTF-8 to its stdout.
+    $u8Words = 'caf' + [char]0x00E9 + ' ' + [char]0x2014 + ' ok'
+    $u8B64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($u8Words))
+    $emit = "`$b = [Convert]::FromBase64String('$u8B64'); `$o = [Console]::OpenStandardOutput(); `$o.Write(`$b, 0, `$b.Length); `$o.Flush()"
+    $emitArgs = @('-NoProfile', '-NonInteractive', '-EncodedCommand', [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($emit)))
+    $thisHost = [string](Get-Process -Id $PID).Path
+    $savedConsole = $null
+    $consoleSet = $false
+    $afterName = ''
+    $decoded = $null
+    try { $savedConsole = [Console]::OutputEncoding; [Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(28591); $consoleSet = $true } catch { $consoleSet = $false }
+    try {
+        if ($consoleSet) {
+            $decoded = Invoke-P20TrackerRead $thisHost $emitArgs
+            $afterName = [Console]::OutputEncoding.WebName
+        }
+    }
+    finally { if ($consoleSet) { [Console]::OutputEncoding = $savedConsole } }
+    Assert-True 'the console takes Latin-1 for the row' $consoleSet
+    Assert-True "a tool's UTF-8 output is read as UTF-8 under a Latin-1 console (PowerShell $($PSVersionTable.PSVersion.Major))" ($null -ne $decoded -and ((@($decoded.Out) -join '') -ceq $u8Words)) "$(if ($decoded) { @($decoded.Lines) -join '|' })"
+    Assert-True "and the console's own encoding is put back after the call" ($afterName -eq 'iso-8859-1') $afterName
+
+    # az is Python, which encodes a pipe in the locale's code page unless
+    # PYTHONIOENCODING says otherwise. A stub az first on the PATH says what it
+    # was handed; the caller's own value is put back after.
+    $azDir = Join-Path $root 'aztool'
+    New-Item -ItemType Directory -Path $azDir -Force | Out-Null
+    $onWindows = ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop')
+    if ($onWindows) { [System.IO.File]::WriteAllText((Join-Path $azDir 'az.cmd'), "@echo %PYTHONIOENCODING%`r`n") }
+    else {
+        [System.IO.File]::WriteAllText((Join-Path $azDir 'az'), "#!/bin/sh`necho `"`$PYTHONIOENCODING`"`n")
+        & chmod +x (Join-Path $azDir 'az')
+    }
+    $savedPath = $env:PATH
+    $savedPython = $env:PYTHONIOENCODING
+    $env:PYTHONIOENCODING = 'p20-caller-value'
+    try {
+        $env:PATH = $azDir + [System.IO.Path]::PathSeparator + $savedPath
+        $azRead = Invoke-P20TrackerRead 'az' @('version')
+        $pythonAfter = $env:PYTHONIOENCODING
+    }
+    finally {
+        $env:PATH = $savedPath
+        if ($null -eq $savedPython) { Remove-Item Env:\PYTHONIOENCODING -ErrorAction SilentlyContinue } else { $env:PYTHONIOENCODING = $savedPython }
+    }
+    Assert-True 'az is handed PYTHONIOENCODING=utf-8' ($azRead.Code -eq 0 -and ((@($azRead.Out) -join '').Trim() -eq 'utf-8')) "$($azRead.Code): $(@($azRead.Lines) -join '|')"
+    Assert-True "and the caller's own value is back after the call" ($pythonAfter -eq 'p20-caller-value') $pythonAfter
+
+    if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') {
+        # The real thing: a .cmd on the PATH, a value that would write a marker.
+        $cmdDir = Join-Path $root 'cmdtool'
+        New-Item -ItemType Directory -Path $cmdDir -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $cmdDir 'p20tool.cmd'), "@echo ran %*`r`n")
+        $marker = Join-Path $cmdDir 'marker.txt'
+        $before = $env:PATH
+        # No whitespace in the value, or PowerShell quotes it: the marker is named
+        # from the folder it lands in, so a temp path with a space changes nothing.
+        Push-Location $cmdDir
+        try {
+            $env:PATH = "$cmdDir;$before"
+            $ok = Invoke-P20TrackerRead 'p20tool' @('--name', 'a b')
+            Assert-True 'a .cmd still runs' ($ok.Code -eq 0 -and ($ok.Out -join ' ') -match 'ran --name') ($ok.Lines -join ' | ')
+            $no = Invoke-P20TrackerRead 'p20tool' @('x&echo.hit>marker.txt&')
+            Assert-True 'and takes no bare syntax' ($no.Code -eq 2) ($no.Lines -join ' | ')
+            Assert-True 'and nothing ran' (-not (Test-Path -LiteralPath $marker)) ($no.Lines -join ' | ')
+
+            # What arrives. Called directly, a .cmd shows a variable's value in the
+            # argument, which is why the shape is refused; through the read, nothing
+            # starts. An argument the rule passes arrives as it was written.
+            $arrived = Join-Path $cmdDir 'arrived.log'
+            [System.IO.File]::WriteAllText((Join-Path $cmdDir 'p20arrive.cmd'), "@>>`"$arrived`" echo %*`r`n")
+            $env:AD_P20_PROBE = 'probe-value'
+            $env:P20_PROBE_VAR = 'probe-value'
+            foreach ($value in @('%AD_P20_PROBE%00', 'a b %P20_PROBE_VAR%')) {
+                Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
+                & p20arrive $value
+                $direct = if (Test-Path -LiteralPath $arrived) { [System.IO.File]::ReadAllText($arrived) } else { '' }
+                Assert-True "called directly, [$value] arrives with the variable's value" ($direct -match 'probe-value') $direct
+                Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
+                $read = Invoke-P20TrackerRead 'p20arrive' @($value)
+                Assert-True "through the read, [$value] is refused and nothing starts" ($read.Code -eq 2 -and -not (Test-Path -LiteralPath $arrived)) ($read.Lines -join ' | ')
+            }
+            $cwdValue = '%CD%00'
+            Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
+            & p20arrive $cwdValue
+            $direct = if (Test-Path -LiteralPath $arrived) { [System.IO.File]::ReadAllText($arrived) } else { '' }
+            Assert-True "called directly, [$cwdValue] arrives with the folder in it" ($direct -match 'cmdtool') $direct
+            Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
+            $read = Invoke-P20TrackerRead 'p20arrive' @($cwdValue)
+            Assert-True "through the read, [$cwdValue] is refused and nothing starts" ($read.Code -eq 2 -and -not (Test-Path -LiteralPath $arrived)) ($read.Lines -join ' | ')
+            # cmd.exe's own =names are set only once it has run something, so what a
+            # direct call shows here varies. The rule is the same either way.
+            foreach ($value in @('a b %=ExitCode%', 'a b %=C:%')) {
+                Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
+                $read = Invoke-P20TrackerRead 'p20arrive' @($value)
+                Assert-True "through the read, [$value] is refused and nothing starts" ($read.Code -eq 2 -and -not (Test-Path -LiteralPath $arrived)) ($read.Lines -join ' | ')
+            }
+            foreach ($value in @('a%2Fb%2Fc', '%2F%2F', 'about 50% done', '100% of 50% done')) {
+                Remove-Item -LiteralPath $arrived -ErrorAction SilentlyContinue
+                $read = Invoke-P20TrackerRead 'p20arrive' @($value)
+                $got = if (Test-Path -LiteralPath $arrived) { [System.IO.File]::ReadAllText($arrived) } else { '' }
+                Assert-True "[$value] arrives as it was written" ($read.Code -eq 0 -and $got.Contains($value)) "$($read.Code): $got"
+            }
+        }
+        finally {
+            $env:PATH = $before
+            Remove-Item Env:AD_P20_PROBE, Env:P20_PROBE_VAR -ErrorAction SilentlyContinue
+            Pop-Location
+        }
+    }
+
+    # -- A backlog card, in a hub that is a git repository ------------------------
+    # The bullet puts a backlog card in play (backlog/ to current/), then Archive
+    # moves it on and commits: the commit has to carry the whole move, so the hub
+    # is clean after a verb that said "Committed.".
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        $gitIn = { param([string[]]$GitArgs) $null = Invoke-P20TestGit -C $hubDir @GitArgs }
+        & $gitIn @('init', '-q')
+        & $gitIn @('config', 'user.email', 'land@example.test')
+        & $gitIn @('config', 'user.name', 'Land Test')
+        & $gitIn @('config', 'commit.gpgsign', 'false')
+        $nameB = 'TaskB3QN-a-planned-card.prompt.md'
+        New-Card -Space 'widgets' -FileName $nameB -Heading 'Task B3QN: A planned card' -Folder 'backlog' | Out-Null
+        & $gitIn @('add', '-A')
+        & $gitIn @('commit', '-q', '-m', 'the hub before Land')
+        $unrelated = Join-Path $hubDir 'widgets/backlog/TaskC4RT-not-this-card.prompt.md'
+        [System.IO.File]::WriteAllText($unrelated, "# Task C4RT: Not this card`n", $utf8)
+        Set-ActiveSpace 'widgets' -StoreSync 'git'
+        $r = Invoke-Land 'tkLand B3QN -Pr 190'
+        Assert-True 'a backlog card in a git hub lands: exit 0, committed' ($r.Text -match 'EXIT=0' -and $r.Text -match 'Committed\.') $r.Text
+        $porcelain = @((Invoke-P20TestGit -C $hubDir status --porcelain --untracked-files=all).Lines)
+        Assert-True 'and the hub is clean but for a card the verb never touched' (($porcelain -join '|') -ceq '?? widgets/backlog/TaskC4RT-not-this-card.prompt.md') ($porcelain -join ' | ')
+        $last = (Invoke-P20TestGit -C $hubDir show --stat --format=%s HEAD).Lines -join "`n"
+        Assert-True 'the archive commit records the card leaving backlog/' ($last -match [regex]::Escape("widgets/{backlog => archive}/$nameB") -or ($last -match "backlog/$nameB" -and $last -match "archive/$nameB")) $last
+        Set-ActiveSpace 'widgets'
+    }
+    else {
+        Write-Host '  SKIP  git is not on PATH: the backlog card in a git hub' -ForegroundColor Yellow
+    }
 
     # -- The help --------------------------------------------------------------
     $r = Invoke-Land 'tkLand -Help'

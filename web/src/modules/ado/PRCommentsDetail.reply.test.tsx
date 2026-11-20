@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { PRCommentsDetail, REPLY_STATUSES, statusFor } from "./PRCommentsDetail";
+import { PRCommentsDetail, REPLY_STATUSES, replyStatusesFor, statusFor } from "./PRCommentsDetail";
 import type { DetailResponse } from "./api.ado";
 
 // The reply box: an open thread with no reply in the card gets a box,
@@ -16,7 +16,9 @@ jest.mock("remark-gfm", () => ({ __esModule: true, default: () => null }));
 // The web-side error log posts with fetch, which jsdom does not have.
 jest.mock("./logError", () => ({ logWebError: jest.fn() }));
 
-const env: { anthropicConfigured: boolean } = { anthropicConfigured: true };
+const env: { anthropicConfigured: boolean; tracker?: "ado" | "github" } = {
+  anthropicConfigured: true,
+};
 jest.mock("../../shell/api", () => ({
   useGetEnvQuery: () => ({ data: env, isLoading: false }),
 }));
@@ -76,6 +78,7 @@ function mount() {
 
 beforeEach(() => {
   env.anthropicConfigured = true;
+  env.tracker = "ado";
   runCommand.mockReset();
   suggestReply.mockReset();
   refetch.mockReset();
@@ -176,6 +179,48 @@ describe("the reply box", () => {
     expect(statusFor("reject")).toBe("wontFix");
     expect(statusFor("modify")).toBe("pending");
     expect(statusFor("anything else")).toBe("fixed");
+    expect(replyStatusesFor("ado")).toEqual([...REPLY_STATUSES]);
+    expect(replyStatusesFor(undefined)).toEqual([...REPLY_STATUSES]);
+  });
+
+  it("on a GitHub Space the box offers fixed, closed and active only", () => {
+    env.tracker = "github";
+    mount();
+    fireEvent.click(screen.getByRole("combobox", { name: "Status for comment 1" }));
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "fixed",
+      "closed",
+      "active",
+    ]);
+  });
+
+  it("on Azure DevOps the box offers all six", () => {
+    mount();
+    fireEvent.click(screen.getByRole("combobox", { name: "Status for comment 1" }));
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([...REPLY_STATUSES]);
+  });
+
+  it("on GitHub a reject or modify maps to active and the draft says the thread is left open", async () => {
+    env.tracker = "github";
+    expect(replyStatusesFor("github")).toEqual(["fixed", "closed", "active"]);
+    expect(statusFor("take", "github")).toBe("fixed");
+    expect(statusFor("reject", "github")).toBe("active");
+    expect(statusFor("modify", "github")).toBe("active");
+    expect(statusFor("anything else", "github")).toBe("fixed");
+    suggestReply.mockReturnValue({
+      unwrap: () =>
+        Promise.resolve({ recommendation: "reject", confidence: "high", draft_reply: "As is." }),
+    });
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: /suggest a reply/i }));
+    await waitFor(() =>
+      expect((screen.getByLabelText("Reply to comment 1") as HTMLTextAreaElement).value).toBe(
+        "As is.\n\nLeaving this thread open.",
+      ),
+    );
+    expect(screen.getByRole("combobox", { name: "Status for comment 1" }).textContent).toContain(
+      "active",
+    );
   });
 });
 

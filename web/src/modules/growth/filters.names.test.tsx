@@ -1,11 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { Goals } from "./Goals";
 import { ReviewArchive } from "./ReviewArchive";
 
-// Axe's button-name (critical): the Growth page's two header filters are
-// Fluent Dropdowns whose only text is their value ("All"), so a screen reader
-// heard an unnamed combobox. Each carries an aria-label for what it filters --
+// Axe's button-name (critical): a filter a screen reader cannot name is an
+// unnamed control. The Growth page's two panels split their lists with chip
+// rows, each a named group, and Reviews narrows by Space with a named select --
 // a contract, held here. The data hooks are stand-ins.
 
 jest.mock("react-redux", () => ({ useDispatch: () => jest.fn() }));
@@ -36,22 +36,24 @@ jest.mock("./api.growth", () => ({
   useGenerateReviewMutation: () => [jest.fn(), { isLoading: false }],
 }));
 
-describe("the Growth page's header filters", () => {
-  it("Goals names its status filter", () => {
+describe("the Growth page's filters", () => {
+  it("Goals names its status chips", () => {
     render(
       <MemoryRouter>
         <Goals />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("combobox", { name: "Status" })).toBeTruthy();
+    const group = screen.getByRole("group", { name: "Filter goals" });
+    expect(within(group).getAllByRole("radio").length).toBe(4);
   });
 
-  it("the review archive names its Space-or-type filter", () => {
+  it("Reviews names its chips and its Space picker", () => {
     render(
       <MemoryRouter>
         <ReviewArchive />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("combobox", { name: "Space or type" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Filter reviews" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Space" })).toBeTruthy();
   });
 });

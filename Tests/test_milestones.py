@@ -89,8 +89,7 @@ class TheRead(unittest.TestCase):
         self.assertEqual(calls[0][2:5], ["--method", "GET", "repos/johnfrog76/toolkit/milestones"])
         self.assertIn("state=all", calls[0])
         self.assertIn("per_page=100", calls[0])
-        # No argument may carry a cmd.exe metacharacter: on Windows gh runs through
-        # the shell and `?state=all&per_page=100` became two commands.
+        # No argument may put a query in the URL: gh takes query parameters as fields.
         self.assertTrue(all(not any(ch in a for ch in "&|<>") for a in calls[0]), calls[0])
         self.assertEqual(resp.milestones, [])
         self.assertIsNone(resp.reason)  # an empty list is a fine answer
@@ -173,7 +172,7 @@ class GhArgumentsAreShellSafe(unittest.TestCase):
             data, why = accounting._gh_json(["gh", "api", "repos/o/r/milestones?state=all&per_page=100"])
         run.assert_not_called()
         self.assertIsNone(data)
-        self.assertIn("cmd.exe", why)
+        self.assertIn("-f field", why)
 
     def test_flags_pass(self):
         self.assertIsNone(

@@ -66,7 +66,7 @@ live surface and `<command> -Help` describes any one. Commands load by themselve
 means `tkInstallAutoload -Force`. Each half also has its own README for the detail:
 [`agent/README.md`](../agent/README.md) and [`web/README.md`](../web/README.md).
 
-Every pull request runs a check, `.github/workflows/verify.yml` (also on every push to `main`, and from the Actions tab's button): the agent's, the CLI's and the web UI's runners on Ubuntu. That is the check a pull request has to pass, alongside CodeQL. The Windows job -- the CLI typed from Windows PowerShell 5.1 and the two browser smoke modes that start their own servers (`smoke:matrix`, `smoke:a11y`) -- does not run on an ordinary pull request or a push to `main`: it runs once each weekday evening against `main`, from the Actions tab's button, and on a pull request that carries the `ci` label, so label a change that is heavy on PowerShell or the browser when it wants that proof before it merges. The label takes effect on the pull request's next push (or reopen); to run Windows on a branch right away, use the button on that branch (`gh workflow run verify.yml --ref <branch>`). A label added to an open pull request starts nothing by itself, on purpose: a label must never cancel the running checks. A scheduled failure is filed as an issue with the run's URL and the next fix to merge carries the repair. Each step failed on a failure, a skipped half or a run that counted nothing, read from the runner's own summary line ([Testing](TESTING.md), "In CI"). It needs no secret, and a suite that does not pass without one is a defect of the suite. It does not run each suite as a file under 5.1, the agent's or the web UI's runners on Windows, or the smoke against servers you started, so a change to anything only those can show is still proved by running them, and the pull request says which ran.
+Every pull request runs a check, `.github/workflows/verify.yml` (also on every push to `main`, and from the Actions tab's button): the agent's, the CLI's and the web UI's runners on Ubuntu, each in a job of its own. A pull request runs the halves its files can reach -- a change under `web/` alone runs the web UI's job and the contract suites the other halves keep about it; a changelog entry, a module document, `docs/SCENARIOS.md` or `docs/KNOWN-GAPS.md` reaches no half, only those contract suites, so a web change that carries them still runs only the web UI's job and those suites; and a shared path runs all three -- and one check, `Verify`, passes when every job the change needed passed ([Testing](TESTING.md), "In CI"). That is the check a pull request has to pass, alongside CodeQL. The two Windows jobs -- the CLI typed from Windows PowerShell 5.1 with its suites in PowerShell 7 and the two browser smoke modes that start their own servers (`smoke:matrix`, `smoke:a11y`) in one, every CLI suite in Windows PowerShell 5.1 itself in the other (`ps51`) -- do not run on an ordinary pull request or a push to `main`: they run once each weekday evening against `main`, from the Actions tab's button, and on a pull request that carries the `ci` label (`ps51` only when the change reaches the CLI half), so label a change that is heavy on PowerShell or the browser when it wants that proof before it merges. When the label starts `ps51`, `Verify` waits for it, up to two and a half hours; only a labelled pull request pays that wait. The label takes effect on the pull request's next push (or reopen); to run Windows on a branch right away, use the button on that branch (`gh workflow run verify.yml --ref <branch>`). A label added to an open pull request starts nothing by itself, on purpose: a label must never cancel the running checks. A scheduled failure is reported by GitHub's notification and nothing else: the workflow files no issue, so whoever sees it files one by hand with the run's URL, and the next fix to merge carries the repair. Each step failed on a failure, a skipped half or a run that counted nothing, read from the runner's own summary line ([Testing](TESTING.md), "In CI"). It needs no secret, and a suite that does not pass without one is a defect of the suite. It does not run the agent's or the web UI's runners on Windows, or the smoke against servers you started, so a change to anything only those can show is still proved by running them, and the pull request says which ran.
 
 The web half (`web/`) runs on **Node 24, the active LTS, from 24.22.0**. The version is stated twice:
 `.nvmrc` at the repository root (`24`, the line) and `web/package.json` `engines.node` (`">=24.22.0"`,
@@ -101,9 +101,11 @@ tkTest -Half agent       # one half: cli, agent or web
 Or run the half you touched with its own runner -- `tkTestToolkit` for the CLI, `python3 -m pytest Tests/`
 for the agent (on Windows: `python` or `py -3`), and `npm test` from `web/` for the web UI --
 and `npm run smoke` from `web/` when a change shows in the browser. Run the ones your change touches,
-and read the summary line rather than the total: a skip is not a pass. What each suite guards, the
-counts a green run prints, and the one rule for a shell with two checkouts in it (one toolkit per
-shell) are in [Testing](TESTING.md). The runners remove any `TEAMS_WEBHOOK_*` variable from their own
+and read the summary line rather than the total: a skip is not a pass. A pull request states no test
+count, and a count typed into a document fails `tkTestToolkit -DocCounts`: the counts live in
+[`docs/TEST-COUNTS.md`](TEST-COUNTS.md), written at a release. What each suite guards, how those counts are
+written, and the one rule for a shell with two checkouts in it (one toolkit per shell) are in
+[Testing](TESTING.md). The runners remove any `TEAMS_WEBHOOK_*` variable from their own
 processes, so a suite never posts to a real channel.
 
 ## The refusal contract
@@ -166,7 +168,7 @@ python -m venv ~/.venv-audit
 ~/.venv-audit/bin/python -m pip_audit -r agent/requirements-dev.txt
 ```
 
-`No known vulnerabilities found` is clean, and a change that raises or adds a requirement runs it before it merges. The Ubuntu job of `.github/workflows/verify.yml` runs both audits -- this one and `npm audit --omit=dev --audit-level=high` in `web/` -- on every run, so an advisory fails a run the day it is published. A requirement that changes also keeps `python Scripts/third_party_notices.py --check` true (see "A new web dependency keeps the bundle permissive" below).
+`No known vulnerabilities found` is clean, and a change that raises or adds a requirement runs it before it merges. `.github/workflows/verify.yml` runs both audits -- this one in its agent job and `npm audit --omit=dev --audit-level=high` in its web job -- on every push to `main` and on every pull request that runs that half, so an advisory fails a run the day it is published. A requirement that changes also keeps `python Scripts/third_party_notices.py --check` true (see "A new web dependency keeps the bundle permissive" below).
 
 ## The rules a change meets
 
@@ -232,11 +234,11 @@ is a finding like an error: the bar is zero of either.
 | agent | the repository root | `ruff check` | `ruff.toml` |
 | agent | the repository root | `ruff format --check`; without `--check` to apply | `ruff.toml` |
 | CLI | the repository root, in `pwsh` | the PSScriptAnalyzer command below | `PSScriptAnalyzerSettings.psd1` |
-| documentation | `web/` | `npm run lint:md` (markdownlint-cli2 over every document in the repository: the root `README.md` and other root documents, `docs/`, the `design/` and `spec/` READMEs, `web/README.md`, `agent/README.md`) | `.markdownlint-cli2.jsonc` |
+| documentation | `web/` | `npm run lint:md` (markdownlint-cli2 over every document in the repository: the root `README.md` and other root documents, `docs/`, the `design/` and `spec/` READMEs, every entry waiting in `changelog.d/`, `web/README.md`, `agent/README.md`) | `.markdownlint-cli2.jsonc`, and `changelog.d/.markdownlint-cli2.jsonc`, which turns off the first-line-heading rule there because an entry opens with a dash |
 
 A Prettier failure names the files: fix them with `npx prettier --write <file>` (`npm run format` for all of `web/src`), then run `npm run lint` again.
 
-`.gitattributes` pins `web/src` to LF on disk, which is what Prettier's `endOfLine` expects, so a Windows checkout with `core.autocrlf` true passes `--check`. A clone that predates that line keeps its CRLF files until they are checked out again.
+`.gitattributes` checks out every text file LF on every platform (`* text=auto eol=lf`), which is what Prettier's `endOfLine` expects, so a Windows checkout with `core.autocrlf` true passes `--check`, and a test that reads the package's own source reads the same bytes everywhere. A clone that predates that line keeps its CRLF files until they are checked out again.
 
 ruff covers `agent/` and the suites in `Tests/*.py`, the repository's only Python, and comes with
 `agent/requirements-dev.txt`, pinned exactly. The line is 120 for the formatter and for `E501` alike. The rules

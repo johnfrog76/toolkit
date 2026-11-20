@@ -1,0 +1,6 @@
+Since Thursday 1 October 2026: 1 started, 1 in progress, 2 commits.
+Nothing is waiting on you.
+Opus: nothing yesterday, 1 open, 2 commits, none in flight, no blockers.
+Opus: nothing yesterday, 1 open, 1 started, no blockers.
+In flight is not yet known: every routed issue reads as open.
+Next: nothing is waiting on you.

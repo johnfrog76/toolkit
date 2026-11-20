@@ -100,6 +100,8 @@ $expected = [ordered]@{
     # A card's two planning lines, each its own: Plan -Milestone and Plan -Sprint write them.
     'stamps.milestone'        = '**Milestone:**'
     'stamps.sprint'           = '**Sprint:**'
+    # Who did the work on a card an agent worked: its model id, beside the Assigned line.
+    'stamps.agent'            = '**Agent:**'
     'stamps.started'          = '**Started:**'
     'stamps.outcome'          = '**Outcome:**'
     'stamps.review'           = '**Review:**'
@@ -130,15 +132,21 @@ $expected = [ordered]@{
     'reviews.fileName'        = 'review.md'
     'reviews.slugSetSeparator' = '+'
     # A list travels as its elements joined with a comma, so the table stays flat.
-    'features.spaceScoped'      = 'sprintAwareness,trainingHoursPerQuarter,suggestions'
+    'features.spaceScoped'      = 'sprintAwareness,trainingHoursPerQuarter,suggestions,teamSize'
     'env.activeSpace'         = 'P20_ACTIVE_SPACE'
     'env.promptsRoot'         = 'PROMPTS_ROOT'
     'env.agentCacheDir'       = 'P20_AGENT_CACHE_DIR'
+    'env.testHistoryDir'      = 'P20_TEST_HISTORY_DIR'
     'env.features'            = 'P20_FEATURES'
     'env.agentPort'           = 'P20_AGENT_PORT'
     'env.teamsWebhookPrefix'  = 'TEAMS_WEBHOOK_'
     'env.testRunMarker'       = 'P20_TEST_RUN'
+    'env.standupAsOf'         = 'P20_STANDUP_AS_OF'
     'agent.bindHost'          = '127.0.0.1'
+    'agent.apiPrefix'         = '/api'
+    'agent.responseHeaders'   = 'Content-Security-Policy=default-src ''self''; script-src ''self''; style-src ''self'' ''unsafe-inline''; img-src ''self'' data: blob: https:; media-src ''self'' blob:; frame-src ''self''; frame-ancestors ''none''; object-src ''none''; base-uri ''none'',X-Frame-Options=DENY,X-Content-Type-Options=nosniff,Referrer-Policy=no-referrer'
+    'agent.framablePrefix'    = '/lounge/'
+    'agent.framableHeaders'   = 'Content-Security-Policy=default-src ''self''; script-src ''self''; style-src ''self'' ''unsafe-inline''; img-src ''self'' data: blob: https:; media-src ''self'' blob:; frame-src ''self''; frame-ancestors ''self''; object-src ''none''; base-uri ''none'',X-Frame-Options=SAMEORIGIN'
     'stamps.sent'             = 'Sent to'
     'stamps.due'              = '**Due:**'
     'stamps.source'           = '**Source:**'
@@ -154,12 +162,32 @@ $expected = [ordered]@{
     'assets.coverExtensions'  = 'png,jpg,jpeg,webp,gif'
     'assets.coverMaxBytes'    = '5242880'
     'regex.dueLine'           = '(?m)^\*\*Due:\*\*[ \t]*(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?'
+    # A card's Tags: line splits on a comma or an Azure DevOps semicolon.
+    'regex.tagSeparator'      = '[,;]'
+    # The shapes of an Azure DevOps git remote and of its address (the checkout resolver, both halves).
+    'regex.adoOriginHttps'         = '^https://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)/([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$'
+    'regex.adoOriginVisualStudio'  = '^https://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com/(?:DefaultCollection/)?([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$'
+    'regex.adoOriginSsh'           = '^(?:ssh://(?:[^/@\s]+@)?(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com)(?::\d+)?/|(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):)v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$'
+    'regex.adoOrgDev'              = '^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)'
+    'regex.adoOrgVisualStudio'     = '^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)'
+    # A commit's Co-Authored-By trailer, the key in any case: group 1 the name (Get-P20CommitCoAuthors).
+    'regex.coAuthorTrailer'        = '(?mi)^[ \t]*Co-Authored-By:[ \t]*([^<\r\n]*?)[ \t]*<[^>\r\n]*>'
     'reminders.buckets'       = 'overdue,today,upcoming'
     'reminders.snooze'        = '1h,tomorrow,nextweek'
+    # A Teams recipient's type: gate 2 checks the first list; the schema offers both.
+    'communication.webhookRecipientTypes'  = 'channel,chat'
+    'communication.deferredRecipientTypes' = 'person'
     # The three halves a test run covers: Test and the CLI runner write
-    # them into test-summary.<machine>.json; the agent serves them.
+    # them into the machine's test summary; the agent serves them.
     'tests.halves'            = 'agent,cli,web'
     'tests.legacyHalf'        = 'cli'
+    # Where a machine keeps its test history: one folder per machine, outside
+    # every checkout (Scripts/Get-TestHistoryDir.ps1; agent/core/log.py).
+    'tests.summaryFile'       = 'test-summary.{machine}.json'
+    'tests.resultsFile'       = 'test-results.{machine}.log'
+    'tests.historyBase'       = 'windows=LOCALAPPDATA,linux=XDG_STATE_HOME'
+    'tests.historyFallback'   = 'windows=AppData/Local,macos=Library/Application Support,linux=.local/state'
+    'tests.historyPath'       = 'windows=ToolKit/TestHistory,macos=ToolKit/TestHistory,linux=toolkit/test-history'
     # The Docs tab's two roots: the agent's path rule and the web's link
     # resolver read them; the CLI states them so the contract is three-sided.
     'docs.readme'             = 'README.md'
@@ -187,7 +215,7 @@ $expected = [ordered]@{
     'studio.promptsRoute'     = '/api/studio/prompts'
     # The Spaces card's one read of every GitHub Space's ledger.
     'studio.ledgerRoute'      = '/api/studio/ledger'
-    'studio.threadRegex'      = '(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/(\d+))\s*$'
+    'studio.threadRegex'      = '(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/([0-9]{1,9}))\s*$'
     # The design lifecycle's identity (L1): the frontmatter key, the id's shape and
     # the state and outcome words. NewDesign and StampDesign write them; lists
     # travel comma-joined.
@@ -205,6 +233,7 @@ $expected = [ordered]@{
     'rituals.route'             = '/api/ritual/standup'
     'rituals.triageRoute'       = '/api/ritual/triage'
     'rituals.milestonesRoute'   = '/api/ritual/milestones'
+    'rituals.orgRoute'          = '/api/ritual/org'
     'rituals.assignMe'          = 'me'
     'rituals.ceremoniesFile'    = 'Config/ceremonies.json'
     'rituals.vocabularyFile'    = 'Config/standup-vocabulary.json'
@@ -224,7 +253,7 @@ $expected = [ordered]@{
     'rituals.grains'             = 'detail,work,brief'
     'rituals.numberWords'        = 'zero,one,two,three,four,five,six,seven,eight,nine,ten,eleven,twelve'
     'rituals.workHeadRegex'      = '^(?:[A-Za-z]+:\s+)?(.+?)(?:\s+--\s+|:\s+|$)'
-    'rituals.workThreadRegex'    = '(?m)^>\s*GitHub:\s*<?(?:https://github\.com/[^/\s>]+/[^/\s>]+/issues/|#)(\d+)'
+    'rituals.workThreadRegex'    = '(?m)^>\s*GitHub:\s*<?(?:https://github\.com/[^/\s>]+/[^/\s>]+/issues/|#)([0-9]{1,9})(?![0-9])'
     'rituals.workDesignRegex'    = 'design/([A-Za-z0-9][A-Za-z0-9_-]*)\.md'
     'rituals.workSmallWordRegex' = '^[a-z]{1,3}$'
     # The also-ons fold (D-SA9): the most groups a folded sentence names.
@@ -241,6 +270,13 @@ $expected = [ordered]@{
     'rituals.suggestShapes'      = 'start,delegate,route,place'
     'rituals.suggestOwnerSeat'   = 'fable'
     'rituals.cornerShapes'       = 'oneLeft,manyLeft,reached,nothingInReach'
+    # The standup room's sizes, the chair included, and what unset reads as.
+    'rituals.teamSizes'          = '3,6,9'
+    'rituals.teamSizeDefault'    = '9'
+    # The standup's room: the nine windows in grid order (a cast id and its plate),
+    # the chair's, the windows three labels keep, and the engineer's. A nested
+    # object travels as PowerShell writes it.
+    'rituals.room'               = 'windows=@{id=dev-hero; plate=DEV-HERO} @{id=ops-dev; plate=OPS-DEV} @{id=minimalist; plate=MINIMALIST} @{id=new-hire; plate=NEW HIRE} @{id=vibemancer; plate=AI VIBEMANCER} @{id=ultrawide; plate=ULTRAWIDE OVERLORD} @{id=qa; plate=QA ALCHEMIST} @{id=pm; plate=PM (TREADMILL)} @{id=designer; plate=DESIGNER},chair=pm,kept=@{fable=dev-hero; opus=vibemancer; sonnet=minimalist},engineer=dev-hero'
     'rituals.suggestExclusions'  = 'notBillable,waiting,inFlight,theirs,dismissed'
     # StartWork's hand-off block (D-AR5): the head line and the three section
     # headings the CLI types and the web's copy box finds; Tests/fixtures/start-work/
@@ -248,11 +284,31 @@ $expected = [ordered]@{
     'startWork.launchEnvFlag'   = 'startWorkLaunch'
     'startWork.howWeWorkNote'   = 'agentic/how-we-work.md'
     'startWork.howWeWorkLine'   = 'How we work here: {path}'
+    # The gh read limits both halves share: Standup, Triage and Route, and the agent's two ritual routes.
+    'ghReads.openIssues'        = '500'
+    'ghReads.allIssues'         = '500'
+    'ghReads.labels'            = '500'
+    'ghReads.repoMissing'       = 'could not resolve to a repository,not found (http 404),http 404'
     # Claude Code usage: /env's flag (and the inventory row's key), and the burn route.
     'usage.envFlag'             = 'claudeUsage'
     'usage.burnRoute'           = '/api/usage/burn'
+    # The statuses a reply may set, per tracker: ReplyPR's GitHub refusal and the PR Comments status box read them.
+    'replyStatuses.ado'         = 'fixed,active,pending,byDesign,wontFix,closed'
+    'replyStatuses.github'      = 'fixed,closed,active'
+    'usage.readingsFolder'      = 'readings'
+    # The words a cost line puts before the models it leaves out: Write-BurnLog.ps1 and the burn tile read them.
+    'usage.unpricedPhrase'      = 'not counting'
+    # The org chart's hub file: Read-OrgChart.ps1 reads (Get-P20Consts).org.file.
+    'org.file'                  = 'org.json'
+    # The model map a card's Agent id is looked up in: Get-P20ModelInfo reads (Get-P20Consts).models.file.
+    'models.file'               = 'Config/models.json'
+    # The order a card's agent is worked out in: Resolve-P20CardAgent reads (Get-P20Consts).models.agentSources.
+    'models.agentSources'       = 'line,assigned,trailer,none'
+    # Daily's window: the billing script, Daily and GET /api/billing refuse a
+    # window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
+    'billing.text'              = 'halfWindow=-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.,notADay={name} ''{value}'' is not a day: yyyy-MM-dd.,backwards=-Since {since} is after -Until {until}.'
     'startWork.text'            = 'head=# Start work: {kind} {id} -- {title},howWeWork=## How we work in {space} ({source}),work=## The work: {kind} {id} ({source}),prompt=## The prompt ({source})'
-    'rituals.text'              = 'title=Standup -- {date},dateFormat=dddd d MMMM yyyy,queueHeading=Waiting on you,queueEmpty=Nothing is waiting on you.,walk=Walk,tracker=Tracker,yesterday=Yesterday,today=Today,blockers=Blockers,mug=Mug,yesterdayEmpty=nothing closed,todayEmpty=nothing in flight,blockersEmpty=no blockers,blockerSuffix= (verify-close),noWorkers=No worker labels in this Space.,adoTracker=Azure DevOps is the human team''s board, and its standup is the one the team holds; Team Agile reads a GitHub Space''s issues and cards, or a local Space''s cards.,check=Check,checkCardArchived={item} -- the card is archived, but the issue is still open.,checkIssueClosed={item} -- the issue is closed, but the card is not archived.,briefWalkOne=walk,briefWalkMany=walks,briefDecideOne=decision,briefDecideMany=decisions,briefLookOne=look,briefLookMany=looks,briefAllPc=all on the PC,briefWhoPc=the PC,briefWhoYou=you,briefClosed={n} closed yesterday,briefClosedNone=nothing yesterday,briefOpen={n} open,briefOpenNone=nothing open,briefInFlight=none in flight,briefBlocker={n} blocker,briefBlockers={n} blockers,briefWorkerNone=nothing today,briefInFlightUnknown=In flight is not yet known: every routed issue reads as open.,briefNext=Next: the {kind} -- {n} on {who}.,briefNextNone=Next: nothing is waiting on you.,suggestNext=Next: {sentence} ({command}),suggestStart={ref} is {why} -- start it?,suggestDelegate={ref} is {size}-sized and well defined -- send it to the crew?,suggestRoute={ref} is {why}{nobody} -- route it?,suggestNobody= and nobody has it,suggestPlace={ref} is {size}-sized but has no milestone -- place it?,suggestWhyLast=the last open {noun} in milestone {milestone},suggestWhyMilestone=the oldest open {kind} in milestone {milestone},suggestWhyOldest=the oldest open {kind},suggestNounCard=card,suggestNounIssue=issue,suggestCommandStart=StartWork {arg},suggestCommandRoute=Route {arg} -Assign <me|size>,suggestCommandPlace=Route {arg} -Milestone <title>,suggestCommandPlaceCard=Plan {arg} -Milestone <title>,cornerOneLeft=one more {noun} {ref} to get milestone {milestone} - start it now,cornerManyLeft={n} more {noun} to get milestone {milestone} - start {ref} now,cornerReached=milestone {milestone} reached,cornerNothingInReach=no milestone in reach - place a card with Route or on its Sprint line,cornerNounCards=cards,cornerNounIssues=issues,cornerNounItems=items,cornerChevron=>,cornerBrief=Corner: {line},cornerBriefCommand=Corner: {line} {chevron} ({command}),workYesterday={name}, {n} closed,workToday={name}, {n},workBlockers={name}, {n} to walk,workWalk={name}, {n} to walk,workGroup={name}, {n},proseSentence={lead} {body}.,proseYesterday=Yesterday I closed,proseYesterdayAlso=I also closed,proseToday=Today I''m on,proseTodayAlso=I''m also on,proseBlockers=Blocked on,proseBlockersAlso=Also blocked on,proseBlockersNone=Nothing blocked.,proseWalk=Waiting on you to walk,proseWalkAlso=Also to walk,proseDecide=Waiting on you to decide,proseDecideAlso=Also to decide,proseLook=Waiting on you to look at,proseLookAlso=Also to look at,proseOne={n} in {name}: {item},proseTodayOne={name}: {item},proseMany={n} in {name} ({refs}),proseBare={item},proseItem={ref}, {clause},proseRefSeparator=, ,proseTodayFold={n} more: {names},proseTodayFoldCount={n} more designs,proseNameSeparator=, ,proseNameLast= and ,itemMotion={ref} ({motion}) {title},motionStarted=started,commitOne={n} commit,commitMany={n} commits,countsTotal=Since {date}: {counts}.,countsNone=nothing moved,countsSeparator=, ,countsClosed={n} closed,countsStarted={n} started,countsInProgress={n} in progress'
+    'rituals.text'              = 'title=Standup -- {date},dateFormat=dddd d MMMM yyyy,queueHeading=Waiting on you,queueEmpty=Nothing is waiting on you.,walk=Walk,tracker=Tracker,yesterday=Yesterday,today=Today,blockers=Blockers,mug=Status,yesterdayEmpty=nothing closed,todayEmpty=nothing in flight,blockersEmpty=no blockers,blockerSuffix= (verify-close),noWorkers=No worker labels in this Space.,adoTracker=Azure DevOps is the human team''s board, and its standup is the one the team holds; Team Agile reads a GitHub Space''s issues and cards, or a local Space''s cards.,trackerNotGitHub=This Space''s tracker is not GitHub -- {ritual} reads a GitHub Space''s issues.,trackerNotAsked=This Space is {status}, so its tracker is not asked.,trackerTier=The tracker is not reachable from here (tier {tier}).,trackerNoRepo=This GitHub Space names no repository -- give its address a repository, or add one to its projects.,trackerManyRepos=Issue numbers are per-repository, and this board has {n}: {repos}.,trackerGhMissing=gh is not installed, so the tracker was not asked.,trackerGhNoAnswer=gh did not answer for {repo}: {error},trackerGhSilent=gh did not answer for {repo},trackerRepoUnreadable=gh cannot read {repo} -- it does not exist yet, or it is private to an account this gh login is not,trackerNotJson=gh answered for {repo} with something that is not JSON,trackerReadFailed=The tracker read failed: {error},check=Check,checkCardArchived={item} -- the card is archived, but the issue is still open.,checkIssueClosed={item} -- the issue is closed, but the card is not archived.,briefWalkOne=walk,briefWalkMany=walks,briefDecideOne=decision,briefDecideMany=decisions,briefLookOne=look,briefLookMany=looks,briefAllPc=all on the PC,briefWhoPc=the PC,briefWhoYou=you,briefClosed={n} closed yesterday,briefClosedNone=nothing yesterday,briefOpen={n} open,briefOpenNone=nothing open,briefInFlight=none in flight,briefBlocker={n} blocker,briefBlockers={n} blockers,briefWorkerNone=nothing today,briefInFlightUnknown=In flight is not yet known: every routed issue reads as open.,briefNext=Next: the {kind} -- {n} on {who}.,briefNextNone=Next: nothing is waiting on you.,suggestNext=Next: {sentence} ({command}),suggestStart={ref} is {why} -- start it?,suggestDelegate={ref} is {size}-sized and well defined -- send it to the crew?,suggestRoute={ref} is {why}{nobody} -- route it?,suggestNobody= and nobody has it,suggestPlace={ref} is {size}-sized but has no milestone -- place it?,suggestWhyLast=the last open {noun} in milestone {milestone},suggestWhyMilestone=the oldest open {kind} in milestone {milestone},suggestWhyOldest=the oldest open {kind},suggestNounCard=card,suggestNounIssue=issue,suggestCommandStart=StartWork {arg},suggestCommandLaunch=StartWork {arg} -Launch,suggestCommandRoute=Route {arg} -Assign <me|size>,suggestCommandPlace=Route {arg} -Milestone <title>,suggestCommandPlaceCard=Plan {arg} -Milestone <title>,cornerOneLeft=one more {noun} {ref} to get milestone {milestone} - start it now,cornerManyLeft={n} more {noun} to get milestone {milestone} - start {ref} now,cornerReached=milestone {milestone} reached,cornerNothingInReach=no milestone in reach - place a card with Route or on its Sprint line,cornerNounCards=cards,cornerNounIssues=issues,cornerNounItems=items,cornerChevron=>,cornerBrief=Corner: {line},cornerBriefCommand=Corner: {line} {chevron} ({command}),workYesterday={name}, {n} closed,workToday={name}, {n},workBlockers={name}, {n} to walk,workWalk={name}, {n} to walk,workGroup={name}, {n},proseSentence={lead} {body}.,proseYesterday=Yesterday I closed,proseYesterdayAlso=I also closed,proseToday=Today I''m on,proseTodayAlso=I''m also on,proseBlockers=Blocked on,proseBlockersAlso=Also blocked on,proseBlockersNone=No blockers.,proseYesterdayNone=Yesterday I picked up where I left off.,proseYesterdayWorked=Yesterday I worked on {refs}.,proseYesterdayWorkedMany=Yesterday I worked on {n} items.,proseTodayNone=Today I''ll pick up the next item from the board.,turnOpen=Good morning.,turnClose=That''s it for me.,chairYesterday=Yesterday I walked {refs}.,chairYesterdayMany=Yesterday I did {n} walks.,chairToday=Today I''ll {body}.,chairTodayNone=Today I''ll keep the board moving.,chairWalk=walk {refs},chairWalkMany=do {n} walks,chairDecide=decide {refs},chairDecideMany=make {n} decisions,chairLook=look at {refs},chairLookMany=look at {n} items,chairClauseSeparator=, ,chairClauseLast=, and ,proseWalk=Waiting on you to walk,proseWalkAlso=Also to walk,proseDecide=Waiting on you to decide,proseDecideAlso=Also to decide,proseLook=Waiting on you to look at,proseLookAlso=Also to look at,proseOne={n} in {name}: {item},proseTodayOne={name}: {item},proseMany={n} in {name} ({refs}),proseBare={item},proseItem={ref}, {clause},proseRefSeparator=, ,proseTodayFold={n} more: {names},proseTodayFoldCount={n} more designs,proseNameSeparator=, ,proseNameLast= and ,itemMotion={ref} ({motion}) {title},motionStarted=started,commitOne={n} commit,commitMany={n} commits,countsTotal=Since {date}: {counts}.,countsNone=nothing moved,countsSeparator=, ,countsClosed={n} closed,countsStarted={n} started,countsInProgress={n} in progress,countsUndated=({n} undated)'
 }
 
 Write-Host "-- It parses, on the 5.1 floor ------------------------" -ForegroundColor Cyan
@@ -277,7 +333,20 @@ foreach ($entry in $expected.GetEnumerator()) {
     $parts = $entry.Key.Split('.')
     $actual = $c.($parts[0]).($parts[1])
     if ($actual -is [array]) { $actual = ($actual -join ',') }
-    elseif ($actual -is [System.Management.Automation.PSCustomObject]) { $actual = (@($actual.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ',') }
+    elseif ($actual -is [System.Management.Automation.PSCustomObject]) {
+        # A value that is itself a list of objects (rituals.room.windows) is written
+        # object by object, the way PowerShell writes one: @{id=...; plate=...}.
+        $actual = (@($actual.PSObject.Properties | ForEach-Object {
+                    $value = $_.Value
+                    if ($value -is [array]) {
+                        $value = (@($value | ForEach-Object {
+                                    if ($_ -is [System.Management.Automation.PSCustomObject]) { '@{' + ((@($_.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" })) -join '; ') + '}' }
+                                    else { [string]$_ }
+                                }) -join ' ')
+                    }
+                    "$($_.Name)=$value"
+                }) -join ',')
+    }
     Assert-Equal $entry.Key $entry.Value $actual
 }
 
@@ -326,7 +395,7 @@ Write-Host "-- One version, and the two files that carry a copy ---" -Foreground
 # read another file), so each is held to the contract by name: a partial bump
 # fails here, naming the file that was left behind.
 # MUST match Tests/test_consts.py's and web/src/shell/consts.test.ts's.
-$expectedVersion = '1.5.0'
+$expectedVersion = '1.6.0'
 Assert-Equal 'version' $expectedVersion ([string]$c.version)
 Assert-True 'the version is three dotted numbers' ([string]$c.version -match '^\d+\.\d+\.\d+$') "got '$($c.version)'"
 
@@ -356,6 +425,8 @@ Assert-True "commitBullet matches a real bullet" ("Commits:`n- 80e2168 add grid"
 Assert-True "commitBullet does not match the placeholder" (-not ("Commits:`n- (pending)" -match $c.regex.commitBullet))
 $bulletHashes = @([regex]::Matches("- 80e2168 a`n- ``abcdef1234`` b`n- (pending)", $c.regex.commitBullet) | ForEach-Object { $_.Groups[1].Value })
 Assert-Equal "commitBullet captures the hash in group 1" '80e2168,abcdef1234' ($bulletHashes -join ',')
+$trailerNames = @([regex]::Matches("Fix`n`nCo-Authored-By: Claude Opus 5.5 <a@b>`r`nco-authored-by:  A Person  <p@q>`nCo-Authored-By: no email", $c.regex.coAuthorTrailer) | ForEach-Object { $_.Groups[1].Value.Trim() })
+Assert-Equal "coAuthorTrailer reads the name in any case of the key, and needs the email" 'Claude Opus 5.5|A Person' ($trailerNames -join '|')
 $idWhole = '^(?:' + $c.regex.cardId + ')$'
 Assert-True "cardId matches a work item number" ('141' -cmatch $idWhole)
 Assert-True "cardId matches the id of a card with no work item" ('K7M2' -cmatch $idWhole)
@@ -457,6 +528,8 @@ $guarded = [ordered]@{
     'env.agentPort'          = 'P20_AGENT_PORT'
     'env.activeSpace'        = 'P20_ACTIVE_SPACE'
     'env.features'           = 'P20_FEATURES'
+    # Get-Standup.ps1 and Hide-RunOverrides.ps1 read the name from (Get-P20Consts).env.standupAsOf.
+    'env.standupAsOf'        = 'P20_STANDUP_AS_OF'
     'stamps.due'             = '**Due:**'
     'stamps.cover'           = '**Cover:**'
     'stamps.before'          = '**Before:**'
@@ -465,6 +538,12 @@ $guarded = [ordered]@{
     'stamps.from'            = '**From:**'
     # Plan-Card.ps1 and the reader build the line from (Get-P20Consts).stamps.milestone.
     'stamps.milestone'       = '**Milestone:**'
+    # Get-P20CardAgent builds the line's pattern from (Get-P20Consts).stamps.agent.
+    'stamps.agent'           = '**Agent:**'
+    # Get-P20ModelInfo reads the map's path from (Get-P20Consts).models.file.
+    'models.file'            = 'Config/models.json'
+    # Get-P20CommitCoAuthors reads the trailer's pattern from (Get-P20Consts).regex.coAuthorTrailer.
+    'regex.coAuthorTrailer'  = 'Authored-By:'
     # The standup's distinctive words: Scripts/Standup-Rules.ps1 reads them
     # from rituals.text and rituals.workerLabelPrefix, and nothing types them.
     'rituals.text.queueHeading'  = 'Waiting on you'
@@ -473,7 +552,15 @@ $guarded = [ordered]@{
     # The work grain's phrases: Standup-Rules.ps1 reads them from rituals.text.
     'rituals.text.workBlockers'  = '{n} to walk'
     # The prose: Standup-Rules.ps1 reads its sentences from rituals.text.
-    'rituals.text.proseBlockersNone' = 'Nothing blocked.'
+    'rituals.text.proseBlockersNone' = 'No blockers.'
+    # A slot with nothing beside one with something: Standup-Rules.ps1 reads the lines from rituals.text.
+    'rituals.text.proseYesterdayNone' = 'Yesterday I picked up where I left off.'
+    'rituals.text.proseTodayNone'    = 'Today I''ll pick up the next item from the board.'
+    # The turn's frame: Standup-Rules.ps1 reads it from rituals.text.
+    'rituals.text.turnOpen'          = 'Good morning.'
+    'rituals.text.turnClose'         = 'That''s it for me.'
+    # The chair's own turn: Standup-Rules.ps1 reads it from rituals.text.
+    'rituals.text.chairTodayNone'    = 'Today I''ll keep the board moving.'
     'rituals.text.proseYesterday'    = 'Yesterday I closed'
     # The line a write to a public repository carries: Get-RepoVisibility.ps1
     # prints it from visibility.publicLine, and nothing types it.
@@ -487,6 +574,21 @@ $guarded = [ordered]@{
     # The Claude Code usage row's key IS /env's flag: Get-OptionalSurfaces.ps1
     # reads (Get-P20Consts).usage.envFlag.
     'usage.envFlag'              = 'claudeUsage'
+    # The cost line's unpriced phrase: Write-BurnLog.ps1 reads (Get-P20Consts).usage.unpricedPhrase.
+    'usage.unpricedPhrase'       = 'not counting'
+    # The org chart's file name: Scripts read (Get-P20Consts).org.file.
+    'org.file'                   = 'org.json'
+    # Daily's window sentence: Resolve-BillingWindow.ps1 reads it from
+    # (Get-P20Consts).billing.text, and nothing types it. notADay is not guarded:
+    # the standup's own -Since refusal says a sentence of the same shape.
+    'billing.text.halfWindow'    = '-Since and -Until go together'
+    # The gh read limits: Get-Standup.ps1 and Get-Triage.ps1 read (Get-P20Consts).ghReads.
+    'ghReads.limitArgument'      = "'--limit', '500'"
+    # The Tracker line's sentences: Ritual-Common.ps1 reads them through
+    # Format-P20TrackerReason, and the ritual verbs type none.
+    'rituals.text.trackerGhMissing' = 'so the tracker was not asked'
+    'rituals.text.trackerNotGitHub' = "reads a GitHub Space's issues"
+    'ghReads.repoMissing'        = 'could not resolve to a repository'
 }
 $allowed = @('Scripts/Get-Consts.ps1')
 

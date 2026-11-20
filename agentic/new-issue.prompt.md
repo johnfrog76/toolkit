@@ -29,11 +29,10 @@ the backlog lives and how an issue is filed, worked and closed.
    anchored to a state of the tree rather than to a day.
 5. **Draft the title and body** from the template below. The title is `Bug: ...`, `Improve: ...` or
    `Feature: ...` followed by what is true, in one line.
-6. **Choose the labels** (vocabulary below): one type, one severity, and -- if you can judge it -- one
-   routing label.
+6. **Choose the label** (vocabulary below): one type. Severity goes in the body's Severity section.
 7. **Confirm before filing.** Show the user the title, the labels and a summary of the sections.
 8. **File it.** Write the body to a scratch file and run
-   `gh issue create --title "<title>" --body-file <file> --label <type> --label <sev> [--label <routing>]`.
+   `gh issue create --title "<title>" --body-file <file> --label <type>`.
 9. **Print the issue URL** and a one-line summary.
 
 ## Body template
@@ -116,27 +115,24 @@ This repository's own labels (`gh label list`), stated once. Another repository'
 
 - **Type** -- `bug` (something is broken or wrong), `enhancement` (new or better: improvements and
   features), `documentation`, `accessibility` (a barrier for people with disabilities).
-- **Severity** -- `sev1` drop everything, `sev2` next session, `sev3` when it fits. The Severity
-  section's Low / Medium / High maps to `sev3` / `sev2` / `sev1`.
-- **Routing**, by the **shape of the work** -- each routing label names the tier of worker the work
-  is handed to, and the tiers are a team's own: this repository uses `fable` **with** `deep-water`
-  for deep or risky work (architecture, scoping traps, process plumbing, migrations), `opus` for
-  volume and multi-file builds, and `sonnet` for well-scoped, pattern-following work. A team with
-  other tiers makes its own labels.
+- **`ci`** goes on a pull request, not an issue: it runs the Windows PowerShell 5.1 job and the browser
+  smoke on that pull request.
+- **`dependencies`** and the language labels are Dependabot's.
+
+There are no severity or routing labels here. Severity is the Severity section of the body. A team that
+wants them makes its own: the Standup and Triage rules read a repository's severity and size labels when
+it has them (`docs/modules/solitaire-agile.md`).
+
 - **`verify-close`** -- merged, but only another host (Windows, or a real org, or a browser) can
   prove it: the fix has a `VERIFY.md` Gate 12 row, and the issue stays open until that row is
   walked. The person who merges closes everything else at merge, so a closed issue means merged and
   pushed, and what verification finds afterwards is a new issue. A closing label, not a filing one.
 
-**Severity says WHEN, routing says WHO, and they are chosen independently**: a sev3 can be deep
-water, and a sev1 can be a one-line fix for the lightest tier. A filer who cannot judge the routing
-**leaves it off** and triage adds it.
-
 ## Rules
 
 - **Do not invent details.** If the user didn't mention a file or line, write `TBD -- needs
   investigation` in Location. Better: open the file and check before you write the line.
-- **Do not inflate severity.** Default to Low (`sev3`) unless there is a clear user-facing impact,
+- **Do not inflate severity.** Default to Low unless there is a clear user-facing impact,
   data loss, or something that reaches a real Teams channel or a real ADO board.
 - **Match the voice** of existing issues -- terse, technical, sourced, no filler.
 - **One issue per filing.** If the user describes several problems, ask which one to file first;

@@ -56,9 +56,10 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     $roleQueries = @(@{ Role = 'Author'; Flag = '--author' })
     if (-not $CreatorOnly) { $roleQueries += @{ Role = 'Reviewer'; Flag = '--review-requested' } }
     foreach ($q in $roleQueries) {
-        $found = gh search prs $q.Flag '@me' --state open --owner $owner `
-            --json 'number,title,repository,createdAt,url' --limit 50 2>$null | ConvertFrom-Json
-        if ($LASTEXITCODE -ne 0) {
+        $search = Invoke-P20TrackerRead 'gh' @('search', 'prs', $q.Flag, '@me', '--state', 'open', '--owner', $owner, '--json', 'number,title,repository,createdAt,url', '--limit', '50')
+        $found = $null
+        if ($search.Code -eq 0 -and ($search.Out -join '').Trim()) { $found = ($search.Out -join "`n") | ConvertFrom-Json }
+        if ($search.Code -ne 0) {
             Write-CliError -Message "GitHub did not answer the PR search for $owner." -Hint "${p}Env shows the tier and whether gh is signed in."
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }

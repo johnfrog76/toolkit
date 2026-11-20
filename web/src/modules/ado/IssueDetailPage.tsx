@@ -27,14 +27,14 @@ import { EmptyState } from "../../shared/EmptyState";
 import { FilePath } from "../../shared/FilePath";
 import { PublicLine, useActiveSpaceIsPublic } from "../../shared/visibility";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { ActionDialog } from "./ActionDialog";
 import type { ActionDialogTab } from "./ActionDialog";
 
 // The reading room for ONE issue -- "list and details" was the
 // research walk's verdict, and this is the details half. It is the house's
-// reading page, the same frame a card or a review is read in: PageCard, the
+// reading page, the same frame a card or a review is read in: PanelFrame, the
 // back arrow and the title on the left, every control on the right -- compact,
 // as the 1:1 page's are -- and ONE
 // MarkdownViewer -- so one zoom, one "On this page", one Top. Read, then act,
@@ -152,7 +152,7 @@ export function IssueDetailPage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         toast={
           pinRefusal ? (
             <StatusMessage status="error" onDismiss={() => setPinRefusal(null)}>
@@ -299,7 +299,7 @@ export function IssueDetailPage() {
             style={{ marginTop: tokens.spacingVerticalS }}
           />
         )}
-      </PageCard>
+      </PanelFrame>
       {readable && (
         <ActionDialog
           open={dialog.open}

@@ -1,11 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { OneOnOne } from "./OneOnOne";
 
-// Axe's button-name (critical): the Meetings card's filter is a Fluent
-// Dropdown whose only text is its value ("All"), on /communication and on
-// /organize, which hosts the card when organize is on. It carries an
-// aria-label, a contract held here. The data hooks are stand-ins.
+// Axe's button-name (critical): a filter a screen reader cannot name is an
+// unnamed control. The Meetings panel splits its list with a row of chips, on
+// /communication and on /organize, which hosts the panel when organize is on;
+// the row is a named group, a contract held here. The data hooks are stand-ins.
 
 jest.mock("./api.communication", () => ({
   useGetManagerQuery: () => ({
@@ -17,15 +17,16 @@ jest.mock("./api.communication", () => ({
   }),
   useCreateManagerSessionMutation: () => [jest.fn(), { isLoading: false }],
 }));
-jest.mock("./CloseMeeting", () => ({ CloseMeetingButton: () => null }));
+jest.mock("./CloseMeeting", () => ({ CloseMeetingDialog: () => null }));
 
-describe("the Meetings card's filter", () => {
-  it("is named Sessions", () => {
+describe("the Meetings panel's filter", () => {
+  it("is a group named Filter meetings, one chip a filter", () => {
     render(
       <MemoryRouter>
         <OneOnOne />
       </MemoryRouter>,
     );
-    expect(screen.getByRole("combobox", { name: "Sessions" })).toBeTruthy();
+    const group = screen.getByRole("group", { name: "Filter meetings" });
+    expect(within(group).getAllByRole("radio")).toHaveLength(4);
   });
 });

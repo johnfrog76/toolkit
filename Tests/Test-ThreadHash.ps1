@@ -16,6 +16,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot = Split-Path $scriptDir -Parent
@@ -67,12 +68,12 @@ function Initialize-Repo {
     New-Item -ItemType Directory -Path $Path -Force | Out-Null
     Push-Location $Path
     try {
-        git init --quiet 2>&1 | Out-Null
-        git checkout -B main --quiet 2>&1 | Out-Null
-        git config user.email 'test@example.com' 2>&1 | Out-Null
-        git config user.name $UserName 2>&1 | Out-Null
-        git config commit.gpgsign false 2>&1 | Out-Null
-        git config core.autocrlf false 2>&1 | Out-Null
+        $null = Invoke-P20TestGit init --quiet
+        $null = Invoke-P20TestGit checkout -B main --quiet
+        $null = Invoke-P20TestGit config user.email 'test@example.com'
+        $null = Invoke-P20TestGit config user.name $UserName
+        $null = Invoke-P20TestGit config commit.gpgsign false
+        $null = Invoke-P20TestGit config core.autocrlf false
     }
     finally { Pop-Location }
 }
@@ -82,8 +83,8 @@ function Add-Commit {
     Set-Content -Path (Join-Path $Repo $FileName) -Value "$Message`n" -Encoding UTF8
     Push-Location $Repo
     try {
-        git add . 2>&1 | Out-Null
-        git commit -m $Message --quiet 2>&1 | Out-Null
+        $null = Invoke-P20TestGit add .
+        $null = Invoke-P20TestGit commit -m $Message --quiet
         return "$(git rev-parse --short=7 HEAD)".Trim()
     }
     finally { Pop-Location }
@@ -130,7 +131,7 @@ function New-ThreadSandbox {
     Initialize-Repo -Path $code -UserName 'Code Test'
     Add-Commit -Repo $code -FileName 'README.md' -Message 'initial' | Out-Null
     Push-Location $code
-    try { git checkout -b $Branch --quiet 2>&1 | Out-Null } finally { Pop-Location }
+    try { $null = Invoke-P20TestGit checkout -b $Branch --quiet } finally { Pop-Location }
     $h1 = Add-Commit -Repo $code -FileName 'one.txt' -Message 'first real change'
     $h2 = Add-Commit -Repo $code -FileName 'two.txt' -Message 'second real change'
     $h3 = Add-Commit -Repo $code -FileName 'three.txt' -Message 'third real change'
@@ -350,7 +351,7 @@ try {
 
     # A branch that matches no card is a stated refusal, not a guess.
     Push-Location $sb.Code
-    try { git checkout -b user/555-no-such-card --quiet 2>&1 | Out-Null } finally { Pop-Location }
+    try { $null = Invoke-P20TestGit checkout -b user/555-no-such-card --quiet } finally { Pop-Location }
     $r2 = Invoke-ThreadHash -From $sb.Code
     Assert-Equal "a branch with no card refuses (exit 2)" 2 $r2.Exit
     Assert-True "the refusal names the branch" ($r2.Text -match 'user/555-no-such-card') $r2.Text
@@ -500,9 +501,44 @@ try {
     $text = Get-CardText $sb.Card
 
     Assert-Equal "a card with placeholders exits 0" 0 $r.Exit
-    Assert-True "the placeholder took the first hash threaded" ($text -match "Fixed in $($sb.CodeHashes[0])\.") $text
+    Assert-True "on a first run the placeholder takes the newest commit added, the last of the three" ($text -match "Fixed in $($sb.CodeHashes[2])\.") $text
     Assert-True "no [commit] token is left" ($text -notmatch '\[commit\]') $text
-    Assert-True "the run reports the replacement" ($r.Text -match 'placeholder') $r.Text
+    Assert-True "the run reports the replacement and names the commit" ($r.Text -match "placeholder with $($sb.CodeHashes[2])") $r.Text
+
+    # The review round: the branch was threaded before, a reply says [commit],
+    # and the fix is committed. The reply names the fix, not the branch's first.
+    $before = Get-CardText $sb.Card
+    [System.IO.File]::WriteAllText($sb.Card, ($before + "`nAnd the other one in [commit].`n"), (New-Object System.Text.UTF8Encoding($false)))
+    $fix = Add-Commit -Repo $sb.Code -FileName 'fix.txt' -Message 'the fix for the review'
+    $r = Invoke-ThreadHash -From $sb.Code -BoundArgs @{ File = $sb.Card }
+    $text = Get-CardText $sb.Card
+    Assert-Equal "a second run exits 0" 0 $r.Exit
+    Assert-True "on a second run the placeholder takes the fix, the one commit added" ($text -match "And the other one in $fix\.") $text
+    Assert-True "and not the branch's first commit" ($text -notmatch "And the other one in $($sb.CodeHashes[0])") $text
+    Assert-True "and the first round's reply keeps its hash" ($text -match "Fixed in $($sb.CodeHashes[2])\.") $text
+
+    # Nothing new to thread: there is no commit to name, so the placeholder stays.
+    $before = Get-CardText $sb.Card
+    [System.IO.File]::WriteAllText($sb.Card, ($before + "`nA third in [commit].`n"), (New-Object System.Text.UTF8Encoding($false)))
+    $r = Invoke-ThreadHash -From $sb.Code -BoundArgs @{ File = $sb.Card }
+    $text = Get-CardText $sb.Card
+    Assert-Equal "a run that adds nothing exits 0" 0 $r.Exit
+    Assert-True "and leaves the placeholder" ($text -match 'A third in \[commit\]\.') $text
+    Assert-True "and says so" ($r.Text -match 'Left 1 \[commit\] placeholder: no new commit to name') $r.Text
+
+    # -Hash names the commit, so the placeholder takes it even when the card has it.
+    $r = Invoke-ThreadHash -From $sb.Code -BoundArgs @{ File = $sb.Card; Hash = $sb.CodeHashes[1] }
+    $text = Get-CardText $sb.Card
+    Assert-True "-Hash fills the placeholder with the commit named" ($r.Exit -eq 0 -and $text -match "A third in $($sb.CodeHashes[1])\.") "$($r.Text) $text"
+
+    # A commit subject that says [commit] is a subject, not a placeholder.
+    $before = Get-CardText $sb.Card
+    [System.IO.File]::WriteAllText($sb.Card, ($before + "`nOne more in [commit].`n"), (New-Object System.Text.UTF8Encoding($false)))
+    $odd = Add-Commit -Repo $sb.Code -FileName 'odd.txt' -Message 'explain the [commit] placeholder'
+    $r = Invoke-ThreadHash -From $sb.Code -BoundArgs @{ File = $sb.Card }
+    $text = Get-CardText $sb.Card
+    Assert-True "the reply takes the newest commit" ($text -match "One more in $odd\.") $text
+    Assert-True "and its bullet keeps its subject as written" ($text -match "(?m)^- $odd explain the \[commit\] placeholder\r?$") $text
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

@@ -165,6 +165,7 @@ switch.
 | --- | --- | --- |
 | `GET /api/prs` | 1 | ADO via `az`, filtered by the resolved identity |
 | `GET /api/status` | 2+ | the Card model; on a GitHub Space at Tier 1 each card also carries `pinned` -- its issue is in the repository's pinned set, asked once per repo by `gh api graphql` and dropped when `EditItem` runs; at Tier 2, on Azure DevOps and with no tracker `gh` is not asked and `pinned` is false |
+| `GET /api/backlog` | 2+ | the Backlog's rows, a folder read ([milestones](../hub/milestones.md#the-backlog-the-order-as-a-table)); on an Azure DevOps Space a **404** naming `MyWork` -- the company's backlog is in Azure DevOps, so ToolKit shows none, and `Backlog` refuses the same way |
 | `GET /api/work-items` | 1 | ADO via `az` (WIQL); on a GitHub Space `gh issue list`, with `?state=open\|closed\|all` and `?all=1` as the Issues tab's two agent axes; a gh row carries `pinned`, GitHub's own `isPinned` |
 | `GET /api/issue-report`, `GET /api/milestones` | 1, GitHub only | the Stats tab: the report read from the Studio ledger's entry for the Space ([the Studio](studio.md)) -- no `gh` call of its own -- and `gh api .../milestones?state=all` with `reached` derived -- every issue closed and at least one |
 | `GET /api/design`, `GET /api/design/{folder}/{name}` | 1, GitHub only | the repo's `design/` and `spec/` via `gh api .../contents` (Studio S2); an owner-grained address is a 400. The list also carries `checkout`: the active Space's `spaceCheckouts.<slug>.path` checked against the repo on every request (`space`, `key`, `path`, `root`, `ready`, `reason`; `agent/core/checkout.py`), which decides whether a row offers `MoveDesign`'s roads ([Studio](studio.md), "The web UI") |
@@ -189,12 +190,12 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
   the tracker gets the reply, the card's `Reply:` slot gets it through `Write-CardText`, and the
   page re-reads the card. The agent writes no card here; the native `save` route was retired.
   For an org with no ADO, Home is the board alone and these are absent; `ConnectAdoCard` and the quiet
-  line under the board are the way in (`homeViewFor`, [the web README](../../web/README.md#the-board)).
+  line under the board are the way in (`homeTabPlan` in `web/src/modules/ado/homeTabs.ts`, [the web README](../../web/README.md#the-board)).
 - **The New card dialog** -- a *From a work item* tab beside *New card*, and the default where ADO is
   reachable. Where ADO is not in use there are no tabs at all.
 - **On a card** -- an **ado** badge first in its meta line (a GitHub-born card wears **gh**, a custom card
   nothing: the card model's `tracker`, from the card's own link), *Open on Azure DevOps* (last in the menu), *Create PR*, the project tag, and the repo filter (which matches on the
-  ADO link, so it hides every unlinked card and SAYS how many). The first two are ABSENT on a card with
+  ADO link; a card with no Azure DevOps link stays in view under every repository). The first two are ABSENT on a card with
   no work item, and on every card while ADO is off; *Create PR* is disabled, with the reason, until the
   card records a commit (`web/src/modules/ado/cardActions.ts`, [the web README](../../web/README.md#the-board)).
   **Land** is on every Code Review card, on this board and on a GitHub one alike, and absent on every
@@ -258,6 +259,8 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
 - **Settings** -- the org's address, tenant and status; the **Azure DevOps** row (`features.ado`), whose
   switch shows what is in effect when unset.
 
+Known gap: [Create PR on Azure DevOps needs the branch pushed](../KNOWN-GAPS.md#create-pr-on-azure-devops-needs-the-branch-pushed).
+
 ## What it writes into a card
 
 Four things, and only these ([the card](../hub/cards.md) is the whole model):
@@ -301,6 +304,8 @@ stated refusal naming `az login`, before anything is read or written. A 401 or 4
 gets the same sign-in advice wherever it is explained. The messages are in [the CLI
 reference](../CLI.md#errors), under "Not authenticated" and "Access denied".
 
+Known gap: [Azure DevOps verbs are hidden, not gone](../KNOWN-GAPS.md#azure-devops-verbs-are-hidden-not-gone).
+
 ## The tests
 
 | Suite | Holds |
@@ -309,9 +314,9 @@ reference](../CLI.md#errors), under "Not authenticated" and "Access denied".
 | `Tests/test_ado_enabled.py` | the agent's copy of the rule over the SAME table; what `/env` serves |
 | `Tests/test_env_org_state.py` | "never asked" is not a failure |
 | `Tests/test_identity.py`, `test_env_probe.py` | who "me" is, with `az` stubbed; `/env` neither blocks on the probe nor repeats it |
-| `tkTestToolkit -PullRequest -CloseItem -PRComments` | the PR description parser, the transition rule and ADO's error messages, the actionable-thread filter; `-CloseItem` also holds the token helper on both PowerShells -- `az` failing with error text, or printing nothing, is a refusal and never a token |
+| `tkTestToolkit -PullRequest -CloseWorkItem -PRComments` | the PR description parser, the transition rule and ADO's error messages, the actionable-thread filter; `-CloseWorkItem` also holds the token helper on both PowerShells -- `az` failing with error text, or printing nothing, is a refusal and never a token |
 | `tkTestToolkit -Land` (`Tests/Test-Land.ps1`) | `Land` typed with `gh`, `az` and the REST calls stubbed: a merged Azure DevOps pull request read through `az repos pr show`, the work item closed through `CloseItem`'s PATCH with a comment naming the commit, a re-run that asks first and posts nothing, an abandoned pull request refused; the GitHub path the same way |
-| `web`: `cliBridge.test.ts`, `homeView.test.ts`, `cardActions.test.ts`, `useLandCard.test.tsx` | the exact argv each dialog sends; which view of Home an org gets; Land on every Code Review card, and what it runs |
+| `web`: `cliBridge.test.ts`, `homeTabs.test.ts`, `cardActions.test.ts`, `useLandCard.test.tsx` | the exact argv each dialog sends; which view of Home an org gets; Land on every Code Review card, and what it runs |
 | `VERIFY.md` | the verbs that cannot be automated, because they need a real board -- the manual runbook |
 
 **No suite calls Azure DevOps.** `az` is stubbed or absent in every one, by design: a signed-in machine
@@ -320,8 +325,11 @@ must not be able to pass a failing assertion.
 ## Known gaps
 
 - **Hidden, not gone.** With ADO not in use its verbs leave `Menu` but stay registered; the bridge will
-  still run them and the routes still exist. Unregistering is phase 8 of
-  [`docs/ROADMAP.md`](../ROADMAP.md).
+  still run them and the routes still exist. Unregistering belongs to M5 -- the rename, in
+  [the roadmap](../ROADMAP.md). Known gap: [Azure DevOps verbs are hidden, not gone](../KNOWN-GAPS.md#azure-devops-verbs-are-hidden-not-gone).
+- **Create PR needs the branch pushed.** On an Azure DevOps board, *Create PR* in the browser runs in the
+  Toolkit's own folder rather than in a clone of the card's repository, so the card's branch must already
+  be pushed ([The web UI](#the-web-ui)). Known gap: [Create PR on Azure DevOps needs the branch pushed](../KNOWN-GAPS.md#create-pr-on-azure-devops-needs-the-branch-pushed).
 
 [Known gaps](../KNOWN-GAPS.md) is the list for the whole
 product; these are the ones that belong to this add-on.

@@ -6,6 +6,8 @@ import type { HomeTabId } from "../../shell/registry";
 import { AdoHome } from "./routes";
 import { NO_FILTERS } from "./FilterDrawer";
 import { drawerSections } from "./homeTabs";
+import { rulesOf } from "../../shell/kinds/panelShapeAssert";
+import { controlRowsSpace } from "../../shell/layoutTokens";
 
 // The strip's toolbar slot is drawn on EVERY tab of a GitHub Space, so
 // nothing moves between tabs. A tab with filters has the control enabled; one
@@ -38,6 +40,7 @@ jest.mock("../../shell/api", () => ({
 jest.mock("./api.ado", () => ({
   useGetStatusQuery: () => ({ data: { count: 0, prompts: [] } }),
   useGetWorkItemsQuery: () => ({ data: { count: 0, items: [] }, isFetching: false }),
+  useGetDesignQuery: () => ({ data: undefined }),
   useGetDocsQuery: () => ({ data: { supported: true, repo: "o/r", readme: null, items: [] } }),
   useGetEngagementSummaryQuery: () => ({ isLoading: false }),
   useGetEngagementWorkBreakdownQuery: () => ({ isLoading: false }),
@@ -56,6 +59,7 @@ const pathOf = (id: string) => GH_STRIP.find((t) => t[0] === id)![2];
 const tabsValue = (): ShellValue => ({
   cards: { home: [], system: [] },
   homeTabs: GH_STRIP.map(([id, label, path]) => ({ id, label, path, cards: [] })),
+  systemTabs: [],
   slot: () => [],
   openSettings: () => {},
   pager: { page: 0, totalPages: 1, onPageChange: () => {} },
@@ -117,5 +121,36 @@ describe("the strip's toolbar slot", () => {
     const slot = screen.getByRole("button", { name: "Filters" });
     fireEvent.click(slot);
     expect(slot.getAttribute("aria-expanded")).toBeNull();
+  });
+});
+
+describe("Home's head: the drawer and what follows it", () => {
+  it("has no margin under the drawer; the tab strip's wrapper owns the space below", () => {
+    const { container } = at(pathOf("backlog"));
+    const head = container.querySelector<HTMLElement>("[data-home-head]")!;
+    expect(head).not.toBeNull();
+    for (const el of [head, ...Array.from(head.children)] as HTMLElement[]) {
+      expect(rulesOf(el)).not.toMatch(/margin/);
+    }
+    expect(rulesOf(head)).toContain(`row-gap: ${controlRowsSpace}`);
+    expect(rulesOf(head)).not.toMatch(/padding-bottom/);
+    expect(head.nextElementSibling?.hasAttribute("data-tab-rows")).toBe(true);
+  });
+
+  it("owns the space below itself when no strip follows", () => {
+    const one = tabsValue();
+    one.homeTabs = one.homeTabs.slice(0, 1);
+    const { container } = render(
+      <MemoryRouter initialEntries={["/backlog"]}>
+        <ShellProvider value={one}>
+          <AdoHome />
+        </ShellProvider>
+      </MemoryRouter>,
+    );
+    expect(container.querySelector("[data-tab-rows]")).toBeNull();
+    const head = container.querySelector<HTMLElement>("[data-home-head]")!;
+    expect(head).not.toBeNull();
+    expect(rulesOf(head)).toContain(`padding-bottom: ${controlRowsSpace}`);
+    expect(rulesOf(head)).not.toMatch(/margin/);
   });
 });

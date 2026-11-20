@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _skipguard import skip_module
+from _tracker_cli import unreachable
 
 try:
     from fastapi.testclient import TestClient
@@ -84,6 +85,7 @@ class AFreshStartsBoard(unittest.TestCase):
         ]
         self.assertEqual(others, [])
 
+    @unreachable("az")
     def test_demo_calls_active_to_do_and_backlog_keeps_its_name(self):
         names = self.client.get("/api/env").json()["config"]["laneNames"]
         self.assertEqual(names.get(consts()["status"]["active"]), "To do")

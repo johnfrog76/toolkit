@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Badge, Subtitle2, Dropdown, Option, tokens } from "@fluentui/react-components";
 import { Tooltip as RTooltip, ScatterChart, Scatter, XAxis, YAxis, ZAxis } from "recharts";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { ChartWrapper } from "../../shared/ChartWrapper";
 import { useChartColors } from "../../hooks/chartPalette";
 import { useWornTheme } from "../../hooks/useWornTheme";
@@ -100,7 +100,7 @@ export function WorkBreakdown({ slug, activeTag }: { slug: string; activeTag?: s
 
   if (isLoading)
     return (
-      <PageCard
+      <PanelFrame
         loading
         loadingLabel="Loading work breakdown…"
         headerLeft={<Subtitle2>Work Breakdown</Subtitle2>}
@@ -148,7 +148,7 @@ export function WorkBreakdown({ slug, activeTag }: { slug: string; activeTag?: s
   const chartHeight = 180;
 
   return (
-    <PageCard
+    <PanelFrame
       headerLeft={<Subtitle2>Work</Subtitle2>}
       headerRight={
         <>
@@ -225,6 +225,6 @@ export function WorkBreakdown({ slug, activeTag }: { slug: string; activeTag?: s
           </ScatterChart>
         </div>
       </ChartWrapper>
-    </PageCard>
+    </PanelFrame>
   );
 }

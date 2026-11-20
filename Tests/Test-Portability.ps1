@@ -42,8 +42,25 @@ if ($Help) {
   Clause 14 No comment carries a date, a name, an agent, a nickname for a host, a tracker
             number, an archive pointer, a private repository or a machine path
   Clause 15 No gh, az or git call with a redirected stderr outside Invoke-TrackerRead.ps1
+  Clause 22 Every suite starts its children through Invoke-P20TestHost (ratchet: the
+            allow-list only shrinks), and the TestToolkit wrapper starts the runner in
+            the host it is typed in
+  Clause 23 No file under Tests/ calls git with a redirected stderr outside Invoke-P20TestGit
+            and no call of the helper writes an argument PowerShell splits or drops
+            before the helper sees it; each argument reaches git as one value
   Clause 16 No script in Scripts/ carries its own Get-CliPrefix or Write-CliError fallback;
             Scripts/Initialize-CliFallbacks.ps1 is the one copy
+  Clause 18 Every Azure DevOps request takes its headers from Get-P20AdoHeaders -OrgUrl `$org
+            and an address built on `$org: the token goes to the Space's organisation only;
+            and every request -Body is UTF-8 bytes from ConvertTo-P20Utf8Body
+  Clause 19 Every Get-Content in shipped PowerShell names its -Encoding: 5.1 reads a
+            file with no BOM as ANSI, and every file the package reads is UTF-8
+  Clause 20 Every path a cmdlet resolves in shipped PowerShell is handed over as
+            -LiteralPath, unless it is a constant: -Path reads a folder named
+            "Work [old]" as a wildcard pattern that matches nothing
+  Clause 21 No script without a BOM holds a non-ASCII byte, Tests/ included, and no
+            shipped script holds one at all but the four named: 5.1 reads a BOM-less
+            script in the ANSI code page
 
   Scope: all three halves -- *.psm1 at the root, Scripts/, Prompt20Toolkit/,
   web/src, web/tests and agent/ -- plus root JSON and Markdown, and Tests/
@@ -69,6 +86,12 @@ $script:errors = @()
 # A bare file name stopped being enough when the scan grew to three halves:
 # there is more than one __init__.py and more than one index.ts. Report the path
 # a reader can open.
+function Write-ClauseProgress {
+    # A line before each clause, with the time, so a run that stops says where.
+    param([string]$Label)
+    Write-Host ("  .. {0}  {1}" -f $Label, (Get-Date).ToString('HH:mm:ss')) -ForegroundColor DarkGray
+}
+
 function Get-RelPath {
     param($File)
     $full = $File.FullName
@@ -96,6 +119,7 @@ function Assert-True {
 # Test-PS51Compat, which had the same omission from the other direction --
 # see Tests/ScanExclusions.ps1.
 . (Join-Path $scriptDir 'ScanExclusions.ps1')
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 # Runtime source only. Tests may legitimately name things that shipped code may not.
 #
@@ -214,6 +238,7 @@ Write-Host "  ──────────────────────
 Write-Host ""
 
 $runtimeFiles = Get-RuntimeFiles
+Write-ClauseProgress 'Clauses 1 to 4 and 10'
 Assert-True "Found runtime files to scan" ($runtimeFiles.Count -gt 0)
 
 # ── Clause 1: no real email addresses ────────────────────────────────────────
@@ -358,6 +383,7 @@ if ($prefixCount -lt $PrefixDebtBaseline) {
 }
 
 # -- Clause 5: no secrets ------------------------------------------------------
+Write-ClauseProgress 'Clause 5'
 # The highest-severity thing that can reach a commit. Matches the shapes of real
 # credentials rather than the word "key", because a variable NAMED apiKey is
 # correct code -- a literal sk-ant-... next to it is not.
@@ -415,6 +441,7 @@ foreach ($f in $runtimeFiles) {
 Assert-True "Clause 4: no absolute machine paths in shipped scripts" ($absHits.Count -eq 0) ($absHits -join '; ')
 
 # -- Clause 6: nothing vendor-shaped is committed -------------------------------
+Write-ClauseProgress 'Clause 6'
 # The client picks the assistant, not us, so the repo must not favour one. The
 # knowledge lives in AGENTS.md, which is neutral; each assistant's own discovery
 # file is generated per machine and gitignored. A committed .claude/ or
@@ -428,7 +455,7 @@ $vendorPaths = @('.claude', '.cursor', '.cursorrules', '.windsurfrules', '.githu
 $trackedVendor = @()
 Push-Location $pkgRoot
 try {
-    $tracked = @(git ls-files 2>$null)
+    $tracked = @((Invoke-P20TestGit ls-files).Out)
     foreach ($v in $vendorPaths) {
         $needle = $v
         foreach ($t in $tracked) {
@@ -448,6 +475,7 @@ Assert-True "Clause 6c: the adapter generator ships" (Test-Path $genScript) `
     'Scripts/Update-AgentDocs.ps1 is what makes a vendor-neutral source usable'
 
 # -- Clause 6d: every generated copy is checked on its own ---------------------
+Write-ClauseProgress 'Clause 6d'
 # The home copy of the Claude skill was written only when the CHECKOUT copy
 # drifted, so the checkout read [ok] while the skill an assistant loads was weeks
 # behind.
@@ -489,6 +517,7 @@ catch {
 finally { Remove-Item $adScratch -Recurse -Force -ErrorAction SilentlyContinue }
 
 # -- Clause 6e: the generator reads and writes UTF-8 whatever the host ----------
+Write-ClauseProgress 'Clause 6e'
 # Get-Content -Raw with no -Encoding read AGENTS.md as the ANSI code page under Windows
 # PowerShell 5.1, so an em dash was written garbled and 5.1 and 7 disagreed about drift
 # for good. A macOS machine has no 5.1, so the test holds what it can: a source with an
@@ -529,6 +558,7 @@ Assert-True "Clause 6e: the generator reads its source with an explicit UTF-8 re
     ($genSrc -match 'ReadAllText\(\$sourcePath, \[System\.Text\.Encoding\]::UTF8\)' -and $genSrc -notmatch 'Get-Content\s+\$sourcePath')
 
 # -- Clause 8: the README's logo matches its source -----------------------------
+Write-ClauseProgress 'Clause 8'
 # The mark lives in docs/logo.txt and is inlined into the README as a fenced
 # block. Two copies drift: the README carried an older version for a day after
 # the art was redrawn, and nothing noticed.
@@ -542,6 +572,7 @@ if ((Test-Path $logoPath) -and (Test-Path $readmePath2)) {
 }
 
 # -- Clause 7: shipped docs do not link outside the package ---------------------
+Write-ClauseProgress 'Clause 7'
 # A relative link that resolved in the repo something was carved from arrives
 # broken. That is not hypothetical: GetPRComments writes a link to an agentic
 # prompt into every card it touches, and for a while that folder had not come
@@ -609,6 +640,7 @@ Assert-True "Clause 10: no `$script: read inside a global function body" ($scope
 Assert-True "Clause 10: the scan saw the global functions it is guarding" ($scopeBodies.Count -ge 40) "saw $($scopeBodies.Count)"
 
 # -- Clauses 11 and 12: a suite cannot under-count in silence -----------
+Write-ClauseProgress 'Clauses 11 and 12'
 # A suite's count is the proof, so a suite that can finish short without saying
 # so is a proof with a hole in it. Two shapes did exactly that: a
 # top-level `try { cases } finally { summary }` with no catch, where a
@@ -699,6 +731,7 @@ if ($unresolvedAsserts.Count -gt 0) {
 Assert-True "Clause 12: every Assert- call in a suite resolves to a helper it defines or loads" (($unresolvedAsserts.Count -eq 0) -and ($suiteFiles.Count -ge 30)) $assertDetail
 
 # -- Clause 17: a suite ends with its own verdict -----------------------------
+Write-ClauseProgress 'Clause 17'
 # A suite's exit code is its verdict. One that ends without an `exit` hands its
 # caller the code of the last child process it ran, so a green run can report 1
 # (a pwsh -Command wrapper, the PowerShell tool) and a red one 0. The last
@@ -731,6 +764,7 @@ if ($noVerdict.Count -gt 0) {
 Assert-True "Clause 17: every suite ends with its own exit verdict" (($noVerdict.Count -eq 0) -and ($suiteFiles.Count -ge 30)) $verdictDetail
 
 # -- Clause 13: no work-marker comment ships ------------------------------
+Write-ClauseProgress 'Clause 13'
 # A seam the code leaves open is a roadmap row in docs/KNOWN-GAPS.md, not a
 # comment in the source: a stranger reading the tree should find what is
 # unfinished in one place, with what they see when they hit it. The four marker
@@ -791,6 +825,7 @@ Assert-True "Clause 13: the marker pattern matches a word, case-sensitively, and
     (-not [regex]::IsMatch($markerWords[1].ToLower(), $markerPattern))) ''
 
 # -- Clause 14: no comment carries what a public tree cannot ship -----------
+Write-ClauseProgress 'Clause 14'
 # A comment is read by whoever opens the file, so it is written for a stranger:
 # no date, no person's name, no agent's name, no tracker number as the subject of
 # a sentence, no pointer into a private archive, no private repository, no machine
@@ -1115,6 +1150,7 @@ finally {
 }
 
 # -- Clause 15: a script calls gh or az through Invoke-P20TrackerRead ----------
+Write-ClauseProgress 'Clause 15'
 # AGENTS.md, "Traps worth knowing": under Windows PowerShell 5.1 a native call
 # whose stderr is redirected (2>&1, 2>$null, *> $null) while the preference is
 # 'Stop' throws on the first stderr line, before the exit code can be read, so a
@@ -1147,7 +1183,9 @@ $rawTrackerAllowed = @{
         Lines  = @('git -c merge.directoryRenames=false pull --rebase 2>', 'git push 2>')
     }
 }
-$rawTrackerPattern = '(?<![\w$-])(gh|az|git)\s[^|\r\n]*(2>|\*>)'
+# A call may run on over backtick continuations (` at a line's end), and the
+# redirection then sits lines below the tool's name: the run is read across them.
+$rawTrackerPattern = '(?<![\w$-])(gh|az|git)\s(?:[^|\r\n`]|`[^\r\n]|`\r?\n)*(2>|\*>)'
 function Get-RawTrackerCalls {
     # Every match of the pattern that starts outside a comment and a string --
     # except inside an expandable string's own $(...), which is code, not text.
@@ -1156,7 +1194,7 @@ function Get-RawTrackerCalls {
     # exactly those $(...) spans, wherever they sit (bare in code or nested in
     # a string), so a match inside one is read even though it is also inside
     # the string token that contains it.
-    param([string]$Text)
+    param([string]$Text, [string]$Pattern = $rawTrackerPattern)
     $tokens = $null; $parseErrors = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$parseErrors)
     $skip = @($tokens | Where-Object {
@@ -1168,7 +1206,7 @@ function Get-RawTrackerCalls {
             ForEach-Object { $_.Extent })
     }
     $found = @()
-    foreach ($m in [regex]::Matches($Text, $rawTrackerPattern)) {
+    foreach ($m in [regex]::Matches($Text, $Pattern)) {
         $inside = $false
         foreach ($t in $skip) {
             if ($m.Index -ge $t.Extent.StartOffset -and $m.Index -lt $t.Extent.EndOffset) {
@@ -1181,7 +1219,7 @@ function Get-RawTrackerCalls {
         }
         if ($inside) { continue }
         $lineNo = ([regex]::Matches($Text.Substring(0, $m.Index), "`n")).Count + 1
-        $found += "${lineNo}: $($m.Value.Trim())"
+        $found += "${lineNo}: $(($m.Value -replace '`\r?\n\s*', ' ').Trim())"
     }
     return $found
 }
@@ -1229,6 +1267,8 @@ $rawTrackerCases = @(
     @{ Hit = $false; Why = 'a hint string that names a call';          Body = 'Write-Host "run: gh auth status 2>&1"' }
     @{ Hit = $false; Why = 'a variable that only ends in the name';    Body = '$gh 2>$null' }
     @{ Hit = $true;  Why = 'a raw call inside an expandable string''s $(...)'; Body = 'Write-Host "$(git rev-parse HEAD 2>$null)"' }
+    @{ Hit = $true;  Why = 'a raw call continued over backticks, its redirection lines below'; Body = "`$r = az boards query ```n    --org `$org ```n    --output json 2>`$null | ConvertFrom-Json" }
+    @{ Hit = $false; Why = 'a helper call continued over a backtick';  Body = "`$r = Invoke-P20TrackerRead 'az' ```n    @('boards', 'query')" }
 )
 foreach ($case in $rawTrackerCases) {
     $caseHits = @(Get-RawTrackerCalls $case.Body).Count
@@ -1244,7 +1284,400 @@ Assert-True "Clause 15: an entry-level file lets its listed call through" (@(Get
 Assert-True "Clause 15: a whole-file reason string allows every raw call in the file" (@(Get-UnlistedRawTrackerCalls $entryBody 'reason').Count -eq 0) 'a string entry reported a call'
 Assert-True "Clause 15: no allow-list entry is left marked D3J7 follow-up" (-not (($rawTrackerAllowed.Values | ForEach-Object { if ($_ -is [hashtable]) { $_.Reason } else { $_ } }) -match 'D3J7 follow-up')) 'a follow-up entry remains'
 
+# -- Clause 22: a suite starts its children through Invoke-P20TestHost --------
+# AGENTS.md, "Traps worth knowing": a suite's children start through
+# Invoke-P20TestHost (Tests/Get-TestHost.ps1), in the host the suite runs in.
+# A suite that types `& pwsh ... 2>&1` instead does two things wrong on Windows
+# PowerShell 5.1: under 'Stop' the child's first stderr line is a terminating
+# NativeCommandError, so the suite stops there; and the verbs it types run on
+# PowerShell 7, so the 5.1 job proves the suite's own code and not the verbs.
+# Read with Clause 15's reader, so a comment or a string naming such a call is
+# not one.
+#
+# The allow-list is the suites not yet moved, each with what it costs. It only
+# shrinks: no name outside the first list may join it, a name moved off it goes
+# in $childPwshMoved and may not come back, and a listed suite with no raw call
+# left is a stale entry. docs/TESTING.md and docs/KNOWN-GAPS.md state how many
+# suites start every child in their own host, and the count is held to this list.
+$childPwshPattern = '(?<![\w$-])pwsh\s(?:[^|\r\n`]|`[^\r\n]|`\r?\n)*(2>|\*>)'
+$childPwshReason = 'starts pwsh by name: under the 5.1 job its verbs run on 7'
+$childPwshAllowed = @{
+    'Tests/Test-Agent.ps1'                  = $childPwshReason
+    'Tests/Test-Archive.ps1'                = $childPwshReason
+    'Tests/Test-Autoload.ps1'               = $childPwshReason
+    'Tests/Test-BackfillStamps.ps1'         = $childPwshReason
+    'Tests/Test-Billable.ps1'               = $childPwshReason
+    'Tests/Test-CloseWorkItem.ps1'          = $childPwshReason
+    'Tests/Test-Config.ps1'                 = $childPwshReason
+    'Tests/Test-Cover.ps1'                  = $childPwshReason
+    'Tests/Test-DocCounts.ps1'              = $childPwshReason
+    'Tests/Test-EditItem.ps1'               = $childPwshReason
+    'Tests/Test-Environment.ps1'            = $childPwshReason
+    'Tests/Test-ExitCodes.ps1'              = $childPwshReason
+    'Tests/Test-GitRoot.ps1'                = $childPwshReason
+    'Tests/Test-HubJson.ps1'                = $childPwshReason
+    'Tests/Test-Menu.ps1'                   = $childPwshReason
+    'Tests/Test-ModuleCommands.ps1'         = $childPwshReason
+    'Tests/Test-Move.ps1'                   = $childPwshReason
+    'Tests/Test-NewMeeting.ps1'             = $childPwshReason
+    'Tests/Test-Plan.ps1'                   = $childPwshReason
+    'Tests/Test-Portability.ps1'            = $childPwshReason
+    'Tests/Test-PublishPR.ps1'              = $childPwshReason
+    'Tests/Test-Reminders.ps1'              = $childPwshReason
+    'Tests/Test-Rituals.ps1'                = $childPwshReason
+    'Tests/Test-SendTeams.ps1'              = $childPwshReason
+    'Tests/Test-Setup.ps1'                  = $childPwshReason
+    'Tests/Test-StandupRemind.ps1'          = $childPwshReason
+    'Tests/Test-Start.ps1'                  = $childPwshReason
+    'Tests/Test-StartWork.ps1'              = $childPwshReason
+    'Tests/Test-Status.ps1'                 = $childPwshReason
+    'Tests/Test-Sync.ps1'                   = $childPwshReason
+    'Tests/Test-Tag.ps1'                    = $childPwshReason
+    'Tests/Test-TestAll.ps1'                = $childPwshReason
+    'Tests/Test-ThreadHash.ps1'             = $childPwshReason
+    'Tests/Test-Update.ps1'                 = $childPwshReason
+    'Tests/Test-Web.ps1'                    = $childPwshReason
+    'Tests/Test-WorkReview.ps1'             = $childPwshReason
+}
+$childPwshFirstList = @('Tests/Test-Agent.ps1', 'Tests/Test-Archive.ps1', 'Tests/Test-Autoload.ps1', 'Tests/Test-BackfillStamps.ps1', 'Tests/Test-Billable.ps1', 'Tests/Test-CloseWorkItem.ps1', 'Tests/Test-Config.ps1', 'Tests/Test-Cover.ps1', 'Tests/Test-DocCounts.ps1', 'Tests/Test-EditItem.ps1', 'Tests/Test-Environment.ps1', 'Tests/Test-ExitCodes.ps1', 'Tests/Test-GitRoot.ps1', 'Tests/Test-HubJson.ps1', 'Tests/Test-Menu.ps1', 'Tests/Test-ModuleCommands.ps1', 'Tests/Test-Move.ps1', 'Tests/Test-NewMeeting.ps1', 'Tests/Test-Plan.ps1', 'Tests/Test-Portability.ps1', 'Tests/Test-PublishPR.ps1', 'Tests/Test-Reminders.ps1', 'Tests/Test-Rituals.ps1', 'Tests/Test-SendTeams.ps1', 'Tests/Test-Setup.ps1', 'Tests/Test-StandupRemind.ps1', 'Tests/Test-Start.ps1', 'Tests/Test-StartWork.ps1', 'Tests/Test-Status.ps1', 'Tests/Test-Sync.ps1', 'Tests/Test-Tag.ps1', 'Tests/Test-TestAll.ps1', 'Tests/Test-ThreadHash.ps1', 'Tests/Test-Update.ps1', 'Tests/Test-Web.ps1', 'Tests/Test-WorkReview.ps1')
+$childPwshMoved = @('Tests/Test-HowWeWork.ps1', 'Tests/Test-Land.ps1')
+$childPwshSuites = @(Get-ChildItem (Join-Path $pkgRoot 'Tests') -Filter 'Test-*.ps1' -File | Where-Object { $_.Name -ne 'Test-Toolkit.ps1' })
+$childPwshHits = @()
+$childPwshStale = @()
+foreach ($f in $childPwshSuites) {
+    $rel = Get-RelPath $f
+    $calls = @(Get-RawTrackerCalls ([System.IO.File]::ReadAllText($f.FullName)) $childPwshPattern)
+    if ($childPwshAllowed.ContainsKey($rel)) {
+        if ($calls.Count -eq 0) { $childPwshStale += $rel }
+    }
+    else {
+        foreach ($hit in $calls) { $childPwshHits += "${rel}:$hit" }
+    }
+}
+$childPwshDetail = "read $($childPwshSuites.Count) suites"
+if ($childPwshHits.Count -gt 0) {
+    $childPwshDetail = "start the child with Invoke-P20TestHost -File/-Command (Tests/Get-TestHost.ps1): " + ($childPwshHits -join '; ')
+}
+Assert-True "Clause 22: no suite off the allow-list starts pwsh by name with its stderr redirected" (($childPwshHits.Count -eq 0) -and ($childPwshSuites.Count -ge 50)) $childPwshDetail
+Assert-True "Clause 22: every suite on the allow-list still starts pwsh by name (a moved one leaves the list)" ($childPwshStale.Count -eq 0) ("stale: " + ($childPwshStale -join ', '))
+$childPwshNew = @($childPwshAllowed.Keys | Where-Object { $childPwshFirstList -notcontains $_ })
+Assert-True "Clause 22: the allow-list only shrinks: no name outside its first list" ($childPwshNew.Count -eq 0) ("added: " + ($childPwshNew -join ', '))
+$childPwshBack = @($childPwshMoved | Where-Object { $childPwshAllowed.ContainsKey($_) })
+Assert-True "Clause 22: a suite moved off the allow-list does not come back" ($childPwshBack.Count -eq 0) ("back: " + ($childPwshBack -join ', '))
+$childPwshMovedRaw = @($childPwshMoved | Where-Object { @(Get-RawTrackerCalls ([System.IO.File]::ReadAllText((Join-Path $pkgRoot $_))) $childPwshPattern).Count -gt 0 })
+Assert-True "Clause 22: a moved suite starts no pwsh by name" ($childPwshMovedRaw.Count -eq 0) ("raw again: " + ($childPwshMovedRaw -join ', '))
+Assert-True "Clause 22: every entry gives what it costs" (@($childPwshAllowed.Values | Where-Object { $_ -ne $childPwshReason }).Count -eq 0) 'an entry carries another reason'
+
+# The count the documents state: suites that start every child in their own host.
+$childPwshInHost = $childPwshSuites.Count - $childPwshAllowed.Count
+$childPwshSentence = "$childPwshInHost of $($childPwshSuites.Count) CLI suites start every child in the host they run in"
+foreach ($doc in @('docs/TESTING.md', 'docs/KNOWN-GAPS.md')) {
+    $docText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot $doc))
+    Assert-True "Clause 22: $doc says $childPwshSentence" ($docText.Contains($childPwshSentence)) "write: $childPwshSentence"
+}
+
+# The sweep's own cases.
+$childPwshCases = @(
+    @{ Hit = $true;  Why = 'a child started by name, stderr kept';       Body = '$out = & pwsh -NoProfile -File $runner 2>&1' }
+    @{ Hit = $true;  Why = 'a child started by name, stderr dropped';    Body = '$null = & pwsh -NoProfile -Command $cmd 2>$null' }
+    @{ Hit = $false; Why = 'a child through the one helper';             Body = '$out = Invoke-P20TestHost -File $runner -NonInteractive' }
+    @{ Hit = $false; Why = 'a comment that names the trap';              Body = '# & pwsh -File x 2>&1 throws under Stop on 5.1' }
+    @{ Hit = $false; Why = 'a string that names a call';                 Body = 'Write-Host "run: pwsh -File x 2>&1"' }
+)
+foreach ($case in $childPwshCases) {
+    $caseHits = @(Get-RawTrackerCalls $case.Body $childPwshPattern).Count
+    Assert-True "Clause 22: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
+# The verb that starts the runner is held to the same rule. TestToolkit typed
+# in Windows PowerShell 5.1 has to run the suites in 5.1, so its wrapper starts
+# the runner with Get-P20TestHost's answer and never with a host named in the
+# source. Read as syntax, so a comment or a string that names a host is not a
+# call.
+$runnerVerbAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $pkgRoot 'utilities.psm1'), [ref]$null, [ref]$null)
+$runnerVerbFn = @($runnerVerbAst.FindAll({ param($n) ($n -is [System.Management.Automation.Language.FunctionDefinitionAst]) -and ($n.Name -match '^(global:)?Test-P20Toolkit$') }, $true))
+$runnerVerbNamed = @()
+$runnerVerbAsks = 0
+if ($runnerVerbFn.Count -eq 1) {
+    foreach ($cmd in @($runnerVerbFn[0].Body.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true))) {
+        $cmdName = [string]$cmd.GetCommandName()
+        if ($cmdName -match '^(pwsh|powershell)(\.exe)?$') { $runnerVerbNamed += "$($cmd.Extent.StartLineNumber): $($cmd.Extent.Text)" }
+        if ($cmdName -eq 'Get-P20TestHost') { $runnerVerbAsks++ }
+    }
+}
+Assert-True "Clause 22: the TestToolkit wrapper names no host for the runner" (($runnerVerbFn.Count -eq 1) -and ($runnerVerbNamed.Count -eq 0)) ("start the runner with Get-P20TestHost's answer: " + ($runnerVerbNamed -join '; '))
+Assert-True "Clause 22: the TestToolkit wrapper asks Get-P20TestHost which host it runs in" ($runnerVerbAsks -eq 1) "calls of Get-P20TestHost in the wrapper: $runnerVerbAsks"
+
+# And typed: with a decoy named pwsh first on the PATH, the verb still starts
+# the real runner, in the host that typed it. A wrapper that names pwsh runs
+# the decoy instead and lists no suite.
+$runnerVerbBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-runner-host-" + [guid]::NewGuid().ToString('N'))
+try {
+    New-Item -ItemType Directory -Force -Path $runnerVerbBase | Out-Null
+    $runnerVerbEnc = New-Object System.Text.UTF8Encoding($false)
+    if ($env:OS -eq 'Windows_NT') {
+        [System.IO.File]::WriteAllText((Join-Path $runnerVerbBase 'pwsh.cmd'), "@echo off`r`necho DECOY-PWSH-RAN`r`n", $runnerVerbEnc)
+    }
+    else {
+        $runnerVerbDecoy = Join-Path $runnerVerbBase 'pwsh'
+        [System.IO.File]::WriteAllText($runnerVerbDecoy, "#!/bin/sh`necho DECOY-PWSH-RAN`n", $runnerVerbEnc)
+        & chmod +x $runnerVerbDecoy
+    }
+    # A file, not -Command: a child PowerShell 7 handed an encoded command
+    # answers in CLIXML, and its host lines would be drawn here as well.
+    $runnerVerbChild = Join-Path $runnerVerbBase 'child.ps1'
+    $runnerVerbBody = @'
+param([string]$Pkg, [string]$Bin)
+$env:PSModulePath = $Pkg
+$env:PATH = $Bin + [System.IO.Path]::PathSeparator + $env:PATH
+Import-Module (Join-Path (Join-Path $Pkg 'Prompt20Toolkit') 'Prompt20Toolkit.psd1') -Force -DisableNameChecking
+Test-P20Toolkit -List
+Write-Host ('RUNNER-VERB-RETURNED=' + $PSVersionTable.PSEdition)
+'@
+    [System.IO.File]::WriteAllText($runnerVerbChild, $runnerVerbBody, $runnerVerbEnc)
+    $runnerVerbOut = (Invoke-P20TestHost -File $runnerVerbChild -Arguments @('-Pkg', $pkgRoot, '-Bin', $runnerVerbBase) -NonInteractive | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True "Clause 22: TestToolkit, typed with a decoy pwsh first on the PATH, does not start the decoy" (($runnerVerbOut -notmatch 'DECOY-PWSH-RAN') -and ($runnerVerbOut -match ('RUNNER-VERB-RETURNED=' + $PSVersionTable.PSEdition))) $runnerVerbOut
+    Assert-True "Clause 22: and it reaches the real runner, which lists the suites" ($runnerVerbOut -match '(?m)^\s*-Portability\s+\[ok\]') $runnerVerbOut
+} catch {
+    Assert-True 'Clause 22: the typed case ran to the end without a terminating error' $false $_.Exception.Message
+} finally {
+    Remove-Item -LiteralPath $runnerVerbBase -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# -- Clause 23: a suite calls git through Invoke-P20TestGit --------------------
+# A suite builds its fixture repositories with git, and on Windows git warns on
+# stderr about line endings. Under Windows PowerShell 5.1, a native command
+# whose stderr is redirected (2>&1, 2>$null, *>) while 'Stop' is in force
+# throws on that first line, so a suite that wrote `git add -A 2>&1 | Out-Null`
+# stopped part-way on 5.1 and passed on 7. Invoke-P20TestGit
+# (Tests/Get-TestHost.ps1) runs git with 'Continue' for the one call and returns
+# what it said as text. Every PowerShell file under Tests/ is read, the runner
+# included, with Clause 15's reader and its pattern for git, which matches a
+# call written with the call operator or without it. A comment or a string
+# naming such a call is not one. Nothing is allowed but the helper's own call.
+$suiteGitPattern = '(?<![\w$-])git\s(?:[^|\r\n`]|`[^\r\n]|`\r?\n)*(2>|\*>)'
+$suiteGitHelper = 'Tests/Get-TestHost.ps1'
+$suiteGitFiles = @(Get-ChildItem (Join-Path $pkgRoot 'Tests') -Filter '*.ps1' -File -Recurse | Where-Object {
+        -not (Test-ScanExcluded -Path $_.DirectoryName -Root $pkgRoot)
+    })
+$suiteGitHits = @()
+foreach ($f in $suiteGitFiles) {
+    $rel = Get-RelPath $f
+    if ($rel -eq $suiteGitHelper) { continue }
+    foreach ($hit in @(Get-RawTrackerCalls ([System.IO.File]::ReadAllText($f.FullName)) $suiteGitPattern)) { $suiteGitHits += "${rel}:$hit" }
+}
+$suiteGitDetail = "read $($suiteGitFiles.Count) files under Tests/"
+if ($suiteGitHits.Count -gt 0) {
+    $suiteGitDetail = "call git through Invoke-P20TestGit (Tests/Get-TestHost.ps1): " + ($suiteGitHits -join '; ')
+}
+$suiteGitRunner = @($suiteGitFiles | Where-Object { (Get-RelPath $_) -eq 'Tests/Test-Toolkit.ps1' }).Count
+Assert-True "Clause 23: no file under Tests/ calls git with its stderr redirected outside Invoke-P20TestGit" (($suiteGitHits.Count -eq 0) -and ($suiteGitFiles.Count -ge 50) -and ($suiteGitRunner -eq 1)) $suiteGitDetail
+$suiteGitHelperText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot $suiteGitHelper))
+Assert-True "Clause 23: the helper sets Continue around its one git call" (($suiteGitHelperText -match 'function Invoke-P20TestGit') -and ($suiteGitHelperText -match "(?s)function Invoke-P20TestGit\s*\{.*?\`$ErrorActionPreference = 'Continue'.*?& git @gitArgs 2>&1")) 'Invoke-P20TestGit no longer sets Continue before its git call'
+
+# The sweep's own cases.
+$suiteGitCases = @(
+    @{ Hit = $true;  Why = 'git with the call operator, stderr kept';   Body = '$null = & git -C $repo add -A 2>&1' }
+    @{ Hit = $true;  Why = 'git with no call operator, piped away';     Body = 'git commit -q -m seed 2>&1 | Out-Null' }
+    @{ Hit = $true;  Why = 'git with stderr dropped, stdout kept';      Body = '$files = @(git -C $root ls-files 2>$null)' }
+    @{ Hit = $false; Why = 'git through the helper';                    Body = '$null = Invoke-P20TestGit -C $repo add -A' }
+    @{ Hit = $false; Why = 'git with no redirect';                      Body = 'git -C $repo init -q' }
+    @{ Hit = $false; Why = 'a comment that names the trap';             Body = '# git add -A 2>&1 throws under Stop on 5.1' }
+    @{ Hit = $false; Why = 'a string that names a call';                Body = '$cmd = "git status 2>&1"' }
+)
+foreach ($case in $suiteGitCases) {
+    $caseHits = @(Get-RawTrackerCalls $case.Body $suiteGitPattern).Count
+    Assert-True "Clause 23: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
+# The arguments. The helper has no param block, so PowerShell reads its
+# arguments as a function's before it runs, and a bare word is not always one
+# argument: the first bare -- ends the parameters and is dropped, -c:x arrives
+# as -c: and x, -a.b as -a and .b, a comma makes two, and stash@{0} arrives as
+# stash@ and 0. Quoted, each arrives as written. So every call of the helper
+# under Tests/ is read as syntax, and one that writes such a word bare is a
+# hit: the call would run a different git command.
+function Get-TestGitSplitArguments {
+    param([string]$Text)
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$null, [ref]$null)
+    $calls = @($ast.FindAll({ param($n) ($n -is [System.Management.Automation.Language.CommandAst]) -and ($n.GetCommandName() -eq 'Invoke-P20TestGit') }, $true))
+    $found = @()
+    foreach ($call in $calls) {
+        $els = @($call.CommandElements)
+        for ($i = 1; $i -lt $els.Count; $i++) {
+            $el = $els[$i]
+            $why = ''
+            if ($el -is [System.Management.Automation.Language.CommandParameterAst]) {
+                if ($el.Extent.Text -eq '--') { $why = "a bare -- is dropped; write '--'" }
+                elseif ($null -ne $el.Argument) { $why = "$($el.Extent.Text) is split at the colon; quote it" }
+            }
+            elseif ($el -is [System.Management.Automation.Language.ArrayLiteralAst]) { $why = "$($el.Extent.Text) is split at the comma; quote it" }
+            elseif ($el.Extent.StartOffset -eq $els[$i - 1].Extent.EndOffset) { $why = "$($els[$i - 1].Extent.Text)$($el.Extent.Text) is split in two; quote it" }
+            if ($why) { $found += "$($el.Extent.StartLineNumber): $why" }
+        }
+    }
+    return $found
+}
+$suiteGitArgHits = @()
+$suiteGitArgCalls = 0
+foreach ($f in $suiteGitFiles) {
+    $text = [System.IO.File]::ReadAllText($f.FullName)
+    $suiteGitArgCalls += ([regex]::Matches($text, 'Invoke-P20TestGit\s')).Count
+    foreach ($hit in @(Get-TestGitSplitArguments $text)) { $suiteGitArgHits += "$(Get-RelPath $f):$hit" }
+}
+$suiteGitArgDetail = "read $($suiteGitFiles.Count) files under Tests/"
+if ($suiteGitArgHits.Count -gt 0) { $suiteGitArgDetail = $suiteGitArgHits -join '; ' }
+Assert-True "Clause 23: no call of Invoke-P20TestGit writes an argument PowerShell splits or drops" (($suiteGitArgHits.Count -eq 0) -and ($suiteGitArgCalls -ge 100)) $suiteGitArgDetail
+
+$suiteGitArgCases = @(
+    @{ Hit = $true;  Why = 'a bare --';                              Body = '$null = Invoke-P20TestGit -C $repo checkout -q -- $path' }
+    @{ Hit = $true;  Why = 'a bare -name:value';                     Body = '$r = Invoke-P20TestGit log -c:x' }
+    @{ Hit = $true;  Why = 'a bare -name: with its value after';     Body = '$r = Invoke-P20TestGit log -c: x' }
+    @{ Hit = $true;  Why = 'a bare dash-led word holding a dot';     Body = '$r = Invoke-P20TestGit log -a.b' }
+    @{ Hit = $true;  Why = 'a bare word holding a comma';            Body = '$r = Invoke-P20TestGit log --format=%h,%s' }
+    @{ Hit = $true;  Why = 'a bare list';                            Body = '$r = Invoke-P20TestGit add a.txt,b.txt' }
+    @{ Hit = $true;  Why = 'a bare stash@{0}';                       Body = '$r = Invoke-P20TestGit stash show stash@{0}' }
+    @{ Hit = $true;  Why = 'a bare -- inside a pipeline';            Body = '$n = @((Invoke-P20TestGit -C $repo log --oneline -- $path).Out | Where-Object { $_ }).Count' }
+    @{ Hit = $false; Why = 'a quoted --';                            Body = "`$null = Invoke-P20TestGit -C `$repo checkout -q '--' `$path" }
+    @{ Hit = $false; Why = 'a quoted -name:value';                   Body = "`$r = Invoke-P20TestGit log '-c:x'" }
+    @{ Hit = $false; Why = 'a quoted word holding a comma';          Body = "`$r = Invoke-P20TestGit log '--format=%h,%s'" }
+    @{ Hit = $false; Why = 'a double-dash option holding a colon';   Body = '$r = Invoke-P20TestGit log --pretty=format:%s' }
+    @{ Hit = $false; Why = 'the options a fixture is built with';    Body = '$null = Invoke-P20TestGit -C $repo -c user.email=t@example.invalid -c commit.gpgsign=false commit --quiet -m "one two"' }
+    @{ Hit = $false; Why = 'a revision and a variable';              Body = '$r = Invoke-P20TestGit -C $repo diff --stat HEAD~1 $head' }
+    @{ Hit = $false; Why = 'a member read as an argument';           Body = '$r = Invoke-P20TestGit -C $box.Repo show $card.Hash' }
+    @{ Hit = $false; Why = 'another command with a bare --';         Body = 'Set-Thing -Name a -- b' }
+    @{ Hit = $false; Why = 'a comment that names the trap';          Body = '# Invoke-P20TestGit checkout -- file.txt drops the --' }
+    @{ Hit = $false; Why = 'a string that names a call';             Body = '$cmd = "Invoke-P20TestGit checkout -- file.txt"' }
+)
+foreach ($case in $suiteGitArgCases) {
+    $caseHits = @(Get-TestGitSplitArguments $case.Body).Count
+    Assert-True "Clause 23: the argument sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
+# What git is handed, one row per shape. `git rev-parse --sq-quote` prints each
+# argument it received in single quotes, so a row states exactly what arrived.
+# Every row runs as the host passes arguments by default; where the host has
+# $PSNativeCommandArgumentPassing (PowerShell 7.3 and later) it runs again with
+# Legacy, the passing Windows PowerShell 5.1 has, which loses an empty argument
+# and a double quote unless the helper escapes them.
+$suiteGitShapes = @(
+    @{ Why = 'plain words';                               Want = " 'log' '-q' '--oneline'";      Call = { Invoke-P20TestGit rev-parse --sq-quote log -q --oneline } }
+    @{ Why = 'a quoted -- and the path after it';         Want = " 'checkout' '--' 'file.txt'";  Call = { Invoke-P20TestGit rev-parse --sq-quote checkout '--' file.txt } }
+    @{ Why = 'a quoted -name:value';                      Want = " '-c:x'";                      Call = { Invoke-P20TestGit rev-parse --sq-quote '-c:x' } }
+    @{ Why = 'a quoted dash-led word holding a dot';      Want = " '-a.b'";                      Call = { Invoke-P20TestGit rev-parse --sq-quote '-a.b' } }
+    @{ Why = 'a quoted word holding a comma';             Want = " '--format=%h,%s'";            Call = { Invoke-P20TestGit rev-parse --sq-quote '--format=%h,%s' } }
+    @{ Why = 'a quoted stash@{0}';                        Want = " 'stash@{0}'";                 Call = { Invoke-P20TestGit rev-parse --sq-quote 'stash@{0}' } }
+    @{ Why = 'a double-dash option holding a colon';      Want = " '--pretty=format:%s'";        Call = { Invoke-P20TestGit rev-parse --sq-quote --pretty=format:%s } }
+    @{ Why = 'an option and its value, a = between';      Want = " '-c' 'user.name=t'";          Call = { Invoke-P20TestGit rev-parse --sq-quote -c user.name=t } }
+    @{ Why = 'a value holding spaces';                    Want = " '-m' 'one two  three'";       Call = { Invoke-P20TestGit rev-parse --sq-quote -m 'one two  three' } }
+    @{ Why = 'an empty value, and the one after it';      Want = " '-m' '' 'after'";             Call = { Invoke-P20TestGit rev-parse --sq-quote -m '' after } }
+    @{ Why = 'a double quote inside a word';              Want = " 'x`"y'";                      Call = { Invoke-P20TestGit rev-parse --sq-quote 'x"y' } }
+    @{ Why = 'double quotes inside a value with spaces';  Want = " 'say `"hi there`" twice'";    Call = { Invoke-P20TestGit rev-parse --sq-quote 'say "hi there" twice' } }
+    @{ Why = 'a lone double quote';                       Want = " '`"' 'after'";                Call = { Invoke-P20TestGit rev-parse --sq-quote '"' after } }
+    @{ Why = 'a backslash before a double quote';         Want = " 'a\`"b'";                     Call = { Invoke-P20TestGit rev-parse --sq-quote 'a\"b' } }
+    @{ Why = 'a trailing backslash';                      Want = " 'dir\' 'after'";              Call = { Invoke-P20TestGit rev-parse --sq-quote 'dir\' after } }
+    @{ Why = 'a trailing backslash after a space';        Want = " 'my dir\' 'after'";           Call = { Invoke-P20TestGit rev-parse --sq-quote 'my dir\' after } }
+    @{ Why = 'a checkout path with a space and a trailing backslash, and the arguments after it'; Want = " '-C' 'C:\My Repos\product\' 'rev-parse' '--show-toplevel'"; Call = { Invoke-P20TestGit rev-parse --sq-quote -C 'C:\My Repos\product\' rev-parse --show-toplevel } }
+    @{ Why = 'a wildcard';                                Want = " '*.txt'";                     Call = { Invoke-P20TestGit rev-parse --sq-quote *.txt } }
+    @{ Why = 'a variable holding spaces and a quote';     Want = " 'a `"b`" c' 'after'";         Call = { $v = 'a "b" c'; Invoke-P20TestGit rev-parse --sq-quote $v after } }
+)
+$suiteGitModes = @('')
+if (Get-Variable -Name PSNativeCommandArgumentPassing -ErrorAction SilentlyContinue) { $suiteGitModes += 'Legacy' }
+foreach ($mode in $suiteGitModes) {
+    $label = if ($mode) { "with $mode passing" } else { 'as the host passes arguments' }
+    foreach ($shape in $suiteGitShapes) {
+        $got = & {
+            if ($mode) { $PSNativeCommandArgumentPassing = $mode }
+            (& $shape.Call).Out -join "`n"
+        }
+        Assert-True "Clause 23: git is handed $($shape.Why), $label" ($got -ceq $shape.Want) "wanted [$($shape.Want)], git got [$got]"
+    }
+}
+
+# The same table, through the shipped reader. Invoke-P20TrackerRead takes
+# its arguments as an array, so nothing is parsed on the way in: each row hands
+# it the values the row says git should print, read out of Want, and git has to
+# print them back. Both helpers call one rule, ConvertTo-P20NativeArgument
+# (Scripts/ConvertTo-NativeArgument.ps1), behind one test of the host; a row that
+# passed for one and failed for the other would be a second rule.
+. (Join-Path $pkgRoot 'Scripts/Invoke-TrackerRead.ps1')
+foreach ($mode in $suiteGitModes) {
+    $label = if ($mode) { "with $mode passing" } else { 'as the host passes arguments' }
+    foreach ($shape in $suiteGitShapes) {
+        $values = @([regex]::Matches($shape.Want, "'([^']*)'") | ForEach-Object { $_.Groups[1].Value })
+        $got = & {
+            if ($mode) { $PSNativeCommandArgumentPassing = $mode }
+            (Invoke-P20TrackerRead 'git' (@('rev-parse', '--sq-quote') + $values)).Out -join "`n"
+        }
+        Assert-True "Clause 23: the shipped reader hands git $($shape.Why), $label" ($got -ceq $shape.Want) "wanted [$($shape.Want)], git got [$got]"
+    }
+}
+
+# The rule itself, one row per value it distinguishes, for each edition. This is
+# how Windows PowerShell 5.1's half is read on a host that is not 5.1: only the
+# Desktop edition doubles the backslashes at the end of a value it will wrap.
+$nativeArgumentRows = @(
+    @{ Why = 'an empty value';                              In = '';                        Desktop = '""';                      Core = '""' }
+    @{ Why = 'a plain word';                                In = 'plain';                   Desktop = 'plain';                   Core = 'plain' }
+    @{ Why = 'a value holding a space';                     In = 'my dir';                  Desktop = 'my dir';                  Core = 'my dir' }
+    @{ Why = 'a double quote';                              In = 'x"y';                     Desktop = 'x\"y';                    Core = 'x\"y' }
+    @{ Why = 'a backslash before a double quote';           In = 'a\"b';                    Desktop = 'a\\\"b';                  Core = 'a\\\"b' }
+    @{ Why = 'a trailing backslash and no space';           In = 'dir\';                    Desktop = 'dir\';                    Core = 'dir\' }
+    @{ Why = 'a trailing backslash after a space';          In = 'my dir\';                 Desktop = 'my dir\\';                Core = 'my dir\' }
+    @{ Why = 'two trailing backslashes after a space';      In = 'my dir\\';                Desktop = 'my dir\\\\';              Core = 'my dir\\' }
+    @{ Why = 'a checkout path with a space, ending in one'; In = 'C:\My Repos\product\';   Desktop = 'C:\My Repos\product\\';  Core = 'C:\My Repos\product\' }
+    @{ Why = 'a checkout path with a space, ending in none'; In = 'C:\My Repos\product';   Desktop = 'C:\My Repos\product';    Core = 'C:\My Repos\product' }
+    @{ Why = 'a drive root';                                In = 'C:\';                     Desktop = 'C:\';                     Core = 'C:\' }
+)
+foreach ($row in $nativeArgumentRows) {
+    $asDesktop = ConvertTo-P20NativeArgument $row.In -Desktop $true
+    $asCore = ConvertTo-P20NativeArgument $row.In -Desktop $false
+    Assert-True "Clause 23: the rule gives Windows PowerShell 5.1 $($row.Why) as [$($row.Desktop)]" ($asDesktop -ceq $row.Desktop) "got [$asDesktop]"
+    Assert-True "Clause 23: the rule gives PowerShell 7's Legacy passing $($row.Why) as [$($row.Core)]" ($asCore -ceq $row.Core) "got [$asCore]"
+}
+
+# One rule, in one file. The test helper and the shipped reader each call it
+# behind the same test of the host, and neither defines an escape of its own.
+$nativeRuleFile = 'Scripts/ConvertTo-NativeArgument.ps1'
+$nativeRuleDefiners = @()
+$nativeRuleRead = @(Get-ChildItem (Join-Path $pkgRoot 'Scripts'), (Join-Path $pkgRoot 'Tests'), (Join-Path $pkgRoot 'Config') -Include '*.ps1', '*.psm1' -File -Recurse) + @(Get-ChildItem $pkgRoot -Filter '*.psm1' -File)
+foreach ($f in $nativeRuleRead) {
+    $body = [System.IO.File]::ReadAllText($f.FullName)
+    if ($body -match '(?m)^\s*function\s+(global:)?(ConvertTo-P20NativeArgument|Test-P20LegacyNativeArguments|ConvertTo-P20TestGitArgument|Test-P20TestLegacyNativeArguments)\b') { $nativeRuleDefiners += (Get-RelPath $f) }
+}
+Assert-True "Clause 23: the argument rule is defined in $nativeRuleFile and nowhere else" ((@($nativeRuleDefiners) -join ',') -eq $nativeRuleFile) "read $($nativeRuleRead.Count) files; defined in: $($nativeRuleDefiners -join ', ')"
+$readerText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Invoke-TrackerRead.ps1'))
+$ruleCall = '(?s)if \(Test-P20LegacyNativeArguments\)\s*\{[^}]*ConvertTo-P20NativeArgument \$_'
+Assert-True 'Clause 23: the test helper and the shipped reader both call the rule, behind the same test of the host' (($suiteGitHelperText -match $ruleCall) -and ($readerText -match $ruleCall)) 'one of them no longer calls ConvertTo-P20NativeArgument behind Test-P20LegacyNativeArguments'
+# The .cmd rule reads an argument as written, before the conversion: converted
+# first, an empty argument would arrive as "" and be refused for its quotes.
+$cmdCheckAt = $readerText.IndexOf('if (Test-P20CmdArgument $argument)')
+$convertAt = $readerText.IndexOf('ConvertTo-P20NativeArgument $_')
+Assert-True 'Clause 23: the shipped reader checks an argument for cmd.exe as written, then converts it' (($cmdCheckAt -gt 0) -and ($convertAt -gt $cmdCheckAt) -and (Test-P20CmdArgument '') -and (-not (Test-P20CmdArgument (ConvertTo-P20NativeArgument '')))) "check at $cmdCheckAt, convert at $convertAt"
+
+# And one that runs a different command without it: the file is named as the
+# branch is, so `git checkout trunk` is a switch that restores nothing and
+# `git checkout -- trunk` puts the file back.
+$dashScratch = Join-Path ([System.IO.Path]::GetTempPath()) "p20-portability-dash-$([guid]::NewGuid().ToString('N'))"
+try {
+    $null = New-Item -ItemType Directory -Path $dashScratch -Force
+    $null = Invoke-P20TestGit -C $dashScratch init --quiet
+    $null = Invoke-P20TestGit -C $dashScratch symbolic-ref HEAD refs/heads/trunk
+    $null = Invoke-P20TestGit -C $dashScratch config core.autocrlf false
+    $dashFile = Join-Path $dashScratch 'trunk'
+    [System.IO.File]::WriteAllText($dashFile, "committed`n")
+    $null = Invoke-P20TestGit -C $dashScratch add trunk
+    $dashCommit = Invoke-P20TestGit -C $dashScratch -c user.email=t@example.invalid -c user.name=t -c commit.gpgsign=false commit --quiet -m one
+    [System.IO.File]::WriteAllText($dashFile, "edited`n")
+    $dashBack = Invoke-P20TestGit -C $dashScratch checkout --quiet '--' trunk
+    $dashNow = [System.IO.File]::ReadAllText($dashFile)
+    Assert-True "Clause 23: a quoted -- and the path after it reach git (checkout -- <path> restores a file named as the branch is)" (($dashCommit.Code -eq 0) -and ($dashBack.Code -eq 0) -and ($dashNow -ceq "committed`n")) "commit $($dashCommit.Code), checkout $($dashBack.Code): $($dashBack.Lines -join ' ') -- the file reads [$($dashNow.Trim())]"
+}
+catch { Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $dashScratch -Recurse -Force -ErrorAction SilentlyContinue }
+
 # -- Clause 9: the documented config shape is the implemented one --------------
+Write-ClauseProgress 'Clause 9'
 # Two failures of the same kind, both found on a cold start: the no-config
 # warning told a reader to copy the whole shipped table, and docs/CONFIGURATION.md
 # told them to patch `orgs` as an ARRAY, which the merge ignores in silence. A
@@ -1374,6 +1807,7 @@ finally {
 }
 
 # -- Clause 16: one copy of the standalone fallbacks ---------------------------
+Write-ClauseProgress 'Clause 16'
 # A script run with no module loaded takes Get-CliPrefix and Write-CliError from
 # Scripts/Initialize-CliFallbacks.ps1, which it dot-sources. Every script used to
 # carry its own pair, and copies drift: some of them stopped recording the stated
@@ -1413,6 +1847,351 @@ Assert-True "Clause 16: the sweep finds an inline definition, indented or global
     ('function global:Get-CliPrefix {' -match $fbPattern) -and
     (-not ('    Write-CliError -Message "x"' -match $fbPattern)) -and
     (-not ('function Get-CliPrefixes {' -match $fbPattern))) ''
+
+# -- Clause 18: an Azure DevOps token goes to the Space's organisation only -----
+Write-ClauseProgress 'Clause 18'
+# Two conditions keep the token at home, and this holds both at every request a
+# script makes: the headers come from Get-P20AdoHeaders (which refuses an address
+# the tracker rule does not read as Azure DevOps, or one that is not https), and
+# the address is built on the Space's own $org, so nothing read from a card can
+# choose the host. A call with no -Headers, or the model call with its own key,
+# carries no Azure DevOps token and is not this clause's.
+
+function Get-AdoRequestHits {
+    param([string]$Text, [string]$Name = 'body')
+    $tokens = $null; $errs = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$errs)
+    $assigns = @{}
+    foreach ($a in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true)) {
+        if ($a.Left -is [System.Management.Automation.Language.VariableExpressionAst]) {
+            $key = $a.Left.VariablePath.UserPath.ToLowerInvariant()
+            if (-not $assigns.ContainsKey($key)) { $assigns[$key] = @() }
+            $assigns[$key] += $a.Right.Extent.Text.Trim()
+        }
+    }
+    $hits = @()
+    foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Invoke-RestMethod' }, $true)) {
+        $uri = $null; $headers = $null
+        $els = $c.CommandElements
+        for ($i = 1; $i -lt $els.Count - 1; $i++) {
+            if ($els[$i] -is [System.Management.Automation.Language.CommandParameterAst]) {
+                if ($els[$i].ParameterName -eq 'Uri') { $uri = $els[$i + 1] }
+                if ($els[$i].ParameterName -eq 'Headers') { $headers = $els[$i + 1] }
+            }
+        }
+        if (-not $headers) { continue }
+        $line = $c.Extent.StartLineNumber
+        if ($uri -and $uri.Extent.Text -match '^["'']https://api\.anthropic\.com/') { continue }
+        $hText = $headers.Extent.Text
+        $hOk = $false
+        if ($hText -match '^\(\s*Get-P20AdoHeaders\s.*-OrgUrl\s+\$org\b') { $hOk = $true }
+        elseif ($headers -is [System.Management.Automation.Language.VariableExpressionAst]) {
+            $vals = @($assigns[$headers.VariablePath.UserPath.ToLowerInvariant()])
+            $hOk = ($vals.Count -gt 0) -and (@($vals | Where-Object { $_ -notmatch '^Get-P20AdoHeaders\s.*-OrgUrl\s+\$org\b' }).Count -eq 0)
+        }
+        if (-not $hOk) { $hits += "${Name}:$line headers not from Get-P20AdoHeaders -OrgUrl `$org ($hText)" }
+        $uOk = $false
+        if ($uri -is [System.Management.Automation.Language.VariableExpressionAst]) {
+            $vals = @($assigns[$uri.VariablePath.UserPath.ToLowerInvariant()])
+            $uOk = ($vals.Count -gt 0) -and (@($vals | Where-Object { $_ -notmatch '^(?:"\$org/|\$org \+ ''/'')' }).Count -eq 0)
+        }
+        if (-not $uOk) { $hits += "${Name}:$line address not built on `$org ($(if ($uri) { $uri.Extent.Text } else { 'no -Uri' }))" }
+    }
+    foreach ($t in $tokens) {
+        if (($t.Kind -eq 'StringExpandable' -or $t.Kind -eq 'StringLiteral') -and $t.Text -match 'Bearer ') {
+            $hits += "${Name}:$($t.Extent.StartLineNumber) a Bearer header built by hand"
+        }
+    }
+    return $hits
+}
+
+$adoHits = @()
+$adoRequests = 0
+foreach ($f in @(Get-ChildItem (Join-Path $pkgRoot 'Scripts') -Filter '*.ps1' -File)) {
+    if ($f.Name -eq 'Get-AdoToken.ps1') { continue }
+    $text = [System.IO.File]::ReadAllText($f.FullName)
+    $adoRequests += ([regex]::Matches($text, 'Invoke-RestMethod[^\r\n]*-Headers')).Count
+    $adoHits += @(Get-AdoRequestHits -Text $text -Name $f.Name)
+}
+Assert-True "Clause 18: every Azure DevOps request in Scripts/ takes Get-P20AdoHeaders -OrgUrl `$org and an address built on `$org ($adoRequests)" (
+    ($adoHits.Count -eq 0) -and ($adoRequests -ge 20)) ($adoHits -join '; ')
+foreach ($case in @(
+        @{ Hit = $true;  Why = 'a hand-built Bearer header'; Body = '$u = "$org/_apis/x"; Invoke-RestMethod -Uri $u -Headers @{ Authorization = "Bearer $t" }' },
+        @{ Hit = $true;  Why = 'an address read from a card'; Body = '$h = Get-P20AdoHeaders -Token $t -OrgUrl $org; $u = $prUrl + "/x"; Invoke-RestMethod -Uri $u -Headers $h' },
+        @{ Hit = $true;  Why = 'headers for another address'; Body = '$h = Get-P20AdoHeaders -Token $t -OrgUrl $cardOrg; $u = "$org/_apis/x"; Invoke-RestMethod -Uri $u -Headers $h' },
+        @{ Hit = $false; Why = 'the house shape'; Body = '$h = Get-P20AdoHeaders -Token $t -OrgUrl $org; $u = "$org/_apis/x"; Invoke-RestMethod -Uri $u -Headers $h -Method Get' },
+        @{ Hit = $false; Why = 'the model call with its own key'; Body = 'Invoke-RestMethod -Uri "https://api.anthropic.com/v1/messages" -Headers @{ "x-api-key" = $k }' }
+    )) {
+    $caseHits = @(Get-AdoRequestHits -Text $case.Body).Count
+    Assert-True "Clause 18: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
+# And every request BODY a script sends is UTF-8 bytes from one helper,
+# ConvertTo-P20Utf8Body: Windows PowerShell 5.1 does not send a string -Body as
+# UTF-8, even with charset=utf-8 in the headers, so a title with an
+# accent reached the organisation altered. The model call and the agent call are
+# held to it too: they carry no token, but they carry the same text.
+function Get-RestBodyHits {
+    param([string]$Text, [string]$Name = 'body')
+    $tokens = $null; $errs = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$tokens, [ref]$errs)
+    $assigns = @{}
+    foreach ($a in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true)) {
+        if ($a.Left -is [System.Management.Automation.Language.VariableExpressionAst]) {
+            $key = $a.Left.VariablePath.UserPath.ToLowerInvariant()
+            if (-not $assigns.ContainsKey($key)) { $assigns[$key] = @() }
+            $assigns[$key] += $a.Right.Extent.Text.Trim()
+        }
+    }
+    $hits = @()
+    $bodies = 0
+    foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and @('Invoke-RestMethod', 'Invoke-WebRequest', 'irm', 'iwr') -contains $n.GetCommandName() }, $true)) {
+        $els = $c.CommandElements
+        for ($i = 1; $i -lt $els.Count; $i++) {
+            if (-not ($els[$i] -is [System.Management.Automation.Language.CommandParameterAst] -and $els[$i].ParameterName -eq 'Body')) { continue }
+            $bodies++
+            $arg = $els[$i].Argument
+            if (-not $arg -and $i + 1 -lt $els.Count) { $arg = $els[$i + 1] }
+            $bText = if ($arg) { $arg.Extent.Text.Trim() } else { '' }
+            $ok = $false
+            if ($bText -match '^\(\s*ConvertTo-P20Utf8Body\s') { $ok = $true }
+            elseif ($arg -is [System.Management.Automation.Language.VariableExpressionAst]) {
+                $vals = @($assigns[$arg.VariablePath.UserPath.ToLowerInvariant()])
+                $ok = ($vals.Count -gt 0) -and (@($vals | Where-Object { $_ -notmatch '^ConvertTo-P20Utf8Body\s' }).Count -eq 0)
+            }
+            if (-not $ok) { $hits += "${Name}:$($c.Extent.StartLineNumber) -Body is not ConvertTo-P20Utf8Body ($bText)" }
+        }
+    }
+    return [PSCustomObject]@{ Hits = $hits; Bodies = $bodies }
+}
+
+$bodyHits = @()
+$bodyCount = 0
+foreach ($f in @(Get-ChildItem (Join-Path $pkgRoot 'Scripts') -Filter '*.ps1' -File)) {
+    $read = Get-RestBodyHits -Text ([System.IO.File]::ReadAllText($f.FullName)) -Name $f.Name
+    $bodyHits += @($read.Hits)
+    $bodyCount += $read.Bodies
+}
+Assert-True "Clause 18: every request body in Scripts/ is UTF-8 bytes from ConvertTo-P20Utf8Body ($bodyCount)" (
+    ($bodyHits.Count -eq 0) -and ($bodyCount -ge 14)) ($bodyHits -join '; ')
+foreach ($case in @(
+        @{ Hit = $true;  Why = 'a string body'; Body = '$b = @{ a = 1 } | ConvertTo-Json; Invoke-RestMethod -Uri $u -Headers $h -Method Post -Body $b' },
+        @{ Hit = $true;  Why = 'a body built inline'; Body = 'Invoke-RestMethod -Uri $u -Method Post -Body (@{ a = 1 } | ConvertTo-Json)' },
+        @{ Hit = $true;  Why = 'a body on a continued line of the model call'; Body = "Invoke-RestMethod ``n    -Uri 'https://api.anthropic.com/v1/messages' ``n    -Body `$requestBody" },
+        @{ Hit = $true;  Why = 'one assignment of the body variable not through the helper'; Body = '$b = ConvertTo-P20Utf8Body $j; if ($x) { $b = $j }; Invoke-RestMethod -Uri $u -Body $b' },
+        @{ Hit = $false; Why = 'the helper inline'; Body = 'Invoke-RestMethod -Uri $u -Headers $h -Method Post -Body (ConvertTo-P20Utf8Body $json)' },
+        @{ Hit = $false; Why = 'a variable the helper filled'; Body = '$b = ConvertTo-P20Utf8Body $json; Invoke-WebRequest -Uri $u -Body $b' },
+        @{ Hit = $false; Why = 'a GET with no body'; Body = 'Invoke-RestMethod -Uri $u -Headers $h -Method Get' }
+    )) {
+    $caseHits = @((Get-RestBodyHits -Text $case.Body).Hits).Count
+    Assert-True "Clause 18: the body sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
+# -- Clause 19: every Get-Content names its encoding ---------------------------
+Write-ClauseProgress 'Clause 19'
+# Windows PowerShell 5.1 reads a file with no BOM in the system's ANSI code page
+# when Get-Content is given no -Encoding; 7 reads it as UTF-8. Every file this
+# package reads is UTF-8 -- the config Config writes, a card, a session -- so a
+# bare Get-Content was the same file read two ways, and a non-ASCII hub path or a
+# card's em dash came back altered on the floor alone. Walked by AST, so a
+# Get-Content in a string or a comment is not a call; an alias is.
+function Get-BareGetContentHits {
+    param([string]$Text, [string]$Name = 'body')
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$null, [ref]$null)
+    $hits = @()
+    foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -in @('Get-Content', 'gc', 'cat', 'type') }, $true)) {
+        $named = @($c.CommandElements | Where-Object { $_ -is [System.Management.Automation.Language.CommandParameterAst] -and $_.ParameterName -like 'Enc*' })
+        if ($named.Count -eq 0) { $hits += "${Name}:$($c.Extent.StartLineNumber) $(($c.Extent.Text -replace '\s+', ' '))" }
+    }
+    return $hits
+}
+
+$gcHits = @()
+$gcFiles = @()
+foreach ($dir in @('Scripts', 'Prompt20Toolkit', 'Config', 'agent')) {
+    $full = Join-Path $pkgRoot $dir
+    if (-not (Test-Path -LiteralPath $full)) { continue }
+    $gcFiles += @(Get-ScanFile -Path $full -Extension '.ps1', '.psm1' -Recurse)
+}
+$gcFiles += @(Get-ChildItem -LiteralPath $pkgRoot -Filter '*.psm1' -File)
+foreach ($f in $gcFiles) {
+    $gcHits += @(Get-BareGetContentHits -Text ([System.IO.File]::ReadAllText($f.FullName)) -Name $f.Name)
+}
+Assert-True "Clause 19: every Get-Content in shipped PowerShell names its -Encoding ($($gcFiles.Count) files)" (
+    ($gcHits.Count -eq 0) -and ($gcFiles.Count -ge 80)) ($gcHits -join '; ')
+foreach ($case in @(
+        @{ Hit = $true;  Why = 'a bare read of a JSON file'; Body = '$c = Get-Content $path -Raw | ConvertFrom-Json' },
+        @{ Hit = $true;  Why = 'a bare read through an alias'; Body = '$lines = gc $card' },
+        @{ Hit = $false; Why = 'a read that names UTF-8'; Body = '$c = Get-Content -LiteralPath $path -Raw -Encoding UTF8' },
+        @{ Hit = $false; Why = 'the words in a string'; Body = '$hint = "Get-Content $path"' }
+    )) {
+    $caseHits = @(Get-BareGetContentHits -Text $case.Body).Count
+    Assert-True "Clause 19: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+
+# -- Clause 20: a path the package computes is read literally -----------------
+Write-ClauseProgress 'Clause 20'
+# -Path is a wildcard pattern. A hub, a package or a home folder whose name holds
+# [ or ] -- "Work [old]" -- is then a pattern that matches nothing: Test-Path says
+# false of a card that is there, Get-ChildItem lists no cards, Move-Item throws,
+# and a writer that asked "is there a file?" first writes over it. Every path in
+# Scripts/ is computed from configuration or a card, never a pattern a person
+# typed, so every cmdlet that resolves one is handed it as -LiteralPath. The bind
+# is PowerShell's own (StaticParameterBinder), so a positional path counts and an
+# alias resolves; a constant path, and a provider path such as env:, cannot hold
+# a stranger's bracket and are left alone. A real wildcard enumerates instead:
+# Get-ChildItem -LiteralPath <folder> -Filter <pattern>.
+$literalResolving = @('Test-Path', 'Get-Content', 'Get-ChildItem', 'Get-Item', 'Resolve-Path', 'Convert-Path',
+    'Import-PowerShellDataFile', 'Set-Content', 'Add-Content', 'Clear-Content', 'Copy-Item', 'Move-Item', 'Rename-Item',
+    'Remove-Item', 'Set-Location', 'Push-Location', 'Out-File', 'Get-FileHash', 'Select-String', 'Get-ItemProperty', 'Invoke-Item')
+# Get-Command for a name that is not a command searches every folder on PATH,
+# and Clause 20 asks it of every command name in every file, so each answer is
+# kept: by the exact name (ordinal, so 'Del' and 'del' are asked separately, as
+# Get-Command would be asked), a hit resolved through its alias, and a miss as
+# $null, so a repeated unknown is not searched for again.
+$sweepCommandCache = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([System.StringComparer]::Ordinal)
+function Resolve-SweepCommand {
+    param([string]$Name)
+    $found = $null
+    if ($sweepCommandCache.TryGetValue($Name, [ref]$found)) { return $found }
+    $found = Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found -and $found.CommandType -eq 'Alias') { $found = $found.ResolvedCommand }
+    $sweepCommandCache[$Name] = $found
+    return $found
+}
+function Get-NonLiteralPathHits {
+    param([string]$Text, [string]$Name = 'body')
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($Text, [ref]$null, [ref]$null)
+    $hits = @()
+    foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+        $cn = $c.GetCommandName()
+        if (-not $cn) { continue }
+        $cmd = Resolve-SweepCommand $cn
+        if (-not $cmd -or $literalResolving -notcontains $cmd.Name) { continue }
+        $bound = [System.Management.Automation.Language.StaticParameterBinder]::BindCommand($c, $true).BoundParameters
+        if ($bound.ContainsKey('LiteralPath')) { continue }
+        $key = @('Path', 'FilePath') | Where-Object { $bound.ContainsKey($_) } | Select-Object -First 1
+        if (-not $key) { continue }
+        $value = $bound[$key].Value
+        if ($value -is [System.Management.Automation.Language.StringConstantExpressionAst]) { continue }
+        if ($value -is [System.Management.Automation.Language.ExpandableStringExpressionAst] -and
+            $value.Value -match '^(?i:env|function|variable|alias):') { continue }
+        $hits += "${Name}:$($c.Extent.StartLineNumber) $(($c.Extent.Text -replace '\s+', ' '))"
+    }
+    return $hits
+}
+
+$litHits = @()
+foreach ($f in $gcFiles) {
+    $litHits += @(Get-NonLiteralPathHits -Text ([System.IO.File]::ReadAllText($f.FullName)) -Name $f.Name)
+}
+Assert-True "Clause 20: every computed path in shipped PowerShell is handed over as -LiteralPath ($($gcFiles.Count) files)" (
+    ($litHits.Count -eq 0) -and ($gcFiles.Count -ge 80)) ($litHits -join '; ')
+foreach ($case in @(
+        @{ Hit = $true;  Why = 'a positional variable path'; Body = 'if (Test-Path $card) { }' },
+        @{ Hit = $true;  Why = 'a named -Path'; Body = '$c = Get-Content -Path $card -Raw -Encoding UTF8' },
+        @{ Hit = $true;  Why = 'a path built by Join-Path'; Body = 'Get-ChildItem (Join-Path $hub ''current'') -Filter ''*.md''' },
+        @{ Hit = $true;  Why = 'an expandable string holding a folder'; Body = 'Move-Item "$current/$name" $dest' },
+        @{ Hit = $true;  Why = 'an alias'; Body = 'del $pidFile -Force' },
+        @{ Hit = $true;  Why = 'Out-File''s -FilePath'; Body = '$x | Out-File $log' },
+        @{ Hit = $true;  Why = 'a wildcard built on a computed folder'; Body = 'Copy-Item (Join-Path $Source ''*'') $Destination -Recurse' },
+        @{ Hit = $false; Why = 'a -LiteralPath'; Body = 'if (Test-Path -LiteralPath $card) { }' },
+        @{ Hit = $false; Why = 'the -LP alias of -LiteralPath'; Body = 'Remove-Item -LP $pidFile -Force' },
+        @{ Hit = $false; Why = 'a constant path'; Body = 'Test-Path ''./config.local.json''' },
+        @{ Hit = $false; Why = 'a provider path'; Body = 'if (Test-Path "env:$name") { }' },
+        @{ Hit = $false; Why = 'the words in a string'; Body = '$hint = "Test-Path $card"' },
+        @{ Hit = $false; Why = 'a path cmdlet that does not resolve one'; Body = '$p = Join-Path $hub ''current''; New-Item -ItemType Directory -Path $p -Force' }
+    )) {
+    $caseHits = @(Get-NonLiteralPathHits -Text $case.Body).Count
+    Assert-True "Clause 20: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" (($caseHits -gt 0) -eq $case.Hit) "hits: $caseHits"
+}
+# The cache answers as Get-Command would: a body read twice reports the same
+# hits, a name that is no command is kept as a miss, and a hit as the command.
+$cacheBody = "if (Test-Path `$card) { }`nNo-SuchSweepCommand `$card`nif (Test-Path `$other) { }`nNo-SuchSweepCommand `$other"
+$cacheFirst = @(Get-NonLiteralPathHits -Text $cacheBody)
+$cacheSecond = @(Get-NonLiteralPathHits -Text $cacheBody)
+Assert-True "Clause 20: a body read twice reports the same hits from the cache" (($cacheFirst.Count -eq 2) -and (($cacheFirst -join '|') -eq ($cacheSecond -join '|'))) "first: $($cacheFirst -join '; ') second: $($cacheSecond -join '; ')"
+$cachedMiss = $null; $cachedHit = $null
+$missKept = $sweepCommandCache.TryGetValue('No-SuchSweepCommand', [ref]$cachedMiss)
+$hitKept = $sweepCommandCache.TryGetValue('Test-Path', [ref]$cachedHit)
+Assert-True "Clause 20: the cache keeps a miss as a miss and a hit as the command" ($missKept -and ($null -eq $cachedMiss) -and $hitKept -and ($cachedHit.Name -eq 'Test-Path')) "miss kept: $missKept; hit: $($cachedHit.Name)"
+Assert-True "Clause 20: the cache keys on the exact name, not a folded one" (-not $sweepCommandCache.ContainsKey('test-path')) 'a lowercase key was found without being asked'
+
+# Each sweep's file set holds only its own kinds of file, on the host running it
+# (Windows PowerShell 5.1 once let every file into the Clause 19 set).
+$gcStray = @($gcFiles | Where-Object { @('.ps1', '.psm1') -notcontains $_.Extension.ToLowerInvariant() })
+Assert-True "Clause 19 and 20: the file set holds only .ps1 and .psm1 files ($($gcFiles.Count))" ($gcStray.Count -eq 0) ("stray: " + (($gcStray | Select-Object -First 5 | ForEach-Object { $_.Name }) -join ', '))
+
+# -- Clause 21: a script without a BOM is ASCII --------------------------------
+Write-ClauseProgress 'Clause 21'
+# Windows PowerShell 5.1 reads a .ps1, .psm1 or .psd1 that has no byte-order mark
+# in the system's ANSI code page; 7 reads it as UTF-8. A non-ASCII character in
+# such a file is two different scripts: a regex class written with raw symbols
+# read, on a Western code page, as ranges in reverse order, and the pattern threw
+# on every card. An escape -- a regex's backslash-u, a string's [char]0x2014 --
+# reads the same on every host. Two rules. No script anywhere in the package,
+# Tests/ included, holds a non-ASCII byte without a BOM. And no SHIPPED script
+# holds one at all, except the files named below: each carries a BOM, and its
+# non-ASCII is text it prints. The list only shrinks; an entry that has become
+# ASCII fails until it is taken off.
+$nonAsciiAllowed = @(
+    'Scripts/Get-PRComments.ps1',
+    'Scripts/Resolve-TierDecision.ps1',
+    'Scripts/Send-PRReply.ps1',
+    'Scripts/Test-Prerequisites.ps1'
+)
+$latin1 = [System.Text.Encoding]::GetEncoding(28591)
+function Get-NonAsciiScriptState {
+    # @{ Bom; Line } for a script's bytes: whether it opens with a UTF-8 BOM, and
+    # the first line holding a non-ASCII byte after it (0 for none).
+    param([byte[]]$Bytes)
+    $bom = ($Bytes.Length -ge 3 -and $Bytes[0] -eq 0xEF -and $Bytes[1] -eq 0xBB -and $Bytes[2] -eq 0xBF)
+    $start = 0
+    if ($bom) { $start = 3 }
+    $text = $latin1.GetString($Bytes, $start, $Bytes.Length - $start)
+    $m = [regex]::Match($text, '[^\x00-\x7F]')
+    $line = 0
+    if ($m.Success) { $line = 1 + @([regex]::Matches($text.Substring(0, $m.Index), "`n")).Count }
+    return @{ Bom = $bom; Line = $line }
+}
+
+$scriptFiles = @(Get-ScanFile -Path $pkgRoot -Extension '.ps1', '.psm1', '.psd1' -Recurse)
+$noBomHits = @()
+$shippedHits = @()
+$allowedSeen = @{}
+foreach ($f in $scriptFiles) {
+    $rel = $f.FullName.Substring($pkgRoot.Length).TrimStart('\', '/') -replace '\\', '/'
+    $state = Get-NonAsciiScriptState -Bytes ([System.IO.File]::ReadAllBytes($f.FullName))
+    if ($state.Line -eq 0) { continue }
+    if (-not $state.Bom) { $noBomHits += "${rel}:$($state.Line)" }
+    $shipped = ($rel -notmatch '^(Tests|samples)/')
+    if ($nonAsciiAllowed -contains $rel) { $allowedSeen[$rel] = $state.Bom; continue }
+    if ($shipped) { $shippedHits += "${rel}:$($state.Line)" }
+}
+$scriptStray = @($scriptFiles | Where-Object { @('.ps1', '.psm1', '.psd1') -notcontains $_.Extension.ToLowerInvariant() })
+$scriptExcluded = @($scriptFiles | Where-Object { Test-ScanExcluded -Path $_.FullName })
+Assert-True "Clause 21: the file set holds only scripts, and nothing under an excluded folder ($($scriptFiles.Count))" (($scriptStray.Count -eq 0) -and ($scriptExcluded.Count -eq 0)) ("stray: " + ((@($scriptStray) + @($scriptExcluded) | Select-Object -First 5 | ForEach-Object { $_.FullName }) -join ', '))
+Assert-True "Clause 21: no script in the package holds a non-ASCII byte without a BOM ($($scriptFiles.Count) files)" (
+    ($noBomHits.Count -eq 0) -and ($scriptFiles.Count -ge 150)) ($noBomHits -join '; ')
+Assert-True "Clause 21: no shipped script holds a non-ASCII byte, but the $($nonAsciiAllowed.Count) named" (
+    $shippedHits.Count -eq 0) ($shippedHits -join '; ')
+foreach ($rel in $nonAsciiAllowed) {
+    Assert-True "Clause 21: $rel still holds non-ASCII, and carries a BOM" ($allowedSeen.ContainsKey($rel) -and $allowedSeen[$rel]) $(
+        if ($allowedSeen.ContainsKey($rel)) { 'no BOM' } else { 'ASCII now, or gone: take it off the list' })
+}
+$e9 = [System.Text.Encoding]::UTF8.GetBytes("'" + [char]0xE9 + "'")
+foreach ($case in @(
+        @{ Hit = $false; Why = 'an ASCII script'; Bytes = [System.Text.Encoding]::ASCII.GetBytes("`$a = 1`n`$b = 2") },
+        @{ Hit = $false; Why = 'an escape in place of the character'; Bytes = [System.Text.Encoding]::ASCII.GetBytes("'^[\u2600-\uD7FF]'") },
+        @{ Hit = $true;  Why = 'a raw accented letter with no BOM'; Bytes = [byte[]](@(0x23, 0x0A) + $e9) },
+        @{ Hit = $false; Why = 'the same letter after a BOM'; Bytes = [byte[]](@(0xEF, 0xBB, 0xBF) + $e9) }
+    )) {
+    $state = Get-NonAsciiScriptState -Bytes $case.Bytes
+    $hit = ($state.Line -gt 0 -and -not $state.Bom)
+    Assert-True "Clause 21: the sweep $(if ($case.Hit) { 'finds' } else { 'leaves alone' }) $($case.Why)" ($hit -eq $case.Hit) "line $($state.Line), BOM $($state.Bom)"
+}
+$rawCase = Get-NonAsciiScriptState -Bytes ([byte[]](@(0x23, 0x0A) + $e9))
+Assert-True "Clause 21: the sweep names the line" ($rawCase.Line -eq 2) "line $($rawCase.Line)"
 
 # ── The scan exclusions are relative to the package root ─────────────────────
 # A checkout whose own path runs through an excluded name (an agent worktree

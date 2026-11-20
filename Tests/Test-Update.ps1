@@ -23,6 +23,7 @@
 #>
 
 $pkgRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 $targetScript = Join-Path (Join-Path $pkgRoot 'Scripts') 'Update-Toolkit.ps1'
 # Update-Toolkit.ps1 dot-sources this, so a sandbox standing in for a package
 # has to carry it: a copy-install has the whole Scripts/ folder, and a sandbox
@@ -30,7 +31,7 @@ $targetScript = Join-Path (Join-Path $pkgRoot 'Scripts') 'Update-Toolkit.ps1'
 # Every script Update-Toolkit.ps1 dot-sources. Resolve-Python.ps1 was missing
 # from this list, so the sandbox's Update fell back to `python3` -- wrong on the
 # Windows, right by coincidence on macOS.
-$helperScripts = @('Test-GitRoot.ps1', 'Resolve-Python.ps1', 'Initialize-CliFallbacks.ps1', 'Invoke-TrackerRead.ps1')
+$helperScripts = @('Test-GitRoot.ps1', 'Resolve-Python.ps1', 'Initialize-CliFallbacks.ps1', 'Invoke-TrackerRead.ps1', 'ConvertTo-NativeArgument.ps1')
 
 $script:passed = 0
 $script:failed = 0
@@ -77,7 +78,36 @@ $publisher = Join-Path $base 'publisher'
 
 function Invoke-Git {
     param([string]$Repo, [string[]]$GitArgs)
-    return @(& git -C $Repo -c user.name=Test -c user.email=test@example.com -c commit.gpgsign=false -c core.autocrlf=false @GitArgs 2>&1 | ForEach-Object { "$_" })
+    return @((Invoke-P20TestGit -C $Repo -c user.name=Test -c user.email=test@example.com -c commit.gpgsign=false -c core.autocrlf=false @GitArgs).Lines)
+}
+
+# No fixture repository runs maintenance on its own, and no fixture clone
+# hardlinks its objects. A commit starts `git maintenance run --auto --detach`,
+# which can still be repacking when the next step clones the repository by
+# path; a local clone hardlinks what it finds in objects/pack, a half-written
+# tmp_pack_* included, and stops with "hardlink different from source". Either
+# half alone closes that; both are here so neither depends on the other.
+$noAutoMaintenance = @('gc.auto=0', 'maintenance.auto=false')
+
+function Set-NoAutoMaintenance {
+    # Straight after `git init`, before anything is added or committed.
+    param([string]$Repo)
+    $said = @()
+    foreach ($pair in $noAutoMaintenance) {
+        $key, $value = $pair -split '=', 2
+        $said += @((Invoke-P20TestGit -C $Repo config $key $value).Lines)
+    }
+    return $said
+}
+
+function Copy-Repo {
+    # The one way this suite clones: a full copy of the objects, and the new
+    # repository's own config carrying the same two settings.
+    param([string]$From, [string]$To, [switch]$Bare)
+    $cloneArgs = @('clone', '-q', '--no-hardlinks')
+    foreach ($pair in $noAutoMaintenance) { $cloneArgs += @('-c', $pair) }
+    if ($Bare) { $cloneArgs += '--bare' }
+    return @((Invoke-P20TestGit @cloneArgs $From $To).Lines)
 }
 
 function Write-RepoFile {
@@ -99,7 +129,7 @@ function New-Consumer {
     # A fresh clone with the REAL script dropped in, untracked.
     param([string]$Name)
     $path = Join-Path $base $Name
-    & git clone -q $origin $path 2>&1 | Out-Null
+    [void](Copy-Repo $origin $path)
     New-Item -ItemType Directory -Path (Join-Path $path 'Scripts') -Force | Out-Null
     Copy-Item $targetScript (Join-Path (Join-Path $path 'Scripts') 'Update-Toolkit.ps1')
     foreach ($h in $helperScripts) {
@@ -122,8 +152,9 @@ function Invoke-Update {
 function Get-Head { param([string]$Repo) return (Invoke-Git $Repo @('rev-parse', 'HEAD') | Select-Object -First 1) }
 
 try {
-    & git init -q --bare -b main $origin 2>&1 | Out-Null
-    & git clone -q $origin $publisher 2>&1 | Out-Null
+    $null = Invoke-P20TestGit init -q --bare -b main $origin
+    [void](Set-NoAutoMaintenance $origin)
+    [void](Copy-Repo $origin $publisher)
     [void](Invoke-Git $publisher @('checkout', '-q', '-b', 'main'))
     Publish-Commit 'utilities.psm1' "# v1`n" 'first'
 
@@ -241,7 +272,7 @@ try {
     # Update SAYS, once, and writes nothing: the verb that dresses them is Cover -Samples.
     Write-Host ""
     Write-Host "-- An older Demo: Update says, and writes nothing -----" -ForegroundColor Cyan
-    $coverHelpers = @('Get-SampleCoverGaps.ps1', 'Add-CardImage.ps1', 'Invoke-TrackerRead.ps1', 'Get-Consts.ps1', 'Resolve-CardName.ps1', 'Set-CardLine.ps1', 'Write-CardText.ps1')
+    $coverHelpers = @('Get-SampleCoverGaps.ps1', 'Add-CardImage.ps1', 'Invoke-TrackerRead.ps1', 'ConvertTo-NativeArgument.ps1', 'Get-Consts.ps1', 'Resolve-CardName.ps1', 'Set-CardLine.ps1', 'Write-CardText.ps1')
     function New-CoverConsumer {
         param([string]$Name)
         $path = New-Consumer $Name
@@ -336,19 +367,40 @@ try {
     $snapshot = Join-Path $base 'snapshot'
     $snapOrigin = Join-Path $base 'snapshot-origin.git'
     New-Item -ItemType Directory -Path $snapshot -Force | Out-Null
-    foreach ($rel in @(& git -C $pkgRoot ls-files --cached --others --exclude-standard)) {
+    # Each step that builds the clone is checked where it runs, with git's own
+    # words, so a failure here names its step -- not a missing module two steps
+    # later, which reads as a failure of the verb. An empty listing is the
+    # quiet way in: nothing is copied, the commit has nothing to commit, and
+    # the clone of an empty repository succeeds with no module in it.
+    $manifestRel = 'Prompt20Toolkit/Prompt20Toolkit.psd1'
+    $step = {
+        param([string]$Name, [scriptblock]$Run)
+        $said = @(& $Run 2>&1 | ForEach-Object { "$_" })
+        $code = $LASTEXITCODE
+        Assert-True "the clone is built: $Name exits 0" ($code -eq 0) "exit $code`n$($said -join "`n")"
+        return $said
+    }
+    $listed = @(& $step 'listing the working tree' { & git -C $pkgRoot ls-files --cached --others --exclude-standard })
+    Assert-True 'the clone is built: the listing names the module manifest' ($listed -contains $manifestRel) "$($listed.Count) path(s) listed"
+    $copyErrors = @()
+    foreach ($rel in $listed) {
         $src = Join-Path $pkgRoot $rel
         if (-not (Test-Path $src -PathType Leaf)) { continue }
         $dst = Join-Path $snapshot $rel
         New-Item -ItemType Directory -Path (Split-Path $dst -Parent) -Force | Out-Null
-        Copy-Item $src $dst
+        Copy-Item $src $dst -ErrorAction SilentlyContinue -ErrorVariable +copyErrors
     }
-    & git init -q -b main $snapshot 2>&1 | Out-Null
-    [void](Invoke-Git $snapshot @('add', '-A'))
-    [void](Invoke-Git $snapshot @('commit', '-q', '-m', 'a snapshot of the working tree'))
-    & git clone -q --bare $snapshot $snapOrigin 2>&1 | Out-Null
+    Assert-True 'the clone is built: every listed file is copied' ($copyErrors.Count -eq 0) (@($copyErrors | ForEach-Object { "$_" }) -join "`n")
+    Assert-True 'the clone is built: the snapshot has the module manifest' (Test-Path -LiteralPath (Join-Path $snapshot $manifestRel) -PathType Leaf) $snapshot
+    # One step, so the count of checks stays what it was: a failed init fails
+    # the config writes after it, and the step reports the last exit code.
+    [void](& $step 'git init' { (Invoke-P20TestGit init -q -b main $snapshot).Lines; Set-NoAutoMaintenance $snapshot })
+    [void](& $step 'git add' { Invoke-Git $snapshot @('add', '-A') })
+    [void](& $step 'the snapshot commit' { Invoke-Git $snapshot @('commit', '-q', '-m', 'a snapshot of the working tree') })
+    [void](& $step 'the bare clone' { Copy-Repo $snapshot $snapOrigin -Bare })
     $real = Join-Path $base 'c-real'
-    & git clone -q $snapOrigin $real 2>&1 | Out-Null
+    [void](& $step 'the clone' { Copy-Repo $snapOrigin $real })
+    Assert-True 'the clone is built: the clone has the module manifest' (Test-Path -LiteralPath (Join-Path $real $manifestRel) -PathType Leaf) "$real`n$(@(Invoke-Git $real @('status', '--short')) -join "`n")"
 
     # A hub that is a plain folder: storeSync is 'none' by default, so Sync has
     # nothing to do and SAYS so -- which is all this case needs it to do.
@@ -359,7 +411,7 @@ try {
     $logDir = Join-Path $base 'log'
     New-Item -ItemType Directory -Path $logDir -Force | Out-Null
     $command = "`$env:PSModulePath = '$real'; `$env:PROMPTS_ROOT = '$plainHub'; `$env:P20_USAGE_LOG_DIR = '$logDir'; " +
-        "Import-Module '$real/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null; $verb -Sync; exit `$LASTEXITCODE"
+        "Import-Module '$real/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null; if (-not (Get-Command $verb -ErrorAction SilentlyContinue)) { exit 3 }; $verb -Sync; exit `$LASTEXITCODE"
     Push-Location $base
     try { $realOut = & pwsh -NoProfile -Command $command 2>&1 | Out-String }
     finally { Pop-Location }

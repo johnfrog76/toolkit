@@ -52,9 +52,21 @@ if (-not (Get-Command Get-P20SettingsWorkflows -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command Get-P20ClaudeProjectsRoot -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Read-ClaudeUsage.ps1')
 }
+# The Teams recipients registry -- the Teams delivery row names who is declared.
+if (-not (Get-Command Read-P20CommunicationConfig -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Read-CommunicationConfig.ps1')
+}
+# The org chart's reader -- the Org chart row's state (docs/hub/org.md).
+if (-not (Get-Command Read-P20OrgChart -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Read-OrgChart.ps1')
+}
 # The one way this file calls git with stderr read as text (Invoke-TrackerRead.ps1).
 if (-not (Get-Command Invoke-P20TrackerRead -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+}
+# The standup room's size, read the one way (Resolve-TeamSize.ps1) -- the team size row.
+if (-not (Get-Command Get-P20SpaceTeamSize -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Resolve-TeamSize.ps1')
 }
 
 function Get-P20SurfaceStates {
@@ -117,11 +129,11 @@ function Get-P20ModuleSurfaces {
 
     $found = @{}
     $configDir = Join-Path $PackageRoot 'Config'
-    if (Test-Path $configDir) {
-        foreach ($psd1 in (Get-ChildItem $configDir -Filter '*.commands.psd1' -File -ErrorAction SilentlyContinue)) {
+    if (Test-Path -LiteralPath $configDir) {
+        foreach ($psd1 in (Get-ChildItem -LiteralPath $configDir -Filter '*.commands.psd1' -File -ErrorAction SilentlyContinue)) {
             # Import-PowerShellDataFile and nothing else, the same reader the
             # module loader uses: a data file in Config/ must never run code.
-            try { $data = Import-PowerShellDataFile -Path $psd1.FullName -ErrorAction Stop }
+            try { $data = Import-PowerShellDataFile -LiteralPath $psd1.FullName -ErrorAction Stop }
             catch { continue }
             if ($data -and $data.Feature) { $found[[string]$data.Feature] = $true }
         }
@@ -139,7 +151,7 @@ function Get-P20ModuleSurfaces {
         # for the others; without this the report said "specified, not built"
         # about a module that was on the screen.
         $webModule = Join-Path (Join-Path (Join-Path (Join-Path $PackageRoot 'web') 'src') 'modules') $name
-        if (Test-Path (Join-Path $webModule 'index.tsx')) {
+        if (Test-Path -LiteralPath (Join-Path $webModule 'index.tsx')) {
             $rows += @{ Feature = $name; Built = $true; WebOnly = $true }
             continue
         }
@@ -442,6 +454,39 @@ function Get-P20OptionalSurfaces {
     }
     $rows += New-P20SurfaceRow -Key 'suggestions' -Title 'Suggestions' -State $sugState -Config $sugLine -Note $sugNote
 
+    # -- The org chart: who sits in which seat (docs/hub/org.md) -----------------
+    # The hub's org file, read by OrgChart. It rides Team Agile, like the
+    # suggestion: where Team Agile is off here the row says so and is off. Where
+    # it is on, no file is `not configured` -- nobody has written one -- a valid
+    # file is `on` with the tree's name and its seats, and a file that is there
+    # but fails its checks is `off` with the sentence that says why: it is not
+    # on, and `not configured` would hide that someone wrote it.
+    $orgFile = Get-P20OrgFileName
+    $orgState = $states.Off
+    $orgNote = "rides Team Agile, which is off in $sugSlug"
+    $orgLine = "$($Prefix)Config -Set features.solitaireAgile=true"
+    if ($sugTeamAgile) {
+        $orgRoot = ''
+        if ($Config -and $Config.PromptsRoot) { $orgRoot = [string]$Config.PromptsRoot }
+        $orgRead = Read-P20OrgChart -PromptsRoot $orgRoot -PackageRoot $PackageRoot
+        $orgLine = "add $orgFile at the hub root, beside hub.json (docs/hub/org.md)"
+        if ($orgRead.Status -eq 'missing') {
+            $orgState = $states.Unset
+            $orgNote = "no $orgFile in the hub; samples/hub/$orgFile is one to copy"
+        }
+        elseif ($orgRead.Status -eq 'ok') {
+            $orgState = $states.On
+            $orgLine = "edit $orgFile at the hub root (docs/hub/org.md)"
+            $seatWord = 'seats'
+            if ($orgRead.SeatCount -eq 1) { $seatWord = 'seat' }
+            $orgNote = "$($orgRead.Chart.tree.name), $($orgRead.SeatCount) $seatWord; $($Prefix)OrgChart prints it"
+        }
+        else {
+            $orgNote = "$orgFile is there but not valid: $($orgRead.Message)"
+        }
+    }
+    $rows += New-P20SurfaceRow -Key 'orgChart' -Title 'Org chart' -State $orgState -Config $orgLine -Note $orgNote
+
     # -- Training hours per quarter: a Space's requirement ---------------------
     # A NUMBER the Space states, not a flag, so its state is on (a requirement is
     # set) or not configured (none is) -- there is no answered "no" to respect.
@@ -460,6 +505,38 @@ function Get-P20OptionalSurfaces {
     if ($trainingHours -gt 0) { $trainingState = $states.On; $trainingNote = "$trainingHours hours a quarter; growth module" }
     $rows += New-P20SurfaceRow -Key 'trainingHoursPerQuarter' -Title 'Training hours per quarter' -State $trainingState `
         -Config "$($Prefix)Config -Set spaces.$slug.features.trainingHoursPerQuarter=<hours> -Hub" -Note $trainingNote
+
+    # -- The team size: how many are in the standup, the chair included --------
+    # spaces[].features.teamSize (Resolve-TeamSize.ps1): a NUMBER the Space states,
+    # one of rituals.teamSizes. It rides Team Agile, as the suggestion's row does:
+    # where Team Agile is off here the row is off and says so; where it is on, on
+    # with the number once set and `not configured` while it is not -- the room is
+    # then rituals.teamSizeDefault, and there is no answered no. A value that is not
+    # a size reads as unset, and the note says so.
+    $teamSpace = $null
+    if ($Config -and $Config.ActiveSpace) {
+        foreach ($sp in @($Config.Spaces)) {
+            if ($sp -and [string]$sp.slug -eq [string]$Config.ActiveSpace) { $teamSpace = $sp }
+        }
+    }
+    $team = Get-P20SpaceTeamSize -Space $teamSpace
+    $teamSizes = @((Get-P20Consts).rituals.teamSizes | ForEach-Object { [string]$_ })
+    $teamTeamAgile = ($Features -and $Features.ContainsKey('solitaireAgile') -and $Features['solitaireAgile'])
+    $teamState = $states.Unset
+    $teamNote = "$($team.Size) in the room by default -- the chair and $($team.Size - 1) members; Team Agile's standup in $slug"
+    if (-not $teamTeamAgile) {
+        $teamState = $states.Off
+        $teamNote = "rides Team Agile, which is off in $slug"
+    }
+    elseif ($team.Set) {
+        $teamState = $states.On
+        $teamNote = "$($team.Size) in the room -- the chair and $($team.Size - 1) members; Team Agile's standup in $slug"
+    }
+    elseif ($teamSpace -and $teamSpace.features -and $teamSpace.features.PSObject.Properties['teamSize']) {
+        $teamNote = "'$($teamSpace.features.teamSize)' is not a team size ($($teamSizes -join ', ')), so the room is $($team.Size); Team Agile's standup in $slug"
+    }
+    $rows += New-P20SurfaceRow -Key 'teamSize' -Title 'Team size' -State $teamState `
+        -Config "$($Prefix)Config -Set spaces.$slug.features.teamSize=<$($teamSizes -join '|')> -Hub" -Note $teamNote
 
     # -- The WIP limit: a number the machine states, never a gate ---------------
     # limits.inPlay: on with the number once set, `not configured` while it is
@@ -573,6 +650,13 @@ function Get-P20OptionalSurfaces {
         $hookState = $states.On
         $hookNote = "$($webhooks.Count) set -- gate 2 of a Teams send"
     }
+    # Who a send can go to: the recipients declared for the Space you are in,
+    # by key -- what SendTeams takes, and what Config -Set declares. A name, not
+    # a URL: the URL is only ever in the environment.
+    $recipientKeys = @()
+    try { $recipientKeys = @((Read-P20CommunicationConfig -Root $PackageRoot).Recipients.Keys | Sort-Object) }
+    catch { $recipientKeys = @() }
+    if ($recipientKeys.Count -gt 0) { $hookNote += "; recipients: $($recipientKeys -join ', ')" }
     $rows += New-P20SurfaceRow -Key 'TEAMS_WEBHOOK_*' -Title 'Teams delivery' -State $hookState `
         -Config 'TEAMS_WEBHOOK_<RECIPIENT> in .env in the package root (copy .env.example)' -Note $hookNote
 
@@ -585,7 +669,8 @@ function Get-P20OptionalSurfaces {
     # key IS that flag's name: consts.json startWork.launchEnvFlag.
     $launchState = $states.Unset
     $launchNote = $Prefix + 'StartWork <id> -Launch: a session in a worktree; the block works without it'
-    if (Get-Command claude -CommandType Application -ErrorAction SilentlyContinue) { $launchState = $states.On }
+    if (-not (Get-Command Test-P20StartWorkLaunch -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Test-StartWorkLaunch.ps1') }
+    if (Test-P20StartWorkLaunch) { $launchState = $states.On }
     $rows += New-P20SurfaceRow -Key (Get-P20Consts).startWork.launchEnvFlag -Title 'StartWork launch' -State $launchState `
         -Config 'claude on the PATH (install Claude Code)' -Note $launchNote
 

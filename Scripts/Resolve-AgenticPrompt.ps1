@@ -40,9 +40,9 @@ function Get-P20AgenticExtensionPath {
     else {
         foreach ($name in @('config.default.json', 'config.local.json')) {
             $path = Join-Path $PackageRoot $name
-            if (-not (Test-Path $path)) { continue }
+            if (-not (Test-Path -LiteralPath $path)) { continue }
             try {
-                $cfg = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
+                $cfg = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
                 if ($cfg -and $cfg.PSObject.Properties['agenticExtensionPath'] -and $null -ne $cfg.agenticExtensionPath) {
                     $raw = [string]$cfg.agenticExtensionPath
                 }

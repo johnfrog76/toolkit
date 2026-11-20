@@ -1,12 +1,14 @@
+import { Navigate } from "react-router";
 import type { ToolkitModule } from "../../shell/registry";
 import { lazyPart } from "../../shell/lazy";
 import { ROUTES } from "./paths";
 
 // The pages are chunks fetched when first drawn (shell/lazy.tsx): this file is
 // the module's DESCRIPTOR and imports no component of its own.
-// Standup, Triage and Milestones share one chunk: the tab's Standup | Triage |
-// Milestones strip and the page under it. StandupPage itself is drawn unchanged
-// inside it; the award dialog and its confetti are a chunk of their own.
+// Standup, Triage and Releases share one chunk: the tab's Standup | Triage |
+// Releases | Org strip and the page under it. StandupPage itself is drawn
+// unchanged inside it; the award dialog and its confetti are a chunk of their
+// own, and so is the Org page with its faces.
 const RitualPage = lazyPart(
   () => import("./RitualPage"),
   (m) => m.RitualPage,
@@ -43,9 +45,13 @@ const StandupRemindSettings = lazyPart(
  * through the bridge -- the module's first write, to the tracker (a card with no
  * issue behind it takes one **Assigned:** line, through the same verb).
  *
- * Milestones is the third: one row per tracker milestone with its bar, and
+ * Releases is the third: one row per GitHub milestone with its bar, and
  * the award dialog when one is reached -- the module's one confetti
  * (docs/modules/solitaire-agile.md, "Milestones: the tab and the award").
+ *
+ * Org is the fourth: the hub's org chart as offices by level, each seat a card
+ * with its plate, and a click on an office opens its prompt in the Studio's
+ * reading room. A read; it writes nothing.
  *
  * Its settings section is the reminder to attend (D-TA15): a time and
  * the days, saved as `Standup -Remind` through the bridge. The reminder is
@@ -57,7 +63,9 @@ export const solitaireAgileModule: ToolkitModule = {
   routes: [
     { path: ROUTES.home, element: <RitualPage ceremony="standup" /> },
     { path: ROUTES.triage, element: <RitualPage ceremony="triage" /> },
-    { path: ROUTES.milestones, element: <RitualPage ceremony="milestones" /> },
+    { path: ROUTES.releases, element: <RitualPage ceremony="releases" /> },
+    { path: ROUTES.org, element: <RitualPage ceremony="org" /> },
+    { path: ROUTES.legacyMilestones, element: <Navigate to={ROUTES.releases} replace /> },
     { path: ROUTES.play, element: <StandupPlay /> },
   ],
   nav: [

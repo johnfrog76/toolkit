@@ -180,7 +180,7 @@ if ($Remove) {
 $toolkitRoot = Split-Path $PSScriptRoot -Parent
 $shimSource  = Join-Path $toolkitRoot 'Prompt20Toolkit'
 
-if (-not (Test-Path (Join-Path $shimSource 'Prompt20Toolkit.psm1'))) {
+if (-not (Test-Path -LiteralPath (Join-Path $shimSource 'Prompt20Toolkit.psm1'))) {
     Write-CliError -Message "Shim source missing at $shimSource" `
                    -Hint "Expected toolkit/Prompt20Toolkit/Prompt20Toolkit.psm1 -- is the repo complete?"
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -189,7 +189,7 @@ if (-not (Test-Path (Join-Path $shimSource 'Prompt20Toolkit.psm1'))) {
 # Regenerate before installing. Installing a manifest whose alias list predates a
 # new `{cliPrefix}*` command silently reintroduces the exact bug this fixes.
 $generator = Join-Path $shimSource 'Update-ToolkitManifest.ps1'
-if (Test-Path $generator) {
+if (Test-Path -LiteralPath $generator) {
     Write-Host "  refreshing manifest from utilities.psm1..." -ForegroundColor Gray
     & $generator
     if ($LASTEXITCODE -ne 0) {
@@ -211,11 +211,11 @@ if (Test-Path $generator) {
 function Get-ShimFingerprint {
     param([string]$Path)
 
-    if (-not (Test-Path $Path)) { return '' }
+    if (-not (Test-Path -LiteralPath $Path)) { return '' }
     $sha = [System.Security.Cryptography.SHA256]::Create()
     try {
         $parts = @()
-        $files = @(Get-ChildItem -Path $Path -File -Recurse -ErrorAction SilentlyContinue | Sort-Object Name)
+        $files = @(Get-ChildItem -LiteralPath $Path -File -Recurse -ErrorAction SilentlyContinue | Sort-Object Name)
         foreach ($f in $files) {
             $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
             $text = [System.Text.Encoding]::UTF8.GetString($bytes)
@@ -236,8 +236,8 @@ function Install-ShimAt {
     param([string]$Destination, [string]$Source, [switch]$Replace, [switch]$CopyOnly)
 
     $wasLink = $false
-    if (Test-Path $Destination) {
-        $existing = Get-Item $Destination -Force
+    if (Test-Path -LiteralPath $Destination) {
+        $existing = Get-Item -LiteralPath $Destination -Force
         $wasLink = ($existing.LinkType -eq 'SymbolicLink')
         # A symlink cannot go stale -- it IS the repo folder.
         if ($wasLink -and -not $Replace) { return 'symlink' }
@@ -247,12 +247,12 @@ function Install-ShimAt {
     }
     else { $verb = 'installed' }
 
-    if (Test-Path $Destination) {
+    if (Test-Path -LiteralPath $Destination) {
         # Remove-Item -Recurse on a DIRECTORY SYMLINK deletes the target's
         # contents on Windows PowerShell 5.1 -- which here is this repo's own
         # Prompt20Toolkit folder. Unlink instead; the link, not the target.
         if ($wasLink) { [System.IO.Directory]::Delete($Destination, $false) }
-        else { Remove-Item $Destination -Recurse -Force }
+        else { Remove-Item -LiteralPath $Destination -Recurse -Force }
     }
     New-Item -ItemType Directory -Path (Split-Path $Destination -Parent) -Force | Out-Null
     if (-not $CopyOnly) {
@@ -266,7 +266,9 @@ function Install-ShimAt {
         }
     }
     New-Item -ItemType Directory -Path $Destination -Force | Out-Null
-    Copy-Item (Join-Path $Source '*') $Destination -Recurse -Force
+    # The source's children, enumerated literally: a package folder holding [ or ]
+    # is a folder name, never a pattern.
+    Get-ChildItem -LiteralPath $Source -Force | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $Destination -Recurse -Force }
     return $verb
 }
 
@@ -352,7 +354,7 @@ Write-Host ""
 # drive them. Adapters are generated per machine rather than committed -- the
 # client picks the assistant, so the repo must not favour one.
 $agentDocs = Join-Path $PSScriptRoot 'Update-AgentDocs.ps1'
-if (Test-Path $agentDocs) {
+if (Test-Path -LiteralPath $agentDocs) {
     Write-Host ""
     Write-Host "  agent adapters..." -ForegroundColor Gray
     try {

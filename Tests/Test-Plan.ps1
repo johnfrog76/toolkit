@@ -386,6 +386,33 @@ try {
     $aCard = @(Get-ChildItem $aHub -Recurse -Filter 'TaskJ7RT-*.prompt.md')
     Assert-True "'Plan -Milestone' still writes the card's line there" ($out -match 'AMS-EXIT=0' -and $aCard.Count -eq 1 -and ([System.IO.File]::ReadAllText($aCard[0].FullName)) -match [regex]::Escape("$milestone Sprint 9")) $out
     Assert-True 'and no order file is written on that Space' (@(Get-ChildItem $aHub -Recurse -Directory -Filter ([string]$consts.folders.milestones)).Count -eq 0)
+
+    Write-Host ""
+    Write-Host "-- A path into another Space reads that Space's tracker -" -ForegroundColor Cyan
+
+    # The order is written beside the card's own Space, so the rule for whether to
+    # keep one is that Space's, whichever Space is active.
+    $xHub = Join-Path $base 'cross-hub'
+    New-Item -ItemType Directory -Path $xHub -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $xHub 'hub.json'),
+        '{ "hub": 1, "spaces": [ { "slug": "acme", "name": "Acme", "status": "local", "org": "https://dev.azure.com/acme", "promptsFolder": "acme" }, { "slug": "home", "name": "Home", "status": "local", "org": "", "promptsFolder": "home" } ] }',
+        (New-Object System.Text.UTF8Encoding($false)))
+    $xPre = { param($active) "`$env:PSModulePath = '$pkgRoot'; `$env:PROMPTS_ROOT = '$xHub'; `$env:P20_ACTIVE_SPACE = '$active'; `$env:P20_USAGE_LOG_DIR = '$log'; " +
+        "Import-Module '$pkgRoot/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; " }
+    $null = & pwsh -NoProfile -NonInteractive -Command ((& $xPre 'acme') + "${prefix}NewPrompt -Now -Title 'Acme card' -Type Task -Id A4DQ | Out-Null") 2>&1
+    $null = & pwsh -NoProfile -NonInteractive -Command ((& $xPre 'home') + "${prefix}NewPrompt -Now -Title 'Home card' -Type Task -Id H6MX | Out-Null") 2>&1
+    $acmeCard = @(Get-ChildItem (Join-Path $xHub 'acme') -Recurse -Filter 'TaskA4DQ-*.prompt.md')
+    $homeCard = @(Get-ChildItem (Join-Path $xHub 'home') -Recurse -Filter 'TaskH6MX-*.prompt.md')
+    Assert-True 'the two cards are made, one in each Space' ($acmeCard.Count -eq 1 -and $homeCard.Count -eq 1) "$($acmeCard.Count) $($homeCard.Count)"
+    if ($acmeCard.Count -eq 1 -and $homeCard.Count -eq 1) {
+        $msDir = [string]$consts.folders.milestones
+        $out = (& pwsh -NoProfile -NonInteractive -Command ((& $xPre 'acme') + "${prefix}Plan '$($homeCard[0].FullName)' -Milestone 'M1'; 'XH-EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $homeOrders = @(Get-ChildItem (Join-Path (Join-Path $xHub 'home') $msDir) -Filter '*.md' -ErrorAction SilentlyContinue)
+        Assert-True 'from an Azure DevOps Space, a card in a Space with no tracker still gets its order line' ($out -match 'XH-EXIT=0' -and $homeOrders.Count -eq 1) $out
+        $out = (& pwsh -NoProfile -NonInteractive -Command ((& $xPre 'home') + "${prefix}Plan '$($acmeCard[0].FullName)' -Milestone 'Sprint 9'; 'XA-EXIT=' + `$LASTEXITCODE; ${prefix}Plan '$($acmeCard[0].FullName)' -Rank top; 'XAR-EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        Assert-True 'and from a Space with no tracker, a card in an Azure DevOps Space gets its line and no order file' ($out -match 'XA-EXIT=0' -and @(Get-ChildItem (Join-Path $xHub 'acme') -Recurse -Directory -Filter $msDir).Count -eq 0) $out
+        Assert-True "and '-Rank' on it refuses, naming MyWork" ($out -match 'XAR-EXIT=2' -and $out -match 'ranking lives in Azure DevOps') $out
+    }
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

@@ -63,7 +63,7 @@ this machine, the **Claude Code usage** inventory row's rule) --, `tracker`
 (which tracker the active board's address names -- `"ado"`, `"github"` or `"none"`), `howIWork` (the
 active Space's answer to "How do you want to work here?", `answer`, `source`, `tracker`, `locked` and
 Team Agile's `switch` as set -- `features` already carries the gate), `identity`
-(`{email, source}`, who the ADO routes filter by), nine named checks, and the active Space's config
+(`{email, source}`, who the ADO routes filter by), the named checks the Environment card lists, and the active Space's config
 including the full `spaces` list -- each Space with its `tracker` and its own `laneNames`. `agent/README.md`'s Tier and identity sections have each field's
 fallback chain and why the tier probe runs off the event loop, cached 45 seconds, keyed by the owner for a GitHub address, with concurrent misses merged into one probe.
 
@@ -87,13 +87,13 @@ what is deliberately absent (a route named but not built, or retired outright) i
 [the section under it](../agent/README.md#deliberately-absent).
 
 **A route about the active Space can be asked about another.** `GET /api/issue-report`, `/api/deploys`, `/api/visibility`,
-`/api/issue/{n}` and `GET /api/status` take an optional `?space=<slug>`: absent, the active Space as
+`/api/issue/{n}`, `GET /api/status` and `GET /api/backlog` take an optional `?space=<slug>`: absent, the active Space as
 always; present, that Space's own entry in `spaces[]` (one lookup, `space_entry()` behind `space_scope()`
 in `agent/ado/accounting.py`), an undeclared slug a 404 naming it. `/api/visibility` also takes `?refresh=1`, past its per-repository cache, as `/api/env?refresh=1` goes past the probe's -- the Spaces card's Refresh. The tracker reads probe that Space's
-tier; `/api/status` reads that Space's `current/` and `backlog/` and asks no tracker. The Studio's Spaces card
+tier; `/api/status` and `/api/backlog` read that Space's `current/` and `backlog/` and ask no tracker. The Studio's Spaces card
 reads its non-GitHub rows through `/api/status?space=` -- one row per Space, none switched into -- and every
 GitHub row through ONE read, `GET /api/studio/ledger` (`consts.json` `studio.ledgerRoute`): the three answers
-above for every GitHub Space, from one `gh api graphql` call plus a `gh run list` per repository, kept on the
+above for every GitHub Space, and its product's design counts, from one `gh api graphql` call plus a `gh run list` per repository, kept on the
 agent's disk for 600 s ([`modules/studio.md`](modules/studio.md#the-routes)).
 
 **A route may read through a verb.** `GET /api/spaces/candidates` -- the repositories the Spaces card's
@@ -136,8 +136,10 @@ was added, dropped or changed; the played view reads it. It writes nothing to th
 `gh` answer a minute, shared with triage, and a dressed reply by its facts in the agent's cache -- and a Space
 with no reachable GitHub tracker still answers 200 with the ritual and the reason
 ([Team Agile](modules/solitaire-agile.md), "The file shape, and how a standup is read").
-`GET /api/ritual/milestones` is the Milestones tab's read, the ado core's milestone reader and its one
+`GET /api/ritual/milestones` is the Releases tab's read, the ado core's milestone reader and its one
 reached rule under the same gate, kept a minute, against `Tests/fixtures/rituals/milestones.json`.
+`GET /api/ritual/org` is the org chart's read: the hub's `org.json` through `agent/solitaire/org.py`, a mirror of the CLI's reader held to
+`Tests/fixtures/org/table.json`, under the same gate, with each position's prompt title and reading-room ref from the Studio's prompt record.
 `GET /api/ritual/triage` (V1) is the same shape for triage, against `Tests/fixtures/rituals/triage.json`;
 its answers are the CLI's `Route`, which the web runs only as `POST /api/cmd/Route` -- the module's
 first write is a tracker label, through the bridge like every other. The hand-off block (`StartWork`)
@@ -177,8 +179,8 @@ $ curl -s -X POST localhost:4100/api/cmd/Archive \
 That request moved the file and stamped `**Closed:** <today>` into it -- it *is* `tkArchive`: the
 agent forks this repo's own PowerShell and calls the function. **The allowlist is the CLI's command
 table, not a list `agent/ado/bridge.py` keeps of its own** -- it reads `Get-P20CommandMap`, cached
-against the modification times of `utilities.psm1`, the two config files and
-`Config/*.commands.psd1`, so a verb added the usual way (see [Contributing](CONTRIBUTING.md)) is
+against a stamp of each file it depends on (modification time, size and a digest of the bytes) --
+`utilities.psm1`, the two config files, the hub's `hub.json` and `Config/*.commands.psd1` -- so a verb added the usual way (see [Contributing](CONTRIBUTING.md)) is
 bridgeable on the next request with no backend edit, and switching a module on makes its verbs
 callable on the next request too. Parameters travel as process argv -- no command string is built
 or parsed on either side -- and a reply is always a `CommandResponse` with one of four statuses
@@ -191,6 +193,9 @@ verb that catches its own failure still honours.
 `web/` is a React + Fluent UI app in two parts: a **shell** that owns the chrome, and **modules**
 that own everything else. `web/README.md` has the layout, the `ToolkitModule` interface field by
 field, every module's own surface, and the production path in full.
+The shared components every panel is built from -- the frame, the row menu, the dialog parts, the
+empty state -- are documented in one place, [`web/COMPONENTS.md`](../web/COMPONENTS.md), which a test
+holds to the code.
 
 ```bash
 cd web && npm ci && npm run dev        # http://localhost:5174 -- or the next free port, which it prints
@@ -237,7 +242,7 @@ section"](../web/README.md#the-configuration-section-and-what-it-does-not-do) ha
 schema itself is Configuration's](CONFIGURATION.md).
 
 **The avatar menu is the one Space switcher** (`src/shell/AvatarMenu.tsx`): Theme, Space and the
-registry's settings links. Its Space entry lists `config.spaces` from `/env` and a choice runs
+registry's settings links. Its Space entry lists the slugs in `config.switcherSpaces` from `/env` (`config.spaces` less a retired Space you are not in; `config.spaces` itself keeps it, for every other reader) and a choice runs
 `SwitchSpace` through the bridge. Up to `SPACE_QUICK_MENU_THRESHOLD` (8) Spaces it is a plain
 submenu; past it the same entry opens a searchable quick menu with **View all**
 (`src/shell/SpaceQuickMenu.tsx`) -- same call, same order, nothing new stored. [`web/README.md`, "The
@@ -254,7 +259,7 @@ report a weakness; this is the long one, with the file that holds each part.
 
 ### Who may call the agent
 
-Any process on the same machine, and nothing else. **The agent binds to the loopback address and
+Any process on the same machine, and the product's own pages in a browser on it. **The agent binds to the loopback address and
 nowhere else.** `Scripts/Start-Agent.ps1` -- the one place the agent is started, by `tkAgent` and by
 `tkWeb -Dev` through it -- passes uvicorn `--host` with the value of `consts.json` `agent.bindHost`,
 which is `127.0.0.1`. It is deliberately not a setting: the launcher has no host parameter,
@@ -272,6 +277,39 @@ the loopback. Setting the default to `0.0.0.0` fails them.
 verb the bridge exposes, with your credentials. If you need it from elsewhere, put a layer you trust
 that authenticates in front of it and keep the agent on the loopback; widening the bind is not the
 answer.
+
+### What a browser may ask of the agent
+
+A browser on this machine can reach the loopback, and it will send requests there on behalf of
+whatever page is open. So one piece of middleware, `RequestGate` in `agent/core/request_gate.py`,
+meets every request first, ahead of routing and before a body is read, and answers a refusal with a
+plain 403 naming the setting:
+
+- **The `Host`** must be a loopback name (`localhost`, `127.0.0.1`, `::1`) or the host of an origin
+  in `web.corsOrigins`, on every path.
+- **`Sec-Fetch-Site: cross-site`** is refused for anything under `/api`. Following a link to the page
+  itself is not.
+- **`Sec-Fetch-Dest`** must be a call, not a load: under `/api`, a browser asking for an image, a
+  frame or a tab is refused, except the two routes that serve pictures (`/api/assets/` and
+  `/api/docs/asset/`).
+- **A state-changing request carrying an `Origin`** must be `Sec-Fetch-Site: same-origin`, or come from
+  an origin in `web.corsOrigins`, or from the agent's own origin. Same-origin is how a page behind
+  the dev server's proxy or the Docker image's nginx is recognised on any port. A request with no
+  `Origin` passes, because browsers send one and a script on this machine is not a browser.
+
+`Tests/test_request_gate.py` is the table, one row for each input the rule tells apart. Picture
+uploads are also limited as they are read, not after, and an upload nobody attached is swept hourly.
+
+The gate also puts `consts.json` `agent.responseHeaders` on every response, so the app cannot be
+framed and loads only what its policy lists; the Docker image's nginx repeats them for the page, and
+drops any request addressed to a name that is not this machine. The Lounge's skins are only ever drawn
+in an iframe, so under `/lounge/` two of those headers relax to `agent.framableHeaders`: framed by this
+origin, never by another. The agent generates no API pages of
+its own, because `/docs` is the Docs tab's.
+
+Markdown is text from elsewhere, so it gets the same rule from the other side:
+`web/src/shared/noAgentImages.ts` runs after the sanitiser on every document and drops a picture
+aimed at the API or at this machine.
 
 ### The web UI is served to the same machine
 
@@ -292,17 +330,19 @@ on a real Linux host -- nobody has run this combination on one, but the reason i
 already known. **The Docker path in this repository is for Docker Desktop.** On native Linux, skip
 Docker and run the agent and the web UI directly on the host instead -- `tkWeb -Dev`, which already
 works there ([Quickstart](QUICKSTART.md), "Supported platforms"). An opt-in, non-default bind
-address that would let the Docker path work on native Linux too is a known gap, not built
-([Known gaps](KNOWN-GAPS.md)). Do not rebind the agent to a wider address to make the container reach
-it.
+address that would let the Docker path work on native Linux too is not built. Do not rebind the
+agent to a wider address to make the container reach it.
+
+Known gap: [Docker does not reach the agent on native Linux](KNOWN-GAPS.md#docker-does-not-reach-the-agent-on-native-linux).
 
 ### CORS
 
 The agent accepts cross-origin requests from the origins in `web.corsOrigins`, which defaults to the
 two dev-server origins (`http://localhost:5173` and `http://localhost:5174`), for the methods its
 routes use (`GET`, `POST`, `PUT`). It is not a wildcard. CORS is a browser's rule about which pages
-may read a response, so it is a second fence for the browser case and **not authentication**: a
-process on the machine is not a browser and is not subject to it. Adding an origin to
+may read a response, so it does not stop a request being sent, which is the request gate's job
+(above), and it is **not authentication**: a process on the machine is not a browser and is not
+subject to it. Adding an origin to
 `web.corsOrigins` lets a page from that origin read the agent's answers and run the bridge as you, so
 add only an origin you serve yourself. The production image needs none: it serves the page and proxies
 `/api/` from one origin.
@@ -314,7 +354,8 @@ add only an origin you serve yourself. The production image needs none: it serve
 `status: rejected` and nothing runs; so is a request with more than 32 parameters or a parameter
 longer than 4,096 characters, and so is a verb of a module that is switched off, because it is not in
 the table. Parameters travel as process argv, with no command string built or parsed on either side,
-so a parameter cannot become a second command. A verb that runs past its timeout is killed. The
+so a parameter cannot become a second command, and a name in the configuration is a name: nothing the
+bridge can write is evaluated as code. A verb that runs past its timeout is killed, with everything it started. The
 bridge is a way to type a verb, not a way to run a script: it cannot be given a file to run, and a
 verb that refuses (a card in `current/` is never overwritten) refuses in the browser with the same
 sentence it prints in a terminal.
@@ -333,6 +374,7 @@ natively in these places, and no others:
 | `PUT /api/manager/{filename}` | an existing 1:1 session (opt-in module) | Edits a file that exists; creating one (`POST /api/manager`) runs the `NewMeeting` verb, which refuses an existing session |
 | `POST /api/assets/upload` | one image, into a fresh folder under the system temp directory | Never the hub; the `Cover` verb copies it in, through the bridge |
 | `POST /api/comms/send` | nothing on disk; posts to a Teams webhook | Needs the webhook variable set; `dryRun` runs every gate and sends nothing |
+| `POST /api/log` | one line (`CMD`, `ERR`, `WARN` or `INFO`) appended to this machine's `usage.<machine>.log` | Always mounted; the one writer the agent logs through, `core/log_writer` |
 
 Anything else the browser can make happen -- archiving a card, opening a pull request, closing a work
 item -- is a verb run through the bridge, with the same checks the terminal applies.
@@ -363,38 +405,45 @@ consts.json             The contract file: the literals all three halves parse (
 ruff.toml               The Python linter's settings, for agent/ and Tests/*.py (docs/CONTRIBUTING.md, "Lint")
 Config/                 One opt-in module's CLI contribution per pair (D-CM, docs/modules/README.md)
   growth.commands.psd1    Feature, Commands, Order, Help -- a DATA file, it cannot run code
-  growth.commands.ps1     The five wrapper functions
-  communication.commands.psd1 / .ps1   The same, for the three communication verbs
-  organize.commands.psd1 / .ps1        The same, for the two organize verbs
-  solitaireAgile.commands.psd1 / .ps1  The same, for the three Team Agile verbs
+  growth.commands.ps1     One wrapper function per growth verb
+  communication.commands.psd1 / .ps1   The same, for the communication verbs
+  organize.commands.psd1 / .ps1        The same, for the organize verbs
+  solitaireAgile.commands.psd1 / .ps1  The same, for the Team Agile verbs
   settings-workflows.json The question each optional surface answers
   ceremonies.json         Team Agile's ceremony slots
   standup-vocabulary.json Team Agile's standup vocabulary
 Scripts/                One script per command, core and module alike
   Get-Consts.ps1          The CLI's reader for consts.json -- dot-sourced, not a verb
   Invoke-TrackerRead.ps1  Invoke-P20TrackerRead, the one gh/az call (stderr as text on 5.1 too) -- dot-sourced
+  ConvertTo-NativeArgument.ps1  How an argument is handed to a host that builds the command line itself (5.1), and a folder path without its trailing separator -- dot-sourced
   Get-AdoToken.ps1        The Azure DevOps token, its headers and the 401/403 advice, for every ADO script -- dot-sourced
   Initialize-CliFallbacks.ps1  Get-CliPrefix and Write-CliError for a script run with no module -- dot-sourced
 Prompt20Toolkit/        Autoload shim installed into the module path
 templates/              Prompt file templates by work item type, plus the module ones:
                         Training, Presentation, Goal (growth), ManagerSession (communication),
                         DesignNote (the Studio, core)
-agentic/                Six card-workflow prompts, pr-suggest, new-issue, four module
-                        prompts, and prompts.json -- which way of working each belongs to,
-                        who sends it and its category (the Studio's Prompts card reads it)
+agentic/                The card workflow's prompts (ado-comments, build, new-bug, new-user-story,
+                        pr-publish, pr-ship); the two the tools send (pr-review, pr-suggest);
+                        new-issue; the module prompts (generate-review, growth-create-training,
+                        growth-create-presentation, manager1on1); how-we-work.template.md, the
+                        template HowWeWork fills; and prompts.json -- which way of working each
+                        belongs to, who sends it and its category (the Studio's Prompts card reads it)
 spec/                   Where a product may keep its specs; this tree keeps only the README ([spec/README.md](../spec/README.md))
-samples/hub/            The sample hub `tkStart` copies out on a first run: one `local` org, Demo, with five
-                        tutorial cards, sample cards, meetings, a goal and a review. Read-only here -- it is
-                        never used in place
+samples/hub/            The sample hub `tkStart` copies out on a first run: two `local` Spaces, Demo and the
+                        GitHub demo (an address, until you connect it), and the folder for the shipped
+                        config's Azure demo, with tutorial cards, sample cards, meetings, a goal, a review,
+                        reminders and design/, spec/ and docs/ files. Read-only here -- it is never used in place
 design/                 Where a product may keep its design notes; this tree keeps only the README ([design/README.md](../design/README.md))
-.github/workflows/      verify.yml, the suites in CI; pages.yml, the landing page's deploy (docs/TESTING.md, "In CI")
+.github/workflows/      verify.yml, the suites in CI; release.yml, the GitHub Release from a tag; codeql.yml,
+                        code scanning; pages.yml, the landing page's deploy (docs/TESTING.md, "In CI")
 AGENTS.md  CHANGELOG.md  VERIFY.md  the agent guide, the change log, the verification gates
 changelog.d/            The next release's changelog entries, one file each, until the release folds them in
 docs/                   The documentation. The root README is the map; each subject has one owner
   QUICKSTART.md           Requirements, install, the first run, a first card, the web UI up
   CONFIGURATION.md        tkConfig, the three config files, consts.json, the hub's hub.json
   CLI.md                  The prefix, the workflow, the command reference, tiers, errors, the log
-  TESTING.md              tkSetup, the four runners, the suites and their counts
+  TESTING.md              tkSetup, the four runners, the suites, and how the counts are written
+  TEST-COUNTS.md          A full run's counts as of the last release, written by Scripts/Write-TestCounts.ps1
   ARCHITECTURE.md         How the three halves fit; the agent and the web UI in overview; this layout
   SCENARIOS.md            Every configuration a machine can be in, what it shows, the test that holds it
   KNOWN-GAPS.md           The roadmap of known gaps, each with what you see and its issue
@@ -416,16 +465,21 @@ docs/                   The documentation. The root README is the map; each subj
   hub/reminders.md        The file contract for reminders/
   hub/design.md           The file contract for design/, the Studio's seed drawer
 agent/                  The FastAPI agent -- see agent/README.md
-  app.py                  The app: CORS, the /api router, module mounting, static serving
-  core/                   config, config_routes, consts, env, identity, tier, parsers, cards, clock, hosts,
-                          model, surfaces, assets, child, log, log_writer, usage -- always on
-  ado/                    status, pr_comments, accounting, reporting, sprint, design, docs, bridge
-  ado/Get-WeeklyBilling.ps1   Module-private: /billing shells out to it. Not a CLI command
+  app.py                  The app: the request gate, CORS, the /api router, module mounting, static serving
+  core/                   assets, cards, checkout, child, clock, config, config_routes, consts, disk_cache,
+                          env, git_history, hosts, hub_sync, identity, log, log_writer, model, parsers,
+                          request_gate, surfaces, tier, usage -- always on
+  ado/                    accounting, backlog, bridge (and bridge.ps1, the child it runs), design, docs,
+                          pr_comments, repo_read, reporting, sprint, status
+  ado/Get-WeeklyBilling.ps1   Run by path: /billing shells out to it, and the CLI's Daily runs it
   growth/                 growth, reviews, resume -- one router, gated on features.growth
   communication/          manager (the routes) + comms (the engine, carried whole)
   organize/               reminders -- gated on features.organize
-  studio/                 the hub's design/ notes, and the + dialog's repositories (NewSpace -Discover) -- core, mounted with no gate (D-S13)
-  solitaire/              the standup and triage, from a GitHub Space's tracker -- gated on features.solitaireAgile
+  studio/                 notes (the hub's design/ notes), spaces (the + dialog's repositories, NewSpace -Discover),
+                          ledger (the Spaces card's read) and prompts (the Prompts card) -- core, mounted with no gate (D-S13)
+  solitaire/              standup, triage, agenda, milestones, org (the org chart), remind (the standup's attend and remind),
+                          corner (the PM Corner), suggest (the suggestion) and tracker (the read they share),
+                          from a GitHub Space's tracker -- gated on features.solitaireAgile
 web/                    The React shell + modules -- see web/README.md
   landing.html            The landing page's entry, the second one; built by `npm run build:landing`
   src/landing/            The landing page: its own copy (copy.ts), the banner, the three ways, the commercial
@@ -442,7 +496,8 @@ web/                    The React shell + modules -- see web/README.md
   tests/smokeMatrix.mjs   --matrix: each module flag alone, the flip, fresh and hostile storage
   tests/smokeFirstRun.mjs --first-run: the first tutorial card dragged to To do, on a copy of samples/hub
 Tests/                  Suites -- Test-*.ps1 (PowerShell) and test_*.py (the agent)
-  fixtures/parsers/       Four prompt files both parsers are pinned against
+  fixtures/parsers/       The prompt files both parsers are pinned against, and the shared tables,
+                          card-ids.json among them
   fixtures/hub/           A prompt store with no toolkit in it and no .git: two cards under
                           test/current/, plus growth/current/ (one artifact per type),
                           reviews/test/2026/..., resume/resume.md and manager/current/

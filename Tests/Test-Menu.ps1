@@ -1365,6 +1365,8 @@ try {
     # The suite table lives beside the runner now; a copy of
     # the runner without it dies before -Help prints a line.
     Copy-Item (Join-Path $toolkitRoot 'Tests/Get-ToolkitSuiteRegistry.ps1') (Join-Path $runnerScratch 'Tests') -Force
+    # ...and so is the host helper it starts each suite through.
+    Copy-Item (Join-Path $toolkitRoot 'Tests/Get-TestHost.ps1') (Join-Path $runnerScratch 'Tests') -Force
     $runnerLocalJson = @{ quietStart = $true; commandPrefix = 'zz' } | ConvertTo-Json
     [System.IO.File]::WriteAllText((Join-Path $runnerScratch 'config.local.json'), $runnerLocalJson, (New-Object System.Text.UTF8Encoding $false))
 
@@ -1561,7 +1563,7 @@ foreach ($cmdName in $parityNames) {
     # it; `switches`, where a verb has one, describes the same set (below).
     # Composition, not switches anyone types, and so not in any usage line:
     # Web's and Agent's -Reuse (Start-Web.ps1 reusing a running agent), Env's -Quiet (the
-    # module's startup probe), InstallAutoload's -ModuleRoot and -CopyOnly
+    # module's tier probe, on first need), InstallAutoload's -ModuleRoot and -CopyOnly
     # (Test-Autoload's scratch installs).
     $compositionByVerb = @{ Web = @('Reuse'); Agent = @('Reuse'); Env = @('Quiet'); InstallAutoload = @('ModuleRoot', 'CopyOnly') }
     $composition = @($compositionByVerb[$cmdName])

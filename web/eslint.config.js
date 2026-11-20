@@ -37,5 +37,12 @@ export default tseslint.config(
     },
   },
 
+  {
+    // The shared layer and the shell are typed all the way down: a props type
+    // that says `any` is the one thing web/COMPONENTS.md cannot describe.
+    files: ["src/shell/**/*.{ts,tsx}", "src/shared/**/*.{ts,tsx}"],
+    rules: { "@typescript-eslint/no-explicit-any": "error" },
+  },
+
   prettierConfig,
 );

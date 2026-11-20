@@ -68,8 +68,10 @@ param(
     [Parameter()]
     [string]$Reply,
 
+    # No ValidateSet: the statuses are the contract's list (consts.json
+    # replyStatuses.ado), checked below, so the verb and the PR Comments page's
+    # status box accept the same words.
     [Parameter()]
-    [ValidateSet('active', 'fixed', 'closed', 'byDesign', 'pending', 'wontFix')]
     [string]$Status,
 
     [Parameter()]
@@ -84,6 +86,10 @@ param(
 
 . (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+. (Join-Path $PSScriptRoot 'Get-Consts.ps1')
+
+# Every status a reply may set, in the order the PR Comments page lists them.
+$replyStatuses = @((Get-P20Consts).replyStatuses.ado)
 
 
 # ── Help ─────────────────────────────────────────────────────────────────────
@@ -100,7 +106,7 @@ PARAMETERS:
     -ThreadId <long>       Thread ID to reply to (positional, required) -- the
                            (Thread N) GetPRComments wrote on the card.
     -Reply <string>        Reply text -- supports markdown (required).
-    -Status <string>       Set thread status: active, fixed, closed, byDesign, pending, wontFix.
+    -Status <string>       Set thread status: $($replyStatuses -join ', ').
     -Repository <string>   ADO repo name. Default: from toolkit config.
                            On GitHub: <owner>/<name>, or <name> under the Space's owner.
     -Project <string>      ADO project name. Default: from toolkit config.
@@ -169,6 +175,13 @@ if (-not $ThreadId) {
 }
 if (-not $Reply) {
     Write-CliError -Message "-Reply is required." -Hint "Usage: $(Get-CliPrefix)ReplyPR <PullRequestId> <ThreadId> -Reply ""text""  or  $(Get-CliPrefix)ReplyPR -Help"
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
+# -Status is one of the contract's words (matched ignoring case, as the
+# ValidateSet this replaces did), on either tracker, before anything is asked
+# or posted.
+if ("$Status" -and "$Status" -notin $replyStatuses) {
+    Write-CliError -Message "-Status $Status is not a thread status." -Hint "Nothing was posted. Use one of $($replyStatuses -join ', ') (consts.json replyStatuses.ado), or leave -Status off."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
 
@@ -247,8 +260,7 @@ if ($trackerKind -eq 'github') {
         else {
             # The conversation tab has no "reply to": a new comment that says
             # which one it answers.
-            $lead = "In reply to $($kind.Url):"
-            if (-not $kind.Url) { $lead = "In reply to comment $($kind.Root):" }
+            $lead = New-P20GitHubReplyLead -Url $kind.Url -Id $kind.Root
             $post = Invoke-P20GhApiWrite "repos/$ghRepoFull/issues/$PullRequestId/comments" ([ordered]@{ body = "$lead`n`n$Reply" })
         }
         if ($post.Code -ne 0) {
@@ -328,7 +340,7 @@ try {
         Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    $headers = Get-P20AdoHeaders -Token $tokenRead.Token
+    $headers = Get-P20AdoHeaders -Token $tokenRead.Token -OrgUrl $org
 
     # Auto-resolve project/repo from PR ID if user didn't specify
     if (-not $userSpecifiedProject -and -not $userSpecifiedRepo) {
@@ -353,7 +365,7 @@ try {
     $commentBody = @{ content = $Reply; parentCommentId = 1 } | ConvertTo-Json
     $commentUri = "$org/$encodedProject/_apis/git/repositories/$Repository/pullRequests/$PullRequestId/threads/$ThreadId/comments?api-version=7.1"
     try {
-        $result = Invoke-RestMethod -Uri $commentUri -Headers $headers -Method Post -Body $commentBody
+        $result = Invoke-RestMethod -Uri $commentUri -Headers $headers -Method Post -Body (ConvertTo-P20Utf8Body $commentBody)
         Write-Host "Reply posted to thread $ThreadId (comment ID: $($result.id))" -ForegroundColor Green
     } catch {
         if ($_.Exception.Response.StatusCode -eq 404) {
@@ -364,7 +376,9 @@ try {
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
 
-    # Update status if requested
+    # Update status if requested. The numbers are Azure DevOps' own
+    # (CommentThreadStatus); the words are the contract's, and Test-PRComments
+    # holds this table to that list.
     if ($Status) {
         $statusMap = @{
             active   = 1
@@ -381,7 +395,7 @@ try {
             $statusBody = @{ status = $numericStatus } | ConvertTo-Json
             $threadUri = "$org/$encodedProject/_apis/git/repositories/$Repository/pullRequests/$PullRequestId/threads/$($ThreadId)?api-version=7.1"
             try {
-                Invoke-RestMethod -Uri $threadUri -Headers $headers -Method Patch -Body $statusBody | Out-Null
+                Invoke-RestMethod -Uri $threadUri -Headers $headers -Method Patch -Body (ConvertTo-P20Utf8Body $statusBody) | Out-Null
                 Write-Host "Thread $ThreadId status set to '$Status'" -ForegroundColor Green
             } catch {
                 Write-Host "Warning: Reply posted, but failed to update thread status to '$Status'." -ForegroundColor Yellow
@@ -408,7 +422,7 @@ try {
     $card = $null
     $currentDir = $null
     if (Get-Command Get-PromptFolders -ErrorAction SilentlyContinue) { $currentDir = (Get-PromptFolders).Current }
-    if ($currentDir -and (Test-Path $currentDir)) {
+    if ($currentDir -and (Test-Path -LiteralPath $currentDir)) {
         # The PR URL line's shape is the contract's (consts.json regex.prUrlLine), not retyped here.
         . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
         if ($trackerKind -eq 'github') {
@@ -419,7 +433,7 @@ try {
         else {
             $prNeedle = "pullrequest/$PullRequestId"
             $prLineRx = (Get-P20Consts).regex.prUrlLine + '\S*' + [regex]::Escape($prNeedle) + '\b'
-            $hits = @(Get-ChildItem -Path $currentDir -Filter '*.prompt.md' -File | Where-Object {
+            $hits = @(Get-ChildItem -LiteralPath $currentDir -Filter '*.prompt.md' -File | Where-Object {
                 ([System.IO.File]::ReadAllText($_.FullName)) -match $prLineRx
             })
         }

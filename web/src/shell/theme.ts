@@ -1,12 +1,12 @@
 import { createDarkTheme, createLightTheme } from "@fluentui/react-components";
 import type { BrandVariants, Theme } from "@fluentui/react-components";
-import { themeById } from "./themeList";
+import { CHIP_APPEARANCES, chipToken, themeById } from "./themeList";
 import type { ToolkitTheme } from "./themeList";
 
 // A named theme (themeList.ts, plain data) made into a Fluent theme. Fluent's
 // own web themes carry everything; a Toolkit theme changes the accent and, for
 // a FLAT theme, what a card is made of. Every card in the app is
-// `colorNeutralBackgroundAlpha` (shared/PageCard.tsx), so one token is the
+// `colorNeutralBackgroundAlpha` (shared/PanelFrame.tsx), so one token is the
 // whole difference between glass and flat -- no component knows which it is.
 
 // Fluent derives some forty tokens from a sixteen-step brand ramp -- tinted
@@ -64,6 +64,8 @@ export function fluentThemeFor(t: ToolkitTheme): Theme {
     colorCompoundBrandBackgroundPressed: t.brand.pressed,
     colorCompoundBrandStroke: t.brand.background,
     colorCompoundBrandForeground1: t.brand.foreground1,
+    // The filter chips' named appearances, as tokens of the same theme (see chipToken).
+    ...Object.fromEntries(CHIP_APPEARANCES.map((a) => [chipToken(a), t.chips[a]])),
     ...(t.card
       ? { colorNeutralBackgroundAlpha: t.card, colorNeutralBackgroundAlpha2: t.card }
       : {}),

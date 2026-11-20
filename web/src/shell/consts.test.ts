@@ -15,10 +15,14 @@ import consts from "@consts";
 
 import {
   ASSETS,
+  BILLING,
+  COMMUNICATION,
   DESIGN,
   DOCS,
   FEATURES,
   FOLDERS,
+  MODELS,
+  ORG,
   RE,
   REMINDERS,
   RITUALS,
@@ -28,6 +32,7 @@ import {
   STUDIO,
   TESTS,
   TOKENS,
+  REPLY_STATUSES_BY_TRACKER,
   USAGE,
   VISIBILITY,
   toRegExp,
@@ -57,6 +62,8 @@ describe("consts.json", () => {
     // A card's two planning lines, each its own (Plan -Milestone, Plan -Sprint).
     expect(STAMPS.milestone).toBe("**Milestone:**");
     expect(STAMPS.sprint).toBe("**Sprint:**");
+    // Who did the work on a card an agent worked: its model id, beside the Assigned line.
+    expect(STAMPS.agent).toBe("**Agent:**");
     expect(TOKENS.prUrl).toBe("PR URL:");
     expect(TOKENS.prReviewHeading).toBe("## PR Review Comments");
     expect(TOKENS.previousRound).toBe("> Previous round:");
@@ -72,6 +79,7 @@ describe("consts.json", () => {
       "sprintAwareness",
       "trainingHoursPerQuarter",
       "suggestions",
+      "teamSize",
     ]);
     // Read by vite.config.ts (outside src/), not by the bundle: the name of the
     // variable Start-Web.ps1 sets and the dev proxy reads.
@@ -82,6 +90,10 @@ describe("consts.json", () => {
     expect(consts.env.testRunMarker).toBe("P20_TEST_RUN");
     // Where the agent listens: Start-Agent.ps1 reads it, the web only states it.
     expect(consts.agent.bindHost).toBe("127.0.0.1");
+    expect(consts.agent.apiPrefix).toBe("/api");
+    expect(consts.agent.responseHeaders["X-Frame-Options"]).toBe("DENY");
+    expect(consts.agent.framablePrefix).toBe("/lounge/");
+    expect(consts.agent.framableHeaders["X-Frame-Options"]).toBe("SAMEORIGIN");
     // The two per-process stand-ins for config.local.json that `Web -Dev -Fixture`
     // hands the agent. The web never reads them -- it reads /api/env -- but
     // the contract is stated on all three sides.
@@ -91,6 +103,12 @@ describe("consts.json", () => {
     // Where the agent's on-disk cache goes instead of the user cache folder: the
     // test runners set it, the agent reads it. Stated here for the same reason.
     expect(consts.env.agentCacheDir).toBe("P20_AGENT_CACHE_DIR");
+    // Where the machine's test history goes instead of its per-machine folder:
+    // the test runners set it, the CLI and the agent read it.
+    expect(consts.env.testHistoryDir).toBe("P20_TEST_HISTORY_DIR");
+    // The instant the CLI's Standup reads the clock as, in a test run only. The
+    // web never reads it; the name is stated on all three sides.
+    expect(consts.env.standupAsOf).toBe("P20_STANDUP_AS_OF");
     // The line a send writes under ## Sent, from the web button and from SendTeams -Session.
     expect(STAMPS.sent).toBe("Sent to");
     // Organize's reminders: the footer lines, the due pattern, and the two word lists.
@@ -108,11 +126,51 @@ describe("consts.json", () => {
     expect(consts.regex.dueLine).toBe(
       String.raw`(?m)^\*\*Due:\*\*[ \t]*(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?`,
     );
+    // A card's Tags: line splits on a comma or an Azure DevOps semicolon (the agent reads it).
+    expect(consts.regex.tagSeparator).toBe("[,;]");
+    // The shapes of an Azure DevOps git remote and of its address (the checkout resolver, both halves).
+    expect(consts.regex.adoOriginHttps).toBe(
+      String.raw`^https://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)/([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$`,
+    );
+    expect(consts.regex.adoOriginVisualStudio).toBe(
+      String.raw`^https://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com/(?:DefaultCollection/)?([^/\s]+)/_git/([^/\s?#]+?)(?:\.git)?/?$`,
+    );
+    expect(consts.regex.adoOriginSsh).toBe(
+      String.raw`^(?:ssh://(?:[^/@\s]+@)?(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com)(?::\d+)?/|(?:ssh://)?[^/@\s]+@(?:ssh\.dev\.azure\.com|vs-ssh\.visualstudio\.com):)v3/([^/\s]+)/([^/\s]+)/([^/\s]+?)(?:\.git)?/?$`,
+    );
+    expect(consts.regex.adoOrgDev).toBe(
+      String.raw`^https?://(?:[^/@\s]+@)?dev\.azure\.com/([^/\s]+)`,
+    );
+    expect(consts.regex.adoOrgVisualStudio).toBe(
+      String.raw`^https?://(?:[^/@\s]+@)?([^/.@\s]+)\.visualstudio\.com(?:[/:]|$)`,
+    );
+    // A commit's Co-Authored-By trailer, the key in any case: group 1 the name.
+    expect(consts.regex.coAuthorTrailer).toBe(
+      String.raw`(?mi)^[ \t]*Co-Authored-By:[ \t]*([^<\r\n]*?)[ \t]*<[^>\r\n]*>`,
+    );
     expect(REMINDERS.buckets).toEqual(["overdue", "today", "upcoming"]);
     expect(REMINDERS.snooze).toEqual(["1h", "tomorrow", "nextweek"]);
+    // A Teams recipient's type: channel and chat post through their webhook, person never posts.
+    expect(COMMUNICATION.webhookRecipientTypes).toEqual(["channel", "chat"]);
+    expect(COMMUNICATION.deferredRecipientTypes).toEqual(["person"]);
     // The three halves a test run covers, in run order.
     expect(TESTS.halves).toEqual(["agent", "cli", "web"]);
     expect(TESTS.legacyHalf).toBe("cli");
+    // Where a machine keeps its test history: the CLI writes it, the agent reads
+    // it, the web only states it (it reads /api/test-history).
+    expect(consts.tests.summaryFile).toBe("test-summary.{machine}.json");
+    expect(consts.tests.resultsFile).toBe("test-results.{machine}.log");
+    expect(consts.tests.historyBase).toEqual({ windows: "LOCALAPPDATA", linux: "XDG_STATE_HOME" });
+    expect(consts.tests.historyFallback).toEqual({
+      windows: "AppData/Local",
+      macos: "Library/Application Support",
+      linux: ".local/state",
+    });
+    expect(consts.tests.historyPath).toEqual({
+      windows: "ToolKit/TestHistory",
+      macos: "ToolKit/TestHistory",
+      linux: "toolkit/test-history",
+    });
     // The Docs tab's roots: the agent's path rule and this half's link
     // resolver must agree on what is a doc.
     expect(DOCS.readme).toBe("README.md");
@@ -144,7 +202,7 @@ describe("consts.json", () => {
     // The Spaces card: every GitHub Space's ledger in one read.
     expect(STUDIO.ledgerRoute).toBe("/api/studio/ledger");
     expect(STUDIO.threadRegex).toBe(
-      String.raw`(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/(\d+))\s*$`,
+      String.raw`(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/([0-9]{1,9}))\s*$`,
     );
     expect(toRegExp(STUDIO.noteName).test("board-ideas.md")).toBe(true);
     expect(toRegExp(STUDIO.noteName).test("../hub.json")).toBe(false);
@@ -194,6 +252,7 @@ describe("consts.json", () => {
       route: "/api/ritual/standup",
       triageRoute: "/api/ritual/triage",
       milestonesRoute: "/api/ritual/milestones",
+      orgRoute: "/api/ritual/org",
       assignMe: "me",
       ceremoniesFile: "Config/ceremonies.json",
       vocabularyFile: "Config/standup-vocabulary.json",
@@ -224,7 +283,7 @@ describe("consts.json", () => {
       ],
       workHeadRegex: "^(?:[A-Za-z]+:\\s+)?(.+?)(?:\\s+--\\s+|:\\s+|$)",
       workThreadRegex:
-        "(?m)^>\\s*GitHub:\\s*<?(?:https://github\\.com/[^/\\s>]+/[^/\\s>]+/issues/|#)(\\d+)",
+        "(?m)^>\\s*GitHub:\\s*<?(?:https://github\\.com/[^/\\s>]+/[^/\\s>]+/issues/|#)([0-9]{1,9})(?![0-9])",
       workDesignRegex: "design/([A-Za-z0-9][A-Za-z0-9_-]*)\\.md",
       workSmallWordRegex: "^[a-z]{1,3}$",
       proseFoldNames: 4,
@@ -247,6 +306,27 @@ describe("consts.json", () => {
       suggestShapes: ["start", "delegate", "route", "place"],
       suggestOwnerSeat: "fable",
       cornerShapes: ["oneLeft", "manyLeft", "reached", "nothingInReach"],
+      // The standup room's sizes, the chair included, and what unset reads as.
+      teamSizes: [3, 6, 9],
+      teamSizeDefault: 9,
+      // The standup's room: the nine windows in grid order (a cast id and its
+      // plate), the chair's, the windows three labels keep, and the engineer's.
+      room: {
+        windows: [
+          { id: "dev-hero", plate: "DEV-HERO" },
+          { id: "ops-dev", plate: "OPS-DEV" },
+          { id: "minimalist", plate: "MINIMALIST" },
+          { id: "new-hire", plate: "NEW HIRE" },
+          { id: "vibemancer", plate: "AI VIBEMANCER" },
+          { id: "ultrawide", plate: "ULTRAWIDE OVERLORD" },
+          { id: "qa", plate: "QA ALCHEMIST" },
+          { id: "pm", plate: "PM (TREADMILL)" },
+          { id: "designer", plate: "DESIGNER" },
+        ],
+        chair: "pm",
+        kept: { fable: "dev-hero", opus: "vibemancer", sonnet: "minimalist" },
+        engineer: "dev-hero",
+      },
       suggestExclusions: ["notBillable", "waiting", "inFlight", "theirs", "dismissed"],
       text: {
         title: "Standup -- {date}",
@@ -258,7 +338,7 @@ describe("consts.json", () => {
         yesterday: "Yesterday",
         today: "Today",
         blockers: "Blockers",
-        mug: "Mug",
+        mug: "Status",
         yesterdayEmpty: "nothing closed",
         todayEmpty: "nothing in flight",
         blockersEmpty: "no blockers",
@@ -266,6 +346,20 @@ describe("consts.json", () => {
         noWorkers: "No worker labels in this Space.",
         adoTracker:
           "Azure DevOps is the human team's board, and its standup is the one the team holds; Team Agile reads a GitHub Space's issues and cards, or a local Space's cards.",
+        trackerNotGitHub:
+          "This Space's tracker is not GitHub -- {ritual} reads a GitHub Space's issues.",
+        trackerNotAsked: "This Space is {status}, so its tracker is not asked.",
+        trackerTier: "The tracker is not reachable from here (tier {tier}).",
+        trackerNoRepo:
+          "This GitHub Space names no repository -- give its address a repository, or add one to its projects.",
+        trackerManyRepos: "Issue numbers are per-repository, and this board has {n}: {repos}.",
+        trackerGhMissing: "gh is not installed, so the tracker was not asked.",
+        trackerGhNoAnswer: "gh did not answer for {repo}: {error}",
+        trackerGhSilent: "gh did not answer for {repo}",
+        trackerRepoUnreadable:
+          "gh cannot read {repo} -- it does not exist yet, or it is private to an account this gh login is not",
+        trackerNotJson: "gh answered for {repo} with something that is not JSON",
+        trackerReadFailed: "The tracker read failed: {error}",
         check: "Check",
         checkCardArchived: "{item} -- the card is archived, but the issue is still open.",
         checkIssueClosed: "{item} -- the issue is closed, but the card is not archived.",
@@ -301,6 +395,7 @@ describe("consts.json", () => {
         suggestNounCard: "card",
         suggestNounIssue: "issue",
         suggestCommandStart: "StartWork {arg}",
+        suggestCommandLaunch: "StartWork {arg} -Launch",
         suggestCommandRoute: "Route {arg} -Assign <me|size>",
         suggestCommandPlace: "Route {arg} -Milestone <title>",
         suggestCommandPlaceCard: "Plan {arg} -Milestone <title>",
@@ -327,7 +422,25 @@ describe("consts.json", () => {
         proseTodayAlso: "I'm also on",
         proseBlockers: "Blocked on",
         proseBlockersAlso: "Also blocked on",
-        proseBlockersNone: "Nothing blocked.",
+        proseBlockersNone: "No blockers.",
+        proseYesterdayNone: "Yesterday I picked up where I left off.",
+        proseYesterdayWorked: "Yesterday I worked on {refs}.",
+        proseYesterdayWorkedMany: "Yesterday I worked on {n} items.",
+        proseTodayNone: "Today I'll pick up the next item from the board.",
+        turnOpen: "Good morning.",
+        turnClose: "That's it for me.",
+        chairYesterday: "Yesterday I walked {refs}.",
+        chairYesterdayMany: "Yesterday I did {n} walks.",
+        chairToday: "Today I'll {body}.",
+        chairTodayNone: "Today I'll keep the board moving.",
+        chairWalk: "walk {refs}",
+        chairWalkMany: "do {n} walks",
+        chairDecide: "decide {refs}",
+        chairDecideMany: "make {n} decisions",
+        chairLook: "look at {refs}",
+        chairLookMany: "look at {n} items",
+        chairClauseSeparator: ", ",
+        chairClauseLast: ", and ",
         proseWalk: "Waiting on you to walk",
         proseWalkAlso: "Also to walk",
         proseDecide: "Waiting on you to decide",
@@ -354,6 +467,7 @@ describe("consts.json", () => {
         countsClosed: "{n} closed",
         countsStarted: "{n} started",
         countsInProgress: "{n} in progress",
+        countsUndated: "({n} undated)",
       },
     });
     // StartWork's hand-off block (D-AR5): the CLI types the four headings and the
@@ -371,10 +485,62 @@ describe("consts.json", () => {
         prompt: "## The prompt ({source})",
       },
     });
+    // The gh read limits the CLI and the agent share; the web reads none, so the
+    // contract's values are held here as the third half's statement of them.
+    const { _: ghDoc, ...ghKeys } = (consts as unknown as { ghReads: Record<string, unknown> })
+      .ghReads;
+    expect(ghDoc).toMatch(/Standup and Triage/);
+    expect(ghKeys).toEqual({
+      openIssues: 500,
+      allIssues: 500,
+      labels: 500,
+      repoMissing: ["could not resolve to a repository", "not found (http 404)", "http 404"],
+    });
     // Claude Code usage: /env's flag (the CLI inventory row's key) and the burn route.
     const { _: usageDoc, ...usageKeys } = USAGE as typeof USAGE & { _: string };
     expect(usageDoc).toMatch(/Burn -AsJson/);
-    expect(usageKeys).toEqual({ envFlag: "claudeUsage", burnRoute: "/api/usage/burn" });
+    expect(usageKeys).toEqual({
+      envFlag: "claudeUsage",
+      burnRoute: "/api/usage/burn",
+      readingsFolder: "readings",
+      unpricedPhrase: "not counting",
+    });
+
+    // The org chart's hub file (docs/hub/org.md): the name all three halves type from here.
+    const { _: orgDoc, ...orgKeys } = ORG as typeof ORG & { _: string };
+    expect(orgDoc).toMatch(/docs\/hub\/org\.md/);
+    expect(orgKeys).toEqual({ file: "org.json" });
+
+    // The model map a card's Agent id is looked up in (docs/hub/cards.md).
+    const { _: modelsDoc, ...modelsKeys } = MODELS as typeof MODELS & { _: string };
+    expect(modelsDoc).toMatch(/Config\/models\.json/);
+    expect(modelsKeys).toEqual({
+      file: "Config/models.json",
+      // The order a card's agent is worked out in: the first source that answers wins.
+      agentSources: ["line", "assigned", "trailer", "none"],
+    });
+
+    // The statuses a reply may set, per tracker.
+    expect(REPLY_STATUSES_BY_TRACKER.ado).toEqual([
+      "fixed",
+      "active",
+      "pending",
+      "byDesign",
+      "wontFix",
+      "closed",
+    ]);
+    expect(REPLY_STATUSES_BY_TRACKER.github).toEqual(["fixed", "closed", "active"]);
+    // Daily's window: the sentences a window is refused with, in all three halves.
+    const { _: billingDoc, ...billingKeys } = BILLING as typeof BILLING & { _: string };
+    expect(billingDoc).toMatch(/Resolve-BillingWindow/);
+    expect(billingKeys).toEqual({
+      text: {
+        halfWindow:
+          "-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.",
+        notADay: "{name} '{value}' is not a day: yyyy-MM-dd.",
+        backwards: "-Since {since} is after -Until {until}.",
+      },
+    });
   });
 
   // Every key of the contract is stated by this half, so a key added to
@@ -386,13 +552,19 @@ describe("consts.json", () => {
         "_README",
         "agent",
         "assets",
+        "billing",
+        "communication",
         "design",
         "docs",
         "env",
         "features",
         "folders",
+        "ghReads",
+        "models",
+        "org",
         "regex",
         "reminders",
+        "replyStatuses",
         "repository",
         "reviews",
         "rituals",
@@ -415,7 +587,7 @@ describe("consts.json", () => {
   // the contract by name: a partial bump fails here naming the file left behind.
   // MUST match Tests/Test-Consts.ps1's and Tests/test_consts.py's.
   describe("one version", () => {
-    const EXPECTED_VERSION = "1.5.0";
+    const EXPECTED_VERSION = "1.6.0";
     const pkgRoot = path.resolve(__dirname, "../../..");
 
     it("is stated by the contract", () => {
@@ -475,6 +647,16 @@ describe("toRegExp", () => {
     // The hash is group 1: the standup's commit count reads the lane rule's own bullet.
     const bullet = new RegExp(RE.commitBullet.source, RE.commitBullet.flags.replace("g", ""));
     expect(bullet.exec("Commits:\n- `80e2168` add grid")?.[1]).toBe("80e2168");
+    // The trailer pattern lifts (?mi) into real flags, and reads the key in any case.
+    expect(RE.coAuthorTrailer.flags).toContain("i");
+    expect(RE.coAuthorTrailer.flags).toContain("m");
+    const trailers = new RegExp(RE.coAuthorTrailer.source, RE.coAuthorTrailer.flags + "g");
+    const names = [
+      ..."Fix\n\nCo-Authored-By: Claude Opus 5.5 <a@b>\r\nco-authored-by:  A Person  <p@q>\nCo-Authored-By: no email".matchAll(
+        trailers,
+      ),
+    ].map((m) => m[1].trim());
+    expect(names).toEqual(["Claude Opus 5.5", "A Person"]);
   });
 
   // The shape of a card's id crosses all three halves: a work item number, or the
@@ -510,6 +692,7 @@ describe("no half retypes a contract literal", () => {
     ["stamps.assigned", STAMPS.assigned],
     ["stamps.from", STAMPS.from],
     ["stamps.milestone", STAMPS.milestone],
+    ["stamps.agent", STAMPS.agent],
     ["stamps.started", STAMPS.started],
     ["stamps.review", STAMPS.review],
     ["stamps.cover", STAMPS.cover],
@@ -523,6 +706,7 @@ describe("no half retypes a contract literal", () => {
     ["regex.commitBullet", consts.regex.commitBullet],
     ["env.agentPort", consts.env.agentPort],
     ["env.testRunMarker", consts.env.testRunMarker],
+    ["env.standupAsOf", consts.env.standupAsOf],
     ["env.activeSpace", consts.env.activeSpace],
     ["env.features", consts.env.features],
     // Solitaire Agile: the route, and the distinctive words of the rendering --
@@ -532,6 +716,7 @@ describe("no half retypes a contract literal", () => {
     ["studio.ledgerRoute", STUDIO.ledgerRoute],
     // The burn tile's read: the System page asks the route by the contract's name.
     ["usage.burnRoute", USAGE.burnRoute],
+    ["usage.unpricedPhrase", USAGE.unpricedPhrase],
     ["visibility.publicLine", VISIBILITY.publicLine],
     ["rituals.text.title", RITUALS.text.title],
     ["rituals.text.queueHeading", RITUALS.text.queueHeading],

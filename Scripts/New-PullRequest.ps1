@@ -339,7 +339,7 @@ if ($trackerKind -eq 'github') {
 # may be a different repo entirely, e.g. the prompts orchestration repo.
 if ($trackerKind -ne 'github' -and $File -and (Test-Path -LiteralPath $File) -and
     (-not $PSBoundParameters.ContainsKey('Project') -or -not $PSBoundParameters.ContainsKey('Repository'))) {
-    $adoLinkLine = Select-String -Path $File -Pattern 'ADO Link.*dev\.azure\.com/[^/]+/([^/]+)/_workitems' | Select-Object -First 1
+    $adoLinkLine = Select-String -LiteralPath $File -Pattern 'ADO Link.*dev\.azure\.com/[^/]+/([^/]+)/_workitems' | Select-Object -First 1
     if ($adoLinkLine) {
         $linkProject = [Uri]::UnescapeDataString($adoLinkLine.Matches[0].Groups[1].Value)
         $linkEntries = @($allProjects | Where-Object { $_.Name -eq $linkProject })
@@ -457,7 +457,7 @@ if (-not $promptFile) {
 Write-Host "[*] Prompt: $(Split-Path $promptFile -Leaf)" -ForegroundColor DarkGray
 
 # -- Parse prompt file --------------------------------------------------------
-$promptContent = Get-Content -Path $promptFile -Raw
+$promptContent = Read-CardText -Path $promptFile
 
 # Title: first heading line. Tolerant of "# Bug 232127: ...", "# User Story 452: ...",
 # or a plain "# <title>". (?m) so ^/$ match per-line in the raw multi-line content.
@@ -687,8 +687,8 @@ try {
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
     $token = $tokenRead.Token
-    $headers = Get-P20AdoHeaders -Token $token
-    $patchHeaders = Get-P20AdoHeaders -Token $token -ContentType 'application/json-patch+json'
+    $headers = Get-P20AdoHeaders -Token $token -OrgUrl $org
+    $patchHeaders = Get-P20AdoHeaders -Token $token -OrgUrl $org -ContentType 'application/json-patch+json'
 } catch {
     Write-CliError -Message "Auth failed -- $($_.Exception.Message)"
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -737,7 +737,7 @@ $jsonBody = $prBody | ConvertTo-Json -Depth 3
 
 try {
     $uri = "$org/$encodedProject/_apis/git/repositories/$Repository/pullrequests?api-version=7.1"
-    $pr = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -Body $jsonBody
+    $pr = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -Body (ConvertTo-P20Utf8Body $jsonBody)
 } catch {
     # ONE block: this used to print a red [!] line and then an Error: under it.
     $statusCode = $_.Exception.Response.StatusCode
@@ -777,7 +777,7 @@ if ($AutoComplete -and $prId) {
         } | ConvertTo-Json -Depth 3
 
         $acUri = "$org/$encodedProject/_apis/git/repositories/$Repository/pullrequests/$($prId)?api-version=7.1"
-        Invoke-RestMethod -Uri $acUri -Headers $headers -Method Patch -Body $acBody | Out-Null
+        Invoke-RestMethod -Uri $acUri -Headers $headers -Method Patch -Body (ConvertTo-P20Utf8Body $acBody) | Out-Null
         Write-Host "[+] Auto-complete enabled (squash, delete branch)" -ForegroundColor Green
     } catch {
         Write-Host "[~] PR created but auto-complete failed -- $($_.Exception.Message)" -ForegroundColor Yellow
@@ -791,7 +791,7 @@ if (-not $SkipWorkItem -and $workItemId) {
 
     try {
         $wiUri = "$org/_apis/wit/workitems/$($workItemId)?api-version=7.1"
-        $wi = Invoke-RestMethod -Uri $wiUri -Headers @{ Authorization = "Bearer $token" } -Method Get
+        $wi = Invoke-RestMethod -Uri $wiUri -Headers $headers -Method Get
         $currentState = $wi.fields.'System.State'
 
         if ($currentState -eq 'Code Review' -or $currentState -eq 'Resolved' -or $currentState -eq 'Closed') {
@@ -808,7 +808,7 @@ if (-not $SkipWorkItem -and $workItemId) {
             $codeReviewIsValid = $true
             try {
                 $statesUri = "$org/$wiProject/_apis/wit/workitemtypes/$([Uri]::EscapeDataString($wiType))/states?api-version=7.1"
-                $states = Invoke-RestMethod -Uri $statesUri -Headers @{ Authorization = "Bearer $token" } -Method Get
+                $states = Invoke-RestMethod -Uri $statesUri -Headers $headers -Method Get
                 $codeReviewIsValid = [bool]($states.value | Where-Object { $_.name -eq 'Code Review' })
             } catch {
                 # Couldn't determine valid states -- fall back to attempting.
@@ -828,7 +828,7 @@ if (-not $SkipWorkItem -and $workItemId) {
                     @{ op = "add"; path = "/fields/System.Reason"; value = "Work started" }
                 ) | ConvertTo-Json -Depth 3
 
-                Invoke-RestMethod -Uri $wiUri -Headers $patchHeaders -Method Patch -Body $statePatch | Out-Null
+                Invoke-RestMethod -Uri $wiUri -Headers $patchHeaders -Method Patch -Body (ConvertTo-P20Utf8Body $statePatch) | Out-Null
                 Write-Host "[+] Work item moved to Code Review" -ForegroundColor Green
             }
         }
@@ -874,7 +874,7 @@ if (-not $SkipWorkItem -and $workItemId) {
 
         $commentUri = "$org/$encodedWiProject/_apis/wit/workItems/$workItemId/comments?api-version=7.1-preview"
         $commentBody = @{ text = $commentText } | ConvertTo-Json -Depth 3
-        Invoke-RestMethod -Uri $commentUri -Headers $headers -Method Post -Body $commentBody | Out-Null
+        Invoke-RestMethod -Uri $commentUri -Headers $headers -Method Post -Body (ConvertTo-P20Utf8Body $commentBody) | Out-Null
         Write-Host "[+] Comment posted to work item" -ForegroundColor Green
     } catch {
         $msg = $_.Exception.Message
@@ -905,7 +905,7 @@ if ($pull.Ok) { $promptFile = $pull.Path }
 
 try {
     if (-not $pull.Ok) { throw $pull.Message }
-    $lines = Get-Content -Path $promptFile
+    $lines = Read-CardText -Path $promptFile -Lines
     $insertIndex = -1
 
     # Insert after the last Git commit line, before ## Work Item Info
@@ -929,7 +929,7 @@ try {
         Write-Host "[+] PR URL written to prompt file" -ForegroundColor Green
     } else {
         Write-Host "[~] Could not find insertion point -- appending to end" -ForegroundColor Yellow
-                Write-CardText -Path $promptFile -Content ((Get-Content -Path $promptFile -Raw).TrimEnd("`r", "`n") + "`n`n$($script:Consts.tokens.prUrl) $prUrl`n")
+                Write-CardText -Path $promptFile -Content ((Read-CardText -Path $promptFile).TrimEnd("`r", "`n") + "`n`n$($script:Consts.tokens.prUrl) $prUrl`n")
     }
 } catch {
     Write-Host "[~] Failed to update prompt file -- $($_.Exception.Message)" -ForegroundColor Yellow

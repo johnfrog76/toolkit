@@ -161,6 +161,18 @@ if (-not $OutputFolder) {
     $OutputFolder = if ($startsInPlay) { "$pf/$($folderNames.current)" } else { "$pf/$($folderNames.backlog)" }
     $script:SpaceCardFolders = @("$pf/$($folderNames.current)", "$pf/$($folderNames.backlog)")
 }
+elseif (-not [System.IO.Path]::IsPathRooted($OutputFolder) -and $cfg.PromptsFolder) {
+    # A bare card-folder name -- current, backlog or archive, consts.json's -- is
+    # the ACTIVE SPACE's folder of that name, the same folder the default above
+    # builds; it used to be joined onto the store root, where no Space looks.
+    # A path with more than one segment (`example/backlog`) stays
+    # relative to the store, and a rooted path is taken as given. With no Space
+    # active there is no Space folder to mean, so a bare name keeps the store
+    # root -- where a hub with no Spaces keeps its cards.
+    $bare = $OutputFolder.Trim().TrimEnd('/', '\')
+    $named = @($folderNames.current, $folderNames.backlog, $folderNames.archive) | Where-Object { $_ -ieq $bare } | Select-Object -First 1
+    if ($named) { $OutputFolder = "$($cfg.PromptsFolder)/$named" }
+}
 
 # Terminal escape sequences for clickable links (OSC 8)
 $esc = [char]27
@@ -187,7 +199,10 @@ PARAMETERS:
                            <activeOrg>/backlog, until Move -To Active, its first
                            ThreadHash or its NewPR pulls it into current/. On an
                            Azure DevOps Space it is always in play: no Backlog lane
-    -OutputFolder <name>   Target folder (default: <activeOrg>/backlog; current/ on Azure DevOps)
+    -OutputFolder <name>   Target folder (default: <activeOrg>/backlog; current/ on Azure DevOps).
+                           A bare current, backlog or archive is the active
+                           Space's folder of that name; <space>/<folder> is under
+                           the prompt store; an absolute path is used as given
     -Cover <image>         Attach a cover picture as the card is made (as Cover does)
     -Before <image>        Attach the 'before' picture of a before/after proof
     -Design <name|id>      Bind the card to the design it is worked against: a
@@ -207,7 +222,7 @@ EXAMPLES:
     $(Get-CliPrefix)NewPrompt 123456 -ReadOnly                        # Don't modify ADO
     $(Get-CliPrefix)NewPrompt 123456 -Force                           # Reassign from someone else
     $(Get-CliPrefix)NewPrompt 123456 -AssignTo "other@contoso.com"    # Assign to specific user
-    $(Get-CliPrefix)NewPrompt 123456 -OutputFolder "archive"          # Output to archive folder
+    $(Get-CliPrefix)NewPrompt 123456 -OutputFolder "archive"          # Into the active Space's archive/
 
   OFFLINE (no az, no ADO -- works at Tier 2):
     $(Get-CliPrefix)NewPrompt -Title "Spike the cache layer"          # Task, next free local id
@@ -819,8 +834,8 @@ function Get-NextLocalId {
     $parent = Split-Path $Folder -Parent
     if ($parent) { $roots += (Join-Path $parent $folderNames.archive), (Join-Path $parent $folderNames.current), (Join-Path $parent $folderNames.backlog) }
     foreach ($r in ($roots | Select-Object -Unique)) {
-        if (-not (Test-Path $r)) { continue }
-        foreach ($f in (Get-ChildItem -Path $r -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue)) {
+        if (-not (Test-Path -LiteralPath $r)) { continue }
+        foreach ($f in (Get-ChildItem -LiteralPath $r -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue)) {
             # Get-P20CardId returns a STRING. Only a number takes
             # part in highest-plus-one: "99" -gt "100" is true for strings.
             $n = Get-P20CardId -Name $f.Name -Pattern $pattern
@@ -863,8 +878,8 @@ if ($WorkItemId) {
     $existingIn = $OutputFolder
     foreach ($relFolder in $existingFolders) {
         $existingFolder = Resolve-TargetFolder $relFolder
-        if (-not (Test-Path $existingFolder)) { continue }
-        $existingCards = @(Get-ChildItem -Path $existingFolder -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue |
+        if (-not (Test-Path -LiteralPath $existingFolder)) { continue }
+        $existingCards = @(Get-ChildItem -LiteralPath $existingFolder -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue |
             Where-Object { (Get-P20CardId -Name $_.Name -Pattern $idPattern) -eq [string]$WorkItemId } |
             Sort-Object Name)
         if ($existingCards.Count -gt 0) { $existingIn = $relFolder; break }
@@ -897,6 +912,16 @@ if ($WorkItemId) {
     }
 }
 
+# The last word before a create. The scan above answers by id, and a file can be
+# here that no id reads (a Bug titled like a date has a name Get-P20CardId skips),
+# so every write asks the file itself. No switch overwrites.
+function Stop-P20IfCardExists {
+    param([string]$Path, [string]$Hint)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    Write-CliError -Message "$(Split-Path $Path -Leaf) already exists in $OutputFolder/. Nothing was written." -Hint $Hint
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
+
 # Main execution
 Write-Host ""
 if ($script:LocalMode) {
@@ -908,7 +933,7 @@ if ($script:LocalMode) {
     }
 
     $targetFolder = Resolve-TargetFolder $OutputFolder
-    if (-not (Test-Path $targetFolder)) {
+    if (-not (Test-Path -LiteralPath $targetFolder)) {
         New-Item -Path $targetFolder -ItemType Directory -Force | Out-Null
     }
 
@@ -957,11 +982,7 @@ if ($script:LocalMode) {
 
     $content = Build-PromptContent -workItem $workItemData -cardDir $targetFolder
     $filePath = Join-Path $targetFolder $fileName
-    if ((Test-Path $filePath) -and -not $Force) {
-        Write-CliError -Message "$fileName already exists in $OutputFolder/." `
-            -Hint 'Pick another title, pass -Id, or delete the file.'
-        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
-    }
+    Stop-P20IfCardExists -Path $filePath -Hint 'Pick another title, pass -Id, or delete the file.'
     # The one writer, and -New because this CREATES: UTF-8 with no BOM (5.1's
     # Set-Content -Encoding UTF8 writes one and 7's does not, so the stamp
     # Archive adds later used to rewrite the whole file on one host only) and
@@ -1046,6 +1067,10 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     $assignedWord = if ($assigneeLogins.Count -gt 0) { $assigneeLogins -join ', ' } else { 'Unassigned' }
     Write-Host "    State: $($issueState.ToLowerInvariant()) | Assigned: $assignedWord | Card type: $resolvedType" -ForegroundColor Gray
 
+    # Before anything changes on the tracker: a refused card assigns nothing.
+    $plannedName = Get-FileName -workItemType $resolvedType -id $WorkItemId -title $title
+    Stop-P20IfCardExists -Path (Join-Path (Resolve-TargetFolder $OutputFolder) $plannedName) -Hint 'To start it over, move or delete that file first.'
+
     if (-not $ReadOnly) {
         if ($assigneeLogins.Count -eq 0) {
             Write-Host ""
@@ -1124,7 +1149,7 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     }
 
     $targetFolder = Resolve-TargetFolder $OutputFolder
-    if (-not (Test-Path $targetFolder)) {
+    if (-not (Test-Path -LiteralPath $targetFolder)) {
         New-Item -Path $targetFolder -ItemType Directory -Force | Out-Null
     }
 
@@ -1203,7 +1228,7 @@ try {
     }
     try {
         $commentsUri = "$org/$([Uri]::EscapeDataString($project))/_apis/wit/workItems/$WorkItemId/comments?api-version=7.1-preview"
-        $commentsHeaders = Get-P20AdoHeaders -Token $tokenRead.Token
+        $commentsHeaders = Get-P20AdoHeaders -Token $tokenRead.Token -OrgUrl $org
         $commentsResponse = Invoke-RestMethod -Uri $commentsUri -Headers $commentsHeaders -Method Get
         if ($commentsResponse.comments) {
             $adoComments = $commentsResponse.comments | ForEach-Object {
@@ -1232,6 +1257,10 @@ try {
     $assignedLabel = if ($assignedTo) { $assignedTo } else { "Unassigned" }
     Write-Host "[+] Found: $workItemType $WorkItemId - $title" -ForegroundColor Green
     Write-Host "    State: $state | Assigned: $assignedLabel" -ForegroundColor Gray
+
+    # Before anything changes on the tracker: a refused card assigns nothing.
+    $plannedName = Get-FileName -workItemType $workItemType -id $WorkItemId -title $title
+    Stop-P20IfCardExists -Path (Join-Path (Resolve-TargetFolder $OutputFolder) $plannedName) -Hint 'To start it over, move or delete that file first.'
 
     # Handle assignment and state changes unless ReadOnly
     if (-not $ReadOnly) {
@@ -1330,7 +1359,7 @@ try {
     # template link is computed relative to where the card will actually sit,
     # so the directory has to exist first.
     $targetFolder = Resolve-TargetFolder $OutputFolder
-    if (-not (Test-Path $targetFolder)) {
+    if (-not (Test-Path -LiteralPath $targetFolder)) {
         New-Item -Path $targetFolder -ItemType Directory -Force | Out-Null
     }
 

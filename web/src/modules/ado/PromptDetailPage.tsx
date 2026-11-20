@@ -10,7 +10,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { BackButton } from "../../shared/BackButton";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { useGetPromptDetailQuery } from "./api.ado";
 import { STATUS } from "../../shell/consts";
@@ -66,7 +66,7 @@ export function PromptDetailPage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         loading={isLoading}
         loadingLabel="Loading prompt..."
         empty={
@@ -174,7 +174,7 @@ export function PromptDetailPage() {
             style={{ marginTop: tokens.spacingVerticalS }}
           />
         )}
-      </PageCard>
+      </PanelFrame>
     </div>
   );
 }

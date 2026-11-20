@@ -25,6 +25,13 @@ next week start (``burn.weekStarts``, Friday 05:00 by default), whichever is
 sooner -- because after it the windows themselves are different. ``?refresh=1`` (the tile's
 Refresh) goes past the cache. A read that failed is not kept.
 
+**A new reading is a miss.** The answer carries the weekly burndown -- the typed plan
+readings ``Burn -Reading`` appends to the hub's ``usage/readings/`` (consts.json
+``usage.readingsFolder``; docs/hub/usage.md, "The weekly burndown") -- so the key also
+fingerprints that folder: every file's name, size and last write. The agent never parses
+a reading; the verb does. And a kept answer is not served past its burndown's
+``renewsAt``, the moment its ``due`` stops being true to the clock.
+
 **Present where on, absent where not.** The gate is ``claude_usage()`` -- the
 Claude Code usage inventory row's rule, carried on ``/env`` under consts.json
 ``usage.envFlag`` -- checked per request: where this machine has no Claude Code
@@ -46,8 +53,8 @@ from fastapi import APIRouter, HTTPException
 
 from ..ado import bridge
 from . import disk_cache
-from .config import API_PREFIX, claude_usage, hub_root
-from .consts import usage_burn_route
+from .config import API_PREFIX, claude_usage, hub_folder, hub_root
+from .consts import usage_burn_route, usage_readings_folder
 from .log_writer import write_log
 
 # How long one reading is served: an hour (the owner's call). The CLI's
@@ -86,10 +93,29 @@ def _json_object(stdout: str) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def _readings_key() -> tuple:
+    """The typed plan readings as they stand: each file's name, size and last
+    write under ``usage/<readingsFolder>/``. Not opened: a change is enough."""
+    folder = hub_folder("usage") / usage_readings_folder()
+    try:
+        files = sorted(p for p in folder.iterdir() if p.is_file())
+    except OSError:
+        return ()
+    out = []
+    for p in files:
+        try:
+            st = p.stat()
+        except OSError:
+            continue
+        out.append((p.name, st.st_size, st.st_mtime_ns))
+    return tuple(out)
+
+
 def _inputs() -> str:
     """What the reading depends on besides the session files: the config files
-    and the module, as the bridge fingerprints them for its command table."""
-    return repr(bridge._map_key_now())
+    and the module, as the bridge fingerprints them for its command table, and
+    the readings folder, so ``Burn -Reading`` is a miss at once."""
+    return repr((bridge._map_key_now(), _readings_key()))
 
 
 def _cached(hub: str, inputs: str, now: float) -> dict | None:
@@ -108,6 +134,11 @@ def _cached(hub: str, inputs: str, now: float) -> dict | None:
         return None
     boundary = _parse_instant(entry["burn"].get("nextBoundaryAt"))
     if boundary is None or now >= boundary:
+        return None
+    # A reading due to renew at a moment the kept answer said it was not: read again.
+    burndown = entry["burn"].get("burndown")
+    renews = _parse_instant(burndown.get("renewsAt")) if isinstance(burndown, dict) else None
+    if renews is not None and fetched < renews <= now:
         return None
     return {**entry["burn"], "fetchedAt": _stamp(fetched), "fromCache": True}
 
@@ -157,8 +188,8 @@ def read_burn(refresh: bool = False) -> dict:
 
 @api.get(ROUTE)
 async def get_burn(refresh: int = 0):
-    """Today's and this week's Claude Code burn, as ``Burn -AsJson`` answers it,
-    plus ``fetchedAt`` (when the verb ran) and ``fromCache``. 404 where this
+    """Today's and this week's Claude Code burn and the weekly burndown, as
+    ``Burn -AsJson`` answers it, plus ``fetchedAt`` (when the verb ran) and ``fromCache``. 404 where this
     machine has no Claude Code session files. ``?refresh=1`` goes past the
     hour-long cache."""
     if not claude_usage():

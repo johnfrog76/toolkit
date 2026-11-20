@@ -39,8 +39,8 @@ halves talking to each other, and the flag that makes a whole module appear and 
 three halves at once. A check that can be automated belongs in a suite; one that cannot is a gate here,
 or it is not verified.
 
-Every verb `config.default.json` defines is in the table below -- 47 always-on, and the 15 the modules
-contribute through `Config/*.commands.psd1` (62 in all; `docs/CLI.md` prints both counts) -- with the
+Every verb `config.default.json` defines is in the table below -- 49 always-on, and the 16 the modules
+contribute through `Config/*.commands.psd1` (65 in all; `docs/CLI.md` prints both counts) -- with the
 suite that types it and the gate that walks it. `Tests/Test-DocCounts.ps1` reads the table back, so a
 verb added without a row fails a suite. **A row that says "neither" is a verb nothing verifies**; it is
 left in the table rather than dropped, because a verb the reader cannot see in it is indistinguishable
@@ -61,8 +61,10 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Sync` | `Sync` (typed, against a bare repo; hook cases skip where there is no `hooks/pre-commit`, and a skip is not a pass) | 6, 12 |
 | `Move` | `Move` (typed) | neither |
 | `Billable` | `Billable` (typed) | neither |
+| `Daily` | `Billable` (typed: a past window byte for byte against the billing script's `raw`, `-Compact`, and the three refusals) | 12 (Windows PowerShell 5.1 and a real hub: the row under "Rows added by a fix") |
 | `Plan` | `Plan` (typed) | neither |
 | `Tag` | `Tag` (typed) | neither |
+| `Backlog` | `Backlog` (typed) | 12 (a Western code page: the row under "Rows added by a fix") |
 | `Cover` | `Cover` (typed) | 12 (the reader's paths on Windows and 5.1, and a picture on the board) |
 | `NewPrompt` | `NewPrompt` (`-Title` offline form; `-Design` and `-From` typed in a fresh shell) | 6 (the ADO form); 12 (`-Design` and its chip on Windows) |
 | `NewItem` | `EditItem` (typed, `-FromCard` only, with `gh` stubbed); `Tests/test_studio.py` (typed, `-FromDesign` only) | 6; 12 (`-FromCard` against the GitHub demo) |
@@ -115,6 +117,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Triage` | `Triage` (typed, with `gh` stubbed) | neither |
 | `Route` | `Triage` (typed, with `gh` stubbed -- the exact argv per switch, never a real write) | 12 (one real write against a GitHub Space) |
 | `StartWork` | `StartWork` (typed, the block byte for byte; `gh` stubbed for an issue) | 12 (the cold-agent walk) |
+| `OrgChart` | `OrgChart` (typed in a fresh shell over a scratch copy of `samples/hub`: off means no verb, the text and `-AsJson` against `Tests/fixtures/org/`, every refusal exit 2 writing nothing) | 12 (Windows PowerShell 5.1: the row under "Rows added by a fix") |
 
 Gate numbers are this file's `## Gate N` headings (8c is gate 8c). The four `Test*` verbs after
 `Test` are the CLI runner itself, so their rows say what covers the runner.
@@ -290,19 +293,19 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **51 suites, 9159 assertions** with a `config.local.json`, every one
-of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
-`hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
-sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
-fewer on the same commit, every suite green on both -- `docs/TESTING.md`, "The CLI total is per
-platform".
+findings, with a `config.local.json`, every suite reporting. What the last release counted is
+[`docs/TEST-COUNTS.md`](docs/TEST-COUNTS.md); a run on a later commit, or on another host, reads differently
+on purpose, and the gate is the green, not the number. `Sync`'s hook-interaction cases skip on their own
+where there is no `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`:
+the Compat sweep does not descend into `web/node_modules`. A Windows run reads a few fewer on the same
+commit, every suite green on both -- `docs/TESTING.md`, "The CLI total is per platform".
 
 Then the other two halves -- or all three at once with `tkTest`, which runs these same three and
 names any half it had to skip:
 
 ```bash
 python -m pytest Tests/      # Windows (python3 is the Store stub there); macOS/Linux: python3 -m pytest Tests/
-cd web && npm test           # the shell; the current counts are in docs/TESTING.md
+cd web && npm test           # the shell; the last release's counts are in docs/TEST-COUNTS.md
 ```
 
 - [ ] All suites pass
@@ -314,13 +317,15 @@ cd web && npm test           # the shell; the current counts are in docs/TESTING
 
 A skip is not a pass. Read the summary line, not just the total.
 
-**What CI covers of this gate.** A pull request's check (`.github/workflows/verify.yml`, the Ubuntu job) runs these three
+**What CI covers of this gate.** A pull request's check (`.github/workflows/verify.yml`, the Ubuntu jobs, one per half,
+summed up by one check, `Verify`) runs these three
 runners on Ubuntu, reads each one's summary line and fails a step on a failure, a skipped half or a run
-that counted nothing ([docs/TESTING.md](docs/TESTING.md), "In CI"). That is this gate on Linux under
-`pwsh` 7. Its Windows job, which runs on a weekday-evening schedule against `main`, from the Actions tab's button and on a pull request labelled `ci` (the label takes effect on the next push or reopen, and a label alone starts nothing, so it never cancels running checks; for a branch right away, `gh workflow run verify.yml --ref <branch>`), not on an ordinary pull request or a push to `main`, adds the CLI half on Windows: `tkTest -Half cli` typed in Windows PowerShell 5.1
-after the one-manifest import, read the same way, with the runner starting each suite in `pwsh` 7. Nothing
-more: each suite run as a file under 5.1, and the agent's and the web UI's runners on Windows, are still
-walked here and in Gate 12.
+that counted nothing ([docs/TESTING.md](docs/TESTING.md), "In CI"). A pull request runs only the halves
+its files can reach, and the cross-half contract suites for the rest; a push to `main` runs all three. That is this gate on Linux under
+`pwsh` 7. Its Windows job, which runs on a weekday-evening schedule against `main`, from the Actions tab's button and on a pull request labelled `ci` (the label takes effect on the next push or reopen, and a label alone starts nothing, so it never cancels running checks; for a branch right away, `gh workflow run verify.yml --ref <branch>`), not on an ordinary pull request or a push to `main`, adds the CLI half on Windows twice, in two jobs side by side: `tkTest -Half cli` typed in Windows PowerShell 5.1
+after the one-manifest import, with the runner starting each suite in `pwsh` 7; and `Tests/Test-Toolkit.ps1`
+with no suite switch started by `powershell.exe` (the `ps51` job), so every suite runs in 5.1. Both are read the same way.
+The agent's and the web UI's runners on Windows are still walked here and in Gate 12.
 
 ---
 
@@ -756,7 +761,8 @@ opens a browser and names it.
 - [ ] `/skills` renders
 - [ ] A **Meetings** nav entry, and `/communication` lists the three fixture sessions with their
       stages -- Plan, Prep, Retro
-- [ ] The retro session's send button is **present, disabled, and names `TEAMS_WEBHOOK_MANAGER`**
+- [ ] The retro session's send button is **present, disabled, and says `Sending off on this server`**
+      (`Webhook not set` on a server not started as a test run)
 - [ ] No page errors across the six routes
 
 > The send button is never pressed, by the runner or by you. A press posts to a real webhook, and
@@ -796,7 +802,9 @@ curl -s localhost:4100/api/env | python -c "import json,sys; print(json.load(sys
 - [ ] The block **names the variable** (`"webhookEnv": "TEAMS_WEBHOOK_MANAGER"`) and does not
       contain a URL anywhere
 - [ ] On a Retro-stage session, the send button is **visible and disabled**, with the reason on the
-      line below it naming `TEAMS_WEBHOOK_MANAGER` -- not hidden, and not an error
+      line below it reading `Webhook not set` and `TEAMS_WEBHOOK_MANAGER` named only in the info
+      icon beside it -- not hidden, and not an error. The System page's Environment card reads the
+      same phrase on that recipient's row, under *Teams messages*
 - [ ] `tkSendTeams manager 'test' -WhatIf` prints the same refusal, names the variable, and
       **exits 0** -- an unset variable is a configuration fact, not a failure
 
@@ -843,11 +851,16 @@ tkWeb -Dev
       Connected Deck Universe*, 19 slides, with an approximate length and the four state filters
 - [ ] The arrow opens `/deck/connected-deck-trailer` **full screen** -- no Toolkit nav bar around it
 - [ ] Arrow keys move through the slides; the counter reads `n / 19`
-- [ ] **It speaks.** Un-mute, and the slide is read aloud; switch **Jenny** to **Brian** and the
-      voice changes. No key, no server, no network call but the mp3
+- [ ] **It speaks.** Press the sound at the bar's right end, and the slide is read aloud; in the
+      gear's **Voice** sheet switch **Jenny** to **Brian** and the voice changes. No key, no
+      server, no network call but the mp3
+- [ ] In the same sheet, **Mode** reads **Paging**; choose **Audiobook** and close it: the counter
+      becomes the play ring and the deck turns its own slides. Exit and open the deck again: it
+      opens in Audiobook. Turn **Narration** off: the mode row goes dead and reads Paging
 - [ ] **Exit** returns to Growth
-- [ ] `/deck/connected-deck-trailer?present=1` is the podium: notes open in a second window and the
-      deck window is silent
+- [ ] `/deck/connected-deck-trailer?present=1` is the podium: the presenter's bar (Exit, the
+      arrows and counter, speaker notes, fullscreen -- no sound, no voice), notes open in a second
+      window, and the deck window is silent
 - [ ] `tkConfig -Set features.growth=false`: the Growth tab goes and a **Decks** tab appears in its
       place -- the flag never shows nothing. Set it back
 - [ ] `tkConfig -Set features.deck=false`: no Decks card, no Decks tab, and `/deck/connected-deck-trailer`
@@ -895,8 +908,8 @@ real one.
 
 **The three runs are one line:** `tkTest` runs the agent's `pytest`, the CLI runner and the web UI's
 `npm test` in order, each with its own environment, and prints one summary and one verdict -- a half
-that cannot run is named SKIPPED, not passed -- and writes all three into `test-summary.<machine>.json`
-(`docs/TESTING.md`, at its head). The rows below that name `tkTestToolkit`,
+that cannot run is named SKIPPED, not passed -- and writes all three into `test-summary.<machine>.json`,
+in the machine's test-history folder (`docs/TESTING.md`, at its head). The rows below that name `tkTestToolkit`,
 `python -m pytest Tests/` or `npm test` are the one-half form of the same runs.
 
 - [ ] **Clone from nothing.** A fresh clone, then `README.md` and the Quick start it links
@@ -906,7 +919,7 @@ that cannot run is named SKIPPED, not passed -- and writes all three into `test-
       verbs exist), then open a fresh `powershell.exe -NoProfile` **and** a fresh `pwsh -NoProfile`:
       `tkMenu` answers in both. Gate 1's note about the two module directories is the usual failure
 - [ ] **The suite on 5.1.** `tkTestToolkit` in `powershell.exe`, full pass, count read from
-      `test-results.<machine>.log` (latest row per suite). Then again in `pwsh`. Both totals go in
+      `test-results.<machine>.log` in the machine's test-history folder (latest row per suite). Then again in `pwsh`. Both totals go in
       the ledger next to the other host's; a suite that passes only on 7 is a 5.1 defect, filed
 - [ ] **Configure against the real hub.** `config.local.json` with `promptsRoot` at
       your real hub and your real `activeOrg`; `tkSetup` green; `tkStatus` lists the
@@ -980,6 +993,24 @@ the same commit (AGENTS.md, "A fix its own host cannot confirm leaves its check 
 names the command, what you should see, and the issue it closes. A row stays until a verification run confirms
 it and records that on the issue. Then the row moves into the gate it belongs to, or goes if a suite
 now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on the verifying host: it prints each `verify-close` issue with the row below that names it, by issue number.
+
+- [ ] **The Docker image behind the agent's request gate.** Docker Desktop running, `tkWeb` with the agent up. Open
+  `http://localhost:5174` and walk Home, the Board and a card: pages load, and creating a card from the web UI
+  works, which proves a write passes through nginx. Open `http://127.0.0.1:5174` and do the same. `curl -si -H "Host:
+  example.test" http://localhost:5174/` should drop the connection, and `curl -sI http://localhost:5174/` should show
+  `Content-Security-Policy` and `X-Frame-Options: DENY`, and `curl -sI http://localhost:5174/lounge/temple.html` should show
+  `X-Frame-Options: SAMEORIGIN`. In the Lounge, open the Skins dialog and see every thumbnail drawn, and wear a skin and see it
+  drawn behind the app. The browser console shows no policy violation.
+
+- [ ] **The agent's reads on Windows, gh and az.** On the Windows PC, with the agent up and a GitHub Space active,
+  `python Tests/test_child_windows.py` passes all three (the Windows CI job runs the same file), then open the Design
+  tab and search for `a&b` and for `"quoted"`, and you should see an ordinary result or none, with the tab still
+  answering. On an Azure DevOps Space, `tkDashboard` and the web UI's work items list as before; `az` still answers.
+
+- [ ] **`Land` and `az.cmd` on Windows.** On the Windows PC, on an Azure DevOps Space, `tkTestToolkit -Land` passes,
+  including its two `.cmd` rows, which run only there. Then `tkEditItem <id> -Title "R&D work"` with `-WhatIf` off on a test
+  item: the title arrives whole, because an argument with a space is quoted. And `tkLand` on a real merged pull request of
+  this Space still works.
 
 - [ ] **`npm ci` asks nothing about install scripts on Windows.** On the Windows PC, in `web/`, `git diff package.json`
   first: a local `allowScripts` edit from approving `@parcel/watcher` or `unrs-resolver` by hand is thrown away with
@@ -1071,8 +1102,8 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   Space answered `agents`, and a card in `current/` whose `**Assigned:**` line says `sonnet`, `cd` into your clone
   of the Space's repository and run `powershell -NoProfile -Command "tkStartWork <id> -Launch" | findstr /n "^"`,
   then the same with `pwsh -NoProfile -c`. You should see each return within a second or two with
-  `Launched ... on sonnet: PID <n>.`, the worktree under `.claude\worktrees\startwork-...` and the log at the
-  repository root -- never a wait for the session to end -- and `Get-Process -Id <n>` still running afterwards.
+  `Launched ... on sonnet: PID <n>.`, the worktree under `.claude\worktrees\startwork-...` and the log under
+  `.git\startwork\` -- never a wait for the session to end -- and `Get-Process -Id <n>` still running afterwards.
   Repeat with an npm-installed `claude.cmd` first on the PATH if you have one: it starts the same way (the prompt
   is the session's stdin, never an argument cmd.exe would cut at a newline). Then `tkTestToolkit -StartWork` on
   that host: green, its launch half named as a skip. Closes Feature MA6P (StartWork -Launch).
@@ -1082,9 +1113,9 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   route the card to `opus` (`tkRoute <id> -Assign opus`) and it says `model opus`; `tkRoute <id> -Assign fable` and
   `-Launch` refuses, naming the owner's own seat. Then launch the `sonnet` card for real and open the log once
   the session has written: its `system`/`init` event names a Sonnet model, and the first user message in the
-  stream is the hand-off block `tkStartWork <id>` prints, whole (compare it with the `.block.log` beside the
-  log). If `stream-json` does not echo the prompt, record what the log does open with and file it -- the
-  `.block.log` is then the record of what the session was handed. Closes Feature MA6P (StartWork -Launch).
+  stream is the hand-off block `tkStartWork <id>` prints, whole (compare it with `tkStartWork <id>`'s own output:
+  the `.block.log` is removed once the session has it). If `stream-json` does not echo the prompt, record what the
+  log does open with and file it. Closes Feature MA6P (StartWork -Launch).
 - [ ] **A server's log keeps filling after the launcher returns, on macOS and Linux.** `tkAgent` (or
   `tkWeb -Dev`), then load a page that makes the agent log a request, then read `agent.log` at the package root:
   you should see request lines written after `tkAgent` returned, not only its startup lines. Proved on macOS
@@ -1159,6 +1190,156 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `%USERPROFILE%\.claude\projects` with each file's last write time before and after the two runs, from a
   plain `powershell` window with no Claude Code session open: the two lists are the same. Refs the pull
   request that adds `Burn`.
+- [ ] **NewPR and GetPRComments keep a card's non-ASCII text under Windows PowerShell 5.1 (review finding
+  G2 f3).** In `powershell` (5.1), on a GitHub Space with a scratch repository, a card whose title and
+  Described Changes hold `café — naïve`: `tkNewPR`, then `tkGetPRComments`. The pull request's title and body show
+  the words as typed, and the card's text is unchanged apart from the `PR URL:` line and the comments section:
+  `git diff` on the hub shows no other line. The `ps51` job runs the reader on 5.1; this is the
+  real pull request.
+- [ ] **A hub under a folder with a non-ASCII name is found under Windows PowerShell 5.1 (review finding G3 f1).**
+  On a Windows account or folder named with an accent (`C:\Users\José\toolkit-hub`, or any folder with `é` in
+  it), `tkConfig -Set promptsRoot=<that folder>`, then a new `powershell` (5.1) window: `tkStatus` lists the
+  hub's cards, with no `Hub not found` at import, and `tkEnv` names the same path. The `ps51` job proves it on a
+  scratch package; this is the real profile and autoload.
+- [ ] **A session's non-ASCII text survives its stage changes under Windows PowerShell 5.1 (review finding G4
+  f2).** With `features.communication` on, in `powershell` (5.1): `tkMeetingAgenda -Plan`, add a line with
+  `Zoë — “fine”` to the session, then `-Prep` and `-Retro`. The line reads as typed after both, in an editor and
+  in the web UI's session view. The `ps51` job runs the same on a sandbox.
+- [ ] **gh and az output keeps its non-ASCII text in a Windows terminal (review finding G2 f4).** In a plain
+  `powershell` window and in `pwsh`, both on the console's default code page (`chcp` shows 437 or 850, not 65001):
+  `tkGetPRComments` on a GitHub Space, on a pull request with a review comment holding `—` and `é`: the card shows both as
+  written, not `ΓÇö` or `Ã©`. On an Azure DevOps Space, `tkNewPrompt <id>` for a work item whose title holds an
+  `é`: the card's heading spells it. Afterwards `chcp` still shows the code page it showed before.
+- [ ] **A lone Build Service comment is not triaged under Windows PowerShell 5.1 (review finding G2 f19).** On an
+  Azure DevOps Space, in `powershell` (5.1), `tkGetPRComments` on a pull request with a thread that holds one
+  Build Service comment on a file: that thread is not among the actionable ones the command counts. The PRComments
+  suite runs the filter on 5.1 in the `ps51` job; this is a real thread.
+- [ ] **Route -Assign takes a size under Windows PowerShell 5.1 (review finding G4 f4).** On a connected GitHub
+  Space with worker labels, in `powershell` (5.1): `tkRoute <card> -Assign <size>` with `-WhatIf` off on a test
+  issue. The size label is set, and the hint never says `is neither me nor a size`. The Triage suite runs the
+  same against a stub on 5.1 in the `ps51` job.
+- [ ] **A work item created from Windows PowerShell 5.1 keeps its accents (review finding G1 f15).** On an Azure
+  DevOps Space with a scratch project, in `powershell` (5.1): `tkNewItem -Title "Café — naïve ✓" -Type Task`.
+  The work item's title in the browser reads exactly as typed, with no `?` and no `Ã`. The CloseWorkItem suite
+  reads the bytes a request sends off a loopback listener under 5.1; this is the organisation reading them.
+- [ ] **A pull request, a comment and a reply from Windows PowerShell 5.1 keep their accents (review finding G2
+  f5).** On the same Space, in `powershell` (5.1), on a card whose title and Described Changes hold `café — naïve`:
+  `tkNewPR`, then `tkReplyPR <pr> <thread> -Reply "Fixed — merci" -Status fixed`, then `tkCloseItem <id> -Comment
+  "Livré — ✓"`. The pull request's title and description, the reply and the work item comment read as typed. And
+  with `ANTHROPIC_API_KEY` set, `tkAddPRReview <pr> -DryRun` on a branch whose diff holds `é` gets the model's
+  answer, not a 400.
+- [ ] **StartWork -Launch leaves nothing of the card in the repository, on Windows with a real session (review
+  finding G4 f11).** In a clone of a GitHub Space's repository whose `.gitignore` has no `*.log` line, in
+  `powershell` (5.1) and in `pwsh`: `tkStartWork <id> -Launch` for a card sized `sonnet`. `git status
+  --untracked-files=all` shows nothing new, and `dir .git\startwork` holds the `.log` and `.err.log`. Note
+  whether the `.block.log` is already gone, or whether the launch printed `block: the session holds it open`.
+  Once the session has ended, a second launch removes it. The StartWork suite runs the launch on both Windows jobs
+  with a stub that exits at once; this row is a session that lives on.
+- [ ] **A hub under a folder whose name holds brackets works from Windows PowerShell 5.1 (review findings G1 f6,
+  G2 f10 and G3 f12).** Copy a hub to `C:\Work [old]\hub` and, in `powershell` (5.1), set `PROMPTS_ROOT` to it in
+  that shell. `tkEnv` says `hub.json read`, with the Spaces it declares; `tkStatus` lists the cards; `tkNewPrompt
+  <id>` for a card in `current/` returns it unchanged; `tkArchive <id>` moves it. Then with `promptsRoot` set to
+  `~/...` in `config.local.json` and no `PROMPTS_ROOT`, `tkStatus` still finds the hub: `-LiteralPath` expands a
+  leading `~` on pwsh 7, and this row is the check on 5.1. The NewPrompt suite types the same verbs against a
+  scratch hub in such a folder on the two Windows jobs, one per host; this row is a real hub and the `~` path.
+- [x] **Backlog reads every heading on a Western code page, from Windows PowerShell 5.1 (#260).** On the Windows
+  PC, in `powershell` (5.1), check `[System.Text.Encoding]::Default.CodePage` first and note it: the row means most on
+  1252. On a local Space, put four cards in `backlog/` whose headings are plain (`# Task W3R7: Plain`; any id no
+  card in the hub has, and an id never holds 0, O, 1, I, L, B, 8, S, 5 or Z), start with an
+  emoji outside the BMP (U+1F52C), start with a BMP symbol (U+2705 or U+26A0), and start with a lowercase accented
+  letter (`# écrire le guide`). `tkBacklog` lists all four with their titles intact: the emoji and the symbol
+  dropped, the accented letter kept, and no `is not valid` error. The `ps51` job runs the Backlog suite on 5.1 and
+  prints the code page it ran on; this row is a real console and a real hub.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13, on code page 1252, with
+  four cards: plain, an emoji (U+1F52C), a symbol (U+2705) and an accented letter. Exit 0 and no `is not valid`;
+  the emoji and the symbol were dropped from the titles and the `é` kept.
+- [x] **A refresh of the Lounge in the Docker image draws the app (#226).** With Docker Desktop running, on the merged
+  head, `tkWeb -Restart`, then open the Lounge and refresh the page: the room draws again, and the address bar still
+  says `localhost:5174`, not `5173` (a browser that met the old redirect keeps it: refresh with Cmd+Shift+R). Then
+  the four `curl` lines of Gate 12b for `/system`, `/lounge`, `/lounge/` and `/lounge/temple.html` each print `200`. `Tests/test_consts.py` holds the template to it; this row is the image.
+  CONFIRMED on Windows: walked at 663ce6a, on 2026-11-13, with Docker 29.6.1. The Lounge drew on load and on two
+  reloads, and the address stayed `:5174/lounge`. `/`, `/system`, `/lounge` and `/lounge/temple.html` each
+  answered 200.
+- [x] **A worktree's test run reaches the Health card on Windows, under Windows PowerShell 5.1 too (#317).** On the
+  Windows PC, in `powershell` (5.1), from a git worktree of the package whose branch is not named after its folder
+  (`git worktree add -b verify-317 ..\toolkit-wt-317`), run
+  `tkTestToolkit -Consts` there. `%LOCALAPPDATA%\ToolKit\TestHistory` now holds `test-summary.<MACHINE>.json` and
+  `test-results.<MACHINE>.log`, the summary's `checkout` reads `toolkit-wt-317`, the worktree folder's name and not
+  the branch's, and its `commit` is the worktree's
+  `git rev-parse --short HEAD`, and neither file is in the worktree. Then, with the agent started from the main
+  checkout, the System page's Test Health card shows that run. The card mounts only at tier 2 or below, so the
+  checkout needs a hub first, or the page shows no card at all: `tkStart`, or `PROMPTS_ROOT` pointing at a copy of
+  `samples/hub`. On a machine that had a `test-summary.<MACHINE>.json`
+  in the main checkout before the upgrade and no folder yet, the card's first read shows that old record, not "not
+  run". `tkTestToolkit -TestAll` holds the rule over `Tests/fixtures/test-history/paths.json`, whose Windows rows
+  only a Windows host reads live.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13, with the runner started
+  in `powershell.exe`. For the last clause, with a scratch `LOCALAPPDATA` and a copy of the sample hub, the first
+  read of the System page showed the old root record, not "not run"; that read created the `TestHistory` folder
+  and copied both files byte for byte, leaving the root files in place, and the next run wrote into the folder.
+  The summary carried the worktree's folder name and its HEAD, and the Health card showed it.
+- [ ] **`Invoke-P20TestGit` hands git an empty argument, a double quote and a trailing backslash under Windows
+  PowerShell 5.1 (#356).** On the Windows PC, in `powershell` (5.1), run `tkTestToolkit -Portability`. Every
+  `Clause 23: git is handed ...` line passes, and there are 18 of them, each ending `as the host passes arguments`:
+  5.1 has no `$PSNativeCommandArgumentPassing`, so its own passing is the only one run. The rows that only 5.1 on
+  Windows reads live are `an empty value, and the one after it`, the four with a double quote, and `a trailing
+  backslash after a space`. On macOS and Linux the same rows run a second time with `Legacy` passing, which is
+  5.1's rule in PowerShell 7; this row is 5.1's own command line and git for Windows reading it. The `ps51` job
+  runs the suite on 5.1 too.
+- [x] **Daily prints any week from Windows PowerShell 5.1 (#291).** On the Windows PC, in `powershell` (5.1), on a
+  Space with cards, run `tkDaily -LastWeek`: the days print, with no `Error:` and nothing copied to the clipboard.
+  Open the web UI's Daily page, step back three weeks with *Earlier week*, press Copy All, and compare it with
+  `tkDaily -Since <that Monday> -Until <that Friday>`: the same text. `tkDaily -Since 2026-01-05` prints one
+  `Error:` naming `-Since and -Until go together`, and `$LASTEXITCODE` is 2. The `ps51` job runs the Billable
+  suite on 5.1; this row is a real console, a real hub and the page.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13. `-LastWeek` printed,
+  exit 0, the clipboard unchanged. `-Since` alone gave one `Error:` and its `Hint:`, exit 2. The page three weeks
+  back, with Copy All, matched `-Since`/`-Until` line for line, 160 lines.
+- [x] **A Space's checkout whose path has a space and ends in a backslash is found under Windows PowerShell 5.1
+  (#407).** On the Windows PC, clone a repository a Space names into a folder with a space in its path, say
+  `C:\My Repos\product`. In `powershell` (5.1), in that Space, run
+  `tkConfig -Set "spaceCheckouts.<slug>.path=C:\My Repos\product\"` (the trailing backslash is the point), then
+  `tkMoveDesign <id> -To Spec -Space <slug> -WhatIf` for a note in that product. It names the clone at
+  `C:\My Repos\product` and the move it would make; it does not say `it is not inside a git repository`. Then run
+  `tkTestToolkit -Design -Portability`: the line `a clone in a folder with a space, asked for with a trailing
+  separator, is found (Desktop 5.1...)` passes, the one after it too, and so does every `Clause 23: the shipped
+  reader hands git ...` line, `a checkout path with a space and a trailing backslash, and the arguments after it`
+  among them. Those rows are `Invoke-P20TrackerRead` escaping for 5.1's own command line, which no other host
+  builds; the `ps51` job runs both suites on 5.1 too.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 3824c0c, on 2026-11-16. `tkMoveDesign -WhatIf`
+  named the clone at `C:\My Repos\product` and the spec it would scaffold, exit 0. `-Design -Portability` in 5.1:
+  518/518, the trailing-separator line and all nineteen Clause 23 reader lines passing.
+- [x] **The agent's checkout tests pass under Python on Windows (#410).** On the Windows PC, from the package root,
+  run `py -3 -m pytest Tests/test_space_checkout.py`. It reads `13 passed`, with no failure naming `/srv/clones/r`:
+  the shared table's absolute-path rows carry `os`, and on Windows the `posix` rows are not run and the two
+  `windows` rows (`C:\clones\r`, and the same with spaces around it) are. Then `tkTestToolkit -Design` in `pwsh` and
+  in `powershell` (5.1): its lines `a path written 'C:\clones\r' reads as 'C:\clones\r'` pass and none names
+  `/srv/clones/r`. The two Windows CI jobs run the Design suite; no CI job runs this pytest file on Windows, so this
+  row is the only place the agent's half reads the `windows` rows live.
+  CONFIRMED on Windows: walked at 3824c0c, on 2026-11-16. `py -3 -m pytest Tests/test_space_checkout.py`: 13 passed,
+  nothing naming `/srv/clones/r`. `-Design` 267/267 in `pwsh` and in 5.1, the `C:\clones\r` line passing in both.
+- [x] **`tkTestToolkit` typed in Windows PowerShell 5.1 runs the suites in 5.1 (#435).** On the Windows PC, in
+  `powershell` (5.1), run `tkTestToolkit -Portability`. It prints 19 `Clause 23: git is handed ...` lines, each
+  ending `as the host passes arguments`, and none ending `with Legacy passing`: the second pass exists only where
+  `$PSNativeCommandArgumentPassing` does, which is PowerShell 7, so a line of it means the verb started the runner
+  in `pwsh`. The four `Clause 22` lines about `TestToolkit` pass there too. In `pwsh`, the same command prints
+  38. The suite holds the wrapper on every host; this row is the verb typed in 5.1.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 3824c0c, on 2026-11-16. Portability 251/251, with
+  19 Clause 23 lines, all `as the host passes arguments`, none `with Legacy passing`; in `pwsh`, 289/289 and 38.
+  The row said 18 and 36 until the walk: #407 added one reader line, which runs on both passes.
+- [x] **OrgChart reads the hub's `org.json` under Windows PowerShell 5.1 (Refs #456).** In `powershell` (5.1), run
+  `tkTestToolkit -OrgChart`: green, and its shared-table half (`Tests/fixtures/org/table.json`) passing every case. Then,
+  in a Space answered `agents` with `features.solitaireAgile` on, copy `samples/hub/org.json` to a scratch hub's root,
+  point `PROMPTS_ROOT` at it and run `tkOrgChart`: you should see the header (`Org chart: My team (mine)`), the machines
+  line, and one line per seat with the middle dot between the position and the model -- in a console set to UTF-8
+  (`chcp 65001`) it reads `·`, never `Â·`; if the default code page garbles it, say so here. `tkOrgChart -AsJson |
+  ConvertFrom-Json` parses, and its `tree.positions[0].seats[0].state` is `staffed`. Then break the file (point a
+  `reportsTo` at a name that is not there): `tkOrgChart` exits 2 with the one sentence and no stack trace.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 3824c0c, on 2026-11-16. OrgChart 195/195. `tkOrgChart`
+  printed the header, the machines line and the seats with `·`, in a console whose default code page is already 65001,
+  so a garbling default was not tried. `-AsJson` parsed, the first seat `staffed`; a broken `reportsTo` exited 2 with
+  the sentence and its `Hint:`. The verb needed `Import-Module` by path, as every module verb does with its flag off in
+  the committed config.
 
 ## Recording a run
 
@@ -1177,12 +1358,16 @@ cd web && npm run build                 # dist/client is the real output path
 cd web && docker compose up -d --build
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5174/          # 200, the built index.html
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5174/system    # 200 -- the SPA, not an nginx 404
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5174/lounge    # 200 -- a route that is also a folder: the SPA, no redirect
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5174/lounge/   # 200 -- the SPA too: try_files tests a folder only for a name ending in /
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:5174/lounge/temple.html  # 200 -- the skin itself
 diff <(curl -s localhost:5174/api/env) <(curl -s localhost:4100/api/env)  # same payload
 docker compose ps                                                        # healthy within ~10s
 ```
 
 - [ ] The image builds and the container serves the hashed asset the build emitted
-- [ ] A deep link returns the app, not a 404 -- `try_files ... /index.html` works
+- [ ] A deep link returns the app, not a 404 -- `try_files ... /index.html` works -- and so does `/lounge`, a route
+      that is also a folder: no redirect to the container's own port 5173, no 403
 - [ ] `/api/env` through the container equals `/api/env` straight to 4100 --
       `host.docker.internal:host-gateway` reaches an agent on the host
 - [ ] **The rebuild claim, demonstrated not inferred.** Change a source file, reload: nothing.

@@ -4,6 +4,11 @@ import { MyWork } from "./MyWork";
 import { IssueFilterRows } from "./IssueFilterRows";
 import type { WorkItemInfo } from "./api.ado";
 import { workItemsPath } from "./issueAxes";
+import { expectListPanelShape } from "../../shell/kinds/panelShapeAssert";
+
+/** A chip's accessible name is its label then its count, where it has one. */
+const chipName = (label: string) =>
+  new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\d*$`);
 
 // The Issues row wears the house row: the title is text, the one exposed
 // action goes somewhere, the menu holds the rest. On a gh space the exposed
@@ -308,7 +313,7 @@ describe("the Issues tab's states say where and what", () => {
     mount();
     fireEvent.click(
       within(screen.getByRole("radiogroup", { name: "Assigned to" })).getByRole("radio", {
-        name: "me",
+        name: chipName("me"),
       }),
     );
     expect(screen.getByText("GitHub issues assigned to me")).toBeTruthy();
@@ -331,7 +336,8 @@ describe("the Issues tab's states say where and what", () => {
 // state and assignee are asked of the agent, worked-by filters the list.
 describe("the Issues tab's chip groups", () => {
   const group = (name: string) => screen.getByRole("radiogroup", { name });
-  const chip = (g: string, name: string) => within(group(g)).getByRole("radio", { name });
+  const chip = (g: string, name: string) =>
+    within(group(g)).getByRole("radio", { name: chipName(name) });
 
   it("opens on today's view -- open issues, assigned to all -- and asks for nothing closed", () => {
     tracker = "github";
@@ -411,7 +417,7 @@ describe("the Issues tab's chip groups", () => {
       const labels = within(group("Worked by"))
         .getAllByRole("radio")
         .map((r) => r.textContent);
-      expect(labels).toEqual(["all", "opus", "fable", "sonnet", "haiku"]);
+      expect(labels).toEqual(["all5", "opus1", "fable1", "sonnet1", "haiku1"]);
     });
 
     it("every row wears its worker, so the list shows who gets what", () => {
@@ -478,7 +484,9 @@ describe("the Issues filters, in the drawer", () => {
   ];
   const shown = () => Array.from(document.querySelectorAll("strong")).map((s) => s.textContent);
   const chip = (g: string, name: string) =>
-    within(screen.getByRole("radiogroup", { name: g })).getByRole("radio", { name });
+    within(screen.getByRole("radiogroup", { name: g })).getByRole("radio", {
+      name: chipName(name),
+    });
 
   it("the list itself holds no chip: one summary line says what the drawer shows", () => {
     tracker = "github";
@@ -536,5 +544,43 @@ describe("the Issues filters, in the drawer", () => {
     workAnswer = { data: { count: rows.length, items: rows } };
     mount({ globalState: "Active", activeRepo: "somewhere-else" });
     expect(shown()).toHaveLength(3);
+  });
+});
+
+// The Issues list has no description to show, so the panel is compact: every
+// item is the title line and the meta band, with no empty band between. The
+// panel is one fixed height on both trackers, so a page is what fits: five.
+describe("the Issues list, as a compact list panel", () => {
+  const many: WorkItemInfo[] = Array.from({ length: 12 }, (_, i) => ({
+    ...ITEM,
+    id: i + 1,
+    title: `Issue ${i + 1}`,
+  }));
+  const panel = (container: HTMLElement) =>
+    container.querySelector<HTMLElement>("[data-panel-kind]")!;
+
+  it.each(["github", "ado"])("on %s: five compact items a page, the pager at the foot", (t) => {
+    tracker = t;
+    workAnswer = { data: { count: many.length, items: many } };
+    const { container } = mount();
+    expect(panel(container).getAttribute("data-panel-density")).toBe("compact");
+    expectListPanelShape(panel(container), {
+      titles: many.slice(0, 5).map((i) => i.title),
+      total: 12,
+    });
+    expect(panel(container).querySelector("[data-row-description]")).toBeNull();
+    expect(screen.getByText("Page 1 of 3")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expectListPanelShape(panel(container), {
+      titles: many.slice(5, 10).map((i) => i.title),
+      total: 12,
+    });
+  });
+
+  it("a short list is the same panel: two items, the same height bounds, no pager", () => {
+    tracker = "github";
+    workAnswer = { data: { count: 2, items: many.slice(0, 2) } };
+    const { container } = mount();
+    expectListPanelShape(panel(container), { titles: ["Issue 1", "Issue 2"], total: 2 });
   });
 });

@@ -83,7 +83,7 @@ if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) { . (Join-Pa
 $currentDir = Join-Path $managerRoot ([string](Get-P20Consts).folders.current)
 $archiveDir = Join-Path $managerRoot ([string](Get-P20Consts).folders.archive)
 foreach ($dir in @($currentDir, $archiveDir)) {
-    if (-not (Test-Path $dir)) { New-Item -Path $dir -ItemType Directory -Force | Out-Null }
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -Path $dir -ItemType Directory -Force | Out-Null }
 }
 
 $defaultSeries = '1on1'
@@ -100,7 +100,7 @@ $isDefaultSeries = ($Type -eq $defaultSeries)
 $fileName = New-P20SessionFileName -Series $Type -Date $Date
 $filePath = Join-Path $currentDir $fileName
 
-if (Test-Path $filePath) {
+if (Test-Path -LiteralPath $filePath) {
     Write-Host "Session for $Date already exists: $managerFolder/current/$fileName" -ForegroundColor Yellow
     Write-Host "    FILE: $filePath"
     return
@@ -113,7 +113,7 @@ if (Test-Path $filePath) {
 # archived copy but not remove the duplicate, and nothing but a hand delete
 # resolved it.
 $archivedPath = Join-Path $archiveDir $fileName
-if (Test-Path $archivedPath) {
+if (Test-Path -LiteralPath $archivedPath) {
     Write-CliError -Message "A session for $Date is already closed: $managerFolder/archive/$fileName" `
         -Hint "Read it at $archivedPath, or pick another date. A closed session is the record; it is not reopened."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -131,8 +131,8 @@ if (Test-Path $archivedPath) {
 $nameRx = (Get-P20Consts).regex.sessionName
 $allSessions = @()
 foreach ($dir in @($currentDir, $archiveDir)) {
-    if (-not (Test-Path $dir)) { continue }
-    foreach ($f in (Get-ChildItem -Path $dir -Filter '*.md' -File)) {
+    if (-not (Test-Path -LiteralPath $dir)) { continue }
+    foreach ($f in (Get-ChildItem -LiteralPath $dir -Filter '*.md' -File)) {
         $m = [regex]::Match($f.Name, $nameRx)
         if (-not $m.Success) { continue }
         $series = if ($m.Groups[1].Success -and $m.Groups[1].Value) { $m.Groups[1].Value } else { $defaultSeries }
@@ -143,12 +143,12 @@ $priorDate = ($allSessions | Sort-Object -Descending | Select-Object -First 1)
 if (-not $priorDate) { $priorDate = '(none)' }
 
 $templatePath = Join-Path (Join-Path $repoRoot 'templates') 'ManagerSession.template.md'
-if (-not (Test-Path $templatePath)) {
+if (-not (Test-Path -LiteralPath $templatePath)) {
     Write-Error "Template not found: $templatePath"
     return
 }
 
-$content = Get-Content -Path $templatePath -Raw -Encoding UTF8
+$content = Get-Content -LiteralPath $templatePath -Raw -Encoding UTF8
 $content = $content -replace '^# \{\{DATE\}\}', ('# ' + $(if ($isDefaultSeries) { $Date } else { "$Type $Date" }))
 $content = $content -replace '\{\{DATE\}\}', $Date
 $content = $content -replace '\{\{PRIOR_DATE\}\}', $priorDate

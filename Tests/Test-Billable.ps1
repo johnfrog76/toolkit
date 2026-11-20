@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    Tests for the Billable verb and the one card-line writer behind it.
+    Tests for the Billable verb, the one card-line writer behind it, and Daily,
+    the verb that prints the week Billable keeps a card off.
 .DESCRIPTION
     Two halves. Set-P20CardLine is tested directly: where the line goes, that an
     unchanged card is not written, and that the card keeps its own bytes. The
@@ -60,6 +61,7 @@ function Assert-Equal {
 }
 
 . $lineScript
+. (Join-Path $scriptDir 'Get-TestHost.ps1')
 $consts = Get-P20Consts
 $billable = $consts.stamps.billable
 $created = $consts.stamps.created
@@ -184,6 +186,47 @@ try {
     Assert-True "'Billable Q4R9 -No' finds it there and exits 0" ($out -match 'ARCHIVED-EXIT=0') $out
     $closedText = [System.IO.File]::ReadAllText($archived[0].FullName)
     Assert-True 'the line sits above Created, and Closed is still last' ($closedText -match ('(?s)' + [regex]::Escape($billable) + ' no\n' + [regex]::Escape($created) + '[^\n]*\n' + [regex]::Escape($consts.stamps.closed) + '[^\n]*\n?$')) $closedText.Substring([Math]::Max(0, $closedText.Length - 160))
+
+    Write-Host ""
+    Write-Host "-- Daily, typed as a verb -----------------------------" -ForegroundColor Cyan
+
+    # A card open across a past window, written by hand into the same Space's
+    # current/: Daily and the billing script it runs read the same folder.
+    $spaceDir = Split-Path $spike[0].DirectoryName -Parent
+    $spaceFolder = $spaceDir.Substring($hub.Length).TrimStart('\', '/')
+    if (-not $spaceFolder) { $spaceFolder = '.' }
+    $windowCard = Join-Path $spike[0].DirectoryName 'TaskD4T7-daily-window.prompt.md'
+    [System.IO.File]::WriteAllText($windowCard, "# Task D4T7: Daily window`n`n---`n`n$created 2026-01-05`n", (New-Object System.Text.UTF8Encoding($false)))
+    $text = $consts.billing.text
+    $dailyOut = Join-Path $base 'daily.txt'
+    $compactOut = Join-Path $base 'daily-compact.txt'
+    $out = (Invoke-P20TestHost -NonInteractive -Command ($preamble +
+        "`$t = ${prefix}Daily -Since 2026-01-05 -Until 2026-01-09; 'WINDOW-EXIT=' + `$LASTEXITCODE; " +
+        "[System.IO.File]::WriteAllText('$dailyOut', ((@(`$t) -join ""``n"")), (New-Object System.Text.UTF8Encoding(`$false))); " +
+        "`$c = ${prefix}Daily -Since 2026-01-05 -Until 2026-01-09 -Compact; " +
+        "[System.IO.File]::WriteAllText('$compactOut', ((@(`$c) -join ""``n"")), (New-Object System.Text.UTF8Encoding(`$false))); " +
+        "'HELP-BEGIN'; ${prefix}Daily -Help; 'HELP-END'; " +
+        "${prefix}Daily -Since 2026-01-05; 'HALF-EXIT=' + `$LASTEXITCODE; " +
+        "${prefix}Daily -Since 2026-13-01 -Until 2026-01-09; 'NOTADAY-EXIT=' + `$LASTEXITCODE; " +
+        "${prefix}Daily -Since 2026-01-09 -Until 2026-01-05; 'BACKWARDS-EXIT=' + `$LASTEXITCODE") | ForEach-Object { "$_" }) -join "`n"
+    $script = Join-Path $pkgRoot 'agent/ado/Get-WeeklyBilling.ps1'
+    $json = (Invoke-P20TestHost -NonInteractive -File $script -Arguments @('-PromptsRoot', $hub, '-PromptsFolder', $spaceFolder,
+            '-AsJson', '-Since', '2026-01-05', '-Until', '2026-01-09') | ForEach-Object { "$_" }) -join "`n"
+    $week = $json | ConvertFrom-Json
+    Assert-True "'Daily -Since 2026-01-05 -Until 2026-01-09' exits 0" ($out -match 'WINDOW-EXIT=0') $out
+    Assert-True 'the script, asked for the same window, lists the card' ($week.raw -match 'D4T7') $json
+    $printed = [System.IO.File]::ReadAllText($dailyOut)
+    Assert-True 'Daily prints the raw the page copies, byte for byte' ($printed -ceq [string]$week.raw) $printed
+    Assert-True 'all five days of the window' (@($week.days).Count -eq 5 -and $printed -match 'Monday' -and $printed -match 'Friday') $printed
+    Assert-True '-Compact prints the compact the page copies' ([System.IO.File]::ReadAllText($compactOut) -ceq [string]$week.compact)
+    $help = [regex]::Match($out, '(?s)HELP-BEGIN(.*)HELP-END').Groups[1].Value
+    Assert-True '-Help names the verb with the registered prefix' ($help -match [regex]::Escape("${prefix}Daily -Since <yyyy-MM-dd>")) $help
+    Assert-True 'half a window is refused in the words the page uses, exit 2' ($out -match [regex]::Escape("Error: $($text.halfWindow)") -and $out -match 'HALF-EXIT=2') $out
+    $notADay = ([string]$text.notADay).Replace('{name}', '-Since').Replace('{value}', '2026-13-01')
+    Assert-True 'a day that is not one is refused, exit 2' ($out -match [regex]::Escape("Error: $notADay") -and $out -match 'NOTADAY-EXIT=2') $out
+    $backwards = ([string]$text.backwards).Replace('{since}', '2026-01-09').Replace('{until}', '2026-01-05')
+    Assert-True 'a window that ends before it starts is refused, exit 2' ($out -match [regex]::Escape("Error: $backwards") -and $out -match 'BACKWARDS-EXIT=2') $out
+    Assert-Equal 'each refusal is said once' 3 ([regex]::Matches($out, '(?m)^Error:').Count)
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

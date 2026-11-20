@@ -147,8 +147,9 @@ def upload_dir() -> Path:
 
 
 # A folder this old is from an upload nobody attached (a cancelled dialog, a
-# crashed agent); the sweep at agent start removes it.
+# crashed agent); the sweep at agent start, and every hour after, removes it.
 STALE_UPLOAD_SECONDS = 24 * 60 * 60
+UPLOAD_SWEEP_SECONDS = 60 * 60
 
 
 def remove_upload(path: str) -> bool:
@@ -212,12 +213,20 @@ async def upload_asset(request: Request, name: str = ""):
         raise HTTPException(
             status_code=400, detail=f"{clean or 'The file'} is not an image type Cover accepts ({', '.join(allowed)})."
         )
-    body = await request.body()
     limit = cover_max_bytes()
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > limit:
+        raise HTTPException(
+            status_code=413, detail=f"{clean} is {int(declared):,} bytes; Cover copies at most {limit:,}."
+        )
+    # Read to the limit and no further: a length can be left out, or be wrong.
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > limit:
+            raise HTTPException(status_code=413, detail=f"{clean} is over the {limit:,} bytes Cover copies.")
     if len(body) == 0:
         raise HTTPException(status_code=400, detail="No bytes were sent.")
-    if len(body) > limit:
-        raise HTTPException(status_code=413, detail=f"{clean} is {len(body):,} bytes; Cover copies at most {limit:,}.")
     target = upload_dir() / clean
     target.write_bytes(body)
     return UploadResponse(path=str(target), name=clean, bytes=len(body))

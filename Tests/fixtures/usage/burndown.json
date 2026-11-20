@@ -1,0 +1,395 @@
+{
+  "_": "The weekly burndown's rule (docs/hub/usage.md, \"The weekly burndown\"): typed readings to each bucket's percent, pace and gap, and the reading's cache line. One row per case. Every instant is UTC; the week is weekStart to weekEnd. Per bucket the latest reading at or after weekStart, before weekEnd and at or before now that names it (a tie goes to the machine that sorts last); pace = floor(elapsed at the reading / week length x 100 + 0.5); gap = percent - pace; cachedAt = the latest reading used; renewsAt = cachedAt + cacheHours; due = now >= renewsAt. Asserted by Tests/Test-Burn.ps1 through Get-P20Burndown (Scripts/Read-BurnReadings.ps1); the web asserts it where it draws the burndown.",
+  "weekStart": "2026-11-06T13:00:00.000Z",
+  "weekEnd": "2026-11-13T13:00:00.000Z",
+  "buckets": [
+    {
+      "key": "general",
+      "label": "General"
+    },
+    {
+      "key": "premium",
+      "label": "Premium (Fable)"
+    }
+  ],
+  "cases": [
+    {
+      "name": "no reading this week",
+      "now": "2026-11-10T21:00:00.000Z",
+      "cacheHours": 4,
+      "entries": [],
+      "expect": {
+        "buckets": {
+          "general": null,
+          "premium": null
+        },
+        "cachedAt": null,
+        "renewsAt": null,
+        "due": false
+      }
+    },
+    {
+      "name": "one bucket typed, the other still none",
+      "now": "2026-11-10T21:00:00.000Z",
+      "cacheHours": 4,
+      "entries": [
+        {
+          "at": "2026-11-10T17:10:00.000Z",
+          "machine": "mini",
+          "buckets": {
+            "premium": 54
+          }
+        }
+      ],
+      "expect": {
+        "buckets": {
+          "general": null,
+          "premium": {
+            "percent": 54,
+            "pace": 60,
+            "gap": -6,
+            "readingAt": "2026-11-10T17:10:00.000Z",
+            "machine": "mini"
+          }
+        },
+        "cachedAt": "2026-11-10T17:10:00.000Z",
+        "renewsAt": "2026-11-10T21:10:00.000Z",
+        "due": false
+      }
+    },
+    {
+      "name": "behind pace: both buckets under the line",
+      "now": "2026-11-10T21:00:00.000Z",
+      "cacheHours": 4,
+      "entries": [
+        {
+          "at": "2026-11-10T17:10:00.000Z",
+          "machine": "mini",
+          "buckets": {
+            "general": 43,
+            "premium": 54
+          }
+        }
+      ],
+      "expect": {
+        "buckets": {
+          "general": {
+            "percent": 43,
+            "pace": 60,
+            "gap": -17,
+            "readingAt": "2026-11-10T17:10:00.000Z",
+            "machine": "mini"
+          },
+          "premium": {
+            "percent": 54,
+            "pace": 60,
+            "gap": -6,
+            "readingAt": "2026-11-10T17:10:00.000Z",
+            "machine": "mini"
+          }
+        },
+        "cachedAt": "2026-11-10T17:10:00.000Z",
+        "renewsAt": "2026-11-10T21:10:00.000Z",
+        "due": false
+      }
+    },
+    {
+      "name": "ahead of pace: over the line",
+      "now": "2026-11-08T14:00:00.000Z",
+      "cacheHours": 4,
+      "entries": [
+        {
+          "at": "2026-11-08T13:00:00.000Z",
+          "machine": "mini",
+          "buckets": {
+            "general": 80,
+            "premium": 30
+          }
+        }
+      ],
+      "expect": {
+        "buckets": {
+          "general": {
+            "percent": 80,
+            "pace": 29,
+            "gap": 51,
+            "readingAt": "2026-11-08T13:00:00.000Z",
+            "machine": "mini"
+          },
+          "premium": {
+            "percent": 30,
+            "pace": 29,
+            "gap": 1,
+            "readingAt": "2026-11-08T13:00:00.000Z",
+            "machine": "mini"
+          }
+        },
+        "cachedAt": "2026-11-08T13:00:00.000Z",
+        "renewsAt": "2026-11-08T17:00:00.000Z",
+        "due": false
+      }
+    },
+    {
+      "name": "on pace: the gap is zero",
+      "now": "2026-11-09T08:00:00.000Z",
+      "cacheHours": 4,
+      "entries": [
+        {
+          "at": "2026-11-09T07:00:00.000Z",
+          "machine": "mini",
+          "buckets": {
+            "general": 39
+          }
+        }
+      ],
+      "expect": {
+        "buckets": {
+          "general": {
+            "percent": 39,
+            "pace": 39,
+            "gap": 0,
+            "readingAt": "2026-11-09T07:00:00.000Z",
+            "machine": "mini"
+          },
+          "premium": null
+        },
+        "cachedAt": "2026-11-09T07:00:00.000Z",
+        "renewsAt": "2026-11-09T11:00:00.000Z",
+        "due": false
+      }
+    },
+    {
+      "name": "pace rounds half up: 21 hours of 168 is 12.5, read as 13",
+      "now": "2026-11-07T11:00:00.000Z",
+      "cacheHours": 4,
+      "entries": [
+        {
+          "at": "2026-11-07T10:00:00.000Z",
+          "machine": "mini",
+          "buckets": {
+            "general": 12
+          }
+        }
+      ],
+      "expect": {
+        "buckets": {
+          "general": {
+            "percent": 12,
+            "pace": 13,
+            "gap": -1,
+            "readingAt": "2026-11-07T10:00:00.000Z",
+            "machine": "mini"
+          },
+          "premium": null
+        },
+        "cachedAt": "2026-11-07T10:00:00.000Z",
+        "renewsAt": "2026-11-07T14:00:00.000Z",
+        "due": false
+      }
+    },
+    {
+      "name": "two readings: per bucket the latest wins, across machines",
+      "now": "2026-11-10T21:00:00.000Z",
+      "cacheHours": 4,
+      "entries": [
+        {
+          "at": "2026-11-09T16:00:00.000Z",
+          "machine": "mini",
+          "buckets": {
+            "general": 40,
+            "premium": 20
+          }
+        },
+        {
+          "at": "2026-11-10T18:00:00.000Z",
+          "machine": "laptop",
+          "buckets": {
+            "general": 45
+          }
+        }
+      ],
+      "expect": {
+        "buckets": {
+          "general": {
+            "percent": 45,
+            "pace": 60,
+            "gap": -15,
+            "readingAt": "2026-11-10T18:00:00.000Z",
+            "machine": "laptop"
+          },
+          "premium": {
+            "percent": 20,
+            "pace": 45,
+            "gap": -25,
+            "readingAt": "2026-11-09T16:00:00.000Z",
+            "machine": "mini"
+          }
+        },
+        "cachedAt": "2026-11-10T18:00:00.000Z",
+        "renewsAt": "2026-11-10T22:00:00.000Z",
+        "due": false
+      }
+    },
+    {
+      "name": "stale: past burn.cacheHours, the reading is still shown and renewal is due",
+      "now": "2026-11-10T14:00:00.000Z",
+      "cacheHours": 4,
+      "entries": [
+        {
+          "at": "2026-11-10T09:00:00.000Z",
+          "machine": "mini",
+          "buckets": {
+            "general": 50,
+            "premium": 50
+          }
+        }
+      ],
+      "expect": {
+        "buckets": {
+          "general": {
+            "percent": 50,
+            "pace": 55,
+            "gap": -5,
+            "readingAt": "2026-11-10T09:00:00.000Z",
+            "machine": "mini"
+          },
+          "premium": {
+            "percent": 50,
+            "pace": 55,
+            "gap": -5,
+            "readingAt": "2026-11-10T09:00:00.000Z",
+            "machine": "mini"
+          }
+        },
+        "cachedAt": "2026-11-10T09:00:00.000Z",
+        "renewsAt": "2026-11-10T13:00:00.000Z",
+        "due": true
+      }
+    },
+    {
+      "name": "renewal due exactly at cachedAt + cacheHours",
+      "now": "2026-11-10T10:00:00.000Z",
+      "cacheHours": 1,
+      "entries": [
+        {
+          "at": "2026-11-10T09:00:00.000Z",
+          "machine": "mini",
+          "buckets": {
+            "general": 50
+          }
+        }
+      ],
+      "expect": {
+        "buckets": {
+          "general": {
+            "percent": 50,
+            "pace": 55,
+            "gap": -5,
+            "readingAt": "2026-11-10T09:00:00.000Z",
+            "machine": "mini"
+          },
+          "premium": null
+        },
+        "cachedAt": "2026-11-10T09:00:00.000Z",
+        "renewsAt": "2026-11-10T10:00:00.000Z",
+        "due": true
+      }
+    },
+    {
+      "name": "past reset: last week's reading does not count, the week starts empty",
+      "now": "2026-11-06T14:00:00.000Z",
+      "cacheHours": 4,
+      "entries": [
+        {
+          "at": "2026-11-06T12:59:00.000Z",
+          "machine": "mini",
+          "buckets": {
+            "general": 97,
+            "premium": 88
+          }
+        }
+      ],
+      "expect": {
+        "buckets": {
+          "general": null,
+          "premium": null
+        },
+        "cachedAt": null,
+        "renewsAt": null,
+        "due": false
+      }
+    },
+    {
+      "name": "a reading after now (Burn -At) does not count",
+      "now": "2026-11-10T21:00:00.000Z",
+      "cacheHours": 4,
+      "entries": [
+        {
+          "at": "2026-11-10T12:00:00.000Z",
+          "machine": "mini",
+          "buckets": {
+            "general": 30
+          }
+        },
+        {
+          "at": "2026-11-10T22:00:00.000Z",
+          "machine": "mini",
+          "buckets": {
+            "general": 70
+          }
+        }
+      ],
+      "expect": {
+        "buckets": {
+          "general": {
+            "percent": 30,
+            "pace": 57,
+            "gap": -27,
+            "readingAt": "2026-11-10T12:00:00.000Z",
+            "machine": "mini"
+          },
+          "premium": null
+        },
+        "cachedAt": "2026-11-10T12:00:00.000Z",
+        "renewsAt": "2026-11-10T16:00:00.000Z",
+        "due": true
+      }
+    },
+    {
+      "name": "a reading at the week's first instant: pace 0",
+      "now": "2026-11-06T13:30:00.000Z",
+      "cacheHours": 4,
+      "entries": [
+        {
+          "at": "2026-11-06T13:00:00.000Z",
+          "machine": "mini",
+          "buckets": {
+            "general": 0,
+            "premium": 2
+          }
+        }
+      ],
+      "expect": {
+        "buckets": {
+          "general": {
+            "percent": 0,
+            "pace": 0,
+            "gap": 0,
+            "readingAt": "2026-11-06T13:00:00.000Z",
+            "machine": "mini"
+          },
+          "premium": {
+            "percent": 2,
+            "pace": 0,
+            "gap": 2,
+            "readingAt": "2026-11-06T13:00:00.000Z",
+            "machine": "mini"
+          }
+        },
+        "cachedAt": "2026-11-06T13:00:00.000Z",
+        "renewsAt": "2026-11-06T17:00:00.000Z",
+        "due": false
+      }
+    }
+  ]
+}

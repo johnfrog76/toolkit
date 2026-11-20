@@ -1,0 +1,75 @@
+{
+  "_": "ONE table, read by both readers of a card's **Agent:** footer line (consts.json stamps.agent; docs/hub/cards.md, \"The footer\"): Scripts/Get-PromptFileStatus.ps1 Get-P20CardAgent (tkTestToolkit -Triage) and agent/core/parsers.py card_agent() (Tests/test_parsers.py). Each row's lines are joined with LF, or CRLF when crlf is true, into a card's text, and both readers are asked who did the work. expected is the value of the FIRST line that starts with the stamp, trimmed -- a model id, as written, never parsed -- and '' when no line starts with it (a person worked the card alone). assigned is what the **Assigned:** reader says of the same text, so a row proves the two lines are read apart. If the two halves ever disagree about a row, one of them is wrong.",
+  "rows": [
+    {
+      "name": "no line: a person worked it alone",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Sprint:** (Not set)", "**Created:** 2026-10-17"],
+      "expected": "",
+      "assigned": ""
+    },
+    {
+      "name": "an Agent line",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Agent:** claude-fable-5-2", "**Created:** 2026-10-17"],
+      "expected": "claude-fable-5-2",
+      "assigned": ""
+    },
+    {
+      "name": "an Assigned line only: an owner, no agent",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Assigned:** me", "**Created:** 2026-10-17"],
+      "expected": "",
+      "assigned": "me"
+    },
+    {
+      "name": "Assigned and Agent together: the person owns it, the agent worked it",
+      "crlf": false,
+      "lines": ["# Task K7M2: Bench notes", "", "**Assigned:** Sam", "**Agent:** claude-sonnet-5-5", "**Created:** 2026-10-17"],
+      "expected": "claude-sonnet-5-5",
+      "assigned": "Sam"
+    },
+    {
+      "name": "the same lines in a CRLF card",
+      "crlf": true,
+      "lines": ["# Task K7M2: Bench notes", "", "**Assigned:** me", "**Agent:** claude-opus-5-5", "**Created:** 2026-10-17"],
+      "expected": "claude-opus-5-5",
+      "assigned": "me"
+    },
+    {
+      "name": "the first line wins",
+      "crlf": false,
+      "lines": ["**Agent:** claude-opus-5-5", "**Agent:** claude-sonnet-5-5"],
+      "expected": "claude-opus-5-5",
+      "assigned": ""
+    },
+    {
+      "name": "spaces around the value are not part of it",
+      "crlf": true,
+      "lines": ["**Agent:**    gpt-5   ", "**Created:** 2026-10-17"],
+      "expected": "gpt-5",
+      "assigned": ""
+    },
+    {
+      "name": "an id the map does not know reads as written",
+      "crlf": false,
+      "lines": ["**Assigned:** me", "**Agent:** some-new-model-1"],
+      "expected": "some-new-model-1",
+      "assigned": "me"
+    },
+    {
+      "name": "an empty line names no agent",
+      "crlf": false,
+      "lines": ["**Agent:**", "**Created:** 2026-10-17"],
+      "expected": "",
+      "assigned": ""
+    },
+    {
+      "name": "the stamp inside a sentence is not the line",
+      "crlf": false,
+      "lines": ["Nobody wrote **Agent:** grok-4 here at the start of a line.", "  **Agent:** gpt-5"],
+      "expected": "",
+      "assigned": ""
+    }
+  ]
+}

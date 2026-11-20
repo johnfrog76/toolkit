@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from "react-router";
 import { Subtitle2, Badge, makeStyles, tokens } from "@fluentui/react-components";
 import { BackButton } from "../../shared/BackButton";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { useGetGrowthDetailQuery } from "./api.growth";
 import { TargetArrowRegular } from "@fluentui/react-icons";
@@ -41,7 +41,7 @@ export function GoalDetailPage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         loading={isLoading}
         loadingLabel="Loading goal..."
         empty={
@@ -105,7 +105,7 @@ export function GoalDetailPage() {
         {data && (
           <MarkdownViewer content={data.content} style={{ marginTop: tokens.spacingVerticalS }} />
         )}
-      </PageCard>
+      </PanelFrame>
     </div>
   );
 }

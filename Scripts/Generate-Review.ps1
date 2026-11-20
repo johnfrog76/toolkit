@@ -99,7 +99,7 @@ if (-not $cfg) {
     $defaults = $null; $local = $null
     # The container's keys in both spellings (ConvertTo-P20SpaceKeys, stage 2).
     . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
-    if (Test-Path $cfgDefault) { $defaults = ConvertTo-P20SpaceKeys (Get-Content $cfgDefault -Raw | ConvertFrom-Json) }
+    if (Test-Path -LiteralPath $cfgDefault) { $defaults = ConvertTo-P20SpaceKeys (Get-Content -LiteralPath $cfgDefault -Raw -Encoding UTF8 | ConvertFrom-Json) }
     if (-not (Get-Command Read-P20LocalConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
     $local = ConvertTo-P20SpaceKeys (Read-P20LocalConfigJson -Path $cfgLocal)
     $spaces = if ($defaults.spaces) { @($defaults.spaces) } else { @() }
@@ -121,7 +121,7 @@ if (-not ($cfg | Get-Member -Name 'Orgs' -MemberType Properties -ErrorAction Sil
     $cfgDefault2 = Join-Path $repoRoot2 'config.default.json'
     $defaults2 = $null
     . (Join-Path $PSScriptRoot 'Resolve-HubConfig.ps1')
-    if (Test-Path $cfgDefault2) { $defaults2 = ConvertTo-P20SpaceKeys (Get-Content $cfgDefault2 -Raw | ConvertFrom-Json) }
+    if (Test-Path -LiteralPath $cfgDefault2) { $defaults2 = ConvertTo-P20SpaceKeys (Get-Content -LiteralPath $cfgDefault2 -Raw -Encoding UTF8 | ConvertFrom-Json) }
     $cfg | Add-Member -NotePropertyName 'Orgs' -NotePropertyValue (@($defaults2.spaces)) -Force
 }
 # Dot-sourced HERE rather than below, because the root has to be resolved before
@@ -132,9 +132,42 @@ if (-not ($cfg | Get-Member -Name 'Orgs' -MemberType Properties -ErrorAction Sil
 . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
 . (Join-Path $PSScriptRoot 'Write-CardText.ps1')
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+
+# A scaffold says it is one, and carries a fingerprint of its own body, so a
+# second run can tell a scaffold nobody has touched -- which it may write again,
+# with fresh history -- from a review someone has edited or written up, which
+# nothing overwrites. The body is everything after the frontmatter, read with
+# LF line ends and no trailing space, so a sync that turned it CRLF still reads
+# as unchanged.
+function Get-P20ScaffoldBodyHash {
+    param([string]$Body)
+    $norm = ($Body -replace "`r`n", "`n").TrimEnd()
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($norm))
+    }
+    finally { $sha.Dispose() }
+    return (($bytes | ForEach-Object { $_.ToString('x2') }) -join '')
+}
+
+# $true only for a file this verb wrote and nobody has changed since: frontmatter
+# with `generator: scaffold` and a `scaffold:` fingerprint that its body still
+# matches. A review from before the fingerprint, edited by hand, or written up
+# by the prose pass is $false, and is never written over.
+function Test-P20PureScaffold {
+    param([string]$Text)
+    $m = [regex]::Match(($Text -replace "`r`n", "`n"), '\A---\n((?:[^\n]*\n)*?)---\n')
+    if (-not $m.Success) { return $false }
+    $front = $m.Groups[1].Value
+    if ($front -notmatch '(?m)^generator: scaffold$') { return $false }
+    $stamp = [regex]::Match($front, '(?m)^scaffold: ([0-9a-f]{64})$')
+    if (-not $stamp.Success) { return $false }
+    $body = ($Text -replace "`r`n", "`n").Substring($m.Length)
+    return ((Get-P20ScaffoldBodyHash $body) -ceq $stamp.Groups[1].Value)
+}
 $script:Consts = Get-P20Consts
 $promptsRoot = Get-P20PromptsRoot -PackageRoot (Split-Path -Parent $PSScriptRoot)
-if (-not $promptsRoot -or -not (Test-Path $promptsRoot)) {
+if (-not $promptsRoot -or -not (Test-Path -LiteralPath $promptsRoot)) {
     @{ error = "PromptsRoot not configured" } | ConvertTo-Json
     return
 }
@@ -216,7 +249,7 @@ else {
 # Build the output slug-set string (sorted asc, joined by the contract's separator)
 $slugSetStr = ($selectedSlugs | Sort-Object) -join $script:Consts.reviews.slugSetSeparator
 
-Push-Location $promptsRoot
+Push-Location -LiteralPath $promptsRoot
 try {
     # -- Per-slug scan loop --------------------------------------------------
     # For each selected slug run the scan (including the legacy-path fallback)
@@ -270,11 +303,11 @@ try {
         if ($folderPrefix) {
             foreach ($kindFolder in @('archive', 'current')) {
                 $cardDir = Join-Path (Join-Path $promptsRoot $folderPrefix) $kindFolder
-                if (-not (Test-Path $cardDir)) { continue }
-                foreach ($cardFile in (Get-ChildItem -Path $cardDir -Filter '*.md' -File -ErrorAction SilentlyContinue)) {
+                if (-not (Test-Path -LiteralPath $cardDir)) { continue }
+                foreach ($cardFile in (Get-ChildItem -LiteralPath $cardDir -Filter '*.md' -File -ErrorAction SilentlyContinue)) {
                     if ($cardFile.Name -eq 'README.md') { continue }
                     $cardRel = "$folderPrefix/$kindFolder/$($cardFile.Name)"
-                    $cardText = Get-Content $cardFile.FullName -Raw -Encoding UTF8
+                    $cardText = Get-Content -LiteralPath $cardFile.FullName -Raw -Encoding UTF8
                     if ($null -eq $cardText) { $cardText = '' }
                     $verdicts[$cardRel] = Test-P20CardInWindow `
                         -Created (Get-P20StampDate $cardText $script:Consts.stamps.created) `
@@ -334,7 +367,7 @@ try {
         if ($matchedPrefix) {
             # Path already has the slug prefix
             $candidate = Join-Path $promptsRoot $rel
-            if (Test-Path $candidate) {
+            if (Test-Path -LiteralPath $candidate) {
                 $resolvedFull = $candidate
                 $resolvedRel  = $rel
             }
@@ -343,7 +376,7 @@ try {
         if (-not $resolvedFull) {
             # Try to resolve relative to root (legacy/bare paths)
             $candidate = Join-Path $promptsRoot $rel
-            if (Test-Path $candidate) {
+            if (Test-Path -LiteralPath $candidate) {
                 $resolvedFull = $candidate
                 $resolvedRel  = $rel
             }
@@ -353,7 +386,7 @@ try {
                 $resolved = $false
                 foreach ($sub in @("$growthFolder/archive/", "$growthFolder/current/")) {
                     $c2 = Join-Path $promptsRoot "$sub$basename"
-                    if (Test-Path $c2) {
+                    if (Test-Path -LiteralPath $c2) {
                         $resolvedFull = $c2
                         $resolvedRel  = "$sub$basename"
                         $resolved = $true
@@ -365,7 +398,7 @@ try {
         }
 
         if (-not $seenPaths.Add($resolvedRel)) { continue }
-        $content = Get-Content $resolvedFull -Raw -Encoding UTF8
+        $content = Get-Content -LiteralPath $resolvedFull -Raw -Encoding UTF8
 
         # Parse YAML frontmatter
         $fm = @{}
@@ -543,6 +576,10 @@ try {
     [void]$sb.AppendLine("*$([char]::ConvertFromUtf32(0x1F916)) A scaffold, from local history. Edit it, then run ``$(Get-CliPrefix)PublishWorkReview`` to commit.*")
 
     $reviewMd = $sb.ToString().TrimEnd()
+    # The fingerprint goes in the frontmatter, over the body it heads.
+    $fmEnd = [regex]::Match($reviewMd, '\A---\r?\n(?:[^\n]*\n)*?(?=---\r?\n)')
+    $bodyText = $reviewMd.Substring($fmEnd.Length) -replace '\A---\r?\n', ''
+    $reviewMd = $reviewMd.Substring(0, $fmEnd.Length) + "scaffold: $(Get-P20ScaffoldBodyHash $bodyText)`n" + $reviewMd.Substring($fmEnd.Length)
 
     # -- Write output file ---------------------------------------------------
 
@@ -553,10 +590,24 @@ try {
     # scratch hub without touching a real one; unset, nothing changes.
     $reviewsRoot = if ($env:PROMPTS_REVIEWS_DIR) { $env:PROMPTS_REVIEWS_DIR } else { Join-Path $promptsRoot $reviewsFolder }
     $outDir = Join-Path $reviewsRoot "$slugSetStr/$year/$folderRange"
-    if (-not (Test-Path $outDir)) {
+    if (-not (Test-Path -LiteralPath $outDir)) {
         New-Item -ItemType Directory -Path $outDir -Force | Out-Null
     }
     $outFile = Join-Path $outDir $script:Consts.reviews.fileName
+    # The prose pass writes into this same file, so one already here may be a
+    # finished review, and nothing overwrites it. The one exception is a scaffold
+    # nobody has touched (Test-P20PureScaffold): it is written again, with the
+    # history as it reads now. There is no switch: to start an edited review
+    # over, a person moves or deletes the file, as with a card.
+    if (Test-Path -LiteralPath $outFile) {
+        $existing = $null
+        try { $existing = [System.IO.File]::ReadAllText($outFile) } catch { $existing = $null }
+        if ($null -eq $existing -or -not (Test-P20PureScaffold $existing)) {
+            $relExisting = "$reviewsFolder/$slugSetStr/$year/$folderRange/$($script:Consts.reviews.fileName)"
+            @{ error = "A review for this range already exists at $relExisting, and it has been edited or written up since it was made. Nothing was written; move or delete it to start over." } | ConvertTo-Json
+            return
+        }
+    }
     # The one byte contract (Write-CardText -New): UTF-8, no BOM, LF. Under
     # Windows PowerShell 5.1 Set-Content -Encoding UTF8 wrote a BOM ahead of the
     # first heading.

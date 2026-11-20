@@ -9,12 +9,13 @@ import { speechSeconds } from "./useSpeechNarration";
 import type { Deck, Slide } from "../decks/types";
 
 // The audiobook hint (decks/types.ts `audiobook`; docs/modules/solitaire-agile.md,
-// "The played view"): Suitcase Mode at any width, prev and next kept beside the
-// transport, and the browser's voice reading a slide's Say text when it has no
-// clip. Everything here is about a deck that SETS the hint, plus the one
-// assertion that a deck which does not is untouched -- the shipped decks'
-// own behaviour stays pinned by DeckPlayer.test.tsx, which this file does not
-// edit.
+// "The played view") played the way its host plays it: in Audiobook mode, which
+// since Connected Deck 0.2.0 is the player's at every width with prev and next
+// either side of the ring, and with the browser's voice reading a slide's Say
+// text when it has no clip -- the one thing the hint itself still decides.
+// Everything here is about a deck that SETS the hint, plus the assertions that
+// the ring is the mode's and the voice the hint's; the shipped decks' own
+// behaviour stays pinned by DeckPlayer.test.tsx.
 
 class BroadcastChannelStub {
   onmessage: ((e: MessageEvent) => void) | null = null;
@@ -79,8 +80,8 @@ function deckOf(audiobook: boolean): Deck {
 }
 
 /** The ritual host's wiring: one voice, "live" (hasApi), and no clip anywhere. */
-function mount(audiobook: boolean) {
-  const deck = deckOf(audiobook);
+function mount(hint: boolean, audiobookMode = true) {
+  const deck = deckOf(hint);
   return render(
     <MemoryRouter>
       <DeckPlayer
@@ -92,7 +93,7 @@ function mount(audiobook: boolean) {
         hasApi
         resolveNarrationUrl={() => null}
         narrateByDefault
-        suitcaseMode
+        audiobook={audiobookMode}
       />
     </MemoryRouter>,
   );
@@ -101,13 +102,13 @@ function mount(audiobook: boolean) {
 const counterless = () => screen.queryByText(/\d+ \/ 3/);
 const onSlide = (title: string) => screen.getByText(title.toLowerCase());
 
-describe("an audiobook deck -- Suitcase on the desktop", () => {
-  it("draws the transport at desktop width, with prev and next beside it", () => {
+describe("an audiobook deck -- Audiobook mode on the desktop", () => {
+  it("draws the ring at desktop width, with prev and next either side", () => {
     mount(true);
     expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Previous slide" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Next slide" })).toBeTruthy();
-    // The transport replaced the counter, as Suitcase always does.
+    // The ring stands where the counter was, as Audiobook mode always does.
     expect(counterless()).toBeNull();
   });
 
@@ -120,8 +121,8 @@ describe("an audiobook deck -- Suitcase on the desktop", () => {
     expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
   });
 
-  it("the same wiring WITHOUT the hint keeps the desktop rule: paging arrows, no transport", () => {
-    mount(false);
+  it("the ring is the mode's, not the hint's: Sofa draws the counter", () => {
+    mount(true, false);
     expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
     expect(screen.getByText("1 / 3")).toBeTruthy();
   });

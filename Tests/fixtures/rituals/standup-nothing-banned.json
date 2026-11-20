@@ -1,0 +1,33 @@
+{
+  "_": "The words a `nothing` line may never say (#451; docs/modules/solitaire-agile.md, \"The file shape, and how a standup is read\"). Config/standup-vocabulary.json's nothing family is a worker's status on a day with nothing on the tracker: the day around the work, never anything the tracker would show. Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- read this ONE list and refuse a nothing line that holds any of these as a whole word, ignoring case (a phrase matches with any run of spaces between its words), and assert the family has more than one line and no line twice. `fix` and `fixed` are not here on purpose: 'Fixed my standing desk' is a fix to the day, not to code, and a fix to code is a bug, a commit or a pull request, which the list already refuses.",
+  "words": [
+    "pr",
+    "prs",
+    "pull request",
+    "review",
+    "reviewed",
+    "merge",
+    "merged",
+    "commit",
+    "commits",
+    "committed",
+    "bug",
+    "bugs",
+    "card",
+    "cards",
+    "issue",
+    "issues",
+    "ticket",
+    "tickets",
+    "deploy",
+    "deployed",
+    "test",
+    "tests",
+    "tested",
+    "release",
+    "released",
+    "shipped",
+    "landed",
+    "closed"
+  ]
+}

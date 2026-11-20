@@ -1,6 +1,13 @@
 import { Button, Tooltip } from "@fluentui/react-components";
 import { AddRegular } from "@fluentui/react-icons";
 
+export interface CreateButtonProps {
+  /** The dialog's own title, word for word. */
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}
+
 /**
  * The card's footer **+** -- how every card that makes something says so.
  *
@@ -11,16 +18,7 @@ import { AddRegular } from "@fluentui/react-icons";
  * Item" opens "New Growth Item"), so the button promises exactly what appears.
  * It is the tooltip and the accessible name at once.
  */
-export function CreateButton({
-  label,
-  onClick,
-  disabled,
-}: {
-  /** The dialog's own title, word for word. */
-  label: string;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
+export function CreateButton({ label, onClick, disabled }: CreateButtonProps) {
   return (
     <Tooltip content={label} relationship="label">
       <Button

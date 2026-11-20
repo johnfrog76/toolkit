@@ -16,10 +16,24 @@ export default {
   preset: "ts-jest",
   testEnvironment: "jsdom",
   testMatch: ["<rootDir>/src/**/*.test.ts", "<rootDir>/src/**/*.test.tsx"],
-  // TextEncoder/TextDecoder for jsdom, which React Router 8 needs at import.
-  setupFiles: ["<rootDir>/tests/jest.setup.cjs"],
+  // TextEncoder/TextDecoder for jsdom, which React Router 8 needs at import;
+  // and the two layout facts Fluent's focus layer reads (tests/jest.layout.cjs).
+  setupFiles: ["<rootDir>/tests/jest.setup.cjs", "<rootDir>/tests/jest.layout.cjs"],
   // Testing Library's wait for an element, raised for the whole suite.
   setupFilesAfterEnv: ["<rootDir>/tests/jest.afterEnv.cjs"],
+  // A test's own limit, well above that 5 s wait, so a slow wait fails with
+  // Testing Library's message -- the element it was waiting for -- and not with
+  // Jest's "Exceeded timeout", which names nothing. One number for every test:
+  // none sets its own (docs/TESTING.md, "How long a web test waits").
+  testTimeout: 20000,
+  // A worker that has grown past this between suites is replaced by a fresh
+  // one. Jest gives a worker 500 ms to exit after the run and calls one that
+  // takes longer a leak, which tkTest fails the web half on. A worker that
+  // has run many suites carries a heap of 600-900 MB, and on a busy machine
+  // its exit can stall past that deadline holding no timer or handle at all.
+  // Kept small, it exits in milliseconds, and the deadline still catches a
+  // real leak (docs/TESTING.md, "A web run that leaks fails").
+  workerIdleMemoryLimit: "512MB",
   // The @consts alias, third of three resolvers (vite.config.ts and tsconfig's
   // `paths` are the others). The contract file is real JSON on disk and jest
   // requires it directly -- nothing is stubbed, so a test reads exactly what
@@ -29,7 +43,7 @@ export default {
     "^@workflows$": "<rootDir>/../Config/settings-workflows.json",
     // React Router 8's one file that reads import.meta, swapped for a stub
     // (tests/routeModules.jest.cjs says why). Only react-router imports it.
-    "^\\./routeModules\\.js$":"<rootDir>/tests/routeModules.jest.cjs",
+    "^\\./routeModules\\.js$": "<rootDir>/tests/routeModules.jest.cjs",
   },
   // The markdown stack (react-markdown, remark-*, rehype-*, unified and their
   // unist/mdast/hast/micromark dependencies) ships ESM only. Registry tests

@@ -131,7 +131,7 @@ EXAMPLES:
     $(Get-CliPrefix)GetPRComments 140123                        # Fetch + append to matching prompt
     $(Get-CliPrefix)GetPRComments                               # Auto-detect PR from current branch
     $(Get-CliPrefix)GetPRComments 140123 -OutputFile .\x.md     # Write to specific file
-    $(Get-CliPrefix)GetPRComments 140123 -Project "Learning Coaches Everywhere" -Repository CoachWebApp
+    $(Get-CliPrefix)GetPRComments 140123 -Project "Acme Project" -Repository widget-api
     $(Get-CliPrefix)GetPRComments 12 -Repository acme/widgets     # GitHub, when no card names PR 12
 
 "@ -ForegroundColor Cyan
@@ -161,7 +161,7 @@ function Test-IsActionableThread {
             -not [string]::IsNullOrWhiteSpace($_.content)
         })
     $hasHumanComment = $humanComments.Count -gt 0
-    $hasBotReview = ($Thread.comments | Where-Object { $_.content -match 'PR Assistant|AI Code Review' }).Count -gt 0
+    $hasBotReview = @($Thread.comments | Where-Object { $_.content -match 'PR Assistant|AI Code Review' }).Count -gt 0
 
     # System/activity threads carry a CodeReviewThreadType property: policy threads
     # (no human content), but ALSO vote / policy-status / PR-status events. ADO stamps the
@@ -172,7 +172,7 @@ function Test-IsActionableThread {
     # Verified against live PR payloads: real review comments never carry this property
     # (vote=VoteUpdate, policy=PolicyStatusUpdate, status=StatusUpdate; real comments=none).
     $isSystemThread = [bool]($Thread.properties -and $Thread.properties.CodeReviewThreadType) -and -not $hasBotReview
-    $isBuildService = ($Thread.comments | Where-Object { $_.author.displayName -match 'Build Service' }).Count -gt 0
+    $isBuildService = @($Thread.comments | Where-Object { $_.author.displayName -match 'Build Service' }).Count -gt 0
 
     return ($hasFileContext -or $hasHumanComment -or $hasBotReview) -and -not $isSystemThread -and -not $isBuildService
 }
@@ -293,6 +293,10 @@ function Get-P20ThreadDelta {
           known      nothing to add
         A comment's id is ADO's, which counts WITHIN the thread (1, 2, 3...); a
         payload without ids falls back to position.
+
+        A GitHub reply read back into the thread it answers (foldedReply) is not
+        written again when the card already holds it as a thread of its own --
+        what every run before the fold wrote -- so a re-run adds nothing.
     #>
     param($Thread, [hashtable]$Recorded)
     $comments = @(Get-P20ThreadTextComments $Thread)
@@ -303,7 +307,9 @@ function Get-P20ThreadDelta {
         if ($comments[$i].PSObject.Properties['id'] -and $comments[$i].id) { $commentId = [long]$comments[$i].id }
         $numbered += [PSCustomObject]@{ Id = $commentId; Comment = $comments[$i] }
     }
-    $later = @($numbered | Select-Object -Skip 1)
+    $later = @($numbered | Select-Object -Skip 1 | Where-Object {
+            -not ($_.Comment.PSObject.Properties['foldedReply'] -and $_.Comment.foldedReply -and $Recorded.ContainsKey([long]$_.Id))
+        })
     if (-not $Recorded.ContainsKey($threadId)) {
         $opener = $null
         if ($numbered.Count -gt 0) { $opener = $numbered[0] }
@@ -315,9 +321,30 @@ function Get-P20ThreadDelta {
     return @{ Kind = 'follow-up'; Opener = $null; FollowUps = $unseen }
 }
 
+function Read-P20TargetCard {
+    # The card this run adds to, read once per use through the one reader. No file is
+    # an empty card (the first fetch into an -OutputFile that does not exist yet). A
+    # file that is there and cannot be read -- a folder, a lock, no permission -- is a
+    # stated refusal BEFORE anything is written: an append onto a read that failed
+    # would replace the card with the new comments alone.
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return '' }
+    $why = $null
+    if (Test-Path -LiteralPath $Path -PathType Container) { $why = 'it is a folder, not a file' }
+    else {
+        try { return (Read-CardText -Path $Path) }
+        catch { $why = $_.Exception.Message }
+    }
+    Write-CliError -Message "the card could not be read, so nothing was written to it: $Path ($why)" -Hint 'check the file is readable and not open elsewhere, then run the verb again.'
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
+
 function Write-P20PRCommentsRecord {
-    # The side record: one small file per PR fetch under <promptsFolder>/pr-comments/, read at
-    # archive time to count prsReviewed. Best effort -- a failure warns and never stops the run.
+    # The side record: one small file per PR and repository per day under
+    # <promptsFolder>/pr-comments/. Best effort -- a failure warns and never stops the run.
+    # The repository is in the name because a PR number is per repository: two
+    # repositories' PR 7 on one day are two records. Nothing overwrites one: a second
+    # fetch the same day ADDS its Fetched and Comments lines to the record that is there.
     param($PullRequestId, [string]$Title, [string]$Url, [string]$Repository, $Count)
     try {
         $cfg = $global:P20Config
@@ -327,17 +354,29 @@ function Write-P20PRCommentsRecord {
             $prCommentsDir = if ($prFolder) { Join-Path $prRoot "$prFolder/pr-comments" } else { Join-Path $prRoot 'pr-comments' }
             New-Item -ItemType Directory -Force -Path $prCommentsDir | Out-Null
             $fetchDate = (Get-Date).ToString('yyyy-MM-dd')
-            $recordFile = Join-Path $prCommentsDir "$fetchDate-PR$PullRequestId.md"
+            $fetched = "Fetched: $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+            $repoPart = ($Repository -replace '[^A-Za-z0-9._-]+', '-').Trim('-', '.')
+            $recordName = if ($repoPart) { "$fetchDate-$repoPart-PR$PullRequestId.md" } else { "$fetchDate-PR$PullRequestId.md" }
+            $recordFile = Join-Path $prCommentsDir $recordName
+            if (Test-Path -LiteralPath $recordFile -PathType Leaf) {
+                $text = [System.IO.File]::ReadAllText($recordFile)
+                if ($text.Length -gt 0 -and -not $text.EndsWith("`n")) { $text += "`n" }
+                $text += "$fetched`nComments: $Count`n"
+                # An edit, not a create: no -New, so the record keeps the line ending it has.
+                Write-CardText -Path $recordFile -Content $text
+                Write-Host "Record added to: pr-comments/$recordName" -ForegroundColor DarkGray
+                return
+            }
             $recordLines = @(
                 "# PR $PullRequestId$(if ($Title) { " - $Title" })"
                 ""
                 "$($script:Consts.tokens.prUrl) $Url"
-                "Fetched: $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+                $fetched
                 "Repository: $Repository"
                 "Comments: $Count"
             )
-            Write-CardText -Path $recordFile -Content ($recordLines -join "`n") -New
-            Write-Host "Record written to pr-comments/$($fetchDate)-PR$PullRequestId.md" -ForegroundColor DarkGray
+            Write-CardText -Path $recordFile -Content (($recordLines -join "`n") + "`n") -New
+            Write-Host "Record written to pr-comments/$recordName" -ForegroundColor DarkGray
         }
     }
     catch {
@@ -471,7 +510,7 @@ try {
         # issue the body names.
         if ($OutputFile) { $targetFile = $OutputFile }
         elseif ($cardByUrl) { $targetFile = $cardByUrl; Write-Host "Matched prompt file: $(Split-Path $cardByUrl -Leaf)" -ForegroundColor Green }
-        elseif ($currentDir -and (Test-Path $currentDir)) {
+        elseif ($currentDir -and (Test-Path -LiteralPath $currentDir)) {
             if ($BranchName) {
                 . (Join-Path $PSScriptRoot 'Resolve-CardForBranch.ps1')
                 $byBranch = Resolve-P20CardForBranch -Branch $BranchName -CurrentDir $currentDir
@@ -481,7 +520,7 @@ try {
                 $issueIds = @(Get-P20GitHubLinkedIssues -Body ([string]$pr.body))
                 if ($issueIds.Count -gt 0) {
                     Write-Host "Linked issue(s): $($issueIds -join ', ')" -ForegroundColor DarkGray
-                    $promptFiles = Get-ChildItem -Path $currentDir -Filter "*.prompt.md" -File
+                    $promptFiles = Get-ChildItem -LiteralPath $currentDir -Filter "*.prompt.md" -File
                     foreach ($issueId in $issueIds) {
                         $match = Find-P20CardForWorkItem -PromptFiles $promptFiles -WorkItemId ([string]$issueId) -Config $cfg
                         if ($match) {
@@ -501,7 +540,7 @@ try {
         Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    $headers = Get-P20AdoHeaders -Token $tokenRead.Token
+    $headers = Get-P20AdoHeaders -Token $tokenRead.Token -OrgUrl $org
     $encodedProject = [Uri]::EscapeDataString($Project)
     $userSpecifiedProject = $PSBoundParameters.ContainsKey('Project')
 
@@ -636,7 +675,7 @@ try {
         $folders = Get-PromptFolders
         $currentDir = $folders.Current
 
-        if ($currentDir -and (Test-Path $currentDir)) {
+        if ($currentDir -and (Test-Path -LiteralPath $currentDir)) {
             $workItemIds = @()
             try {
                 $wiUri = "$org/$encodedProject/_apis/git/repositories/$Repository/pullRequests/$PullRequestId/workitems?api-version=7.1"
@@ -654,7 +693,7 @@ try {
 
             if ($workItemIds.Count -gt 0) {
                 Write-Host "Linked work item(s): $($workItemIds -join ', ')" -ForegroundColor DarkGray
-                $promptFiles = Get-ChildItem -Path $currentDir -Filter "*.prompt.md" -File
+                $promptFiles = Get-ChildItem -LiteralPath $currentDir -Filter "*.prompt.md" -File
                 foreach ($wiId in $workItemIds) {
                     $match = Find-P20CardForWorkItem -PromptFiles $promptFiles -WorkItemId ([string]$wiId) -Config $cfg
                     if ($match) {
@@ -677,8 +716,8 @@ try {
         # Design: writing "PR URL:" to the prompt file is what causes {cliPrefix}Status to flip the card
         # from In Progress → Code Review. Clicking fetch after creating a PR is the intentional
         # trigger for that transition — even with no comments yet. The PR URL is the state gate.
-        if ($targetFile -and (Test-Path $targetFile)) {
-            $fileContent = Get-Content -Path $targetFile -Raw
+        if ($targetFile -and (Test-Path -LiteralPath $targetFile)) {
+            $fileContent = Read-P20TargetCard -Path $targetFile
             if ($fileContent -notmatch [regex]::Escape($script:Consts.tokens.prUrl)) {
                 # Through the one card writer: it keeps the file's line endings.
                 Write-CardText -Path $targetFile -Content ($fileContent.TrimEnd("`r", "`n") + "`n`n$($script:Consts.tokens.prUrl) $prUrl`n")
@@ -695,9 +734,7 @@ try {
     # written, even when its thread is an old one. Get-P20RecordedComments reads what the card
     # has; Get-P20ThreadDelta says what each thread adds.
     $fileContent = ""
-    if ($targetFile -and (Test-Path $targetFile)) {
-        $fileContent = Get-Content -Path $targetFile -Raw
-    }
+    if ($targetFile) { $fileContent = Read-P20TargetCard -Path $targetFile }
     $recordedComments = Get-P20RecordedComments -FileContent $fileContent
     $existingThreadIds = @($recordedComments.Keys | ForEach-Object { [long]$_ } | Sort-Object -Unique)
     if ($existingThreadIds.Count -gt 0) {
@@ -880,7 +917,9 @@ try {
         # Appended through the one card writer -- Add-Content wrote a bare-LF
         # tail onto a CRLF card.
         $existingText = ''
-        if (Test-Path $targetFile) { $existingText = [System.IO.File]::ReadAllText($targetFile) }
+        # Literal: a '[' in the path read as a pattern says "no file", and the card
+        # would be replaced by the new comments alone.
+        $existingText = Read-P20TargetCard -Path $targetFile
         if ($existingText -and -not $existingText.EndsWith("`n")) { $existingText += "`n" }
         Write-CardText -Path $targetFile -Content ($existingText + $output + "`n")
         Write-Host ""
@@ -898,7 +937,7 @@ try {
     }
 
     # --- Write canonical pr-comments record ---
-    # One file per PR fetch in <org>/pr-comments/ so prsReviewed stat is countable at archive time.
+    # One file per PR, repository and day in <org>/pr-comments/ (Write-P20PRCommentsRecord).
     # -OutputFile names the only file a redirected run writes, so it writes no side record.
     if ($OutputFile) {
         Write-Host "Side record skipped: -OutputFile names the only file this run writes." -ForegroundColor DarkGray

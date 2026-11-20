@@ -8,23 +8,26 @@ import { useSwitchModeMutation } from "../../shell/api";
 // and it lands where a GitHub Space's Home lands: its first tab, which owns
 // `/`. Already in that Space, it only navigates. No confirmation: the foyer
 // never had one.
-export function useEnterSpace(slug: string, here: boolean) {
+// One hook for a whole panel: its items are data, so the panel holds the
+// switch and each item names the Space it enters.
+export function useEnterSpace(activeSpace: string) {
   const navigate = useNavigate();
   const [switchMode, { isLoading: switching }] = useSwitchModeMutation({
     fixedCacheKey: "org-switch",
   });
-  const [failed, setFailed] = useState(false);
+  /** The Space the last switch could not reach, or null. */
+  const [failed, setFailed] = useState<string | null>(null);
 
-  const enter = () => {
-    setFailed(false);
-    if (here) {
+  const enter = (slug: string) => {
+    setFailed(null);
+    if (slug === activeSpace) {
       navigate("/");
       return;
     }
     switchMode({ mode: slug })
       .unwrap()
       .then(() => navigate("/"))
-      .catch(() => setFailed(true));
+      .catch(() => setFailed(slug));
   };
 
   return { enter, switching, failed };

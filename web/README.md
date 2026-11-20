@@ -12,6 +12,10 @@ This is one of the Toolkit's three halves. It reads through the agent (`../agent
 [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md#the-web-ui) is the short version of this file; this
 one is the detail. The root [`README.md`](../README.md) is the map of every document.
 
+The shared components -- `PanelFrame` and the panel kinds, `CardActions`, the dialog parts, `EmptyState` and the rest -- have
+one document, [`COMPONENTS.md`](COMPONENTS.md): what each is for, when to use it, its props and its
+test.
+
 ## Quick start
 
 ```bash
@@ -84,17 +88,18 @@ web/
 ├── nginx.conf.template   static + /api -> host.docker.internal:${P20_AGENT_PORT}, substituted
 │                        by the nginx image's entrypoint at container start
 ├── docker-compose.yml    127.0.0.1:5174 -> container 5173; passes P20_AGENT_PORT in
-├── tests/smoke.mjs       Playwright, two modes (23 checks off / 30 on), raw `playwright` not @playwright/test
+├── tests/smoke.mjs       Playwright, two modes (28 checks off / 32 on), raw `playwright` not @playwright/test
 ├── tests/smokeStudio.mjs   its --studio cases; smokeStack.mjs starts the servers that mode owns
 ├── tests/smokeMatrix.mjs   its --matrix cases, on the same kind of servers
 ├── tests/smokeA11y.mjs     its --a11y audit, on the same kind of servers
 ├── tests/smokeFirstRun.mjs  its --first-run drag, on the same kind of servers and a copy of samples/hub
 ├── tests/jest.setup.cjs   jest setupFiles: Node's TextEncoder/TextDecoder for jsdom, which React Router 8 needs
+├── tests/jest.layout.cjs  jest setupFiles: an offsetParent and a <body> size, so Fluent's focus layer sees what can take focus
 ├── tests/jest.afterEnv.cjs jest setupFilesAfterEnv: Testing Library waits up to 5 s for an element
 ├── tests/routeModules.jest.cjs  jest only: a stub for react-router's one file that reads import.meta
 └── src/
     ├── shell/            the composition root -- owns chrome, owns no decisions
-    │   ├── App.tsx         theme, nav, the /env gate, Home's tabs, System's pager, the <Routes> table
+    │   ├── App.tsx         theme, nav, the /env gate, Home's tabs, System's tabs, the <Routes> table
     │   ├── SpaceAnchor.tsx the Space pill at the left of the nav, which IS the Home entry
     │   ├── SettingsDrawer.tsx  the one settings surface; the avatar in the nav bar opens it
     │   ├── main.tsx        Provider + BrowserRouter + ConfettiProvider + App
@@ -105,38 +110,42 @@ web/
     │   ├── ThemePicker.tsx the first section of the settings drawer
     │   ├── store.ts        one Redux store: the api slice and the filters slice
     │   ├── filtersSlice.ts the filter drawer's six values; a successful Space switch clears them, and the Docs and Design filters with them
-    │   ├── api.ts          createApi, and exactly two endpoints: /env and /switch-mode
-    │   ├── registry.ts     ToolkitModule, CardContext, and the four functions that read them
+    │   ├── api.ts          createApi, and the shell's own endpoints: /env and /switch-mode
+    │   ├── registry.ts     ToolkitModule, CardContext, and the functions that read them
     │   ├── registry.test.tsx
-    │   └── cards.tsx       ShellContext: the card pages and the filter tuple, passed down
+    │   └── cards.tsx       ShellContext: the card pages and the filter tuple, passed down;
+    │                       PageGrid and PanelRow, a page's rows of panels
     ├── modules/ado/      the ADO prompt-engineering module -- always on, no flag
     │   ├── index.tsx       the ToolkitModule export: routes, nav, homeCards, systemCards
     │   ├── routes.tsx      AdoHome and AdoSystem -- what sits around the shell's card grid
-    │   ├── api.ado.ts      the module's endpoints, injected into the shell's slice; tag types Status, PrComments, Config, Billing, Issues, Issue
+    │   ├── api.ado.ts      the module's endpoints, injected into the shell's slice; tag types Status, PrComments, Config, Billing, Issues, Issue, Connect
     │   └── *.tsx           every card and detail page (see "The module's surface")
     ├── modules/growth/    opt-in, features.growth
     │   ├── index.tsx       export growthModule, plus ReviewArchive and SkillsSnapshot by name
     │   ├── api.growth.ts   tag types Growth, Resume, Reviews
-    │   └── GrowthPage, Goals, GoalDetailPage, SkillsPage, ReviewArchive, SkillsSnapshot
+    │   └── GrowthPage, Goals, GoalDetailPage, SkillsPage, ReviewArchive, SkillsSnapshot (Goals and ReviewArchive are list panels; their dialogs are files beside them)
     ├── modules/communication/   opt-in, features.communication
     │   ├── index.tsx       export communicationModule, the four routes and three redirects
     │   ├── paths.ts        every route path of this module, in one place
     │   ├── api.communication.ts   tag type Manager, and /env's communication block typed here
     │   ├── sendButton.ts   the send button's rule, as a pure function
-    │   └── OneOnOne, ManagerDetailPage, ManagerSessionPage, Timer
+    │   └── OneOnOne, NewMeetingDialog, ManagerDetailPage, ManagerSessionPage, Timer
     ├── modules/organize/   opt-in, features.organize -- the Organize tab
-    │   ├── index.tsx       export organizeModule: one route, one nav entry, the header bell, no cards elsewhere
+    │   ├── index.tsx       export organizeModule: its routes, one nav entry, the header bell, no cards elsewhere
     │   ├── paths.ts        the module's route path, and the router state that opens a bucket
     │   ├── ReminderBell    the header bell: asleep (zz) or awake with the past-due count
     │   ├── useOverdueReminders  the past-due slice of the reminders read, polled each minute
-    │   ├── api.organize.ts tag type Reminders; GET /api/reminders and the two verbs via the bridge
+    │   ├── api.organize.ts tag types Reminders and Reference; GET /api/reminders, GET /api/reference and the two verbs via the bridge
+    │   ├── OrganizePages   the tab's pages under its in-page tabs: Reminders | Reference
+    │   ├── ReferenceCard   a list panel of the hub's reference documents: search, Open; read only
+    │   ├── ReferencePage   one document's reading room, rendered as markdown
     │   ├── reminderEntry   a stored due split into the Edit dialog's date and time, and joined back
-    │   └── RemindersCard   bucket chips, snooze menu, edit, done, the quick add
-    ├── modules/solitaireAgile/   opt-in, features.solitaireAgile -- today's standup, read and played, and triage
-    │   ├── index.tsx       export solitaireAgileModule: four routes (the standup, triage, milestones, the played view, chromeless), one nav entry, no cards elsewhere
+    │   └── RemindersCard   a list panel: bucket chips, archive, the snooze menu, edit, the quick add
+    ├── modules/solitaireAgile/   opt-in, features.solitaireAgile -- today's standup, read and played, triage, releases and the org chart
+    │   ├── index.tsx       export solitaireAgileModule: its routes (the standup, triage, releases, org, the old milestones address, the played view, chromeless), one nav entry, no cards elsewhere
     │   ├── paths.ts        the module's route paths and the played deck's id
-    │   ├── api.solitaireAgile.ts   GET /api/ritual/standup, /triage and /milestones ?space=<slug>, read through @consts; POST /api/cmd/Route
-    │   ├── RitualPage      the Standup | Triage | Milestones strip, each tab an address, and the page under it
+    │   ├── api.solitaireAgile.ts   GET /api/ritual/standup, /triage and /milestones ?space=<slug>, and /org, read through @consts; POST /api/cmd/Route
+    │   ├── RitualPage      the Standup | Triage | Releases | Org strip, each tab an address, and the page under it (Org a chunk of its own)
     │   ├── StandupPage     Agenda first, then the agent's text verbatim on Detail | Work | Brief: line one the header, the rest monospace, #<n> linked; Copy and Play in the header
     │   ├── AgendaLanes     the Agenda: Since <day> and Waiting on you, tiles from the board's face pieces (or rows), one button a waiting tile
     │   ├── agenda.ts       the Agenda's words: the long day, the lane heading, each tile's one fact
@@ -144,21 +153,43 @@ web/
     │   ├── MilestonesPage  one row per milestone, its bar the tracker's numbers; the award queue (award.ts)
     │   ├── AwardDialog     the award -- congratulations, what it took, the trophy -- and useConfetti()'s one caller
     │   ├── Trophy          the award's picture: a gold trophy, an inline SVG
+    │   ├── OrgPage         the org chart: offices by level, walls by level, a card a seat, an office a link to its prompt
+    │   ├── orgChart.ts     the chart's rules: the position-to-face map, the walls, the plates' words, the tidy-tree layout
+    │   ├── OrgParts        an office door (frame, wall, sill) and the plate under it
+    │   ├── VacantSeat      a seat nobody sits in -- today a placeholder; the empty desk scene replaces its inside
     │   └── stage/          the played view: one lazy chunk with the deck engine
-    │       ├── cast.tsx        the Remote Standup's atoms, by copy from the Wasteland (no bios); reduced motion stills them
-    │       ├── seats.ts        the nine seats, the plates (role · persona (label)), the deal of workers onto seats
-    │       ├── standupDeck.tsx the standup response -> an audiobook Deck: queue, chair, a tile a worker, chair, queue
+    │       ├── cast.tsx        the Remote Standup's tiles, bubbles and nine scenes, by copy from the Wasteland (no bios), drawn in the refined cast; reduced motion stills them
+    │       ├── refined.tsx     the refined style for the stage's own drawings: the shade, the wall's light, the one shadow
+    │       ├── seats.ts        the room, from consts.json rituals.room: nine windows, the response's round seated in turn order -- a member in its kept or dealt window plated PERSONA (label), an invented cast member in its own -- empty desks and their mugs
+    │       ├── EmptyDesk.tsx   the eight mug looks and the day's deal of them, and the desk the Org page draws in a vacant seat
+    │       ├── RefinedDesk.tsx a window with nobody in it, in the refined cast and full colour: a flat-backed chair, a shut laptop and a steaming drink
+    │       ├── standupDeck.tsx the standup response -> an audiobook Deck: the board, the open, a call and a turn a member, the chair's status, the close
     │       └── StandupPlay     /deck/ritual/standup: the resolver, handed to the deck engine's GeneratedDeckHost
+    ├── modules/deck/      opt-in, features.deck -- web-only, the presentation engine (docs/modules/deck.md)
+    │   ├── index.tsx       export deckModule: the deck, notes, list and deck-page routes, the Growth page's launcher slot, Home's first-run banner; every part lazy
+    │   ├── DeckPickerCard  the launcher: the decks, and this machine's archived ones under a filter
+    │   ├── DeckPage        one deck's page: what its file says, Play, Archive
+    │   ├── DeckHost        the player; GeneratedDeckHost beside it plays a deck built from data
+    │   └── engine/         carried code: Connected Deck's engine (see "The deck module")
+    ├── modules/studio/    core, no flag (D-S13) -- the foyer, one row per Space (docs/modules/studio.md)
+    │   ├── index.tsx       export studioModule: /studio, a design note's and a prompt's reading rooms, one nav entry; its pages lazy
+    │   ├── api.studio.ts   the ledger, the hub's design notes and the prompts, read; the Space verbs through the bridge
+    │   ├── StudioPage      the foyer, the Designs card and the Prompts card
+    │   └── FoyerCard, DesignsCard, PromptsCard, NewSpaceDialog, SpaceLifecycleDialog, MoveDesignDialog
+    ├── modules/lounge/    opt-in, features.lounge -- web-only, the ambient room (docs/modules/lounge.md)
+    │   ├── index.tsx       export loungeModule: /lounge and a Lounge nav entry, last by module order
+    │   └── Lounge, GoBoard, TicTacToe, WordRing, SkinsDialog
     ├── landing/          the landing page: no router, no store, no agent (see "The landing page")
     │   ├── main.tsx        the entry: the page, or the commercial playing
     │   ├── words.ts        the page's words, read from README.md and THIRD-PARTY-NOTICES.md
     │   ├── Landing.tsx     the five bands, drawn from the words
     │   ├── Commercial.tsx  the deck's poster and player, the app's own engine and clips
     │   └── people.ts       band 3's three lines -- empty, and the band held, until they are written
-    ├── shared/           reusable UI: PageCard, Pagination, FilterBadge, listRowStyles (the house list row), MarkdownViewer, ImageDropZone (one picture in: drop, paste, or a file; C2),
+    ├── shared/           reusable UI: PanelFrame (the private base of the panel kinds -- "Panels and card items"), Pagination, FilterBadge, listRowStyles (the house list row), MarkdownViewer, ImageDropZone (one picture in: drop, paste, or a file; C2),
     │                     StatusMessage (a live region: role=status, role=alert for an error), StatTile (the one way a card counts), CardActions,
     │                     ConfirmDialog and CreateButton (one grammar for acting), ToolKitLogo over Wordmark (the SVG mark, its outlines in wordmarkPaths.ts),
     │                     usePersistedState, faces, health, Confetti (the one wrapper over react-confetti; the root mounts it),
+    │                     refinedFaces (the refined cast's busts: the landing page's portraits and the org chart's offices),
 │                     thinScrollbar (the one themed scrollbar -- spread it, never retype it), ...
     ├── hooks/            reusable logic: useWornTheme (and the store's useCurrentTheme), usePagination, useFacePref,
     │                     chartPalette, useUserRefetch, useConfetti (the one way to throw confetti)
@@ -267,8 +298,8 @@ The other modules each have a document that owns their detail:
   **Agenda** -- what moved since the last standup, and what is waiting on you as tiles built from the
   board's card face, each waiting one with **Work it now** or **Review it** -- and its Detail, Work and
   Brief tabs show the agent's `text` verbatim, its first line as the card's header and the rest in a
-  monospace block, each `#<n>` the response names linked to its issue. Under the tab, a Standup | Triage
-  strip: Triage (`/solitaire-agile/triage`) asks the open issues one at a time -- milestone,
+  monospace block, each `#<n>` the response names linked to its issue. Under the tab, a Standup | Triage |
+  Releases | Org strip: Triage (`/solitaire-agile/triage`) asks the open issues one at a time -- milestone,
   severity, size -- and each answer is the CLI's `Route` through `POST /api/cmd/Route`.
 - **lounge** (`features.lounge`, [`../docs/modules/lounge.md`](../docs/modules/lounge.md)) -- web-only,
   like deck: `/lounge` and a **Lounge** nav entry, last by module order, and no cards anywhere else.
@@ -315,8 +346,10 @@ including that module's own page components.
 
 That is not tidiness. A registry test is about the registry's *filtering*, so a one-line stand-in
 (`{ id: "growth", feature: "growth", routes: [] }`) is the correct subject. And the practical reason
-is sharp: a sibling's real tree left to load pulls in `react-markdown` -- ESM, which ts-jest cannot
-take -- so the suite goes red for a reason that has nothing to do with the registry.
+is sharp: a sibling's real tree left to load pulls in `react-markdown` -- ESM, which ts-jest takes only
+through the `transformIgnorePatterns` allow-list in `jest.config.mjs`, there for the one suite that renders
+it for real (`markdownPlugins.test.tsx`), and slow to transform -- so the suite pays for a tree that has
+nothing to do with the registry.
 
 **Adding a module means adding a mock line to every one of these files.**
 
@@ -449,7 +482,8 @@ flow card actions etc"), converged on this:
   row reads the same. The exposed action goes somewhere in the app (Open the card, Open the issue, Open
   the goal, Open the review, Open the resume); where the tracker has no page of ours for the thing -- an
   ADO work item or PR -- it is the tracker's page; a reminder has no page, so it is the act it exists
-  for, **Archive**. The external link is LAST in the menu, behind a divider. The trigger's name is
+  for, **Archive**. The external link is LAST in the menu, behind a divider. A row's title is plain text, never a link
+  or a button: opening goes through Open, and every list panel holds it (`expectListPanelShape`, [Panels and card items](#panels-and-card-items)). The trigger's name is
   `Actions for <the row's title>`. Every word, icon and tooltip comes from one vocabulary --
   [One vocabulary for row actions](#one-vocabulary-for-row-actions).
 - **A card that makes something has one +.** `shared/CreateButton`: the footer's subtle **+**, its
@@ -540,13 +574,14 @@ row that draws them, and listed here. Two kinds, both named:
 | `issue.unpin` | Unpin | `PinOffRegular` | one record | the Issues tab |
 | `reminder.snooze` | Snooze: *when* | `SnoozeRegular` | one record | Reminders |
 | `reminder.edit` | Edit | `EditRegular` | one record | Reminders |
+| `meeting.edit` | Edit or send | `EditRegular` | one record | Meetings: the session page, where the notes are edited and the retro is sent |
 | `deck.play` | Play | `PlayRegular` | one record | a deck, its row's menu and its page's exposed action |
 | `deck.unarchive` | Unarchive | `ArchiveArrowBackRegular` | one record | a deck's page, once it is archived on this machine |
 | `resume.generate` | Generate resume scaffold | `AddRegular` | one record | the resume |
 | `resume.howItWorks` | How resume updates work | `InfoRegular` | one record | the resume |
 | `design.graduate` | Graduate to a spec | `HatGraduationRegular` | one record | a hub design (Studio), and a product design (the Design tab) where its Space's checkout is named |
 | `design.promote` | Promote | `ShareRegular` | one record | a design note's page |
-| `space.enter` | Go into *the Space* | `ArrowEnterRegular` | one record | the Studio's Spaces |
+| `space.enter` | Go into *the Space* | `ArrowEnterRegular` | one record | the Studio's Hub Designs rows (a note's Space) |
 | `space.connect` | Connect *the Space* | `LinkRegular` | one record | the Studio's Spaces |
 | `space.retire` | Retire *the Space* | `HistoryRegular` | different move: a status written through `Config`, no file moved | the Studio's Spaces |
 | `space.remove` | Remove *the Space* | `SubtractCircleRegular` | different move: un-declared, nothing deleted | the Studio's Spaces |
@@ -585,7 +620,7 @@ defect, not a style question. What the pass settled, beside the intro lines and 
   (**GitHub**, **Azure DevOps**, or **Tracker** on a Space with none);
   its **Store sync** row is `HubSyncRow.tsx` -- under `git`, ahead and behind and **Sync the hub**, one
   fetch when the page opens; under `none`, what carries the folder -- and the cards that write into the
-  hub share one foot line, `HubSyncLine.tsx`, through `PageCard`'s `footNote`, both worded by `hubSync.ts`
+  hub share one foot line, `HubSyncLine.tsx`, through `PanelFrame`'s `footNote`, both worded by `hubSync.ts`
   (`docs/CONFIGURATION.md`, "Syncing the hub from the web app");
   its badge's sentence names the tracker too ("this Space's GitHub answered", never "az CLI, and ADO" on gh;
   `envBadge.ts`, shared with the Build card). The drawer's Configuration says "the Space you are working
@@ -600,6 +635,220 @@ defect, not a style question. What the pass settled, beside the intro lines and 
 `MyWork.test.tsx` holds the Issues tab's states as a table, tracker by state, and asserts no ADO word on
 gh soil; `ActionDialog.titles.test.tsx` holds the dialog's titles door by door; `envBadge.test.ts` holds the
 Environment card's words by tracker, and `configLabels.test.ts` the Space's address and status.
+
+## Panels and card items
+
+Three words, and the code, the docs and the tests use these and no others:
+
+| Word | Means | Lives in |
+| --- | --- | --- |
+| **panel** | The container on a page. A panel is one of the **kinds** -- `ListPanel` today; `StatusPanel`, `StatPanel`, `ChartPanel` and `ScenePanel` as their panels move -- each built on `PanelFrame`, the private base only the kinds wrap. Every kind has a minimum height; a list panel is exactly that height. | `src/shell/kinds/`, with the minimum heights in `src/shell/panelHeight.ts`; `src/shared/PanelFrame.tsx` |
+| **card item** | One entry inside a list panel: the clamped, uniform entry `CardItem` draws from data, with no tooltip. | `src/shell/CardItem.tsx`, with its tokens (the item height, the clamp lines) in `src/shell/cardItemTokens.ts` |
+| **prompt file** | The Markdown file a work item keeps in the hub, which the CLI also calls a card ([`docs/hub/cards.md`](../docs/hub/cards.md)). Active Cards shows each one **as a card item**. Where the two meet, say "prompt file" for the file and "card item" for its entry on screen. | the hub |
+
+"Module" is neither: it already means a feature module. Titles on screen do not change -- Active Cards
+is still Active Cards.
+
+**A panel picks a kind and fills its slots.** It does not configure a general-purpose frame:
+
+- **A panel has no way to set a height, a class or an item style.** A kind's props are an exact
+  interface, so filling a slot the kind does not have -- `height`, `className`, `pageSize`, a body --
+  is a compile error (`ListPanel.test.tsx` holds nine of them with `@ts-expect-error`).
+- **A list panel is 600 px (`PANEL_HEIGHT_PX`): its minimum and its maximum.** `PANEL_MIN_HEIGHT_PX` in `panelHeight.ts`
+  names a floor per kind and `PANEL_MAX_HEIGHT_PX` a cap for the list kind, the same figure -- on the
+  4 px grid, holding four full card items under one row of filter chips with a few px to spare -- both
+  applied above the two-column breakpoint (`PANEL_GRID_MIN_WIDTH_PX`, which a page's rows read
+  too). The bounds are on the panel, and its row still stretches its neighbour. The
+  other kinds (status, stat, chart, scene) have the floor only. The reference is the Azure DevOps
+  dual-entry row -- Active Cards beside My Work: two 600 px columns 16 px apart, a 24 px header, a
+  32 px foot with the pager centred in it, 12 px of padding and 12 px between the parts.
+- **The foot holds the bottom.** `PanelFrame` is a column whose body grows, so a panel's foot sits at
+  its bottom edge however short its content is, and the empty room is between the body and the foot.
+  It is one rule in the frame that every kind inherits; no divider is drawn above the foot, and no
+  panel pins one of its own. Environment's version line is its foot.
+- **A panel reads as named slots.** `PANEL_SLOTS` in `panelHeight.ts` names them once, in order:
+  `header`, `info`, `actions`, `filters`, `body`, `foot`. On `PanelFrame` they are filled today by
+  `headerLeft` (the header and its info icon), `headerRight` (the actions), `body`, and `footerLeft`,
+  `footerCenter`, `footerRight` and `footNote` (the foot); a list panel's filters are the top of its
+  body. `body` is a named slot like the others, and `children` is the default slot that fills it:
+  pass one or the other, never both -- the types refuse both, and so does the frame when drawn. A
+  kind fills the body by name: `ListPanel` hands the frame its card list.
+- **What does not fit has two forms, chosen by the kind and never ad hoc.** A list panel **pages**:
+  its page is sized to fit, so nothing scrolls inside it and nothing is cut off. A panel whose body
+  is one block rather than items -- a set of checks, a long status body -- **scrolls** it in
+  `PanelFrame`'s own `scrollable` area, the header and foot fixed. `PANEL_BODY` names each capped
+  kind's form (`list: "paged"`); a kind that gains a cap gains an entry, and a typed `body` prop if
+  its panels differ. No panel sets an overflow of its own.
+- **`item` returns data.** `ListPanel`'s `item: (entry) => CardItemData` hands the kind an object --
+  `title`, `description`, `badges`, `meta`, `thumb`, `progress`, `primary`, `menu` -- and the kind
+  draws the card item. A panel cannot draw its own, so one item shape and one clamp hold by
+  construction.
+- **A card item: a plain title, one exposed action, the rest in the menu.** In `full` density, three
+  bands: the title on one line with its status badges and the controls at the right, the description
+  on two lines, and a meta band. In `compact` density, the title line and the meta band, with no
+  description band. In `line` density, one band. The title is plain text, never a link; `primary` is
+  the one exposed action, Open from the [row vocabulary](#one-vocabulary-for-row-actions), and every
+  other action is in `menu`. Text is clamped and stays whole in the DOM; **clamped text has no
+  tooltip** -- Open is how a person sees more. A badge or a short word in the meta band may carry a
+  native `title` for what it stands for. A `line` item that opens nothing (a log entry) has no action.
+- **Every length in an item is a token, and its height is their sum.** `src/shell/cardItemTokens.ts`
+  names the outline (1), the one vertical padding (`CARD_ITEM_PADDING_Y_PX`, 12 -- Fluent's
+  `tokens.spacingVerticalM`, which the styles use; a test holds the number to it), the title band
+  (24), a description line (15, two of them), the meta band (16), the 8 between a full item's
+  description and its meta band (`CARD_ITEM_META_GAP_PX`, a track of the item's grid, so the meta
+  band has the same room under a one-line description as under two) and the 8 between a compact
+  item's two bands. Each size's height is worked out from those -- 104 full, 74 compact, 28 line --
+  so no fixed height can cancel a change to a padding, a band or that gap. **The space under the last band is the
+  space over the first**: one padding serves both, the title's line is its band and the meta band is
+  a badge's height, so there is 13 px over the title and 13 px under the badges. `CardItem.tsx`
+  types no length of its own.
+- **The space between items is the collection's.** A card item has no margin. A list panel draws its
+  items in one `<ul role="list" class="cardList" data-card-list>`, each alone in an `<li>`, and that
+  list owns the gap between them and the space over the first: `cardListGap` (8 for a full or a compact
+  item, 0 for a line) and `cardListPaddingTop` in `src/shell/layoutTokens.ts`. The rule holds at every level:
+  spacing comes from the wrapper's gap, never from a margin on a card item, a `PanelFrame`, a row
+  or a list ([A page is rows of panels](#a-page-is-rows-of-panels)).
+- **The item size is the panel's, never an item's.** `density: "full" | "compact" | "line"` is a
+  prop on `ListPanel`, and the three sizes are named in `src/shell/cardItemTokens.ts`
+  (`CARD_ITEM_HEIGHTS_PX`). A panel whose items never have a description -- My Work and GitHub
+  Issues -- is `compact`, so no item keeps an empty two-line band; its `item` returns
+  `CompactItemData`, which has no `description` field, and no item data has a `density` field. Within
+  a panel every item is the same height. **The item size never moves the panel's floor**: a compact
+  panel has its kind's minimum height like any other, 600 px for a list, so one with two items still
+  lines up with its neighbours. The item size changes how many fit on a page, nothing else.
+- **Every spacing value is a Fluent token on the 4 px grid.** In the panel layer -- the card item,
+  the kinds, `PanelFrame` and `layoutTokens.ts` -- every gap, padding and margin is one of Fluent's
+  spacing tokens whose length is a multiple of 4 (XS 4, S 8, M 12, L 16...), never a typed length
+  and never an off-grid token (XXS 2, SNudge 6). Where a sum needs the number, it sits beside its
+  token (`cardListGapPx`, `filterRowGapPx`, `CARD_ITEM_PADDING_Y_PX`) and a test holds the pair
+  equal. The bands are not spacing but content sizes -- the title's line (24), a description line
+  (15), a badge's height (16) -- and are not held to the grid.
+- **`CardItem` is not a Fluent `Card`.** It is a plain element styled with Fluent tokens. Fluent's
+  `Card` is imported by `PanelFrame`, as its outline box, and by nothing else.
+- **`ListPanel` owns paging.** A panel passes `items` and nothing about pages: no page-size prop, no
+  pager slot, no page state. **The page size is measured.** Once the list is laid out, the kind reads
+  the room it really has -- from the list's top down to where the foot begins (`measureListRoom`,
+  `src/shell/kinds/listRoom.ts`) -- and the page is `max(1, floor((room + gap) / (item + gap)))`
+  (`pageSizeForRoom`, `src/shell/pageSize.ts`), with the density's derived item height and
+  `cardListGap`. So whatever sits above the list takes its real height -- a status line, a second row
+  of chips, a header that wrapped -- and the last item always ends above the foot: nothing scrolls
+  and nothing is cut off. A `ResizeObserver` on the panel and on what sits above the list measures
+  again when any of them changes size. The foot row's room is kept free while no foot is drawn, so a
+  pager appearing never changes the page. The page is held as the index of its first item: when a
+  resize changes the page size, the item at the top of the page stays in view.
+  The same answer worked out from the tokens (`listPageSize`: the frame 117, a row of chips 26 with
+  `filterRowGap` between two, a lead chart 153, a foot note 32, a status line 48) is the first
+  paint's page, so nothing jumps, and the page wherever there is no layout to measure -- a narrow
+  page, where a panel grows with its items, and the tests. Under a chip row the list drops its own top
+  padding, so the sum takes it off the chrome there. From `listPageSize`: four full items with no chip
+  row or under one, three under two chip rows or where a foot note or a status line takes room as
+  well; five compact; seventeen log lines, eleven under the chart. The pager is in
+  the foot's centre, drawn only when there is a second page: Previous and Next, `Page 2 of 5`, and
+  the arrow keys while it has focus. The kind sends the page back to the first when a filter chip, a
+  picker or the search changes, and clamps it when the list shrinks.
+- **One way to filter: `filters`.** A panel that splits its items hands the kind rows of chips, each
+  chip with its count; a row is one line and scrolls sideways where it cannot fit. The rows sit in
+  one wrapper, a column whose gap (`filterRowGap` in `layoutTokens.ts`, Fluent's XS, 4 px) spaces them, and which owns
+  the space under them (`filtersSpaceBelow`, 12 px, matching the frame's 12 px over them): a row has
+  no margin, so the space between two rows is there only while both are drawn, and every row looks
+  alike -- a chosen chip in a second row is drawn as one in the first. An inline subhead
+  used as a split ("Design (5)") is not allowed. A choice from a longer list (a period, a tag, a
+  state) is a `pickers` entry in the header, or in a row at the top of the body
+  when the panel sets `controlsInBody` (the Log card).
+- **One way to explain: `info`.** A sentence about what a panel holds goes behind the info icon
+  beside its title. No helper sentence sits in the body.
+- **The header and the foot have one order.** Header: icon, title, info; then pickers, search, the
+  panel's one `action`, refresh, the count chip. Foot: `footLeft` words, the pager, the **+**
+  (`create`), and a `footNote` line under them. `status` says what the last write came to;
+  `loading` and the required `empty` (with `filteredEmpty` for a filter that hid everything) are the
+  only other things a body can be.
+
+### A page is rows of panels
+
+A page's panels sit in real row elements, so a row can be selected in the browser's developer tools
+with the gap that belongs to it and the panels it stretches together:
+
+```html
+<div data-page-rows>                       <!-- the page: a flex column, gap pageRowGap -->
+  <div class="panelRow" data-panel-row>    <!-- a row: a grid, gap panelGap, stretch -->
+    <!-- panel -->
+    <!-- panel -->
+  </div>
+  <div class="panelRow" data-panel-row>
+    <!-- panel -->
+  </div>
+</div>
+```
+
+- **`PageGrid` (`src/shell/cards.tsx`) is the page.** A page wraps its panels in it and declares no
+  columns of its own. The panels pair two to a row, in the order given. `ModuleCardGrid`, the System
+  page's cards, is a `PageGrid` with the cards' pager under it.
+- **A row holds at most two panels**: side by side above 900 px (`PANEL_GRID_MIN_WIDTH_PX`), stacked
+  below it, and stretched to the taller. The row element is there at every width.
+- **A lone panel keeps half the width**, like every other panel. `PageGrid full` is the list
+  exception -- the Backlog, Design and Docs tabs -- with one panel to a row, across the window.
+- **A page that groups its panels itself passes `PanelRow`.** The Studio tab is
+  `<PanelRow>` Spaces, Hub Designs `</PanelRow>` then `<PanelRow>` Prompts `</PanelRow>`. Panels beside
+  a `PanelRow` pair up on either side of it. A `PanelRow` handed more than two draws further rows,
+  two at a time, and one with nothing in it draws no row.
+- **A card the page leaves out leaves no slot.** `null`, `false`, `undefined` and an empty list are
+  dropped before pairing, and a list or a fragment of panels is laid flat, so a slot's cards pair with
+  the page's own. A panel that is mounted and then draws nothing keeps its place: its neighbour stays
+  where it was, at half width, and a row whose panels all drew nothing takes no room.
+- **Every space is a wrapper's gap, and each is a Fluent spacing token that is a multiple of 4 px.**
+  `src/shell/layoutTokens.ts` names them side by side: `pageRowGap` (the page, between rows;
+  `spacingVerticalL`, 16 px), `panelGap` (a row, between its panels; `spacingHorizontalL`, 16 px),
+  `cardListGap` (a list, between its items) and `filterRowGap` (a panel's filters, between chip
+  rows). Nothing has a margin: not a panel, a card item, a row or a list. The cards' pager is spaced
+  from the rows by a gap too.
+
+`src/shell/pageRows.test.tsx` holds it with `expectPageRowsShape` (`src/shell/pageRowsAssert.ts`):
+every panel is directly inside exactly one `[data-panel-row]`, the page holds rows and nothing else,
+a row holds at most two, the page and each row wear their gap token, and no page, row, panel, list or
+item has a margin. It draws the Studio page, the System page's grid and the Growth page with its
+slot, and real list panels for the margins inside.
+
+**A page's tab rows sit in one wrapper too.** `TabRows` (`src/shared/TabRows.tsx`,
+`data-tab-rows`) holds Home's view strip, Team Agile's ceremony strip and the Standup panel's
+Agenda and grain tabs. It owns the space: `tabRowsPadding` above and below (`controlRowsSpace`, `spacingVerticalM`, 12 px,
+the same as the space under a list panel's chips) and `tabRowGap` between two rows stacked in it
+(`spacingVerticalS`, 8 px), all in `src/shell/layoutTokens.ts`. A `TabList` takes no className and no style, so a tab row has no margin
+of its own. `src/shared/TabRows.test.tsx` holds every `TabList` in the app to that.
+
+**The structural test holds the panel's rules**, in two halves:
+
+- `src/shell/kinds/panelStructure.test.ts` reads every source file and refuses: Fluent `Card`
+  imported anywhere but `PanelFrame`; `PanelFrame` imported by a feature module; `ScenePanel` outside
+  the Lounge; `Pagination` or `usePagination` outside `ListPanel`; and, in a file that fills a kind, a
+  `height`, `min-height` or `max-height`, a `density` on an item, a px or vh length, a page size, a `Tooltip`, a link, a
+  heading, a `<section>`, a `CardItem` or `CardActions` of its own, or a body handed to the kind.
+- `expectListPanelShape` (`src/shell/kinds/panelShapeAssert.ts`), called from each panel's own test,
+  asserts on the DOM: the root carries `data-panel-kind` and both of its kind's bounds;
+  every item is a card item with the same band classes, a plain-text title, exactly one exposed action
+  besides the `...` menu, and its text whole with no tooltip; no more than one page is drawn, with a
+  pager exactly when there is more. It asserts that the items sit alone in the `<li>`s of one
+  `ul.cardList` in the body, which wears the gap tokens, and that no item has a margin; that the
+  frame's body grows so the foot is the last thing in it; the kind's bounds whatever the item size, the
+  density's own height on every item, no description band on a compact item, that the body is the
+  paged form with no `overflow-y` scroll on the panel, its frame, its body or an item, and that the
+  chrome it drew plus its items come to no more than the panel's height.
+
+The static half also pins the item's tokens -- each height the sum of its outline, padding and bands,
+the padding equal to Fluent's token, no length typed in `CardItem.tsx`, no margin on an item or the
+frame, one `<ul>` owning the gap -- the slot names, and the item sizes: the three heights, that a `density` is never set in an
+item's data, that a file whose panel is `compact` gives no item a description, and that `ListPanel`
+asks for one height class, its kind's, with nothing about density in it; that the list kind has both
+bounds and every other kind a floor only; and that a capped kind names its form and `ListPanel`
+never asks for the frame's scroll area.
+
+**The migration's to-do is that test's named lists.** A panel not yet on its kind is on
+`FRAME_NOT_YET_MOVED` (with the kind it becomes), `CARD_NOT_YET_MOVED` or `PAGER_NOT_YET_MOVED`; a
+page that is not a panel -- a detail or document page, the Docs reader, the Actions forms, the
+Connect, Standup and Triage pages -- is on `FRAME_EXEMPT` with its reason. Each list is held exact: a
+file that moves comes off its list, and a new one cannot join quietly. On the kinds today: Active
+Cards, My Work / GitHub Issues, the Log, Decks, and the Studio's Spaces, Hub Designs and Prompts. The
+Environment panel wears the status kind's minimum height and is still on the frame; with no cap it has
+nothing to scroll, and takes the scroll form when the status kind is built.
 
 ## The settings drawer
 
@@ -657,8 +906,9 @@ fun, and `FacePicker` is drawn by the Lounge (spec D-L24).
 **A line that explains a page is `Body1` (14px) with `spacingVerticalL spacingHorizontalS` of padding
 -- 1rem and 0.5rem.** The owner's rule: "the general rule is Body1 for these intro texts or
 14px and same padding." Three lines are this: the one above the board's lanes (`Board.tsx`,
-`barText`), the one under Home's tabs (`routes.tsx`, `explain`, one per tab), and the one at the foot
-of a local org's Home (`connectLine`, which becomes the tips row).
+`barText`), the one under Home's tabs (`routes.tsx`, `explain`, one per tab), and the tips row at Home's
+foot (`Tips`, `shared/Tips.tsx`, which replaced a local org's connect line). The `homeFoot` line under the
+tips is the landing page's link, not an intro text.
 
 Fluent's `Link` draws at 14px whatever the sentence around it does, so a `Caption1` intro line puts
 two sizes on one row. **The size comes from the typography component, never from a number** -- `Body1`, not
@@ -682,7 +932,7 @@ what the operating system says. (A browser that has never chosen follows the sys
 
 Two **kinds**, because both are wanted. *Glass* is translucent cards over a gradient and paper grain.
 *Flat* is opaque cards on a plain page: functional, classic, right for a projector. Every card in the
-app is `colorNeutralBackgroundAlpha` (`shared/PageCard.tsx`), so that one token is the whole
+app is `colorNeutralBackgroundAlpha` (`shared/PanelFrame.tsx`), so that one token is the whole
 difference -- no component knows which kind it is in.
 
 **Every theme keeps its own accent.** Atlantis's cyan, Basement's amber lamp, Office's teal: the
@@ -691,15 +941,23 @@ The product's own accent (rose, below) is worn in exactly two places, the landin
 wordmark's default blob, and by no theme.
 
 - **`shell/themeList.ts`** is the themes as data: name, mode, kind, page colour and gradient, grain,
-  the logo's colour, the card, five accent colours. It imports nothing from Fluent, because
+  the logo's colour, the card, five accent colours, and `chips`. It imports nothing from Fluent, because
   `useCurrentTheme` reads it and that hook is pulled into vite-node by the deck voice-bake.
   **Adding a theme is adding a record**, and checking three things by eye: white on the primary
   button (a test holds it to AA), links on a card, and the logo's word over its face. A fourth is
   held by number: `brand.foreground2` is a brand tint badge's text, and `themeList.test.ts` holds it
   to AA on the ramp's tint background in every theme. The same file snapshots every named theme --
-  its record and the whole Fluent theme made of it -- against `shell/fixtures/themes-93d9d88.json`,
-  the themes as they were in 1.4.0, so a theme changes only on purpose (regenerate the fixture and
-  say so in the commit).
+  its record and the whole Fluent theme made of it -- against `shell/fixtures/themes-364.json`,
+  the six themes and the two skins as rendered with their chip colours, so a theme changes only on
+  purpose (regenerate the fixture and say so in the commit).
+- **A theme's `chips`** are the colours of the filter chip's four slots (`tabColorOne` to
+  `tabColorFour`; `FilterBadge`, `COMPONENTS.md`). A record declares three, its `tabColors`, and
+  `defineTheme` takes slot one from `brand.foreground1`, so the default chip is the theme's
+  interactive colour and cannot drift from its links and tab strip. The test holds a fifth thing by
+  number: each slot clears 4.5:1 on the theme's page and card, and the four stay well apart.
+  `theme.ts` writes them onto the Fluent theme as `toolkitChipTabColorOne` and so on, which the
+  provider turns into CSS custom properties, so a chip reads its colour from whatever theme it is
+  drawn under, a worn skin included.
 - **`shell/theme.ts`** makes a record into a Fluent theme. Fluent derives some forty tokens from a
   sixteen-step brand ramp; overriding the five obvious ones left the rest Fluent's blue, so the ramp
   is generated from the theme's accent (`brandRamp`) and the five are set on top.
@@ -743,8 +1001,11 @@ wordmark's default blob, and by no theme.
   1px rule in the theme's stroke follows it, then the engineer's tabs; the data model still lists Home.
 - **A title per page**, from the nav entry that owns the path: `Daily · ToolKit`. A path with no
   entry is just `ToolKit`.
-- **The header holds what is true on every page** -- brand, org, nav, you; no pager. System's pager is under its cards, with words ("Cards, page
-  1 of 3"), from `pager` on the shell context. Home has no pager: it has named tabs (below).
+- **The header holds what is true on every page** -- brand, org, nav, you; no pager. No page has one for its cards. System's cards sit under in-page tabs,
+  **Overview** (`/system`) and **Agents** (`/system/agents`): `SYSTEM_TABS` in the registry, grouped by
+  `moduleSystemTabs`, each tab an address and showing all of its cards. The strip is placed as Team
+  Agile's is, in a `TabRows` above the cards, and with fewer than two tabs there is no strip. Home has
+  named tabs too (below).
 - **Home is named tabs -- Focus | Board | Sprint | Actions** on an Azure DevOps Space, and on a
   GitHub space the strip wears that tracker's words and its own order: **Issues | Board | Stats |
   Design | Docs** (Sprint is an ADO word; the issues come first because the board ceremony is optional on a
@@ -834,7 +1095,7 @@ wordmark's default blob, and by no theme.
   `design/` then `spec/`: each row the house row (title as text, **Open the document** exposed, the menu
   holding *Open the thread* when the file names one and then *Open on GitHub*), with the frontmatter
   description, the folder and the thread's `#n`. `/design/:folder/:name` is `DesignDocPage.tsx`, the
-  house reading page -- `PageCard`, `BackButton`, compact header controls and ONE `MarkdownViewer`
+  house reading page -- `PanelFrame`, `BackButton`, compact header controls and ONE `MarkdownViewer`
   holding the document and then its thread (`designDocument`, reusing the issue page's
   `issueDocument` over `GET /api/issue/{n}`). The thread is read only when it lives in the Space's own
   repo -- the issue route resolves its repo among the Space's, so another repo's would be the wrong
@@ -847,20 +1108,21 @@ wordmark's default blob, and by no theme.
   into the design's reading room (`/studio/design/<path>` for a hub design, `/design/<folder>/<name>` for a
   repo's). Unresolved, it is the line as last written: the short id and the title, a GitHub link opening
   github.com, the tooltip saying it was not read. A hand-written `> Spec:` line shows its title and its words,
-  with no id. Every design row -- the Design tab's and Hub Designs' -- ends with `BoundCards`: `N cards`, each
+  with no id. A design row on the Design tab ends with `BoundCards`: `N cards`, each
   card's id and state, a click opening the card when it is in the Space you are in and not archived,
-  another Space's named with its slug in brackets. Nothing reads the line here; the agent serves it parsed.
+  another Space's named with its slug in brackets. Hub Designs is a list panel, so its card item says
+  `N cards` in the meta band and opens each card that can be opened from its `...` menu, by the same rule. Nothing reads the line here; the agent serves it parsed.
   `DesignBindings.test.tsx` pins the rooms, the words, the chip and the cards.
 - **A GitHub Space has a Docs tab, last** (D-S12): `docs` in `HOME_TABS`, filled by
   `homeTabPlan`'s GitHub branch at Tier 1 beside Design -- the same gate, so Tier 2, an ADO and a
-  local Space never show it. `DocsLanding.tsx` is the tab: the house detail page -- `PageCard`, the
+  local Space never show it. `DocsLanding.tsx` is the tab: the house detail page -- `PanelFrame`, the
   README's title and the repo on the left, Refresh then **Open on GitHub** last on the right, ONE
   `MarkdownViewer` holding `README.md` -- with everything under `docs/` folded above the text
   (`DocsTree`, a `<details>`, closed, so nothing moves until it is asked for). `/docs/*` is
   `DocsDocPage.tsx`, one document's room, its repo path after the prefix (`/docs/docs/CLI.md`); the
   same frame with `BackButton`. Between documents the room keeps the one it has until the next
   arrives, then swaps the text in place -- no spinner, no jump -- and starts at the top unless the
-  address carries an anchor.
+  address carries an anchor. Known gap: [The Docs tab reads one repository, and only reads](../docs/KNOWN-GAPS.md#the-docs-tab-reads-one-repository-and-only-reads).
 - **Where a link in a repo's document goes is decided ONCE**, in `shared/docLinks.ts`, used by
   the shared viewer's `a` and `img` (`shared/DocLink.tsx`). A page that mounts the viewer for a repo
   file passes `links` -- a `DocLinkBase`: the document's own repo path and three answers about a repo
@@ -889,7 +1151,7 @@ wordmark's default blob, and by no theme.
   (Pin on GitHub / Unpin) and then Open on GitHub -- consistency over the shortcut a linked title would be. An ADO row, with no
   reading room, still exposes Open in ADO. The page shows the body, the thread under it, then
   the timeline's high signal (commits, the linked PR, cross-refs) from `GET /api/issue/{number}`. **It is the
-  house reading page, not a page of its own**: `PageCard`, `BackButton` and the title
+  house reading page, not a page of its own**: `PanelFrame`, `BackButton` and the title
   (badges and the issue's link under it, through `FilePath`, the line every detail page carries) on
   the left, every control on the right and compact as the 1:1 page's are -- severity, then Close
   issue, Pin / Unpin and Open on GitHub as icons with a title, Make a card the one with words, Refresh last -- and ONE `MarkdownViewer` holding body, thread and timeline as one document
@@ -910,7 +1172,13 @@ wordmark's default blob, and by no theme.
   it. The subtitle carries the one rule true of every hub -- the cards'
   dates decide -- and the sentence under the week (`billingNote`) carries what is conditional on the
   week that was built: whether git enriched it, and which cards were left off. A CLI instruction in
-  the GUI uses the machine's prefix (`env.cliPrefix`).
+  the GUI uses the machine's prefix (`env.cliPrefix`). The week is a stepper -- *Earlier week*, a
+  label, *Later week* -- that opens on "This week" and steps back a week at a time ("Last week",
+  then "Week of 19 Oct"); *Later week* is disabled on this week. This week and last week ask the
+  route `week=current|last`, so the script works them out; two or more back, the page sends that
+  week's Monday to Friday as `since`/`until`, worked out in local time (`billingWeek.ts`, with a
+  Sunday belonging to the week before, as the script has it). The CLI's `Daily -Since -Until` prints
+  the same week's copy text.
 
 ## The avatar menu, and arriving at a setting
 
@@ -1043,7 +1311,7 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
   serves the card model's `tracker` (the tracker rule over the card's OWN link, never the Space's
   address), and `TrackerBadge.tsx` is the one chip for it -- the Issues tab's rows wear the same one. And
   **the repo row's rule is stated**: it appears only when the org
-  declares projects -- an Azure DevOps org -- and `unlinkedHiddenByRepo` keeps saying how many cards it hid.
+  declares projects -- an Azure DevOps org.
   Left alone on purpose: the repo row's counts count configuration, and the
   state row mixes two vocabularies.
 - **A second write, and it is not a move**: a card's menu also offers **Mark not billable** / **Make billable
@@ -1093,10 +1361,9 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
   display name from `/env` `config.laneNames` (`laneLabel`, pure and tested); the headings, the menu, the
   list's status badge and the filter's chips all print it, and the contract word is still what is
   compared. Demo reads To do / Doing / Waiting / Done; an org that says nothing reads the contract's words.
-- **The tab row spans the centre block, flush both ends.** Home's row above the cards (`viewBar`: flex,
-  space-between) has the tabs at its left edge, level with the cards below. **New card
+- **The tab row spans the centre block, flush both ends.** Home's row above the cards has the tabs at its left edge, level with the cards below. **New card
   follows the explain text** on both rows: on the board, after the milestone, sprint and tag filters, at the row's end; the
-  text wraps inside itself so the buttons keep the row. The System page keeps its pager under the grid.
+  text wraps inside itself so the buttons keep the row. The System page has a tab strip of its own above its cards, and no pager.
 - **The board owns the height; a lane scrolls inside itself.** The owner: "they all expand to fill the
   space; if I have 20 cards in a single lane each lane has overflow-y." The lanes grid is
   `clamp(360px, 100vh - 290px, 1100px)` tall with `align-items: stretch`, so every lane is the same height
@@ -1107,7 +1374,7 @@ are prompts, and agile lanes are a better view for how multiple items flow for h
 - Empty lanes use `EmptyState`; under ~1000px the lanes scroll sideways INSIDE the board and the page
   never overflows; tokens only, checked in Seaglass and Basement.
 - **A lane's scrollbar is the app's scrollbar.** Both scrolls -- a lane's cards and the lanes sideways --
-  spread `shared/thinScrollbar.ts`, the same fragment `PageCard`, `StatusMessage` and `TestHealth` use.
+  spread `shared/thinScrollbar.ts`, the same fragment `PanelFrame`, `StatusMessage` and `TestHealth` use.
   The lane keeps `paddingRight: 2px`: the styled bar is a classic one that takes its 6px
   beside the padding, so the gap between a card's edge and the bar is unchanged.
 
@@ -1184,7 +1451,7 @@ lets ts-jest compile exactly the markdown stack's ESM packages and React Router 
   an outline. `headingsOf()` (in `prepareMarkdown.ts`) gives each heading its `level`, its `line`
   and an id from its words, with `-2`, `-3` on a repeat (five review rounds each headed
   `### Response`); the h2 and h3 renderers take the id by the heading's line, so the list and the
-  element agree even when the words do not differ. Sticky works because `PageCard` is
+  element agree even when the words do not differ. Sticky works because `PanelFrame` is
   `overflow: clip`, not Fluent's `hidden` -- `hidden` makes the card a scroll container that never
   scrolls, and sticky never sticks inside one.
 - **100% is the comfortable size.** The scale is built in (`BASE_SCALE`), so the control means what
@@ -1219,13 +1486,15 @@ a flag that shows nothing when it is on was the defect this module was filed ove
 static `DECKS` list; `GeneratedDeckHost.tsx` plays a deck another module BUILT from data and handed
 over as a resolution (deck, loading, error) -- Team Agile's played standup, at its own route
 `/deck/ritual/standup`, which is that module's and works with `features.deck` off. Nothing is ever
-pushed into `DECKS`. Both share `DeckRoom.tsx`. A built deck sets `audiobook` on the `Deck` type:
-Suitcase Mode at any width, prev and next kept beside the transport, and the browser's
-`speechSynthesis` reading a slide that has no clip (`engine/useSpeechNarration.ts`); a deck without
-the hint is untouched (`DeckPlayer.audiobook.test.tsx`).
+pushed into `DECKS`. Both share `DeckRoom.tsx`. `DeckHost` keeps a listed deck's Paging or Audiobook
+per browser; `GeneratedDeckHost` plays its deck in Audiobook (the player's `audiobook` prop), and a built deck sets the `audiobook` hint on the `Deck` type: the
+browser's `speechSynthesis` reading a slide that has no clip (`engine/useSpeechNarration.ts`); a deck
+without the hint is untouched (`DeckPlayer.audiobook.test.tsx`). Where each host offers Podium is
+`offeredModes.ts` ([`docs/modules/deck.md`, "The player's two bars"](../docs/modules/deck.md#the-players-two-bars)).
 
-`modules/deck/engine/` is carried code -- 25 files from the predecessor repo -- and is excluded from
-nothing: it is type-checked, linted, scanned by Portability and its 79 tests run with the rest.
+`modules/deck/engine/` is carried code -- 28 files, Connected Deck 0.2.0's engine with this module's
+own menu and differences -- and is excluded from nothing: it is type-checked, linted, scanned by
+Portability and its 130 tests run with the rest.
 `bakedVoices.ts` finds a deck's audio with `import.meta.glob`, which is why `src/vite-env.d.ts`
 exists; the files sit under `src/`, not `public/`, so the build ships each once.
 
@@ -1253,7 +1522,7 @@ rose for the bullets' dots and the links. `Landing.tsx` sets them on the page as
 | Band | What it holds |
 | --- | --- |
 | The banner | The wordmark (`src/shared/Wordmark.tsx`: one SVG, the letters and the face as outlines so no font is asked for and every machine draws the same bytes; colours, size and the face are its arguments; named `ToolKit` for a screen reader), the offering, three bullets, the call to action **Play Introducing ToolKit**, and at right the many faces of ToolKit: every face the app's logo can wear as a grid of twelve small wordmarks, the blobs cycling through the palette (`src/landing/Faces.tsx`), with one line under them |
-| The three ways | Under an eyebrow, each way of working in turn: its heading and copy on one side, one of the cast in their Zoom window on the other, delivering one line from a bubble; the sides alternate. `src/landing/people.ts` says who stands for which way and their line; the window and the figure come from the stage's cast source, parked |
+| The three ways | Under an eyebrow, each way of working in turn: its heading and copy on one side, one of the cast on a testimonial card on the other -- their portrait in the refined cast style, a dark plate with their title, and their line quoted under it; the sides alternate. `src/landing/people.ts` says who stands for which way, their title and their line; the portraits are the refined cast's, `src/shared/refinedFaces.tsx`, which the Team Agile org chart draws its offices' busts from too -- a change there reaches both pages, and `refinedFaces.test.tsx` holds these three to the markup they had before the faces were shared (the portrait is hidden from a screen reader, the plate and the line carry the meaning) |
 | Quick start | A real heading over the five lines, coloured the way a terminal would colour them (verb, flags, strings, the comment after `#`; `src/landing/Code.tsx`) on the page's own ground, with Nimbus, the Azure Butler from the commercial's second window, standing beside the shell at about its height (`src/landing/Butler.tsx`, drawn by the deck's own exported function) |
 | The footer | The repository, the documents, and the narration disclosure |
 
@@ -1330,7 +1599,10 @@ gets a reply box; **Suggest a reply** calls the agent's `suggest` route (offered
 says `anthropicConfigured`; otherwise the box names the variable) and fills the draft and the status
 from the recommendation; **Post reply** is `ReplyPR` through `runCommand`, the one writer of the
 card's `Reply:` slot, and the page re-reads the card. The page calls no native save route -- there is
-none -- and `PRCommentsDetail.reply.test.tsx` holds all of it.
+none -- and `PRCommentsDetail.reply.test.tsx` holds all of it. The status box offers the statuses the
+Space's tracker keeps (`consts.json` `replyStatuses`, by `/env`'s `tracker`): all six on Azure DevOps,
+`fixed`, `closed` and `active` on GitHub, where a suggested reject or modify maps to `active` and the
+draft says the thread is left open.
 
 The home cards have three branches, one per org status (`homeTabPlan` in `modules/ado/homeTabs.ts`
 also places each on a Home tab, and plans a GitHub Space's cards -- see "The shell's frame"). Which
@@ -1343,7 +1615,7 @@ year of use behind it.
 | `local` | `PRCommentsList`, `PromptStatus`, and `SprintVelocity` if `features.sprintAwareness` |
 | active | Tier-gated: `PRCommentsList` (Tier ≤ 2), `MyPRs` (Tier 1), `PromptStatus` (always), `MyWork`, `EngagementSummary`, `WorkBreakdown`, `Dashboard`, `PromptActions` (all Tier 1), plus `SprintVelocity` on its flag |
 
-`systemCards`: `EnvCard`, `ModulesCard`, `ToolkitLog`, `TestHealth` (Tier ≤ 2) -- four (the owner: "system tab four and lounge tab four"). `EnvCard` is the machine's story, its checks and the footer's metadata; `ModulesCard` names every add-on, on, off or not configured, with a Change link to its flag -- the CLI's `Opt in by configuration` block in web form. There is no
+`systemCards`: `EnvCard`, `ModulesCard`, `ToolkitLog`, `TestHealth` (Tier ≤ 2) -- four (the owner: "system tab four and lounge tab four"). `EnvCard` is the machine's story, its checks and the footer's metadata; `ModulesCard` names every add-on, on, off or not configured, with a Change link to its flag -- the CLI's `Opt in by configuration` block in web form. What the panel holds is said behind the info icon beside its title, not in a sentence at its foot. There is no
 Space dropdown here: the avatar menu is the one place a Space is switched. `settingRows.tsx` is the
 row grammar both cards share. `FacePicker` is drawn by the Lounge (spec D-L24) and nowhere else.
 Configuration is a section of [the settings drawer](#the-settings-drawer), not a card.
@@ -1430,15 +1702,16 @@ cannot, so it is lifted into a real flag -- and an inline flag with no JS equiva
 build time rather than matching nothing. `src/shell/consts.test.ts` covers that and greps this
 half for a retyped literal; ["The contract file"](../docs/CONFIGURATION.md#the-contract-file) in `docs/CONFIGURATION.md` is the long version.
 
-**One way to say "nothing here": `shared/EmptyState.tsx`, in `PageCard`'s `empty` slot**, so an
+**One way to say "nothing here": `shared/EmptyState.tsx`, in `PanelFrame`'s `empty` slot**, so an
 empty page looks empty rather than half finished.
 
-- **`PageCard` has an `empty` slot**: a `ReactNode`, like `headerLeft`, optional. `null` or
+- **`PanelFrame` has an `empty` slot**: a `ReactNode`, like `headerLeft`, optional. `null` or
   `undefined` means the card has a body; anything else is shown INSTEAD of the body, with the header
   and footer kept -- a filter that hid everything has to stay reachable. Hand it an `<EmptyState>`.
 - **`<EmptyState icon title detail? tone? action? />`** is the one component: the card's own icon, a
-  title, and a second line that says why or what comes next. A card that is not a `PageCard` (Daily)
-  or whose message sits below other content (the Log's filters) renders it directly.
+  title, and a second line that says why or what comes next. A card that is not a `PanelFrame` (Daily)
+  renders it directly. A panel on a kind hands the kind an `EmptyMessage` -- the same fields, as
+  data -- in its required `empty` slot, and a `filteredEmpty` for a filter that hid everything.
 - **Three tones that must not look alike.** `empty` -- nothing, and that is fine. `filtered` -- there
   IS something and a filter is hiding it; it says how many. `error` -- nothing was READ: a red icon
   and `role="alert"`, never dressed as empty: a "No ... yet" for a request that FAILED is an
@@ -1449,7 +1722,8 @@ empty page looks empty rather than half finished.
 -- **81** Items closed, **4** Reviews, **6** Repos: the number beside its caption in a hairline box, in a wrapping, centred `<StatTiles>` row.
 
 - **`<StatTile count label color? />`** -- `count` arrives formatted (`3/5`, `42%`,
-  `toLocaleString()`); `color` is for a count that is a VERDICT (Test Health's pass ratio, the sprint's
+  `toLocaleString()`; a count that can run to thousands goes through `shared/formatCount.ts`, exact and
+  grouped by the reader's locale, as Test Health's tiles, suite rows and y-axis all do); `color` is for a count that is a VERDICT (Test Health's pass ratio, the sprint's
   days left, velocity) and nothing else. It forwards its ref, so a `Tooltip` wraps one directly.
 - Every card that counts uses it: the Space summary, the Issue Report, Test Health, Sprint Velocity,
   Milestones. A new counting card does too -- never a `Title3` over a `Caption1`.
@@ -1481,9 +1755,11 @@ these exist for.
 queries an archived org's cards need, so the grid gates once instead of flickering card by card.
 `AdoSystem` renders the grid and nothing else.
 
-**This module's known gaps** -- Create PR reading the card rather than its checkout, the repo filter
-hiding cards with no Azure DevOps link, and the ADO verbs hidden rather than gone -- are listed once,
-in [`docs/KNOWN-GAPS.md`](../docs/KNOWN-GAPS.md), rather than twice. Two things here that look like gaps are not:
+**This module's known gaps** --
+[Create PR on Azure DevOps needs the branch pushed](../docs/KNOWN-GAPS.md#create-pr-on-azure-devops-needs-the-branch-pushed)
+and [Azure DevOps verbs are hidden, not gone](../docs/KNOWN-GAPS.md#azure-devops-verbs-are-hidden-not-gone) --
+are listed once, in Known gaps, rather than twice. The repo filter never hides a card with no Azure
+DevOps link: such a card stays in view under every repository. Two things here that look like gaps are not:
 `ReviewPage` is mounted **and** fed, by the growth module's `/api/reviews*` and
 `/api/review-preview`. With growth off those 404 and the page reads "No reviews yet" -- which is the
 design, not a missing route. And `SprintVelocity` offers no "Run"
@@ -1499,7 +1775,7 @@ Routes: `/growth` (`GrowthPage` = `ReviewArchive` + `Goals`), `/growth/goals/:fi
 No cards of its own; `ReviewArchive` and `SkillsSnapshot` are exported by name for the ADO module's
 archive-mode home.
 
-`api.growth.ts` injects nine endpoints into the shell's slice and adds the tag types `Growth`,
+`api.growth.ts` injects its endpoints into the shell's slice and adds the tag types `Growth`,
 `Resume` and `Reviews`. Three of those endpoints are reads of a CLI verb run through the bridge on
 the agent's side (`/api/review-preview`, `/api/resume-preview`, `POST /api/review/generate`), which
 is invisible from here -- they are ordinary queries.
@@ -1513,10 +1789,10 @@ Routes and nav, all of them spelled once in `paths.ts`:
 
 | Path | Renders |
 | --- | --- |
-| `/communication` | `OneOnOne` -- the one-card landing page the `Meetings` nav points at. A complete session's row offers **Close**, behind a confirm, through `POST /cmd/MeetingAgenda` |
+| `/communication` | `OneOnOne` -- the one-panel landing page the `Meetings` nav points at, a `ListPanel`: chips for All, Current, Past and Archive; each entry opens the read view, and its menu holds **Edit or send** and, on a complete session, **Archive**, behind a confirm, through `POST /cmd/MeetingAgenda` |
 | `/communication/1on1/:filename` | `ManagerDetailPage` -- read view, with an `Edit / send` button to the session page and **Close** on a complete session |
 | `/communication/sessions/new` | `ManagerSessionPage` -- scaffold and edit |
-| `/communication/sessions/:filename` | `ManagerSessionPage` -- edit, the stage ahead (`Prep` / `Retro` / `Plan` through `POST /cmd/MeetingAgenda`, saving the notes first), Close on a complete session, and the send. Reached from `Edit / send` on a meeting row and on the read view |
+| `/communication/sessions/:filename` | `ManagerSessionPage` -- edit, the stage ahead (`Prep` / `Retro` / `Plan` through `POST /cmd/MeetingAgenda`, saving the notes first), Close on a complete session, and the send. Reached from **Edit or send** in a meeting entry's menu and from `Edit / send` on the read view |
 | `/growth/1on1/:filename` | **redirect**, filename forwarded |
 | `/growth/sessions/new` | **redirect** |
 | `/growth/sessions/:filename` | **redirect**, filename forwarded |
@@ -1543,12 +1819,15 @@ is pressing a button that posts to a real webhook.
 | State | When |
 | --- | --- |
 | **absent** | `postRetroSummary` is false. The workflow does not include a send, so there is nothing to explain |
-| **disabled** | The stage is not Retro, the recipient has no webhook, `## Sent` already records a send, or the Agenda holds only its placeholder -- and every reason that holds is rendered on the line below it, the recipient's first, **naming the environment variable** from the moment the page opens, before Retro as well as at it |
+| **disabled** | The stage is not Retro, the recipient has no webhook, sending is off on this server, `## Sent` already records a send, or the Agenda holds only its placeholder -- and every reason that holds is rendered on the line below it, the recipient's first, from the moment the page opens, before Retro as well as at it |
 | **enabled** | Retro stage, recipient configured, an Agenda with content, nothing under `## Sent` |
 
 Disabled-and-explained rather than hidden is the point: a button that vanishes teaches nobody what
-to set. The reason string is the whole fix -- `Set TEAMS_WEBHOOK_MANAGER to this recipient's webhook
-URL.`
+to set. The recipient's reason is its state in a few neutral words -- `Webhook not set`, or
+`Sending off on this server` where `/env` reports `sendingOff` -- and the fix, with the environment
+variable's name, is in the info icon beside it. Those words are the Environment card's too: both
+read `recipientState.ts` ([`docs/modules/communication.md`](../docs/modules/communication.md),
+"`/env`'s `communication` block").
 
 A click posts
 
@@ -1600,7 +1879,8 @@ for the next person which ports they are allowed to use.
 npm test
 ```
 
-How many suites and tests the shell has, and every suite's count, is
+How many suites and tests the shell had at the last release is
+[`docs/TEST-COUNTS.md`](../docs/TEST-COUNTS.md); what each suite guards is
 [`docs/TESTING.md`](../docs/TESTING.md), which lists them all. The ones whose contract is worth a
 paragraph:
 
@@ -1608,6 +1888,7 @@ paragraph:
 | --- | --- |
 | `src/shell/registry.test.tsx` | The registry contract: a module whose flag is false is dropped and contributes no routes, nav or cards; a missing `features` map reads the same as false; a module with no `feature` is always on; module order is preserved across routes, nav and cards; a `hidden` nav predicate is honoured; a module that contributes nothing is not an error. And Home's tabs: cards grouped by the tab they declare, in strip order; an empty tab absent; the tab read from the address, `/board` as Cards |
 | `src/modules/ado/homeTabs.test.ts` | Which Home tab each ADO card is on, as a table: active at Tiers 1-3 with sprint awareness on and off, `local`, archived with growth on and off, and not loaded yet -- and no card on two tabs |
+| `src/shared/escapeRegExp.test.ts` | The one regex escape: text with every character a pattern reads as syntax, a stamp, a token and the empty string each match only themselves once escaped |
 | `src/shared/usePersistedState.test.ts` | Surviving a remount, falling back rather than throwing on corrupt stored values or a stale `isValid` shape, localStorage that throws, and the updater form composing two updates in one batch instead of clobbering |
 | `src/modules/ado/cliBridge.test.ts` | The CLI parameter contract: the exact argv each of the two dialogs produces, that a value with spaces stays one element, that a field left blank is omitted rather than sent as the script's own default, and that each of the four statuses renders as its own message |
 | `src/modules/communication/stages.test.ts` | The three stages in one place -- the file's word, the badge's label, what comes next, complete only at the last -- so no page keeps its own list; and the one switch the session page offers, the stage ahead |
@@ -1621,12 +1902,22 @@ paragraph:
 | `src/modules/ado/TrackerBadge.test.tsx` | The card's tracker chip as a table: `github` wears **gh**, `ado` wears **ado**, and `none`, an absent field (an older agent) or an unknown word wear nothing |
 | `src/modules/ado/Board.badge.test.tsx` | The board's card face in a mixed Space: a GitHub-born, an ADO-born and a custom card each wear their own chip, the custom one none |
 | `src/modules/ado/FilterDrawer.test.tsx` | The drawer's linkedness row: drawn in a mixed Space with counts from the cards, a badge sets its filter and the active one sets All back, absent where every card is custom, kept while a filter is active |
+| `src/modules/ado/Billing.test.tsx` | Daily Activity's week stepper: it opens on this week with *Later week* disabled, one step back asks `week=last`, three back ask that week's Monday to Friday as `since`/`until`; Monday found as the script finds it (a Sunday ends the week before) and a week in another year named with its year; the agent's `error` shown as the week that could not be built |
 | `src/modules/ado/billingNote.test.ts` | The sentence under the week on Daily Activity: what it was built from, and the cards that are NOT on it and why -- singular and plural, silence for a count of zero, and the git clause only for a hub that has git |
 | `src/modules/ado/useLandCard.test.tsx` | Land asks first, naming the card; Land runs `POST /api/cmd/Land` with the card's file and says once that it landed; a refusal keeps the confirm open with the verb's own sentence; Cancel runs nothing |
 | `src/modules/ado/useBillableToggle.test.ts` | The toggle offers the opposite of what the card says now, and says what the change means for Daily |
 | `src/hooks/useFacePref.test.tsx` | A browser that refuses storage: with `localStorage.getItem` throwing BEFORE the Face store is imported -- its read runs at module scope, in the shell, through the logo -- the store answers the default face and the logo renders; with `setItem` throwing, a chosen face holds for the session and nothing is kept |
 | `src/hooks/useCurrentTheme.test.ts` | A theme choice in a browser that refuses storage: with every storage call throwing, a chosen theme holds for the session, and a fresh load of the store answers the default again; where storage keeps, a fresh load answers the choice |
 | `src/landing/landing.test.tsx` | The landing page's words are the README's: each piece read out of `README.md` and `THIRD-PARTY-NOTICES.md` is found there as written, a README missing a piece is refused by name, and the page draws exactly those words, band by band, with band 3 absent while it is held ([The landing page](#the-landing-page)) |
+| `src/shell/kinds/panelStructure.test.ts` | The panel rules over every source file: Fluent `Card` only in `PanelFrame`, `PanelFrame` only in the kinds, the pager only in `ListPanel`, `ScenePanel` only in the Lounge, and no height, page size, tooltip, link, subhead, item or body of its own in a file that fills a kind -- with the panels not yet moved on named lists held exact, and the checker run over sources written wrong on purpose |
+| `src/shell/pageRows.test.tsx` | A page's rows of panels: every panel directly inside exactly one `[data-panel-row]`, the page holding rows only, a row of at most two, the gaps as Fluent tokens that are multiples of 4 px, and no margin on a page, a row, a panel, a list or an item -- for the Studio page, the System page's grid and the Growth page |
+| `src/shared/TabRows.test.tsx` | A page's tab rows: `TabRows` one marked wrapper (`[data-tab-rows]`) with its rows directly inside, its padding the control rows' one space (`controlRowsSpace`, the same as under a list panel's chips) and its gap a Fluent token that is a multiple of 4 px, and every `TabList` under `src/` inside a `TabRows` with no className or style of its own |
+| `src/modules/ado/systemPanels.test.ts` | The System page's panels, read from `systemCards`: each that draws a list is a `ListPanel` (Test Health and the Log, so a row's two panels are one height), and a panel that is not one and draws rows is named with its reason (Environment, Modules, Burn) |
+| `src/shell/kinds/modulePanels.test.ts` | Every module's panels and pages, read for their kind with the reader `systemPanels.test.ts` uses (`panelKindFacts.ts`): a file under `src/modules/` that draws a panel or a page and maps entries to elements is a `ListPanel`, unless it is named with its reason on one of three lists held exact -- a fixed set of status, stat or chart rows; a page, a form or a scene whose rows are not records; a list of records not yet moved (Home's pull requests, review comments, milestones, deploys, builds and the matches inside a design search, and Team Agile's Releases). The twelve list panels are named, and the reader is tried on three shapes It cannot see a list split across files (the frame in one, the `.map()` in the other), so each such file is named on a fourth list, `ROWS_THROUGH_CHILDREN` (the Design tab's list and the Standup's agenda lanes), held exact. |
+| `src/shell/kinds/listRoom.test.ts` | The room a list has, from boxes handed in: from the list's top under its padding down to the foot, what sits above it and a line under the foot each taking its height, the foot row's room kept free while none is drawn, and nothing where the panel has no fixed height or there is no layout |
+| `src/shell/kinds/ListPanel.test.tsx` | The measured page size -- the formula at several rooms down to one item, the component following a handed-in room, watching the panel and what sits above the list, and keeping the page's first item in view when a resize changes the page; the page size as a sum over the panel's chrome, a full page always fitting and one more item never, four full items under one chip row at the one panel height, and more chrome never a bigger page; the pager at five and not at four, its `Page 2 of 5` and arrow keys; a chip, the search and a picker each returning to page 1, the page clamped when the list shrinks; `empty` against `filteredEmpty`; the header, foot, status and lead slots; the compact density (five a page, no description band), a smaller page under more chrome, and the panel's height the same at every density; and nine things a panel cannot say, as compile errors |
+| `src/shell/CardItem.test.tsx` | One item shape whatever the text: the same classes with a long title, a long description and none; the title's one line, the description's two and the line item's one line each read from the rules of that element's own classes, so another component's clamp cannot stand in for it, and the text whole in the DOM; a plain element, not a Fluent `Card`; a plain-text title with no tooltip; one exposed action and the menu; the meta band's thumb, progress, badges and text; the meta band one gap under the description -- a track of the item's grid, the band on the row after it, no margin on a band, the same under one line, two or none; the compact item, the title line and the meta band at one shorter height; the one-band line item |
+| `src/modules/ado/PromptStatus.test.tsx` | Active Cards as a list panel: four card items a page, the checklist's progress and the facts in the meta band, Open the way in, the state picker, and the two empty sentences |
 | `src/hooks/usePagination.test.ts` | Clamping a page that is out of range, paging independently of the filtered set's size, and controlled mode where the caller's `onPageChange` is the only writer |
 
 The per-module registry tests mock **every** module, not only their own -- see
@@ -1685,7 +1976,8 @@ the filter changes, the choice kept after a reload, a fresh browser context open
 **`--matrix`** (`npm run smoke:matrix`) runs on the same kind of servers, over `Tests/fixtures/hub`:
 each module flag alone on -- its nav entry, page, data and source there, every other module's absent and
 never requested, one new browser context per pass, the cases being `docs/SCENARIOS.md`'s "The nav, by
-module" rows; `flipCase` on the Lounge; and each choice kept in browser storage (the Spaces filter, the
+module" rows; the board's lanes by tracker, four on the fixture's Azure DevOps address before the passes and
+five, Backlog first, on the GitHub one after them; `flipCase` on the Lounge; and each choice kept in browser storage (the Spaces filter, the
 Reminders filter, the theme, the Lounge's tic-tac-toe) in a fresh context and in one whose
 `localStorage` and `sessionStorage` throw on access. Chromium only, and opt-in because every flag write
 is a `Config` run through the bridge.
@@ -1774,11 +2066,12 @@ come on top of these; the totals are in [`docs/TESTING.md`](../docs/TESTING.md))
 | 1:1 data was requested | `/api/manager` was actually called |
 | The retro session has a send button | The third state of `sendButtonState`: shown, because `postRetroSummary` is on |
 | The send button is disabled | And an **enabled** one here is a reason to stop: it means a live webhook is configured in the agent's environment |
-| The send button names `TEAMS_WEBHOOK_MANAGER` | The disabled reason sends a reader to a shell rather than to source. This is the check the whole "read-only" rule exists to make possible -- the button is never pressed |
-| Each meeting row offers `Edit / send` | The page the send button is on can be reached from the list |
+| The send button says why | Its reason is the recipient's state in a few neutral words: `Sending off on this server` on a server started as a test run, which the fixture one is, or `Webhook not set` on any other. The button is never pressed |
+| The send button's reason is not an instruction to set a variable | The variable's name and the how-to are behind the info icon beside the reason, not in the reason itself |
+| Each meeting entry's menu offers Edit or send | The page the send button is on can be reached from the list: every entry of the Meetings panel has a `...` menu, and each menu holds **Edit or send** |
 | The read view offers `Edit / send` | And from the page a row lands on |
 | `Edit / send` lands on the session page | The button is pressed -- it navigates, it does not send -- and the URL is `/communication/sessions/2026-02-05.md` |
-| Exactly the complete session offers Close | Presence on one of three rows, never pressed: a press runs `MeetingAgenda -Close` and moves a file in the committed fixture hub |
+| Exactly the complete session offers Archive | Presence in one of three entries' menus, never chosen: choosing it and confirming runs `MeetingAgenda -Close` and moves a file in the committed fixture hub |
 | No page errors across every route visited | Nothing threw while proving the others |
 
 It uses raw `playwright`, not `@playwright/test` -- chromium, `domcontentloaded`, then wait for the
@@ -1829,7 +2122,8 @@ reachable from the container through that route. This is how Docker's own bridge
 not something that needed a Linux host to discover -- nobody has run this image on one. On native
 Linux, run the agent and the web UI directly on the host instead: `tkWeb -Dev`, which already works
 there (`docs/QUICKSTART.md`, "Supported platforms"). An opt-in, non-default bind address that would
-let the Docker path work on native Linux too is a known gap, not built (`docs/KNOWN-GAPS.md`).
+let the Docker path work on native Linux too is not built. Known gap:
+[Docker does not reach the agent on native Linux](../docs/KNOWN-GAPS.md#docker-does-not-reach-the-agent-on-native-linux).
 
 **Verified by a run (2026-09-16).** On a Mac with Docker Desktop 28.3.0 and Compose 2.38.1: the image builds (104 MB),
 `http://localhost:5174/` serves the built `index.html` with the hashed asset the build emitted, the
@@ -1852,7 +2146,7 @@ holds it with a scratch `dist/client`.
 
 React 19 · Fluent UI v9 (`@fluentui/react-components`, `makeStyles`/`tokens`) · Redux Toolkit +
 RTK Query · React Router 8 (`react-router`) · Recharts · react-markdown 10 + remark-gfm + rehype-raw + rehype-sanitize · Vite 8 · Jest 30 +
-ts-jest + Testing Library · Playwright (the raw package) · TypeScript 6.0, because ts-jest and typescript-eslint do not yet accept 7 ([Known gaps](../docs/KNOWN-GAPS.md)). Node 24, the active LTS, from 24.22.0 (`.nvmrc`, `engines`): on 24.21 a jest worker is sometimes killed by a crash in V8 ([Contributing](../docs/CONTRIBUTING.md)); verified on 24.22.0. Lint is ESLint 10 with typescript-eslint; `eslint-plugin-react` still declares a peer range that ends at ESLint 9, so `package.json` `overrides` hands it the root's ESLint, and `eslint.config.js` reads React's version from its package because the plugin's `"detect"` calls an API ESLint 10 removed. `overrides` also pins `re2js` to 2.8.7, a patch release with a security fix, because `markdownlint` 0.42.0 (under `markdownlint-cli2`) pins 2.8.6 exactly; drop it when a `markdownlint` release allows 2.8.7. `minimatch` has no override: 11, the fixed release, is a major version, and `eslint-plugin-react` calls 3.x's default export as a function, which 11 does not have, so five of its rules would crash ESLint the day one is turned on.
+ts-jest + Testing Library · Playwright (the raw package) · TypeScript 6.0, because ts-jest and typescript-eslint do not accept 7 ([The web UI is on TypeScript 6](../docs/KNOWN-GAPS.md#the-web-ui-is-on-typescript-6)). Node 24, the active LTS, from 24.22.0 (`.nvmrc`, `engines`): on 24.21 a jest worker is sometimes killed by a crash in V8 ([Contributing](../docs/CONTRIBUTING.md)); verified on 24.22.0. Lint is ESLint 10 with typescript-eslint; `eslint-plugin-react` still declares a peer range that ends at ESLint 9, so `package.json` `overrides` hands it the root's ESLint, and `eslint.config.js` reads React's version from its package because the plugin's `"detect"` calls an API ESLint 10 removed. `overrides` also pins `re2js` to 2.8.7, a patch release with a security fix, because `markdownlint` 0.42.0 (under `markdownlint-cli2`) pins 2.8.6 exactly; drop it when a `markdownlint` release allows 2.8.7. `minimatch` has no override: 11, the fixed release, is a major version, and `eslint-plugin-react` calls 3.x's default export as a function, which 11 does not have, so five of its rules would crash ESLint the day one is turned on.
 
 Fluent and RTK Query are whole-app dependencies, not per-card ones. A fork that wanted a different
 stack would be rewriting the views, not relocating files.

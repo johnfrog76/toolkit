@@ -26,20 +26,23 @@ import asyncio
 import re
 import subprocess
 import time
+from datetime import date as _date
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..core import log_writer
 from ..core.config import BILLING_SCRIPT, hub_folder, hub_root, load_config
 from ..core.consts import (
+    billing_text,
     folder_archive,
     re_closed_stamp_date,
     review_file_name,
     review_slug_separator,
 )
 from ..core.hosts import NO_HOST_ERROR, host_argv
+from ..growth import growth_enabled, require_growth
 
 api = APIRouter()
 
@@ -110,11 +113,42 @@ def _billing_failure(sentence: str) -> BillingResponse:
     return BillingResponse(days=[], raw=sentence, error=sentence)
 
 
+# A day as the window takes it: yyyy-MM-dd, nothing else. Checked here, before
+# the argv is built, so a value starting with "-" can never bind as a switch.
+_BILLING_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _billing_window_refusal(since: str, until: str) -> str:
+    """The sentence a window is refused with, or "" for a window the script may
+    be given. The script's own rule (Scripts/Resolve-BillingWindow.ps1) also
+    refuses a backwards window; that one comes back as the script's stderr."""
+    text = billing_text()
+    if bool(since) != bool(until):
+        return text["halfWindow"]
+    for name, value in (("-Since", since), ("-Until", until)):
+        ok = bool(_BILLING_DAY.match(value))
+        if ok:
+            try:
+                _date.fromisoformat(value)
+            except ValueError:
+                ok = False
+        if not ok:
+            return text["notADay"].replace("{name}", name).replace("{value}", value)
+    return ""
+
+
 @api.get("/billing", response_model=BillingResponse)
-async def get_billing(week: str = "current"):
-    """Delegate to Get-WeeklyBilling.ps1 -AsJson (single source of truth)."""
+async def get_billing(week: str = "current", since: str = "", until: str = ""):
+    """Delegate to Get-WeeklyBilling.ps1 -AsJson (single source of truth).
+
+    ``week=current|last``, or a window: ``since`` and ``until``, both yyyy-MM-dd.
+    A window wins over ``week``, as it does in the script."""
     import json as _json
 
+    if since or until:
+        refusal = _billing_window_refusal(since, until)
+        if refusal:
+            return _billing_failure(refusal)
     if not BILLING_SCRIPT.exists():
         return _billing_failure("Billing script not found.")
     # Same resolver the bridge uses: this is the other place the agent starts a
@@ -136,7 +170,9 @@ async def get_billing(week: str = "current"):
     # first Space and was the script's hub root). The script now refuses without it.
     folder = str(load_config().get("promptsFolder", "") or "")
     args += ["-PromptsFolder", folder or BILLING_HUB_ROOT_FOLDER]
-    if week == "last":
+    if since and until:
+        args += ["-Since", since, "-Until", until]
+    elif week == "last":
         args.append("-LastWeek")
 
     try:
@@ -400,7 +436,7 @@ def _count_org_reviews(slug: str | None, archived: bool = False) -> tuple[int, l
         except OSError:
             text = ""
         artifacts = 0
-        m = re.search(r"Total work items[^\d]*(\d+)", text)
+        m = re.search(r"Total work items[^\d]*(\d{1,9})(?!\d)", text)
         if m:
             artifacts = int(m.group(1))
 
@@ -477,10 +513,10 @@ def _infer_work_type(text: str, filename: str) -> str:
 
 def _extract_sprint(text: str) -> str:
     """Extract sprint label from prompt file content."""
-    m = re.search(r"sprint[:\s]+sprint\s+(\d+)", text, re.IGNORECASE)
+    m = re.search(r"sprint[:\s]+sprint\s+(\d{1,9})(?!\d)", text, re.IGNORECASE)
     if m:
         return f"Sprint {m.group(1)}"
-    m = re.search(r"\bsprint[:\s]+(\d+)\b", text, re.IGNORECASE)
+    m = re.search(r"\bsprint[:\s]+(\d{1,9})\b", text, re.IGNORECASE)
     if m:
         return f"Sprint {m.group(1)}"
     return ""
@@ -536,7 +572,7 @@ def _build_work_breakdown(archive_dir: Path) -> WorkBreakdownResponse:
 
     # Sort sprints: numeric sprints first (ascending), then "Unsorted"
     def sprint_sort_key(s: str) -> tuple:
-        m = re.search(r"(\d+)", s)
+        m = re.search(r"(\d{1,9})(?!\d)", s)
         return (0, int(m.group(1))) if m else (1, 0)
 
     by_sprint = [WorkBreakdownSprintEntry(sprint=s, **sprint_map[s]) for s in sorted(sprint_map, key=sprint_sort_key)]
@@ -730,7 +766,8 @@ async def get_engagement_summary(slug: str):
     if org is None:
         raise HTTPException(status_code=404, detail=f"Unknown Space slug: {slug}")
 
-    review_count, _ = _count_org_reviews(slug)
+    # The module's own data: with growth off there are no reviews to count.
+    review_count = _count_org_reviews(slug)[0] if growth_enabled() else 0
     closed_count = _count_archive_items(org)
     start_date, end_date, days_billed = _read_billing_data(org)
     prs_reviewed = _count_pr_comments(org)
@@ -751,7 +788,11 @@ async def get_engagement_summary(slug: str):
     )
 
 
-@api.get("/engagement/{slug}/reviews", response_model=list[EngagementReviewItem])
+@api.get(
+    "/engagement/{slug}/reviews",
+    response_model=list[EngagementReviewItem],
+    dependencies=[Depends(require_growth)],
+)
 async def get_engagement_reviews(slug: str, archived: bool = False):
     # "all" is a cross-org view, not a real org — skip the org-config check.
     if slug != "all":

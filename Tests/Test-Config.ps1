@@ -319,6 +319,104 @@ try {
     [void](Invoke-Config $box @('-Set', 'aliases.Bowling.display=false'))
     Assert-Contains 'display false is kept when set on purpose' (Get-LocalConfigText $box) '"display": false'
 
+    # A name becomes part of a command, so it has to be one. Every row is refused
+    # by name, and nothing reaches the file.
+    #
+    $before = Get-LocalConfigText $box
+    foreach ($bad in @('x y', 'x;y', 'x{y', 'x$y', 'x`y', '1x', '-x', "x'y", 'x(y)', 'x|y')) {
+        $r = Invoke-Config $box @('-Set', "aliases.$bad.path=/somewhere")
+        Assert-Equal "alias name '$bad' is a stated refusal" 2 $r.ExitCode
+        Assert-Contains "and it says why" $r.Output 'cannot be a nav alias'
+    }
+    foreach ($bad in @('t k', 't;k', '1k', 't$k', "t'k", 't(k)', 'my-tk2', 'a_b', '-tk')) {
+        $r = Invoke-Config $box @('-Set', "commandPrefix=$bad")
+        Assert-Equal "prefix '$bad' is a stated refusal" 2 $r.ExitCode
+        Assert-Contains 'and it says what a prefix is' $r.Output 'commandPrefix is a letter'
+    }
+    Assert-Equal 'a refused name writes nothing' $before (Get-LocalConfigText $box)
+    foreach ($good in @('Home2', 'my-repo', 'a_b')) {
+        Assert-Equal "alias name '$good' is accepted" 0 (Invoke-Config $box @('-Set', "aliases.$good.path=/somewhere")).ExitCode
+    }
+    Assert-Equal 'a prefix may carry a digit' 0 (Invoke-Config $box @('-Set', 'commandPrefix=ab2')).ExitCode
+    Assert-Contains 'and it is written' (Get-LocalConfigText $box) '"commandPrefix": "ab2"'
+    [void](Invoke-Config $box @('-Unset', 'commandPrefix'))
+
+    # A file can already hold a name the schema would refuse, so the readers check
+    # too. A scratch copy of the package, imported in a fresh shell: the key says
+    # to write a marker, and the marker must never appear.
+    #
+    $nameBox = Join-Path ([System.IO.Path]::GetTempPath()) "p20-names-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+    try {
+        New-Item -ItemType Directory -Path $nameBox -Force | Out-Null
+        foreach ($item in @('Prompt20Toolkit', 'Scripts', 'Config', 'utilities.psm1', 'config.default.json', 'consts.json')) {
+            Copy-Item -LiteralPath (Join-Path $pkgRoot $item) -Destination $nameBox -Recurse
+        }
+        $marker = Join-Path $nameBox 'marker.txt'
+        $hub = Join-Path $nameBox 'hub'
+        New-Item -ItemType Directory -Path $hub -Force | Out-Null
+        $hostile = "x {};New-Item -Path '$marker';function y"
+        $safePath = Join-Path $nameBox 'it''s here'
+        New-Item -ItemType Directory -Path $safePath -Force | Out-Null
+        $local = [ordered]@{
+            promptsRoot = $hub
+            aliases     = [ordered]@{
+                $hostile = @{ path = $nameBox; display = $true }
+                Good     = @{ path = $safePath; display = $true }
+            }
+        }
+        $writeLocal = { [System.IO.File]::WriteAllText((Join-Path $nameBox 'config.local.json'), ($local | ConvertTo-Json -Depth 6)) }
+        & $writeLocal
+        $probe = "`$env:PSModulePath = '$nameBox'; `$env:TOOLKIT_QUIET_STARTUP = '1'; Import-Module '$nameBox/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force"
+        $out = (& pwsh -NoProfile -Command "$probe; tkGood | Out-Null; (Get-Location).Path" 2>&1 3>&1 | Out-String)
+        Assert-True 'a hostile alias key in the file runs nothing' (-not (Test-Path -LiteralPath $marker)) $out
+        Assert-Contains 'and is skipped, by name' $out 'is not a command name'
+        Assert-Contains 'and a good shortcut beside it still goes where it says, quote and all' $out "it's here"
+
+        $local.Remove('aliases')
+        $local.commandPrefix = "x;New-Item -Path '$marker'"
+        & $writeLocal
+        $out = (& pwsh -NoProfile -Command "$probe; (Get-Command tkStatus -ErrorAction SilentlyContinue).Name" 2>&1 3>&1 | Out-String)
+        Assert-True 'a hostile prefix in the file runs nothing' (-not (Test-Path -LiteralPath $marker)) $out
+        Assert-Contains 'and is named in a warning' $out 'commandPrefix in'
+        Assert-Contains 'and the shipped prefix answers' $out 'tkStatus'
+        $resolved = (& pwsh -NoProfile -Command ". '$nameBox/Scripts/Resolve-CliPrefix.ps1'; Resolve-P20ConfigPrefix -PackageRoot '$nameBox' 3>`$null" 2>$null | Out-String).Trim()
+        Assert-Equal 'and the script-side reader falls back the same way' 'tk' $resolved
+
+        # What Config accepts has to register: a new shell with no verbs has no
+        # Config to put it right with. A prefix set in the file, the module
+        # imported in a fresh shell, and the verbs typed there.
+        $local.commandPrefix = 'ab2'
+        & $writeLocal
+        $typedVerbs = "$probe; ab2Config -Help | Out-Null; 'config=' + `$?; ab2Menu | Out-Null; 'menu=' + `$?; (Get-Command ab2Status).Name; (Get-Command tkStatus -ErrorAction SilentlyContinue).Name"
+        $out = (& pwsh -NoProfile -Command $typedVerbs 2>&1 3>&1 | Out-String)
+        Assert-True "a prefix of 'ab2' registers with nothing refused" ($out -notmatch 'Cannot validate|not recognized|not a command prefix') $out
+        Assert-Contains 'and ab2Config runs in a new shell' $out 'config=True'
+        Assert-Contains 'and ab2Menu' $out 'menu=True'
+        Assert-Contains 'and ab2Status answers' $out 'ab2Status'
+        Assert-True 'and the shipped prefix is not registered beside it' ($out -notmatch '(?m)^tkStatus') $out
+        # A dash or an underscore Config refuses; a file that already holds one
+        # falls back to the shipped prefix, named in a warning, and the shell
+        # still has its verbs.
+        foreach ($prefix in @('my-tk2', 'a_b')) {
+            $local.commandPrefix = $prefix
+            & $writeLocal
+            $out = (& pwsh -NoProfile -Command "$probe; tkConfig -Help | Out-Null; 'config=' + `$?; (Get-Command tkStatus).Name; (Get-Command ${prefix}Status -ErrorAction SilentlyContinue).Name" 2>&1 3>&1 | Out-String)
+            Assert-Contains "a prefix of '$prefix' in the file is named in a warning" $out 'is not a command prefix'
+            Assert-Contains 'and the shipped prefix answers, Config included' $out 'config=True'
+            Assert-Contains 'and Status is there' $out 'tkStatus'
+            Assert-True "and nothing is registered under '$prefix'" ($out -notmatch "(?m)^${prefix}Status") $out
+        }
+        $local.commandPrefix = 'tk'
+        & $writeLocal
+        foreach ($bad in @('x;y', 'my-tk')) {
+            $refused = (& pwsh -NoProfile -Command "$probe; try { Register-PromptAlias -Prefix '$bad' -Commands Status; 'took it' } catch { `$_.Exception.Message }" 2>&1 3>&1 | Out-String)
+            Assert-Contains "and Register-PromptAlias reads the same rule: '$bad'" $refused 'is not a command prefix'
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $nameBox -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     # A Space's checkout (spaceCheckouts.<slug>.path, #146): this machine's, so
     # config.local.json and never hub.json; keyed by a Space that exists; one
     # shape. And -List names the Space you are in, so the drawer has its field.
@@ -431,6 +529,23 @@ try {
     Assert-True 'the switch lands on the Space''s features as a boolean false' ($sugSpace.features -and $sugSpace.features.suggestions -is [bool] -and -not $sugSpace.features.suggestions) (Get-HubText $box)
     Assert-True 'and nothing of it reached config.local.json' ((Get-LocalConfigText $box) -notlike '*suggestions*') (Get-LocalConfigText $box)
     [void](Invoke-Config $box @('-Unset', 'spaces.acme.features.suggestions', '-Hub'))
+
+    # The team size: a Space-scoped NUMBER with allowed values (consts.json
+    # rituals.teamSizes), written onto the Space's hub entry as an int; a number
+    # that is not a size is a stated refusal naming the sizes, and writes nothing.
+    $team = Invoke-Config $box @('-Set', 'spaces.acme.features.teamSize=3', '-Hub')
+    Assert-Equal 'spaces.<slug>.features.teamSize=3 -Hub exits 0' 0 $team.ExitCode
+    $teamSpace = Get-HubSpace $box 'acme'
+    Assert-True 'the size lands on the Space''s features as the number 3' ($teamSpace.features -and ($teamSpace.features.teamSize -is [int] -or $teamSpace.features.teamSize -is [long]) -and [int]$teamSpace.features.teamSize -eq 3) (Get-HubText $box)
+    Assert-True 'and nothing of it reached config.local.json' ((Get-LocalConfigText $box) -notlike '*teamSize*') (Get-LocalConfigText $box)
+    foreach ($bad in @('4', '0', '12', 'nine')) {
+        $refusedTeam = Invoke-Config $box @('-Set', "spaces.acme.features.teamSize=$bad", '-Hub')
+        Assert-Equal "teamSize=$bad is a stated refusal (exit 2)" 2 $refusedTeam.ExitCode
+        Assert-True "...naming the sizes a Space may state" ($refusedTeam.Output -match '3, 6, 9') $refusedTeam.Output
+    }
+    Assert-Equal 'a refused size leaves the stored one as it was' 3 ([int](Get-HubSpace $box 'acme').features.teamSize)
+    [void](Invoke-Config $box @('-Unset', 'spaces.acme.features.teamSize', '-Hub'))
+    Assert-True '-Unset takes the size off the Space again' (-not ((Get-HubSpace $box 'acme').features -and (Get-HubSpace $box 'acme').features.PSObject.Properties['teamSize'])) (Get-HubText $box)
 
     # The first write of the Azure on-ramp. Setting a field on the
     # SHIPPED org must patch it -- not add an org called "test" (its slug then) with status
@@ -663,16 +778,24 @@ finally { Remove-Item $box.Root -Recurse -Force -ErrorAction SilentlyContinue }
 # ONE table, two readers: Tests/test_offered_orgs.py runs the agent's copy of the
 # rule over the same file.
 Write-Host ''
-Write-Host '-- Select-P20OfferedSpaces: a dismissed Example org is not offered --' -ForegroundColor Cyan
+Write-Host '-- Select-P20SwitcherSpaces: a dismissed Example org and a retired Space are not offered --' -ForegroundColor Cyan
 . (Join-Path $pkgRoot 'Scripts/Select-OfferedSpaces.ps1')
 $offeredTable = (Get-Content (Join-Path $PSScriptRoot 'fixtures/offered-orgs/table.json') -Raw | ConvertFrom-Json).rows
 foreach ($row in $offeredTable) {
     $org = [pscustomobject]@{ slug = 'test'; example = [bool]$row.example }
+    if ($row.retired) { $org | Add-Member -NotePropertyName status -NotePropertyValue 'archive' }
     $active = 'other'
     if ($row.active) { $active = 'test' }
-    $got = Select-P20OfferedSpaces -Spaces @($org) -ActiveSpace $active -Dismissed ([bool]$row.dismissed)
+    $got = Select-P20SwitcherSpaces -Spaces @($org) -ActiveSpace $active -Dismissed ([bool]$row.dismissed)
     Assert-True $row.why ((@($got).Count -eq 1) -eq [bool]$row.offered) "got $(@($got).Count) org(s)"
 }
+$retiredOrg = [pscustomobject]@{ slug = 'gone'; status = 'archive' }
+# Assigned first, as the loop above does: both return `, $list`, so @(<call>) would
+# count the empty list itself as one item.
+$keptRetired = Select-P20OfferedSpaces -Spaces @($retiredOrg) -ActiveSpace 'other' -Dismissed $false
+$droppedRetired = Select-P20SwitcherSpaces -Spaces @($retiredOrg) -ActiveSpace 'other' -Dismissed $false
+Assert-True 'the offered list keeps a retired Space; only the switcher drops it' (
+    @($keptRetired).Count -eq 1 -and @($droppedRetired).Count -eq 0) "offered $(@($keptRetired).Count), switcher $(@($droppedRetired).Count)"
 
 # -- spaces.<slug>.projects: the field discovery writes (settings by workflow W2) --
 Write-Host ''
@@ -703,6 +826,114 @@ catch {
 }
 finally { Remove-Item $box.Root -Recurse -Force -ErrorAction SilentlyContinue }
 
+# -- A Teams recipient: declared through Config, never by hand ------------------
+# Two patterns: managerWorkflow.communication.recipients.<key>.<field> is this
+# machine's, and spaces.<slug>.communication.recipients.<key>.<field> is the
+# Space's. The rest of managerWorkflow stays the team's -- the trap is that the
+# machine pattern row would hide the team's managerWorkflow row.
+Write-Host ''
+Write-Host '-- A Teams recipient: two patterns, one writer ----------' -ForegroundColor Cyan
+$recipientRows = @($schemaRows | Where-Object { $_.key -like 'managerWorkflow.communication.recipients.<key>.*' })
+Assert-Equal 'the schema has a machine row per recipient field' 'type,display,webhookEnv' (@($recipientRows | ForEach-Object { ($_.key -split '\.')[-1] }) -join ',')
+Assert-True 'and every one is the machine''s' (@($recipientRows | Where-Object { $_.scope -ne 'machine' }).Count -eq 0)
+$typeRow = @($recipientRows | Where-Object { $_.key -like '*.type' })[0]
+$recipientConsts = (Get-Content (Join-Path $pkgRoot 'consts.json') -Raw | ConvertFrom-Json).communication
+Assert-Equal 'a type takes the contract''s words, webhook types then deferred' `
+    ((@($recipientConsts.webhookRecipientTypes) + @($recipientConsts.deferredRecipientTypes)) -join ', ') (@($typeRow.allowed) -join ', ')
+Assert-Equal 'which are channel, chat and person' 'channel, chat, person' (@($typeRow.allowed) -join ', ')
+Assert-True 'managerWorkflow itself is still the team''s row' `
+    (@($schemaRows | Where-Object { $_.key -eq 'managerWorkflow' -and $_.scope -eq 'default' }).Count -eq 1)
+Assert-True 'and aliases is still not a team row' (@($schemaRows | Where-Object { $_.key -eq 'aliases' }).Count -eq 0)
+Assert-True 'the Space''s recipient rows are hub.json''s' `
+    (@($schemaRows | Where-Object { $_.key -like 'spaces.<slug>.communication.recipients.<key>.*' -and $_.scope -eq 'org' }).Count -eq 3)
+$box = New-ConfigSandbox
+try {
+    Set-HubRoot $box
+    foreach ($pair in @('managerWorkflow.communication.recipients.mom.type=chat',
+            'managerWorkflow.communication.recipients.mom.display=Mom',
+            'managerWorkflow.communication.recipients.mom.webhookEnv=TEAMS_WEBHOOK_MOM')) {
+        $r = Invoke-Config $box @('-Set', $pair)
+        Assert-Equal "-Set $($pair.Split('=')[0].Split('.')[-1]) of a recipient exits 0" 0 $r.ExitCode $r.Output
+    }
+    $local = Get-LocalConfigText $box | ConvertFrom-Json
+    $mom = $local.managerWorkflow.communication.recipients.mom
+    Assert-Equal 'the type lands in config.local.json' 'chat' $mom.type
+    Assert-Equal 'and the display' 'Mom' $mom.display
+    Assert-Equal 'and the variable''s NAME' 'TEAMS_WEBHOOK_MOM' $mom.webhookEnv
+    Assert-True 'and nothing of it reaches hub.json' ((Get-HubText $box) -notlike '*TEAMS_WEBHOOK_MOM*') (Get-HubText $box)
+    Assert-True 'and the shipped recipient is not copied in beside it' ($null -eq $local.managerWorkflow.communication.recipients.PSObject.Properties['manager'])
+    $upper = Invoke-Config $box @('-Set', 'managerWorkflow.communication.recipients.mom.type=CHAT')
+    Assert-Equal 'a type in other capitals is accepted' 0 $upper.ExitCode $upper.Output
+    Assert-Equal 'and written as the contract spells it' 'chat' (Get-LocalConfigText $box | ConvertFrom-Json).managerWorkflow.communication.recipients.mom.type
+
+    $pager = Invoke-Config $box @('-Set', 'managerWorkflow.communication.recipients.mom.type=pager')
+    Assert-Equal 'an unknown type is refused' 2 $pager.ExitCode
+    Assert-Contains 'naming the allowed values' $pager.Output 'channel, chat, person'
+    $url = Invoke-Config $box @('-Set', 'managerWorkflow.communication.recipients.mom.webhookEnv=https://example.invalid/hook')
+    Assert-Equal 'a URL where the variable''s name goes is refused' 2 $url.ExitCode
+    Assert-True 'and the refusal does not echo the URL' ($url.Output -notlike '*example.invalid*') $url.Output
+    Assert-True 'and no file carries it' ((Get-LocalConfigText $box) -notlike '*example.invalid*')
+    $plain = Invoke-Config $box @('-Set', 'managerWorkflow.communication.recipients.mom.webhookEnv=MOM_HOOK')
+    Assert-Equal 'a variable without the webhook prefix is refused' 2 $plain.ExitCode
+    Assert-Contains 'naming the prefix' $plain.Output 'TEAMS_WEBHOOK_<NAME>'
+    $field = Invoke-Config $box @('-Set', 'managerWorkflow.communication.recipients.mom.colour=blue')
+    Assert-Equal 'a field a recipient does not have is refused' 2 $field.ExitCode
+    Assert-Contains 'naming the fields' $field.Output 'type, display, webhookEnv'
+    foreach ($bad in @('managerWorkflow.communication.recipients.a.b.type', 'managerWorkflow.communication.recipients.mom', 'managerWorkflow.communication.recipients')) {
+        $r = Invoke-Config $box @('-Set', "$bad=x")
+        Assert-Equal "'$bad' is refused for its shape" 2 $r.ExitCode
+        Assert-Contains 'naming the shape' $r.Output 'recipients.<key>.<field>'
+    }
+    $digit = Invoke-Config $box @('-Set', 'managerWorkflow.communication.recipients.9x.type=chat')
+    Assert-Equal 'a key that starts with a digit is refused' 2 $digit.ExitCode
+    Assert-Contains 'saying what a key is' $digit.Output 'cannot be a recipient''s key'
+
+    # The other side of the trap: the rest of managerWorkflow is the team's.
+    foreach ($teamKey in @('managerWorkflow.retroChannel', 'managerWorkflow', 'managerWorkflow.communication.other')) {
+        $r = Invoke-Config $box @('-Set', "$teamKey=x")
+        Assert-Equal "'$teamKey' is refused" 2 $r.ExitCode
+        Assert-Contains 'as the team''s, not as unknown' $r.Output 'config.default.json, which this command never writes'
+    }
+
+    # The Space's own: hub.json, or -Local for this machine's patch.
+    $team = Invoke-Config $box @('-Set', 'spaces.azure-demo.communication.recipients.team.type=channel')
+    Assert-Equal 'a Space''s recipient is accepted' 0 $team.ExitCode $team.Output
+    $demo = Get-HubSpace $box 'azure-demo'
+    Assert-Equal 'and nests under the Space''s entry in hub.json' 'channel' $demo.communication.recipients.team.type
+    $teamLocal = Invoke-Config $box @('-Set', 'spaces.azure-demo.communication.recipients.team.display=Team', '-Local')
+    Assert-Equal 'with -Local it is accepted' 0 $teamLocal.ExitCode $teamLocal.Output
+    Assert-Equal 'and lands in this machine''s patch' 'Team' (Get-LocalConfigText $box | ConvertFrom-Json).spaces.'azure-demo'.communication.recipients.team.display
+    $spaceBad = Invoke-Config $box @('-Set', 'spaces.azure-demo.communication.recipients.team.type=pager')
+    Assert-Equal 'a Space''s recipient takes the same types' 2 $spaceBad.ExitCode
+    Assert-Contains 'and names them' $spaceBad.Output 'channel, chat, person'
+    $spaceShape = Invoke-Config $box @('-Set', 'spaces.azure-demo.communication.recipients.team=x')
+    Assert-Equal 'a Space''s recipient with no field is refused' 2 $spaceShape.ExitCode
+    Assert-Contains 'naming the shape' $spaceShape.Output 'spaces.<slug>.communication.recipients.<key>.<field>'
+
+    # -Unset one field, then the last: the recipient goes with its last field.
+    $un = Invoke-Config $box @('-Unset', 'managerWorkflow.communication.recipients.mom.display')
+    Assert-Equal '-Unset of one field exits 0' 0 $un.ExitCode $un.Output
+    $mom = (Get-LocalConfigText $box | ConvertFrom-Json).managerWorkflow.communication.recipients.mom
+    Assert-True 'and takes only that field' ($null -eq $mom.PSObject.Properties['display'] -and $mom.type -eq 'chat') (Get-LocalConfigText $box)
+    [void](Invoke-Config $box @('-Unset', 'managerWorkflow.communication.recipients.mom.type'))
+    [void](Invoke-Config $box @('-Unset', 'managerWorkflow.communication.recipients.mom.webhookEnv'))
+    $recips = (Get-LocalConfigText $box | ConvertFrom-Json).managerWorkflow.communication.recipients
+    Assert-True 'the recipient goes with its last field' ($null -eq $recips.PSObject.Properties['mom']) (Get-LocalConfigText $box)
+    [void](Invoke-Config $box @('-Unset', 'spaces.azure-demo.communication.recipients.team.type', '-Hub'))
+    $demo = Get-HubSpace $box 'azure-demo'
+    Assert-True 'and a Space''s, from hub.json' ($null -eq $demo.communication.recipients.PSObject.Properties['team']) (Get-HubText $box)
+
+    $schema = Invoke-Config $box @('-Schema')
+    Assert-Contains '-Schema prints the machine pattern' $schema.Output 'managerWorkflow.communication.recipients.<key>.type'
+    Assert-Contains 'and the Space''s' $schema.Output 'spaces.<slug>.communication.recipients.<key>.type'
+    $list = Invoke-Config $box @('-List', '-AsJson')
+    Assert-True '-List (the web''s form) lists no pattern row' ($list.Output -notlike '*<key>*') $list.Output
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { Remove-Item $box.Root -Recurse -Force -ErrorAction SilentlyContinue }
+
 # SwitchSpace Status offers what the rule says, and the switch is the Config verb's.
 $box = New-ConfigSandbox
 try {
@@ -711,7 +942,8 @@ try {
     # config: give the sandbox's a second org, and make it the active one.
     $defaultPath = Join-Path $box.Pkg 'config.default.json'
     $shipped = (Invoke-LockRetry 'read of a scratch file' { Get-Content $defaultPath -Raw }) | ConvertFrom-Json
-    $shipped.spaces = @($shipped.spaces) + @([pscustomobject]@{ slug = 'other'; name = 'Other'; status = 'local'; promptsFolder = 'other' })
+    $shipped.spaces = @($shipped.spaces) + @([pscustomobject]@{ slug = 'other'; name = 'Other'; status = 'local'; promptsFolder = 'other' }) +
+        @([pscustomobject]@{ slug = 'retired-one'; name = 'Retired One'; status = 'archive'; promptsFolder = 'retired-one' })
     $shipped.activeSpace = 'other'
     Invoke-LockRetry 'write of a scratch file' { Set-Content -Path $defaultPath -Value ($shipped | ConvertTo-Json -Depth 20) -Encoding utf8 }
     $before = & pwsh -NoProfile -File $switch 'Status' 2>&1 | Out-String
@@ -721,6 +953,7 @@ try {
     $after = & pwsh -NoProfile -File $switch 'Status' 2>&1 | Out-String
     Assert-True 'and then it is not offered' ($after -notmatch '(?m)^\s+azure-demo\s+Azure demo') $after
     Assert-True 'while the org you are in still is' ($after -match '->\s*other') $after
+    Assert-True 'a retired Space is not offered while you are in another' ($after -notmatch 'Retired One' -and $before -notmatch 'Retired One') $after
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
@@ -743,7 +976,11 @@ try {
     Invoke-LockRetry 'scratch copy' { Copy-Item (Join-Path $pkgRoot 'Config')  $switchPkg -Recurse -Force }
     $defaultPath = Join-Path $switchPkg 'config.default.json'
     $shipped = (Invoke-LockRetry 'read of a scratch file' { Get-Content $defaultPath -Raw }) | ConvertFrom-Json
-    $shipped.spaces = @($shipped.spaces) + @([pscustomobject]@{ slug = 'other'; name = 'Other'; status = 'local'; promptsFolder = 'other' })
+    $shipped.spaces = @($shipped.spaces) + @([pscustomobject]@{ slug = 'other'; name = 'Other'; status = 'local'; promptsFolder = 'other' }) +
+        @([pscustomobject]@{ slug = 'twin-a'; name = 'Twin'; status = 'local'; promptsFolder = 'twin-a' }) +
+        @([pscustomobject]@{ slug = 'twin-b'; name = 'Twin'; status = 'local'; promptsFolder = 'twin-b' }) +
+        @([pscustomobject]@{ slug = 'named-one'; name = 'Named One'; status = 'local'; promptsFolder = 'named-one' }) +
+        @([pscustomobject]@{ slug = 'retired-one'; name = 'Retired One'; status = 'archive'; promptsFolder = 'retired-one' })
     Invoke-LockRetry 'write of a scratch file' { Set-Content -Path $defaultPath -Value ($shipped | ConvertTo-Json -Depth 20) -Encoding utf8 }
     $prefix = $shipped.commandPrefix
     $localPath = Join-Path $switchPkg 'config.local.json'
@@ -766,6 +1003,46 @@ try {
     $written2 = (Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw }) | ConvertFrom-Json
     Assert-Equal 'an activeOrg file is written as activeSpace, with the new Space' 'other' $written2.activeSpace
     Assert-True 'and activeOrg is gone' (-not $written2.PSObject.Properties['activeOrg'])
+
+    # A file holding BOTH spellings -- an old activeOrg left beside a newer activeSpace --
+    # goes through ConvertTo-P20SpaceSpelling's merge: it comes out as ONE activeSpace,
+    # a string naming the new Space, never an array of the two and never the old key.
+    Invoke-LockRetry 'write of a scratch file' { Set-Content -Path $localPath -Value "{ `"promptsRoot`": `"$hubPath`", `"quietStart`": true, `"activeOrg`": `"test`", `"activeSpace`": `"twin-a`", `"email`": `"both@example.com`" }" -Encoding UTF8 }
+    $outBoth = & pwsh -NoProfile -Command $typed 2>&1 | Out-String
+    $bothRaw = Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw -Encoding UTF8 }
+    $writtenBoth = $bothRaw | ConvertFrom-Json
+    Assert-True 'a file with both activeOrg and activeSpace: SwitchSpace writes one activeSpace string, the new Space' (
+        $writtenBoth.activeSpace -is [string] -and $writtenBoth.activeSpace -eq 'other' -and
+        ([regex]::Matches($bothRaw, '"activeSpace"').Count -eq 1)) "$outBoth $bothRaw"
+    Assert-True 'and no activeOrg is left beside it' (-not $writtenBoth.PSObject.Properties['activeOrg']) $bothRaw
+    Assert-Equal 'and the machine keys it carried are kept' 'both@example.com' $writtenBoth.email
+
+    # A name is matched exactly, ignoring case, and only when one Space has it:
+    # a wildcard or a shared name never picks a Space for the person.
+    $switchTo = { param([string]$What) "`$env:PSModulePath = '$($switchPkg -replace "'", "''")'; `$env:PROMPTS_ROOT = '$hubPath'; " +
+        "Import-Module '$module' -Force -DisableNameChecking 3>`$null 6>`$null; ${prefix}SwitchSpace '$What'; 'SWITCH-CODE=' + `$LASTEXITCODE" }
+    Invoke-LockRetry 'write of a scratch file' { Set-Content -Path $localPath -Value "{ `"promptsRoot`": `"$hubPath`", `"quietStart`": true, `"activeSpace`": `"other`" }" -Encoding UTF8 }
+    $held = Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw }
+    $twin = & pwsh -NoProfile -Command (& $switchTo 'Twin') 2>&1 | Out-String
+    Assert-True 'a name two Spaces share is a stated refusal' ($twin -match 'SWITCH-CODE=2' -and $twin -match "'Twin' is the name of 2 Spaces: twin-a, twin-b") $twin
+    Assert-Equal 'and the file is not touched' $held (Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw })
+    $star = & pwsh -NoProfile -Command (& $switchTo '*') 2>&1 | Out-String
+    Assert-True 'a wildcard matches no Space: Unknown Space, exit 2' ($star -match 'SWITCH-CODE=2' -and $star -match 'Unknown Space: \*') $star
+    Assert-Equal 'and the file is not touched either' $held (Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw })
+    $one = & pwsh -NoProfile -Command (& $switchTo 'NAMED one') 2>&1 | Out-String
+    $written3 = (Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw }) | ConvertFrom-Json
+    Assert-True 'a name only one Space has switches to it, whatever its case' ($one -match 'SWITCH-CODE=0' -and $written3.activeSpace -eq 'named-one') "$one $($written3.activeSpace)"
+    Assert-True 'and activeSpace is written as one string, never an array' ($written3.activeSpace -is [string])
+
+    # A retired Space is left off the switcher but is still reachable by slug, and once
+    # you are in it the switcher lists it.
+    $switchScript = Join-Path $switchPkg 'Scripts/Switch-Mode.ps1'
+    $listed = & pwsh -NoProfile -File $switchScript 'Status' 2>&1 | Out-String
+    $retiredIn = & pwsh -NoProfile -Command (& $switchTo 'retired-one') 2>&1 | Out-String
+    $written4 = (Invoke-LockRetry 'read of a scratch file' { Get-Content $localPath -Raw }) | ConvertFrom-Json
+    Assert-True 'SwitchSpace <slug> to a retired Space still switches' ($retiredIn -match 'SWITCH-CODE=0' -and $written4.activeSpace -eq 'retired-one') "$retiredIn $($written4.activeSpace)"
+    $listedIn = & pwsh -NoProfile -File $switchScript 'Status' 2>&1 | Out-String
+    Assert-True 'and the Space list names it only once you are in it' ($listed -notmatch 'retired-one' -and $listedIn -match '->\s*retired-one') "$listed $listedIn"
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message

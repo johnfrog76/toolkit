@@ -35,6 +35,8 @@ jest.mock("./MilestonesPage", () => ({ MilestonesPage: () => null }));
 jest.mock("./RitualPage", () => ({ RitualPage: () => null }));
 jest.mock("./stage/StandupPlay", () => ({ StandupPlay: () => null }));
 
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import {
   activeModules,
   isChromeless,
@@ -92,6 +94,8 @@ describe("the solitaireAgile module's registry contract", () => {
     expect(moduleRoutes(active).map((r) => r.path)).toEqual([
       "/solitaire-agile",
       "/solitaire-agile/triage",
+      "/solitaire-agile/releases",
+      "/solitaire-agile/org",
       "/solitaire-agile/milestones",
       "/deck/ritual/standup",
     ]);
@@ -102,12 +106,33 @@ describe("the solitaireAgile module's registry contract", () => {
     expect(solitaireAgileModule.headerItems).toBeUndefined();
   });
 
-  it("Triage and Milestones are pages under the ONE Team Agile entry, and not chromeless", () => {
+  it("Triage, Releases and Org are pages under the ONE Team Agile entry, and not chromeless", () => {
     const [entry] = moduleNav(activeModules(all, env({ solitaireAgile: true })), ctx);
-    for (const page of ["/solitaire-agile/triage", "/solitaire-agile/milestones"]) {
+    for (const page of [
+      "/solitaire-agile/triage",
+      "/solitaire-agile/releases",
+      "/solitaire-agile/org",
+    ]) {
       expect(entry.match(page)).toBe(true);
       expect(solitaireAgileModule.chromeless?.(page)).toBe(false);
     }
+  });
+
+  it("the old /milestones address redirects to /releases, so a bookmark still lands on the tab", () => {
+    const routes = moduleRoutes(activeModules(all, env({ solitaireAgile: true })));
+    const Where = () => <p data-testid="where">{useLocation().pathname}</p>;
+    render(
+      <MemoryRouter initialEntries={["/solitaire-agile/milestones"]}>
+        <Routes>
+          {routes.map((r) => (
+            <Route key={r.path} path={r.path} element={r.element} />
+          ))}
+          <Route path="*" element={<Where />} />
+        </Routes>
+        <Where />
+      </MemoryRouter>,
+    );
+    expect(screen.getAllByTestId("where").pop()?.textContent).toBe("/solitaire-agile/releases");
   });
 
   it("the played standup is a room of its own (chromeless) only while the flag is on", () => {

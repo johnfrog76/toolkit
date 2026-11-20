@@ -269,7 +269,7 @@ try {
         Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    $headers = Get-P20AdoHeaders -Token $tokenRead.Token
+    $headers = Get-P20AdoHeaders -Token $tokenRead.Token -OrgUrl $org
     $encodedProject = [Uri]::EscapeDataString($Project)
 
     # --- Resolve PR ID from branch if not supplied ---
@@ -397,11 +397,11 @@ try {
     $resolvedPrompt = Resolve-P20AgenticPrompt -Name 'pr-review.prompt.md'
     $promptPath = $resolvedPrompt.Path
     Write-Host "  Prompt: $promptPath ($($resolvedPrompt.Source) copy)" -ForegroundColor DarkGray
-    if (-not (Test-Path $promptPath)) {
+    if (-not (Test-Path -LiteralPath $promptPath)) {
         Write-CliError -Message "Review prompt not found at $promptPath"
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    $promptTemplate = Get-Content $promptPath -Raw
+    $promptTemplate = Get-Content -LiteralPath $promptPath -Raw -Encoding UTF8
     # The frontmatter and everything above the --- fence are for a person, not
     # instruction (Get-P20PromptInstruction, beside the resolver).
     $promptTemplate = Get-P20PromptInstruction -Text $promptTemplate
@@ -423,9 +423,9 @@ try {
             -Headers @{
                 "x-api-key"         = $apiKey
                 "anthropic-version" = "2023-06-01"
-                "content-type"      = "application/json"
+                "content-type"      = "application/json; charset=utf-8"
             } `
-            -Body $requestBody
+            -Body (ConvertTo-P20Utf8Body $requestBody)
     } catch {
         Write-CliError -Message "Claude API call failed. $($_.Exception.Message)"
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -533,7 +533,7 @@ try {
             Write-Host "  $comment" -ForegroundColor White
         } else {
             try {
-                $result = Invoke-RestMethod -Uri $threadsUri -Method Post -Headers $headers -Body $body
+                $result = Invoke-RestMethod -Uri $threadsUri -Method Post -Headers $headers -Body (ConvertTo-P20Utf8Body $body)
                 $threadId = $result.id
                 Write-Host "  Posted thread $threadId - $file L$line" -ForegroundColor Green
                 $posted++
@@ -546,7 +546,7 @@ try {
                     $thread.Remove('threadContext')
                     $body = $thread | ConvertTo-Json -Depth 6 -Compress
                     try {
-                        $result = Invoke-RestMethod -Uri $threadsUri -Method Post -Headers $headers -Body $body
+                        $result = Invoke-RestMethod -Uri $threadsUri -Method Post -Headers $headers -Body (ConvertTo-P20Utf8Body $body)
                         Write-Host "    Posted as general comment (thread $($result.id))." -ForegroundColor Green
                         $posted++
                     } catch {

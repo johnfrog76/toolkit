@@ -1,5 +1,5 @@
 {
-  "_": "The standup's SECOND source, cards, as a table (#130; docs/modules/solitaire-agile.md, \"The second source: cards\"; docs/hub/cards.md, 'A card in a standup'). Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's cards to their cards fill and assert the computed `since`, the chair's vocabulary indices, the walk queue and the one worker's slots by card id, and the rendered text against standup-cards-<name>.txt in this folder, byte for byte (LF). A card is a row the thin layer reads out of the Space's current/ and archive/: its file, its folder, its DERIVED state (docs/hub/cards.md, 'State is derived, never stored'), its **Closed:** day when archived (null when it has none), the title its heading gives and the id the filename gives. A row with `billable: false` is a card that says **Billable:** no, and is nowhere (the rule Daily reads). `sources` pins which source a Space's address and status choose -- an active GitHub Space reads `both` (standup-joined.json); `titles` pins the heading-to-title rule.",
+  "_": "The standup's SECOND source, cards, as a table (#130; docs/modules/solitaire-agile.md, \"The second source: cards\"; docs/hub/cards.md, 'A card in a standup'). Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- feed each case's cards to their cards fill and assert the computed `since`, the chair's vocabulary indices, the walk queue, the idle worker's two made-up items by index (`nothingIndex`, `nothingTodayIndex`, as standup.json states them) and the one worker's slots by card id, and the rendered text against standup-cards-<name>.txt in this folder, byte for byte (LF). A card is a row the thin layer reads out of the Space's current/ and archive/: its file, its folder, its DERIVED state (docs/hub/cards.md, 'State is derived, never stored'), its **Closed:** day when archived (null when it has none), the title its heading gives and the id the filename gives. A row with `billable: false` is a card that says **Billable:** no, and is nowhere (the rule Daily reads). `sources` pins which source a Space's address and status choose -- an active GitHub Space reads `both` (standup-joined.json); `titles` pins the heading-to-title rule.",
   "sources": [
     { "address": "", "status": "local", "source": "cards", "reason": "" },
     { "address": "", "status": "active", "source": "cards", "reason": "" },
@@ -39,7 +39,7 @@
         "dayOfYear": 275,
         "chair": { "openIndex": 3, "closeIndex": 4 },
         "queue": { "walk": ["139", "144"], "decide": [], "look": [] },
-        "worker": { "label": "widgets", "name": "Widgets", "yesterday": ["198", "Q3R9"], "today": ["K7M2", "139", "144"], "blockers": [], "empty": false, "nothingIndex": null },
+        "worker": { "label": "widgets", "name": "Widgets", "yesterday": ["198", "Q3R9"], "today": ["K7M2", "139", "144"], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
         "text": "standup-cards-friday.txt",
         "brief": "standup-cards-friday.brief.txt"
       }
@@ -62,7 +62,7 @@
         "dayOfYear": 278,
         "chair": { "openIndex": 6, "closeIndex": 7 },
         "queue": { "walk": [], "decide": [], "look": [] },
-        "worker": { "label": "widgets", "name": "Widgets", "yesterday": ["161", "162", "163"], "today": [], "blockers": [], "empty": false, "nothingIndex": null },
+        "worker": { "label": "widgets", "name": "Widgets", "yesterday": ["161", "162", "163"], "today": [], "blockers": [], "empty": false, "nothingIndex": null, "nothingTodayIndex": null },
         "text": "standup-cards-monday-weekend.txt",
         "brief": "standup-cards-monday-weekend.brief.txt"
       }
@@ -81,7 +81,7 @@
         "dayOfYear": 278,
         "chair": { "openIndex": 6, "closeIndex": 7 },
         "queue": { "walk": [], "decide": [], "look": [] },
-        "worker": { "label": "widgets", "name": "Widgets", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 0 },
+        "worker": { "label": "widgets", "name": "Widgets", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 18, "nothingTodayIndex": 12 },
         "text": "standup-cards-nothing-in-flight.txt",
         "brief": "standup-cards-nothing-in-flight.brief.txt"
       }
@@ -97,7 +97,7 @@
         "dayOfYear": 276,
         "chair": { "openIndex": 4, "closeIndex": 5 },
         "queue": { "walk": [], "decide": [], "look": [] },
-        "worker": { "label": "scratch", "name": "scratch", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 0 },
+        "worker": { "label": "scratch", "name": "scratch", "yesterday": [], "today": [], "blockers": [], "empty": true, "nothingIndex": 16, "nothingTodayIndex": 10 },
         "text": null,
         "brief": "standup-cards-no-cards-no-name.brief.txt"
       }

@@ -56,11 +56,11 @@ if ($Ack) {
     # would put it back in another format. 5.1 never does.
     $ackJsonArgs = @{}
     if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $ackJsonArgs['DateKind'] = 'String' }
-    if (Test-Path $localCfgPath) {
+    if (Test-Path -LiteralPath $localCfgPath) {
         # A file that will not parse is left exactly as it is: writing the ack into
         # what was read (nothing) would replace the person's settings.
         try {
-            $ackRaw = Get-Content $localCfgPath -Raw -Encoding UTF8
+            $ackRaw = Get-Content -LiteralPath $localCfgPath -Raw -Encoding UTF8
             # A zero-byte or whitespace-only file is an empty object, not a parse failure.
             if ([string]::IsNullOrWhiteSpace($ackRaw)) { $ackRaw = '{}' }
             $localCfg = $ackRaw | ConvertFrom-Json @ackJsonArgs
@@ -133,7 +133,7 @@ function Format-LogLine {
 }
 
 # -- Main ----------------------------------------------------------------------
-$logFiles = Get-ChildItem -Path $logRoot -Filter 'usage.*.log' -ErrorAction SilentlyContinue
+$logFiles = Get-ChildItem -LiteralPath $logRoot -Filter 'usage.*.log' -ErrorAction SilentlyContinue
 if (-not $logFiles) {
     Write-Host "  No usage log files found." -ForegroundColor Yellow
     return
@@ -145,7 +145,7 @@ if ($Clear) {
     foreach ($lf in $logFiles) {
         $archiveName = "$($lf.BaseName).$dateSuffix.bak"
         $archivePath = Join-Path $logRoot $archiveName
-        Move-Item -Path $lf.FullName -Destination $archivePath
+        Move-Item -LiteralPath $lf.FullName -Destination $archivePath
     }
     Write-ToolkitLog -Type INFO -Source "$(Get-CliPrefix)Log" -Detail "log cleared - archived $($logFiles.Count) file(s)"
     Write-Host "  Archived $($logFiles.Count) log file(s) - fresh log started." -ForegroundColor Green
@@ -156,12 +156,12 @@ if ($Clear) {
 if ($Tail) {
     $machine = [System.Environment]::MachineName
     $localLog = Join-Path $logRoot "usage.$machine.log"
-    if (-not (Test-Path $localLog)) {
+    if (-not (Test-Path -LiteralPath $localLog)) {
         Write-Host "  No log file for this machine ($machine) yet." -ForegroundColor Yellow
         return
     }
     Write-Host "  Tailing usage.$machine.log (Ctrl+C to stop)..." -ForegroundColor DarkGray
-    Get-Content $localLog -Wait -Tail 10 -Encoding UTF8 | ForEach-Object {
+    Get-Content -LiteralPath $localLog -Wait -Tail 10 -Encoding UTF8 | ForEach-Object {
         Format-LogLine $_
     }
     return
@@ -170,7 +170,7 @@ if ($Tail) {
 # Read all log files and merge
 $lines = @()
 foreach ($lf in $logFiles) {
-    $lines += Get-Content $lf.FullName -Encoding UTF8
+    $lines += Get-Content -LiteralPath $lf.FullName -Encoding UTF8
 }
 # Sort by timestamp (first field)
 $lines = $lines | Sort-Object { ($_ -split "`t")[0] }

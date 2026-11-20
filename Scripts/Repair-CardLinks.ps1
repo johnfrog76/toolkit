@@ -70,21 +70,21 @@ if (-not (Get-Command Resolve-P20PackageLink -ErrorAction SilentlyContinue)) {
     function Resolve-P20PackageLink {
         param([string]$TargetPath, [string]$FromDirectory, [string]$Fallback = '')
         if (-not $TargetPath -or -not $FromDirectory) { return $Fallback }
-        if (-not (Test-Path $TargetPath) -or -not (Test-Path $FromDirectory)) { return $Fallback }
+        if (-not (Test-Path -LiteralPath $TargetPath) -or -not (Test-Path -LiteralPath $FromDirectory)) { return $Fallback }
         # No relative path exists between two drives, or onto a network share, and
         # Resolve-Path -Relative then answers with the ABSOLUTE path (spelled
         # ".\<drive>:\..." by Windows PowerShell 5.1). That names a machine, and a
         # card is synced to others, so it is the caller's -Fallback instead: the
         # roots are compared first, and the answer is checked after.
         try {
-            $targetRoot = [System.IO.Path]::GetPathRoot((Convert-Path $TargetPath))
-            $fromRoot = [System.IO.Path]::GetPathRoot((Convert-Path $FromDirectory))
+            $targetRoot = [System.IO.Path]::GetPathRoot((Convert-Path -LiteralPath $TargetPath))
+            $fromRoot = [System.IO.Path]::GetPathRoot((Convert-Path -LiteralPath $FromDirectory))
         }
         catch { return $Fallback }
         if (-not [string]::Equals($targetRoot, $fromRoot, [System.StringComparison]::OrdinalIgnoreCase)) { return $Fallback }
-        Push-Location $FromDirectory
+        Push-Location -LiteralPath $FromDirectory
         try {
-            $rel = (Resolve-Path $TargetPath -Relative -ErrorAction Stop).Replace([char]92, [char]47)
+            $rel = (Resolve-Path -LiteralPath $TargetPath -Relative -ErrorAction Stop).Replace([char]92, [char]47)
             if ($rel.StartsWith('./')) { $rel = $rel.Substring(2) }
             if ($rel -match '^(?:[A-Za-z]:/|/)') { return $Fallback }
             return $rel
@@ -246,12 +246,12 @@ function Repair-P20CardLinks {
     param([Parameter(Mandatory = $true)][string]$Path)
 
     try {
-        if (-not (Test-Path $Path)) { return $false }
+        if (-not (Test-Path -LiteralPath $Path)) { return $false }
         # -Encoding UTF8 on the way in as well as the way out: without it,
         # Windows PowerShell 5.1 reads a BOM-less file in the ANSI code page and
         # a card with an emoji or a curly quote comes back mangled -- and this
         # function writes back everything it read.
-        $content = Get-Content -Path $Path -Raw -Encoding UTF8 -ErrorAction Stop
+        $content = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop
         if ($null -eq $content) { return $false }
         $cardDir = Split-Path $Path -Parent
         $updated = $content
@@ -362,8 +362,8 @@ function Repair-P20FolderLinks {
     param([Parameter(Mandatory = $true)][string]$Folder)
 
     $changed = 0
-    if (-not (Test-Path $Folder)) { return 0 }
-    foreach ($f in (Get-ChildItem -Path $Folder -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue)) {
+    if (-not (Test-Path -LiteralPath $Folder)) { return 0 }
+    foreach ($f in (Get-ChildItem -LiteralPath $Folder -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue)) {
         if (Repair-P20CardLinks -Path $f.FullName) { $changed++ }
     }
     return $changed

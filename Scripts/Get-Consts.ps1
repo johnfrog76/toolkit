@@ -41,10 +41,10 @@ function Get-P20Consts {
         return $script:P20ConstsCache
     }
     if (-not $Path) { $Path = Get-P20ConstsPath }
-    if (-not (Test-Path $Path)) {
+    if (-not (Test-Path -LiteralPath $Path)) {
         throw "consts.json not found at $Path. It is the package's contract file and has no default."
     }
-    $parsed = (Get-Content -Path $Path -Raw -Encoding UTF8 | ConvertFrom-Json)
+    $parsed = (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json)
     if (-not $Path -or $Path -eq (Get-P20ConstsPath)) { $script:P20ConstsCache = $parsed }
     return $parsed
 }

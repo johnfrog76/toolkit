@@ -10,6 +10,7 @@ caller supplies the file name and modified date.
 """
 
 import re
+from datetime import date
 
 # The ONE tracker rule (D-G2): a pure
 # function of an address, shared with the Space's own derivation.
@@ -18,14 +19,20 @@ from .consts import (
     card_id_shape,
     folder_archive,
     folder_backlog,
+    model_agent_sources,
     re_card_design_line,
+    re_co_author_trailer,
     re_commit_bullet,
     re_design_id,
     re_pr_url_line,
     re_review_line,
     re_started_line,
+    re_tag_separator,
+    rituals_assign_me,
+    stamp_agent,
     stamp_assigned,
     stamp_billable,
+    stamp_created,
     stamp_from,
     stamp_milestone,
     stamp_sprint,
@@ -38,6 +45,7 @@ from .consts import (
     token_previous_round,
     token_tags,
 )
+from .models import model_by_co_author, read_model_current, read_model_map
 
 # The state vocabulary and the two patterns that derive it come from
 # consts.json, the package's contract file -- NOT from literals here. This
@@ -198,6 +206,176 @@ def card_assigned(content: str) -> str:
     return m.group(1) if m else ""
 
 
+def card_agent(content: str) -> str:
+    """Who did the work, when an agent did: the value of the card's first
+    ``**Agent:**`` line, trimmed -- a model id, as written -- and "" when it has
+    none (a person worked it alone).
+
+    The line sits beside ``**Assigned:**``: the person owns the card, the agent
+    worked it. The value is never parsed here; ``agent/core/models.py``'s
+    ``model_info`` looks it up in the model map. The one reader of
+    ``stamps.agent`` in this half; the CLI's mirror is ``Get-P20CardAgent`` in
+    ``Scripts/Get-PromptFileStatus.ps1``, and ``Tests/fixtures/parsers/agent-lines.json``
+    holds the two to one table."""
+    m = re.search(r"(?m)^" + re.escape(stamp_agent()) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", content or "")
+    return m.group(1) if m else ""
+
+
+_GIT_HASH = re.compile(r"^[0-9a-f]{7,40}$")
+
+
+def commit_co_authors(message: str | None) -> list[str]:
+    """The names a commit message's ``Co-Authored-By`` trailers carry, trimmed, in
+    the order they are written: one per line that matches consts.json
+    ``regex.coAuthorTrailer`` (the key in any case, the name before an
+    ``<email>``). A person's name is a name too; whether it names a model is
+    ``models.model_by_co_author``'s question. The mirror of
+    ``Get-P20CommitCoAuthors``; ``Tests/fixtures/parsers/agent-source.json``
+    holds the two to one table."""
+    names = (m.group(1).strip() for m in re_co_author_trailer().finditer(message or ""))
+    return [n for n in names if n]
+
+
+def git_messages(raw: str | None) -> dict[str, str]:
+    """The output of ``git log --no-walk=unsorted --ignore-missing
+    --format=%x00%H%x1f%B <hashes>`` -> short hash (its first seven characters,
+    lower case) -> the commit's message, its trailing line endings removed.
+
+    A record with no unit separator, or whose hash is not 7 to 40 hex
+    characters, is skipped; a commit given twice keeps the first. Pure: the
+    caller runs git. The mirror of ``ConvertFrom-P20GitMessages``."""
+    out: dict[str, str] = {}
+    for rec in (raw or "").split("\x00"):
+        cut = rec.find("\x1f")
+        if cut < 0:
+            continue
+        full = rec[:cut].strip().lower()
+        if not _GIT_HASH.match(full):
+            continue
+        key = full[:7]
+        if key not in out:
+            out[key] = rec[cut + 1 :].rstrip("\r\n")
+    return out
+
+
+def _short_hash(value: str) -> str:
+    return str(value).strip().lower()[:7]
+
+
+def _trailer_model(content: str, messages: dict, models: dict) -> str | None:
+    """The trailer source: each of the card's commits votes once for every model
+    its trailers name; most votes wins, a tie to the first seen."""
+    msgs: dict[str, str] = {}
+    for k, v in messages.items():
+        key = _short_hash(k)
+        if key and key not in msgs:
+            msgs[key] = "" if v is None else str(v)
+    hashes: list[str] = []
+    for h in re_commit_bullet().findall(content or ""):
+        key = h.lower()[:7]
+        if key not in hashes:
+            hashes.append(key)
+    votes: dict[str, int] = {}
+    for h in hashes:
+        if h not in msgs:
+            continue
+        named: list[str] = []
+        for name in commit_co_authors(msgs[h]):
+            mid = model_by_co_author(name, models)
+            if mid and mid not in named:
+                named.append(mid)
+        for mid in named:
+            votes[mid] = votes.get(mid, 0) + 1
+    if not votes:
+        return None
+    best = max(votes.values())
+    # dicts keep insertion order: the first id to reach the best count was seen first.
+    return next(mid for mid, n in votes.items() if n == best)
+
+
+def resolve_card_agent(
+    content: str | None,
+    label: str | None = "",
+    messages: dict | None = None,
+    models: dict | None = None,
+    order: list[str] | tuple[str, ...] | None = None,
+    current: dict | None = None,
+) -> dict:
+    """Who worked a card, worked out every time it is read and never written into
+    it: ``{id, family, source}``. The sources are tried in ``order`` (default
+    consts.json ``models.agentSources``) and the first that answers wins:
+
+    - ``line``: the card's Agent line, as ``card_agent`` reads it -- the id
+      as written; family from the id's row, else the id as written.
+    - ``assigned``: a card with NO Agent line whose ``**Assigned:**``
+      value (``card_assigned``) names a worker -- a size, which
+      ``Route -Assign <size>`` writes on a card with no issue. Read tolerantly: a
+      key of the map's ``current`` block (ignoring case) is its model, id ``current[size]`` and
+      family that id's (else the id as written); any other value is the worker
+      as written, id None and family the value. Empty, ``rituals.assignMe``
+      (``me``, in any case) and an ``@<login>`` do not answer.
+    - ``trailer``: only when ``messages`` is given -- the card's own commit
+      bullets (``regex.commitBullet``, the squash-merged bullet among them,
+      distinct by their first seven characters, in bullet order) looked up in
+      ``messages``; each commit votes once for every model its ``Co-Authored-By``
+      trailers name, most votes wins, a tie to the first seen in bullet then
+      trailer order; a name no row carries is ignored, a hash with no message
+      skipped.
+    - ``label``: not in the shipped order, read only where ``order`` names it --
+      the card's issue's worker label, trimmed: id None, family the label as
+      written.
+    - ``none``: a person worked it alone -- id and family None.
+
+    An order that leaves ``none`` out still ends in it. ``messages`` is short
+    hash -> message (``git_messages``; a longer key is cut to seven) or None for
+    not read; ``models`` the map, None for the shipped one; ``current`` its ``current`` block. The mirror of
+    ``Resolve-P20CardAgent``; ``Tests/fixtures/parsers/agent-source.json`` holds
+    the two to one table."""
+    rows = read_model_map() if models is None else models
+    # The map's ``current`` block (worker size -> model id): the shipped one with
+    # the shipped map, else what the caller passes (none is empty).
+    if current is None:
+        current = read_model_current() if models is None else {}
+    # Keyed in lower case: a size matches ignoring case, as models.current_model matches it.
+    sizes = {str(k).lower(): v for k, v in (current or {}).items()} if isinstance(current, dict) else {}
+    for source in model_agent_sources() if order is None else order:
+        if source == "line":
+            mid = card_agent(content or "")
+            if mid:
+                row = rows.get(mid)
+                family = row.get("family") if isinstance(row, dict) else None
+                return {"id": mid, "family": family or mid, "source": "line"}
+        elif source == "assigned":
+            # A size's model may later come from the map's own size lookup
+            # (models.current_model, the CLI's Get-P20ModelForSize); the step stays here.
+            if card_agent(content or ""):
+                continue
+            size = card_assigned(content or "")
+            if not size or size.lower() == rituals_assign_me().lower() or size.startswith("@"):
+                continue
+            mid = sizes.get(size.lower())
+            if not mid:
+                return {"id": None, "family": size, "source": "assigned"}
+            row = rows.get(mid)
+            family = row.get("family") if isinstance(row, dict) else None
+            return {"id": str(mid), "family": family or str(mid), "source": "assigned"}
+        elif source == "trailer":
+            if messages is None:
+                continue
+            mid = _trailer_model(content or "", messages, rows)
+            if mid:
+                row = rows.get(mid)
+                family = row.get("family") if isinstance(row, dict) else None
+                return {"id": mid, "family": family or mid, "source": "trailer"}
+        elif source == "label":
+            text = (label or "").strip()
+            if text:
+                return {"id": None, "family": text, "source": "label"}
+        elif source == "none":
+            break
+    return {"id": None, "family": None, "source": "none"}
+
+
 def card_from_record(content: str) -> str | None:
     """The meeting record the card came from: the value of its first ``**From:**``
     line, trimmed -- the record's file stem, ``<series>-YYYY-MM-DD`` or the bare
@@ -266,7 +444,8 @@ def card_sprint(content: str) -> str:
 
 
 def card_tags(content: str) -> list[str]:
-    """The card's ``Tags:`` line, split on commas and trimmed, empties dropped;
+    """The card's ``Tags:`` line, split on commas or semicolons (``regex.tagSeparator``:
+    an Azure DevOps work item's tags arrive ``a; b``) and trimmed, empties dropped;
     [] when it has none or a parenthesised placeholder. The suggestion reads a
     card's severity and size from it, and the board's tag filter the whole list.
     ``Tag`` writes it. Mirror: ``Get-P20CardTags``, same table."""
@@ -274,7 +453,7 @@ def card_tags(content: str) -> list[str]:
     value = m.group(1) if m else ""
     if value.startswith("("):
         return []
-    return [t.strip() for t in value.split(",") if t.strip()]
+    return [t.strip() for t in re_tag_separator().split(value) if t.strip()]
 
 
 _ORDER_HEADING = re.compile(r"^##[ \t]+Order[ \t]*$", re.IGNORECASE)
@@ -337,25 +516,165 @@ def milestone_order(text: str, title: str, cards: list[dict]) -> dict:
     return {"ranked": ranked, "unranked": [str(c.get("id", "")) for c in rest], "stale": stale}
 
 
+def card_heading(content: str) -> str:
+    """A card's ``# `` heading, whole and trimmed, a leading emoji dropped; "" for none.
+    ``_split_heading`` reads its type and name. Mirror: ``Get-P20CardHeading``
+    in ``Scripts/Read-Backlog.ps1``."""
+    m = re.search(r"(?m)^#\s+(.+)", content or "")
+    if not m:
+        return ""
+    return re.sub(r"^[\U00002600-\U0001FFFF]\s*", "", m.group(1).strip())
+
+
+_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+
+def card_created(content: str) -> str:
+    """The yyyy-MM-dd a card's (or a milestone file's) first ``**Created:**`` line
+    starts with; "" for none or a placeholder. The same read
+    ``Get-P20SpaceOpenCards`` makes."""
+    m = _DAY.match(_card_line(content, stamp_created())[1])
+    return m.group(0) if m else ""
+
+
+def milestone_file_title(text: str) -> str:
+    """The title a milestone file names: its first ``# `` heading, trimmed; "" for
+    none. Mirror: ``Get-P20MilestoneTitle``."""
+    m = re.search(r"(?m)^#[ \t]+([^\r\n]*?)[ \t]*\r?$", text or "")
+    return m.group(1) if m else ""
+
+
+def backlog_card(name: str, folder: str, content: str, type_names, prefixes) -> dict | None:
+    """One open card as the Backlog reads it: ``{id, title, type, milestone, tags,
+    created, folder, file}``, or None for a file with no id. ``title`` is the
+    heading's name -- the heading whole when it names no known type -- and
+    ``type`` "" for none. Mirror: ``ConvertTo-P20BacklogCard``."""
+    cid = card_id(name, prefixes)
+    if not cid:
+        return None
+    heading = card_heading(content)
+    card_type, title = _split_heading(heading, type_names) if heading else (None, "")
+    return {
+        "id": cid,
+        "title": title,
+        "type": card_type or "",
+        "milestone": card_milestone(content),
+        "tags": card_tags(content),
+        "created": card_created(content),
+        "folder": folder,
+        "file": name,
+    }
+
+
+def _age(created: str, today: str) -> int | None:
+    try:
+        days = (date.fromisoformat(today) - date.fromisoformat(created)).days
+    except ValueError:
+        return None
+    return max(0, days)
+
+
+def _fold(value: str, spaces: bool = False) -> str:
+    v = (value or "").lower()
+    return re.sub(r"\s+", "", v) if spaces else v
+
+
+def backlog_rows(
+    cards: list[dict],
+    milestone_files: dict[str, str],
+    today: str,
+    milestone: str = "",
+    tag: str = "",
+    card_type: str = "",
+) -> list[dict]:
+    """The Backlog: the cards in ``backlog/`` as ranked rows (docs/hub/milestones.md,
+    "The Backlog: the order as a table"). The one reader in this half.
+
+    ``cards`` are the Space's open cards (``backlog_card``; current/ and backlog/).
+    A milestone is a group when a card in backlog/ names it, and every member of
+    a group is a row in its place -- a card in play too, ``in_play`` True -- so
+    the ranks read 1, 2, 3. A card in play with no milestone, or in a milestone
+    with no waiting card, is no row. ``milestone_files`` maps a file's name in ``milestones/``
+    to its text. Milestones with a file -- at the title's slug, its heading the
+    title exactly -- go first, by the file's created day (none after the
+    dated), ties by title; then milestones with no file, by title; inside each,
+    ``milestone_order``'s ranked ids then its unranked; then the cards with no
+    milestone, oldest first, no date last, ties by id. ``rank`` is the place among
+    the ranked ids (Plan -Rank's count), None when unranked; ``age`` the days since
+    created, 0 for a future day, None for none. The filters AND, matched ignoring
+    case (``card_type`` ignoring spaces too), and never change a rank.
+
+    Mirror: ``Get-P20BacklogRows`` in ``Scripts/Read-Backlog.ps1``;
+    ``Tests/fixtures/parsers/backlog-order.json`` holds the two to one table."""
+    waiting = [c for c in cards if c.get("folder") == folder_backlog()]
+    # Every open card by id: a group's rows are its members, in play or waiting.
+    by_id = {c["id"]: c for c in cards}
+    titles: list[str] = []
+    for c in waiting:
+        if c["milestone"] and c["milestone"] not in titles:
+            titles.append(c["milestone"])
+
+    groups = []
+    for t in titles:
+        text = milestone_files.get(f"{milestone_slug(t)}.md")
+        exists = text is not None and milestone_file_title(text) == t
+        created = card_created(text) if exists else ""
+        key = (0, created == "", created, t) if exists else (1, False, "", t)
+        groups.append((key, t, text if exists else ""))
+    groups.sort(key=lambda g: g[0])
+
+    rows: list[dict] = []
+
+    def add(c: dict, rank: int | None) -> None:
+        rows.append(
+            {
+                "rank": rank,
+                "id": c["id"],
+                "title": c["title"],
+                "type": c["type"],
+                "milestone": c["milestone"],
+                "tags": list(c["tags"]),
+                "age": _age(c["created"], today) if c["created"] else None,
+                "created": c["created"],
+                "file": c.get("file", ""),
+                "in_play": c.get("folder") != folder_backlog(),
+            }
+        )
+
+    for _, t, text in groups:
+        order = milestone_order(text, t, cards)
+        for i, cid in enumerate(order["ranked"]):
+            if cid in by_id:
+                add(by_id[cid], i + 1)
+        for cid in order["unranked"]:
+            if cid in by_id:
+                add(by_id[cid], None)
+    loose = [c for c in waiting if not c["milestone"]]
+    for c in sorted(loose, key=lambda c: (c["created"] == "", c["created"], c["id"])):
+        add(c, None)
+
+    if milestone:
+        rows = [r for r in rows if _fold(r["milestone"]) == _fold(milestone)]
+    if tag:
+        rows = [r for r in rows if any(_fold(t) == _fold(tag) for t in r["tags"])]
+    if card_type:
+        rows = [r for r in rows if r["type"] and _fold(r["type"], True) == _fold(card_type, True)]
+    return rows
+
+
 def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder: str = "") -> dict:
     """Extract the file-content-derived fields of PromptInfo.
 
-    Returns a dict with keys: title, type, name, linked, tracker, billable, assigned, from_record, sprint,
+    Returns a dict with keys: title, type, name, linked, tracker, billable, assigned, agent, from_record, sprint,
     milestone, tags, progress, checked, total, ado_url, pr_url, previous_round, design, commits, status --
     the content half of the Card model (docs/hub/cards.md, "The model, as the agent serves it").
     ``id`` comes from the FILENAME (``card_id``), so the caller adds it. Fields that need filesystem access (file
     name, modified date) are filled in by the caller.
     """
-    title = ""
-    card_type = None
-    name = ""
-    m = re.search(r"(?m)^#\s+(.+)", content)
-    if m:
-        title = m.group(1).strip()
-        title = re.sub(r"^[\U00002600-\U0001FFFF]\s*", "", title)
-        card_type, name = _split_heading(title, type_names)
-        if len(title) > 60:
-            title = title[:57] + "..."
+    title = card_heading(content)
+    card_type, name = _split_heading(title, type_names) if title else (None, "")
+    if len(title) > 60:
+        title = title[:57] + "..."
 
     checked = len(re.findall(r"(?m)^\s*-\s*\[x\]", content))
     total = len(re.findall(r"(?m)^\s*-\s*\[[x ]\]", content))
@@ -414,6 +733,8 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder:
         "billable": card_billable(content),
         # Who takes it: the **Assigned:** line's value (me, or a size), "" for nobody.
         "assigned": card_assigned(content),
+        # Who did the work, when an agent did: the **Agent:** line's model id, "" for none.
+        "agent": card_agent(content),
         # The meeting record an agenda line came from: the **From:** line's
         # record stem, None when the card names none (NewPrompt -From writes it).
         "from_record": card_from_record(content),

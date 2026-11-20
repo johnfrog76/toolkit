@@ -37,6 +37,7 @@ $pkgRoot = Split-Path $scriptDir -Parent
 . (Join-Path $pkgRoot 'Scripts/Get-Consts.ps1')
 . (Join-Path $pkgRoot 'Scripts/Resolve-HubConfig.ps1')
 . (Join-Path $pkgRoot 'Scripts/Read-DesignTree.ps1')
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 # -- Test harness --------------------------------------------------------------
 
@@ -260,7 +261,7 @@ try {
         $stamped = Join-Path $base 'stamped'
         New-Item -ItemType Directory -Path $stamped -Force | Out-Null
         Push-Location $stamped
-        try { git init -q . 2>$null | Out-Null } finally { Pop-Location }
+        try { $null = Invoke-P20TestGit init -q . } finally { Pop-Location }
         Write-Lf (Join-Path $stamped 'design/one.md') "---`n${idKey}: $idAlone`n---`n`n# One`n"
         $row = Get-DesignRow -In $stamped
         Assert-Equal 'a repository whose files are all stamped is on' $states.On $row.state
@@ -277,7 +278,7 @@ try {
         $readmeOnly = Join-Path $base 'readme-only'
         New-Item -ItemType Directory -Path $readmeOnly -Force | Out-Null
         Push-Location $readmeOnly
-        try { git init -q . 2>$null | Out-Null } finally { Pop-Location }
+        try { $null = Invoke-P20TestGit init -q . } finally { Pop-Location }
         Write-Lf (Join-Path $readmeOnly 'design/README.md') "# Design notes`n"
         Write-Lf (Join-Path $readmeOnly 'spec/README.md') "# Specs`n"
         $row = Get-DesignRow -In $readmeOnly
@@ -288,7 +289,7 @@ try {
         $nodesign = Join-Path $base 'nodesign'
         New-Item -ItemType Directory -Path $nodesign -Force | Out-Null
         Push-Location $nodesign
-        try { git init -q . 2>$null | Out-Null } finally { Pop-Location }
+        try { $null = Invoke-P20TestGit init -q . } finally { Pop-Location }
         $row = Get-DesignRow -In $nodesign
         Assert-Equal 'a repository with no design/ is not configured' $states.Unset $row.state
     }
@@ -363,7 +364,15 @@ try {
     . (Join-Path $pkgRoot 'Scripts/Resolve-Tracker.ps1')
     . (Join-Path $pkgRoot 'Scripts/Resolve-SpaceCheckout.ps1')
     $table = Get-Content -LiteralPath (Join-Path $pkgRoot 'Tests/fixtures/space-checkout/table.json') -Raw | ConvertFrom-Json
+    # What counts as absolute is the platform's: a row that carries "os" runs only
+    # there, a row without one runs everywhere, and any other value stops the suite.
+    $here = 'posix'
+    if ($env:OS -eq 'Windows_NT') { $here = 'windows' }
     foreach ($row in @($table.paths)) {
+        if ($row.PSObject.Properties['os']) {
+            if (@('posix', 'windows') -notcontains [string]$row.os) { throw "the paths row '$($row.written)' has os '$($row.os)'; it is posix, windows or absent" }
+            if ([string]$row.os -ne $here) { continue }
+        }
         if ($row.PSObject.Properties['home']) {
             $want = $HOME
             if ($row.home) { $want = Join-Path $HOME $row.home }
@@ -371,8 +380,26 @@ try {
         else { $want = [string]$row.expect }
         Assert-Equal "a path written '$($row.written)' reads as '$want'" $want (ConvertTo-P20CheckoutPath $row.written)
     }
+    # A separator at the end of a folder path, with both of Windows's named so
+    # its rows are read on every host. A root keeps its own.
+    foreach ($row in @($table.trailing)) {
+        Assert-Equal "a folder written '$($row.path)' is '$($row.expect)' without its trailing separator" ([string]$row.expect) (Remove-P20TrailingSeparator ([string]$row.path) -Separators @([char]'\', [char]'/'))
+    }
     foreach ($row in @($table.origins)) {
         Assert-Equal "the remote '$($row.url)' names '$($row.repo)'" $row.repo (Get-P20GitHubOriginRepo -Url $row.url)
+    }
+    foreach ($row in @($table.adoOrigins)) {
+        Assert-Equal "the Azure DevOps remote '$($row.url)' names '$($row.repo)'" $row.repo (Get-P20AdoOriginRepo -Url $row.url)
+    }
+    foreach ($row in @($table.targets)) {
+        $got = Get-P20CheckoutTarget -OrgUrl $row.org -Projects @($row.projects)
+        Assert-Equal "the Space at '$($row.org)' with $(@($row.projects).Count) project(s) is a clone of '$($row.repo)'" $row.repo ([string]$got.Repo)
+    }
+    foreach ($row in @($table.clones)) {
+        $target = [string](Get-P20CheckoutTarget -OrgUrl $row.org -Projects @($row.projects)).Repo
+        $origin = Get-P20OriginRepo -Url $row.origin -Tracker (Resolve-P20Tracker -OrgUrl $row.org)
+        $hit = [bool]$target -and ($origin -ieq $target)
+        Assert-Equal "a clone with origin '$($row.origin)' answers for '$($row.org)': $($row.match)" $row.match $hit
     }
     foreach ($row in @($table.matches)) {
         $same = [bool]$row.origin -and ($row.origin -ieq $row.space)
@@ -382,6 +409,30 @@ try {
     $cfg = @{ SpaceCheckouts = ('{"prod":{"path":"/srv/r"}}' | ConvertFrom-Json) }
     Assert-Equal 'Get-P20ConfiguredCheckout reads the Space''s path' '/srv/r' (Get-P20ConfiguredCheckout -Slug 'prod' -Config $cfg)
     Assert-Equal 'and another Space has none' '' (Get-P20ConfiguredCheckout -Slug 'other' -Config $cfg)
+
+    # A real clone whose path holds a space, asked for with the platform's
+    # separator at its end. Under Windows PowerShell 5.1 that is
+    # `...\my clone\`, which the host wraps in quotes without doubling the last
+    # backslash: unescaped, git reads the closing quote into the path and the
+    # clone reads as not a clone. Test-P20CheckoutCandidate is handed the path as
+    # written, so it is Invoke-P20TrackerRead's escaping that is on trial, not
+    # the trim in ConvertTo-P20CheckoutPath. On every other host the row passes
+    # either way; the ps51 job is where it can fail.
+    . (Join-Path $pkgRoot 'Scripts/Invoke-TrackerRead.ps1')
+    $cloneLeaf = "my clone $([guid]::NewGuid().ToString('N').Substring(0, 8))"
+    $cloneRoot = Join-Path ([System.IO.Path]::GetTempPath()) $cloneLeaf
+    try {
+        $null = New-Item -ItemType Directory -Path $cloneRoot -Force
+        $null = Invoke-P20TestGit -C $cloneRoot init --quiet
+        $null = Invoke-P20TestGit -C $cloneRoot remote add origin https://github.com/o/r.git
+        $asked = $cloneRoot + [System.IO.Path]::DirectorySeparatorChar
+        $hit = Test-P20CheckoutCandidate -Path $asked -Repo 'o/r' -Tracker 'github'
+        $edition = "$($PSVersionTable.PSEdition) $($PSVersionTable.PSVersion)"
+        Assert-True "a clone in a folder with a space, asked for with a trailing separator, is found ($edition)" (([string]$hit.Top) -and ((Split-Path -Leaf ([string]$hit.Top)) -eq $cloneLeaf)) "asked '$asked'; top '$($hit.Top)'; why '$($hit.Why)'"
+        $viaConfig = Resolve-P20SpaceCheckout -OrgUrl 'https://github.com/o/r' -Projects @() -Configured $asked -ConfiguredKey 'spaceCheckouts.prod.path' -WsRoot ''
+        Assert-True 'and the same path as the configured checkout resolves to that clone' (($viaConfig.Source -eq 'configured') -and ((Split-Path -Leaf ([string]$viaConfig.Root)) -eq $cloneLeaf)) "root '$($viaConfig.Root)'; reason '$($viaConfig.Reason)'; configured '$($viaConfig.ConfiguredReason)'"
+    }
+    finally { Remove-Item -LiteralPath $cloneRoot -Recurse -Force -ErrorAction SilentlyContinue }
 
     . (Join-Path $pkgRoot 'Scripts/Get-OptionalSurfaces.ps1')
     $none = Get-P20OptionalSurfaces -Prefix 'tk' -PackageRoot $pkgRoot -Config @{ ActiveSpace = 'prod'; Spaces = @() } | Where-Object { $_.key -eq 'spaceCheckouts' }

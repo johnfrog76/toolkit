@@ -82,7 +82,7 @@ describe("the played standup's route", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/did not answer/);
   });
 
-  it("with an answer, plays it in Suitcase at desktop width, prev and next beside the transport", () => {
+  it("with an answer, plays it in Audiobook mode at desktop width, prev and next either side of the ring", () => {
     answer = { data: noTracker() };
     mount();
     expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();

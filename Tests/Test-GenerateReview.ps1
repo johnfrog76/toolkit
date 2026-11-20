@@ -38,6 +38,8 @@ if ($Help) {
 
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
+
 $testDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot = Split-Path $testDir -Parent
 $reviewScript = Join-Path $pkgRoot 'Scripts/Generate-Review.ps1'
@@ -88,8 +90,8 @@ function Invoke-DatedCommit {
     param([string]$Message, [string]$Stamp)
     $env:GIT_AUTHOR_DATE = $Stamp
     $env:GIT_COMMITTER_DATE = $Stamp
-    git add -A 2>&1 | Out-Null
-    git -c user.name='Fixture' -c user.email='fixture@example.com' commit -m $Message 2>&1 | Out-Null
+    $null = Invoke-P20TestGit add -A
+    $null = Invoke-P20TestGit -c user.name='Fixture' -c user.email='fixture@example.com' commit -m $Message
     $env:GIT_AUTHOR_DATE = $null
     $env:GIT_COMMITTER_DATE = $null
 }
@@ -101,8 +103,8 @@ $savedReviewsDir = $env:PROMPTS_REVIEWS_DIR
 
 Push-Location $hub
 try {
-    git init -q -b main 2>&1 | Out-Null
-    git config core.autocrlf false 2>&1 | Out-Null
+    $null = Invoke-P20TestGit init -q -b main
+    $null = Invoke-P20TestGit config core.autocrlf false
 
     # Well outside the window under test.
     New-Card 'first/archive/101-old-thing.prompt.md' 'An older closed card' 'Sprint 1' '- [x] done'
@@ -238,6 +240,39 @@ try {
     Assert-True 'the combined review is written to the combined folder' `
         (Test-Path (Join-Path $hub 'reviews/first+second/2026/2026-05-11_2026-05-13/review.md'))
 
+    # The prose pass writes into review.md, so a second run for a range must not
+    # write over it. The refusal is JSON, which the route answers as a 400.
+    $writtenUp = Join-Path $hub 'reviews/first/2026/2026-05-11_2026-05-13/review.md'
+
+    # A scaffold nobody has touched is the one exception: it carries a fingerprint
+    # of its own body, and a second run writes it again.
+    $fresh = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' -Slugs 'first' | ConvertFrom-Json
+    $scaffoldText = if (Test-Path -LiteralPath $writtenUp) { [System.IO.File]::ReadAllText($writtenUp) } else { '' }
+    Assert-True 'the scaffold carries a fingerprint of its body in the frontmatter' ($scaffoldText -match '(?m)^scaffold: [0-9a-f]{64}$' -and $scaffoldText -match '(?s)\A---\n.*generator: scaffold\n.*scaffold: ') $scaffoldText
+    $again = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' -Slugs 'first' | ConvertFrom-Json
+    Assert-True 'a second run over an untouched scaffold writes it again, with no error' (-not $again.error -and $again.file_path -match 'reviews/first/') "$($again.error)"
+    [System.IO.File]::WriteAllText($writtenUp, ($scaffoldText -replace "`n", "`r`n"), [System.Text.UTF8Encoding]::new($false))
+    $crlf = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' -Slugs 'first' | ConvertFrom-Json
+    Assert-True 'and one a sync turned CRLF still reads as untouched' (-not $crlf.error) "$($crlf.error)"
+    $touched = @(
+        @{ Why = 'a line added to its body'; Text = $scaffoldText.TrimEnd() + "`n`nOne thing I want to say about this.`n" },
+        @{ Why = 'a word changed in its body'; Text = ($scaffoldText -replace '# ', '# Edited ') },
+        @{ Why = 'one from before the fingerprint'; Text = ($scaffoldText -replace '(?m)^scaffold: [0-9a-f]{64}\n', '') },
+        @{ Why = 'its generator changed'; Text = ($scaffoldText -replace 'generator: scaffold', 'generator: prose') }
+    )
+    foreach ($row in $touched) {
+        [System.IO.File]::WriteAllText($writtenUp, $row.Text, [System.Text.UTF8Encoding]::new($false))
+        $r = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' -Slugs 'first' | ConvertFrom-Json
+        Assert-Contains "a scaffold with $($row.Why) is refused" "$($r.error)" 'edited or written up'
+        Assert-True 'and left exactly as it was' ([System.IO.File]::ReadAllText($writtenUp) -ceq $row.Text)
+    }
+    $prose = "# A finished review`n`nWritten up by hand, and not a scaffold.`n"
+    [System.IO.File]::WriteAllText($writtenUp, $prose, [System.Text.UTF8Encoding]::new($false))
+    $second = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' | ConvertFrom-Json
+    Assert-Contains 'a second run for a range is refused, naming the file' "$($second.error)" 'already exists'
+    Assert-True 'and the written review is untouched' ([System.IO.File]::ReadAllText($writtenUp) -ceq $prose)
+    Remove-Item -LiteralPath $writtenUp -Force
+
     $singleViaSlugs = & $reviewScript -StartDate '2026-05-11' -EndDate '2026-05-13' -Slugs 'first' | ConvertFrom-Json
     Assert-Contains 'one slug via -Slugs writes the plain org folder' $singleViaSlugs.file_path 'reviews/first/'
     Assert-NotContains 'and a one-org review does not label its bullets' $singleViaSlugs.review '**[first]**'
@@ -281,8 +316,8 @@ try {
     New-Item -ItemType Directory -Path $renamedHub -Force | Out-Null
     Push-Location $renamedHub
     try {
-        git init -q -b main 2>&1 | Out-Null
-        git config core.autocrlf false 2>&1 | Out-Null
+        $null = Invoke-P20TestGit init -q -b main
+        $null = Invoke-P20TestGit config core.autocrlf false
         # Everything the default-named hub has, under a different name.
         [System.IO.File]::WriteAllText((Join-Path $renamedHub 'hub.json'),
             '{ "folders": { "growth": "development" } }', [System.Text.UTF8Encoding]::new($false))
@@ -387,8 +422,8 @@ try {
     # time inside the window -- the shape a reorganisation or a backfill leaves.
     New-StampedHub $gitHub9
     Push-Location $gitHub9
-    git init -q -b main 2>&1 | Out-Null
-    git config core.autocrlf false 2>&1 | Out-Null
+    $null = Invoke-P20TestGit init -q -b main
+    $null = Invoke-P20TestGit config core.autocrlf false
     Invoke-DatedCommit 'reorganise: every card touched in one commit' '2026-05-25T09:00:00'
     Pop-Location
 

@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { ToolkitLog } from "./ToolkitLog";
+import { expectListPanelShape } from "../../shell/kinds/panelShapeAssert";
 
 // The Log card's two filters are native <select>s with no visible label,
 // and axe's select-name (critical) found them nameless on the System page. A
@@ -55,5 +56,19 @@ describe("ToolkitLog's filters", () => {
     render(<ToolkitLog />);
     expect(screen.getByRole("combobox", { name: "Entry type" })).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Period" })).toBeTruthy();
+  });
+
+  it("is a list panel of line items: one band each, the text whole and no tooltip", () => {
+    const { container } = render(<ToolkitLog />);
+    // The entry is older than the default week.
+    fireEvent.change(screen.getByRole("combobox", { name: "Period" }), { target: { value: "0" } });
+    const items = expectListPanelShape(container.querySelector<HTMLElement>("[data-panel-kind]")!, {
+      titles: ["Status"],
+      total: 1,
+    });
+    expect(items[0].textContent).toContain("09:00:00");
+    expect(items[0].textContent).toContain("CMD");
+    expect(items[0].textContent).toContain("Status ok");
+    expect(items[0].querySelector("[title]")).toBeNull();
   });
 });

@@ -1,0 +1,19 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Waiting on you
+  Nothing is waiting on you.
+
+Fable
+  Status     "Yesterday I read up on how the team works, so I'm ready for what's next."
+  Status     "Today I'll move my shell to the new terminal and pick a theme."
+Opus
+  Yesterday  nothing closed
+  Today      K9L2 (2 commits) Wire the column
+  Blockers   no blockers
+Opus
+  Yesterday  nothing closed
+  Today      R4T6 (started) Read the board
+  Blockers   no blockers
+
+"Let's circle back."

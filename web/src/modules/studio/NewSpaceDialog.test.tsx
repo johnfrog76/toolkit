@@ -276,7 +276,7 @@ describe("the + on the Spaces card", () => {
     );
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByText(/Added Juggling Engine\./)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Go into Juggling Engine" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open Juggling Engine" })).toBeTruthy();
   });
 
   it("shows a refusal in the verb's own words, in the dialog, and keeps it open", async () => {

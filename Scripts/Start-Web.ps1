@@ -85,8 +85,8 @@ function Show-ConfigHelp {
 }
 
 function Get-DevServerProcessId {
-    if (-not (Test-Path $pidFile)) { return 0 }
-    $raw = (Get-Content $pidFile -Raw).Trim()
+    if (-not (Test-Path -LiteralPath $pidFile)) { return 0 }
+    $raw = (Get-Content -LiteralPath $pidFile -Raw -Encoding UTF8).Trim()
     if (-not $raw) { return 0 }
     try {
         $proc = Get-Process -Id $raw -ErrorAction Stop
@@ -94,7 +94,7 @@ function Get-DevServerProcessId {
         return 0
     }
     catch {
-        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
         return 0
     }
 }
@@ -102,8 +102,8 @@ function Get-DevServerProcessId {
 # Vite asks for 5174 and takes the next free port if it is busy, so the URL is
 # read back out of its own output rather than assumed.
 function Get-DevServerUrl {
-    if (-not (Test-Path $logFile)) { return '' }
-    $line = Get-Content $logFile -ErrorAction SilentlyContinue |
+    if (-not (Test-Path -LiteralPath $logFile)) { return '' }
+    $line = Get-Content -LiteralPath $logFile -ErrorAction SilentlyContinue -Encoding UTF8 |
         Where-Object { $_ -match 'https?://localhost:\d+' } |
         Select-Object -Last 1
     if (-not $line) { return '' }
@@ -193,8 +193,8 @@ function Open-WebUi {
 # file that decides is the file that is read.
 function Get-ProductionPort {
     $compose = Join-Path $webPath 'docker-compose.yml'
-    if (Test-Path $compose) {
-        $m = [regex]::Match((Get-Content $compose -Raw -ErrorAction SilentlyContinue), '"(?:[\d.]+:)?(\d+):\d+"')
+    if (Test-Path -LiteralPath $compose) {
+        $m = [regex]::Match((Get-Content -LiteralPath $compose -Raw -ErrorAction SilentlyContinue -Encoding UTF8), '"(?:[\d.]+:)?(\d+):\d+"')
         if ($m.Success) { return [int]$m.Groups[1].Value }
     }
     return $script:DefaultDevPort
@@ -206,8 +206,8 @@ function Get-ProductionPort {
 function Get-DevServerPorts {
     $ports = @()
     $viteConfig = Join-Path $webPath 'vite.config.ts'
-    if (Test-Path $viteConfig) {
-        $m = [regex]::Match((Get-Content $viteConfig -Raw -ErrorAction SilentlyContinue), 'port:\s*(\d+)')
+    if (Test-Path -LiteralPath $viteConfig) {
+        $m = [regex]::Match((Get-Content -LiteralPath $viteConfig -Raw -ErrorAction SilentlyContinue -Encoding UTF8), 'port:\s*(\d+)')
         if ($m.Success) { $ports += [int]$m.Groups[1].Value }
     }
     if ($ports.Count -eq 0) { $ports += $script:DefaultDevPort }
@@ -348,6 +348,60 @@ function Test-IsDevServerProcess {
     return (($Name -eq 'node') -or ($Name -eq 'node.exe'))
 }
 
+# Whether a node listener belongs to THIS checkout. A node on the dev port is
+# only an orphan of ours when it was started from this package's web/ folder:
+# its command line names a path under it, or its working directory is under it.
+# Any other node -- another checkout's dev server, an unrelated script -- is not
+# ours to stop, and an answer that cannot be read is "not ours": being unable to
+# tell is not evidence of being an orphan. A listener that descends from the PID
+# file's process never reaches here; the callers have already set those aside.
+if (-not (Get-Command Test-WebListenerIsOurs -ErrorAction SilentlyContinue)) {
+    function Test-WebListenerIsOurs {
+        param([int]$ProcessId)
+        if ($ProcessId -le 0) { return $false }
+        $roots = @($webPath)
+        try {
+            $resolved = (Resolve-Path -LiteralPath $webPath -ErrorAction Stop).ProviderPath
+            if ($resolved -and ($roots -notcontains $resolved)) { $roots += $resolved }
+        }
+        catch { $null = $_ }
+        $sep = [System.IO.Path]::DirectorySeparatorChar
+        $under = {
+            param([string]$Text, [bool]$Exact)
+            if (-not $Text) { return $false }
+            foreach ($root in $roots) {
+                $base = $root.TrimEnd('\', '/')
+                if ($Exact -and [string]::Equals($Text.TrimEnd('\', '/'), $base, [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
+                if ($Text.IndexOf($base + $sep, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { return $true }
+                if ($Text.IndexOf($base + '/', [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { return $true }
+            }
+            return $false
+        }
+        try {
+            if ($script:IsWin) {
+                # The command line only: Windows does not expose a working
+                # directory. Without CimCmdlets there is no answer, so no.
+                if (-not (Get-Command Get-CimInstance -ErrorAction SilentlyContinue)) { return $false }
+                $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction SilentlyContinue
+                if ($proc -and (& $under ([string]$proc.CommandLine) $false)) { return $true }
+                return $false
+            }
+            $cmd = & ps -o command= -p $ProcessId 2>$null
+            if ($cmd -and (& $under (($cmd | Out-String).Trim()) $false)) { return $true }
+            $cwd = ''
+            if (Test-Path -LiteralPath "/proc/$ProcessId/cwd") {
+                $cwd = [string](Get-Item -LiteralPath "/proc/$ProcessId/cwd" -ErrorAction SilentlyContinue).Target
+            }
+            elseif (Get-Command lsof -ErrorAction SilentlyContinue) {
+                $line = @(& lsof -a -p $ProcessId -d cwd -Fn 2>$null | Where-Object { $_ -like 'n*' }) | Select-Object -First 1
+                if ($line) { $cwd = ([string]$line).Substring(1) }
+            }
+            return (& $under $cwd $true)
+        }
+        catch { return $false }
+    }
+}
+
 if (-not (Get-Command Stop-WebProcessTree -ErrorAction SilentlyContinue)) {
     function Stop-WebProcessTree {
         param([int]$ProcessId)
@@ -378,7 +432,7 @@ if (-not (Get-Command Test-DockerAvailable -ErrorAction SilentlyContinue)) {
 # One definition of "take the container down", called by -Stop and -Restart.
 if (-not (Get-Command Invoke-WebComposeDown -ErrorAction SilentlyContinue)) {
     function Invoke-WebComposeDown {
-        Push-Location $webPath
+        Push-Location -LiteralPath $webPath
         try { docker compose down 2>$null | Out-Null }
         finally { Pop-Location }
     }
@@ -408,7 +462,7 @@ function Stop-DevServer {
         $ours = @($running) + (Get-WebDescendantIds -ProcessId $running)
         Stop-WebProcessTree -ProcessId $running
         Write-Host "  Dev server stopped (PID $running and its children)." -ForegroundColor Green
-        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
         $stopped = $true
         Start-Sleep -Milliseconds 200
     }
@@ -431,6 +485,10 @@ function Stop-DevServer {
                 Write-Host "  Port $port is held by $label (PID $listener) -- not a dev server; not stopping it." -ForegroundColor Yellow
                 continue
             }
+            if (-not (Test-WebListenerIsOurs -ProcessId $listener)) {
+                Write-Host "  Port $port is held by a $name (PID $listener) that belongs to another checkout; not stopping it." -ForegroundColor Yellow
+                continue
+            }
             Stop-WebProcessTree -ProcessId $listener
             Write-Host "  Also stopped PID $listener ($name), which was still listening on port $port." -ForegroundColor Yellow
             $stopped = $true
@@ -442,7 +500,7 @@ function Stop-DevServer {
 
 if ($Help) { Show-ConfigHelp; exit 0 }
 
-if (-not (Test-Path $webPath)) {
+if (-not (Test-Path -LiteralPath $webPath)) {
     Write-CliError -Message "No web/ directory at $webPath." `
         -Hint 'The web UI ships in this repo; a checkout missing it is incomplete.'
     Write-WebLog 'ERR' 'web/ not found'
@@ -492,8 +550,13 @@ if ($Status) {
             if ($ours -contains $listener) { continue }
             $name = Get-WebProcessName -ProcessId $listener
             if (Test-IsDevServerProcess $name) {
-                $orphans += $listener
-                Write-Host "  Port $port is still being served by PID $listener ($name), which this command did not start." -ForegroundColor Yellow
+                if (Test-WebListenerIsOurs -ProcessId $listener) {
+                    $orphans += $listener
+                    Write-Host "  Port $port is still being served by PID $listener ($name), which this command did not start." -ForegroundColor Yellow
+                }
+                else {
+                    Write-Host "  Port $port is held by a $name (PID $listener) that belongs to another checkout; not stopping it." -ForegroundColor Yellow
+                }
             }
             else {
                 $label = $name
@@ -507,7 +570,7 @@ if ($Status) {
     }
 
     if (Test-DockerAvailable) {
-        Push-Location $webPath
+        Push-Location -LiteralPath $webPath
         try {
             # -q prints ids and nothing else, so there is no header row to
             # mistake for a running container.
@@ -574,7 +637,7 @@ if ($Dev) {
         Write-WebLog 'ERR' 'npm not found'
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    if (-not (Test-Path (Join-Path $webPath 'node_modules'))) {
+    if (-not (Test-Path -LiteralPath (Join-Path $webPath 'node_modules'))) {
         Write-CliError -Message 'web/node_modules is missing -- the dev server has nothing to run.' `
             -Hint "Run: cd $webPath; npm ci"
         Write-WebLog 'ERR' 'node_modules missing'
@@ -649,7 +712,7 @@ if ($Dev) {
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
 
-        $proc.Id | Set-Content $pidFile -Encoding UTF8
+        $proc.Id | Set-Content -LiteralPath $pidFile -Encoding UTF8
 
         # Wait for Vite to print its port rather than guessing 5174: it takes the
         # next free one, and a URL that is merely probable is worse than none.
@@ -665,7 +728,7 @@ if ($Dev) {
             Write-CliError -Message 'The dev server exited immediately after starting.' `
                 -Hint 'Read web.err.log at the repository root.'
             Write-WebLog 'ERR' 'dev server exited immediately'
-            Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
             exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
         }
 
@@ -712,7 +775,7 @@ Write-Host "  Building and starting the web container ..." -ForegroundColor Cyan
 # to the container, where nginx's entrypoint writes it into the proxy_pass.
 $agentPort = Export-AgentPortForProxies
 Write-Host "  The container proxies /api to the agent on port $agentPort." -ForegroundColor Gray
-Push-Location $webPath
+Push-Location -LiteralPath $webPath
 try {
     docker compose up --build -d
     if ($LASTEXITCODE -ne 0) {

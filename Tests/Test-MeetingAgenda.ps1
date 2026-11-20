@@ -14,6 +14,8 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+# Children start in the host this suite runs in (Tests/Get-TestHost.ps1).
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot = Split-Path $scriptDir -Parent
@@ -127,7 +129,7 @@ function Invoke-Agenda {
     # Windows PowerShell 5.1 turns a redirected native stderr into a throw under
     # 'Stop' before $LASTEXITCODE can be read; a refusal's text is the subject here.
     $ErrorActionPreference = 'Continue'
-    $output = pwsh -NoProfile -Command $command 2>&1 | Out-String
+    $output = Invoke-P20TestHost -Command $command | Out-String
     return @{ Output = $output; ExitCode = $LASTEXITCODE }
 }
 
@@ -362,6 +364,31 @@ try {
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { Remove-AgendaSandbox $sandbox }
+
+# A stage change rewrites the whole session. Under Windows PowerShell 5.1 it read
+# the file with no encoding, as ANSI, and wrote that back as UTF-8, so every
+# non-ASCII character doubled on each change. The verb runs in this suite's own
+# host (Tests/Get-TestHost.ps1), so the 5.1 job runs it on 5.1. The text is built
+# from code points; the bytes are compared, not a decoding of them.
+$sandbox = New-AgendaSandbox
+try {
+    $null = Invoke-Agenda -Root $sandbox -Arguments @('-Date', '2026-06-19', '-Plan')
+    $sessionPath = Get-SessionPath $sandbox '2026-06-19'
+    $words = 'Caf' + [char]0x00E9 + ' with Zo' + [char]0x00EB + ' ' + [char]0x2014 + ' ' + [char]0x201C + 'fine' + [char]0x201D
+    [System.IO.File]::AppendAllText($sessionPath, "`n$words`n", (New-Object System.Text.UTF8Encoding($false)))
+    $null = Invoke-Agenda -Root $sandbox -Arguments @('-Date', '2026-06-19', '-Prep')
+    $null = Invoke-Agenda -Root $sandbox -Arguments @('-Date', '2026-06-19', '-Retro')
+    Assert-True "two stage changes on a non-ASCII session reach retro (PowerShell $($PSVersionTable.PSVersion.Major))" ((Get-Stage $sandbox '2026-06-19') -eq 'retro')
+    $sessionText = [System.IO.File]::ReadAllText($sessionPath, (New-Object System.Text.UTF8Encoding($false)))
+    Assert-True "and the session's non-ASCII text is still itself" ($sessionText.Contains($words)) ($sessionText -replace "`r?`n", ' | ')
+    # An e-acute read as ANSI and written back as UTF-8 is A-tilde and a
+    # copyright sign: the doubled form, which must not be there.
+    Assert-True "and none of it was encoded twice, and there is no BOM" ((-not $sessionText.Contains([string][char]0x00C3 + [char]0x00A9)) -and -not (Test-HasBom $sessionPath))
+}
+catch {
+    Assert-True 'the non-ASCII session cases ran to the end' $false $_.Exception.Message
 }
 finally { Remove-AgendaSandbox $sandbox }
 
@@ -675,7 +702,7 @@ try {
     Assert-Contains "a date that is not a date is refused" $result.Output 'Invalid date'
 
     $script = Join-Path $sandbox 'pkg/Scripts/Get-MeetingAgenda.ps1'
-    $output = pwsh -NoProfile -Command "`$env:PROMPTS_ROOT = ''; & '$script'" 2>&1 | Out-String
+    $output = Invoke-P20TestHost -Command "`$env:PROMPTS_ROOT = ''; & '$script'" | Out-String
     Assert-Contains "an unconfigured hub is reported in words" $output 'Hub not found'
     Assert-Contains "and names the file the path came from" $output 'config.local.json'
     Assert-True "and does not write a raw error record" ($output -notmatch 'Write-Error') $output
@@ -685,7 +712,7 @@ try {
     # directory that does not exist reaches the identical guard on any host.
     #
     $ghost = Join-Path $sandbox 'no-such-folder/hub'
-    $output = pwsh -NoProfile -Command "`$env:PROMPTS_ROOT = '$ghost'; & '$script'" 2>&1 | Out-String
+    $output = Invoke-P20TestHost -Command "`$env:PROMPTS_ROOT = '$ghost'; & '$script'" | Out-String
     Assert-Contains "a hub that is not there says so" $output 'Hub not found'
     Assert-True "and shows no Join-Path stack trace" ($output -notmatch 'Cannot find drive|Cannot bind argument') $output
 }
@@ -719,20 +746,20 @@ function global:Get-CliPrefix { return 'tk' }
 . '$commandFile'
 "@
 
-$result = pwsh -NoProfile -Command "$stubs; if (Get-Command Get-P20MeetingAgenda -ErrorAction SilentlyContinue) { 'DEFINED' }" 2>&1 | Out-String
+$result = Invoke-P20TestHost -Command "$stubs; if (Get-Command Get-P20MeetingAgenda -ErrorAction SilentlyContinue) { 'DEFINED' }" | Out-String
 Assert-Contains "dot-sourcing the command file defines Get-P20MeetingAgenda" $result 'DEFINED'
 
-$result = pwsh -NoProfile -Command "$stubs; Get-P20MeetingAgenda -Help" 2>&1 | Out-String
+$result = Invoke-P20TestHost -Command "$stubs; Get-P20MeetingAgenda -Help" | Out-String
 Assert-Contains "-Help renders from the shared help table" $result 'HELP:MeetingAgenda'
 
 # The guard that exists because someone spliced a markdown file onto the command
 # line and got a string-to-switch conversion error instead of an explanation.
-$result = pwsh -NoProfile -Command "$stubs; Get-P20MeetingAgenda '## Agenda' 'some pasted file content'" 2>&1 | Out-String
+$result = Invoke-P20TestHost -Command "$stubs; Get-P20MeetingAgenda '## Agenda' 'some pasted file content'" | Out-String
 Assert-Contains "a positional argument is refused with an explanation" $result 'takes only named flags'
 Assert-Contains "the refusal shows what was passed" $result '## Agenda'
 Assert-Contains "the refusal is logged" $result 'LOG:ERR'
 
-$result = pwsh -NoProfile -Command "$stubs; (Get-Command Get-P20MeetingAgenda).Parameters.Keys -join ','" 2>&1 | Out-String
+$result = Invoke-P20TestHost -Command "$stubs; (Get-Command Get-P20MeetingAgenda).Parameters.Keys -join ','" | Out-String
 foreach ($flag in @('Date', 'Type', 'Plan', 'Prep', 'Retro', 'Close', 'DryRun')) {
     Assert-Contains "the wrapper takes -$flag" $result $flag
 }

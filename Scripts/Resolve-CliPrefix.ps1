@@ -39,6 +39,29 @@ function Get-P20DefaultPrefix {
     return $script:P20DefaultCommandPrefix
 }
 
+function Test-P20CommandName {
+    <#
+        Whether a nav alias key may become a command's name: a letter, then
+        letters, digits, '-' or '_'. The schema refuses anything else as it is
+        set, and every reader checks again, because a file can already hold one.
+        A commandPrefix has its own, narrower rule: Test-P20CommandPrefix.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Name)
+    return ($Name -cmatch '^[A-Za-z][A-Za-z0-9_-]*\z')
+}
+
+function Test-P20CommandPrefix {
+    <#
+        Whether a value may be the commandPrefix: a letter, then letters or
+        digits. Narrower than an alias key on purpose: the prefix starts every
+        verb, and 'my-tkStatus' is a name nobody wants to type. The one rule for
+        the schema, the readers and Register-PromptAlias, so what Config accepts
+        always registers.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Name)
+    return ($Name -cmatch '^[A-Za-z][A-Za-z0-9]*\z')
+}
+
 function ConvertTo-P20BareAliasKey {
     <#
         The bare spelling of a navigation alias key.
@@ -71,6 +94,21 @@ function ConvertTo-P20BareAliasKey {
 
 if (-not (Get-Command Write-P20ConfigParseWarning -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Write-ConfigParseWarning.ps1') }
 
+function Select-P20CommandPrefix {
+    <#
+        A configured prefix, if it may be one; otherwise the fallback, with a
+        warning that names the file and the rule.
+    #>
+    param(
+        [AllowEmptyString()][AllowNull()][string]$Value,
+        [Parameter(Mandatory = $true)][string]$Fallback,
+        [string]$Path = 'config'
+    )
+    if (Test-P20CommandPrefix $Value) { return $Value }
+    Write-Warning "commandPrefix in $Path is not a command prefix (a letter, then letters or digits); using '$Fallback'."
+    return $Fallback
+}
+
 function Resolve-P20ConfigPrefix {
     <#
         The prefix this package registers: config.default.json, then
@@ -81,10 +119,10 @@ function Resolve-P20ConfigPrefix {
     $prefix = $script:P20DefaultCommandPrefix
     foreach ($name in @('config.default.json', 'config.local.json')) {
         $path = Join-Path $PackageRoot $name
-        if (-not (Test-Path $path)) { continue }
+        if (-not (Test-Path -LiteralPath $path)) { continue }
         try {
-            $cfg = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($cfg.commandPrefix) { $prefix = [string]$cfg.commandPrefix }
+            $cfg = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($cfg.commandPrefix) { $prefix = Select-P20CommandPrefix -Value ([string]$cfg.commandPrefix) -Fallback $prefix -Path $path }
         }
         catch { if ($name -eq 'config.local.json') { $null = Write-P20ConfigParseWarning -Path $path -Message $_.Exception.Message } }
     }

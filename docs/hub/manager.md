@@ -40,10 +40,11 @@ the key and it stays `manager/`. [Configuration](../CONFIGURATION.md#the-hub-dec
 engagements the way a career record does — it must not reset when the active Space does. This is also
 why the `manager` recipient lives in a top-level `managerWorkflow` block rather than on an org.
 
-Filenames are date-first so the folder sorts chronologically and a session's identity is its date.
-That identity spans both folders: one date is one session, whether it is open in `current/` or
-closed in `archive/`, and every writer on both sides checks the pair rather than one of them.
-A file in `current/` whose name is not a date is not a session, and nothing reads it.
+Filenames end in the date so a series' records sort chronologically, and a session's identity is its
+name -- the series, if any, and the date. That identity spans both folders: one name is one session,
+whether it is open in `current/` or closed in `archive/`, and every writer on both sides checks the pair
+rather than one of them. A file in `current/` whose name does not fit the rule above is not a session,
+and nothing reads it.
 
 ## The stages
 
@@ -128,9 +129,9 @@ A session gets the same contract a card gets, through the same writer --
   close shows up as one added line rather than as a whole-file diff.
 - **LF, because a session is a file the tool creates.** Both scaffolds (`NewMeeting`, which the web's
   create also runs, and `MeetingAgenda -Plan`) call the writer with `-New`,
-  which normalises CRLF to LF. The template is not copied byte for byte: on a Windows clone, where
-  `* text=auto` plus `core.autocrlf=true` checks `templates/ManagerSession.template.md` out CRLF, that
-  would write CRLF sessions beside the Mac's LF ones in the same hub.
+  which normalises CRLF to LF. The template is not copied byte for byte: the package checks it out
+  LF everywhere, but a Windows clone that predates that line still has it CRLF, and a byte-for-byte
+  copy would write CRLF sessions beside the Mac's LF ones in the same hub.
   A stage change is an EDIT: it rewrites the whole file and keeps the terminator it finds, so a
   session you edited on Windows stays CRLF.
 

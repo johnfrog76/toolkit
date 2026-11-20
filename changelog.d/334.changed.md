@@ -1,0 +1,1 @@
+- On the Studio tab, every Spaces, Hub Designs and Prompts row now shows one action, Open, with everything else in the ... menu, and its title is plain text rather than a link.

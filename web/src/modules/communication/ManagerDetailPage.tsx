@@ -28,7 +28,7 @@ import {
 import { EditRegular, SendRegular, SparkleFilled } from "@fluentui/react-icons";
 import { DialogDismiss } from "../../shared/DialogDismiss";
 import { BackButton } from "../../shared/BackButton";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { useGetEnvQuery } from "../../shell/api";
@@ -184,7 +184,7 @@ export function ManagerDetailPage() {
 
   return (
     <div className={styles.page}>
-      <PageCard
+      <PanelFrame
         loading={isLoading}
         loadingLabel="Loading the meeting..."
         empty={
@@ -302,7 +302,7 @@ export function ManagerDetailPage() {
               </Caption1>
             );
           })()}
-      </PageCard>
+      </PanelFrame>
 
       {data && (
         <Dialog open={dialogOpen} onOpenChange={(_e, d) => setDialogOpen(d.open)}>

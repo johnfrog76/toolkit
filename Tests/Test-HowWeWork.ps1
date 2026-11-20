@@ -48,6 +48,9 @@ $pkgDir = Join-Path $root 'pkg'
 $hubDir = Join-Path $root 'hub'
 $logDir = Join-Path $root 'log'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
+# Children start in the host this suite runs in, with stderr read as text on 5.1
+# (Tests/Get-TestHost.ps1).
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 $notePath = Join-Path $hubDir 'github-demo/agentic/how-we-work.md'
 
 # What the note may never name (the card's rule: roles and loops, never models,
@@ -72,7 +75,7 @@ $Snippet
 "@
     $runner = Join-Path $root ("run-" + [guid]::NewGuid().ToString('N').Substring(0, 8) + ".ps1")
     [System.IO.File]::WriteAllText($runner, $text, $utf8)
-    $out = & pwsh -NoProfile -NonInteractive -File $runner 2>&1
+    $out = Invoke-P20TestHost -File $runner -NonInteractive
     Remove-Item $runner -Force -ErrorAction SilentlyContinue
     $all = (($out | ForEach-Object { $_.ToString() }) -join "`n")
     $code = ''

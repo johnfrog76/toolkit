@@ -2,21 +2,21 @@
   "_": "The standup's DRESS, as a table (#140; D-SA11; docs/modules/solitaire-agile.md, \"The agentic layer\"): a model may re-say a worker's prose sentence (#199) in standup language and may never add a fact. The prose is the floor and the fallback; dress_guard / Test-P20StandupDress hold each dressed sentence to its group's facts and answer '' (it stands) or the first of consts.json rituals.dressGuards it fails (the prose stands). Both halves -- tkTestToolkit -Rituals and Tests/test_rituals.py -- assert every row of `rows` (a group, a sentence, the reason), and the `reply` case: the model's answer per id, and the sentences that are said, the floor wherever the guard refused. The model's output is never pinned; the guard is. Three groups: Opus's yesterday in Team Agile (three, one a bug and two features), its yesterday in the Studio (one), and its today in Phase 6 (ten, all bugs). The shapes: a dressed sentence that keeps every fact, with kind counts and with a persona's colour ('20g of protein' -- a number glued to a unit is no number, a lowercase word no name); a fact ADDED (#999, a card-id-shaped word, an invented milestone); a fact DROPPED (a ref, the count, the group's name); a number CHANGED (four for three, Phase 7 for Phase 6); a kind counted wrong or said for a kind the group has none of; blank and two-line answers.",
   "groups": [
     {
-      "id": "opus/0", "worker": "Opus", "slot": "yesterday", "first": true,
+      "id": "opus/1", "worker": "Opus", "slot": "yesterday", "first": true,
       "floor": "Yesterday I closed three in Team Agile (#501, #502, #506).",
       "name": "Team Agile", "count": 3, "refs": ["#501", "#502", "#506"],
       "titles": { "#501": "Feature: Team Agile -- wire the stage", "#502": "Port the cast atoms", "#506": "Bug: the stage drops a voice" },
       "kinds": { "bugs": 1, "features": 2 }
     },
     {
-      "id": "opus/1", "worker": "Opus", "slot": "yesterday", "first": false,
+      "id": "opus/2", "worker": "Opus", "slot": "yesterday", "first": false,
       "floor": "I also closed one in the Studio: #503, Count the foyer rows.",
       "name": "the Studio", "count": 1, "refs": ["#503"],
       "titles": { "#503": "Count the foyer rows" },
       "kinds": {}
     },
     {
-      "id": "opus/2", "worker": "Opus", "slot": "today", "first": true,
+      "id": "opus/3", "worker": "Opus", "slot": "today", "first": true,
       "floor": "Today I'm on ten in Phase 6 (#601, #602, #603, #604, #605, #606, #607, #608, #609, #610).",
       "name": "Phase 6", "count": 10, "refs": ["#601", "#602", "#603", "#604", "#605", "#606", "#607", "#608", "#609", "#610"],
       "titles": {},
@@ -46,9 +46,9 @@
   ],
   "reply": {
     "answer": {
-      "opus/0": "Wired up three in Team Agile (#501, #502, #506) and #999.",
-      "opus/1": "Plumbing for the Studio: #503, counted the foyer rows.",
-      "opus/2": "Smashing ten bugs in Phase 6 (#601, #602, #603, #604, #605, #606, #607, #608, #609, #610)."
+      "opus/1": "Wired up three in Team Agile (#501, #502, #506) and #999.",
+      "opus/2": "Plumbing for the Studio: #503, counted the foyer rows.",
+      "opus/3": "Smashing ten bugs in Phase 6 (#601, #602, #603, #604, #605, #606, #607, #608, #609, #610)."
     },
     "said": [
       "Yesterday I closed three in Team Agile (#501, #502, #506).",

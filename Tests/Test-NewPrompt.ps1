@@ -33,6 +33,8 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+# Children start in the host this suite runs in (Tests/Get-TestHost.ps1).
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
 
 $testDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot = Split-Path $testDir -Parent
@@ -110,7 +112,7 @@ function Invoke-NewPrompt {
     $ErrorActionPreference = 'Continue'
     $target = Join-Path $Sandbox 'current'
     $all = @('-OutputFolder', $target) + $ScriptArgs
-    $output = (& pwsh -NoProfile -File $targetScript @all 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $output = (Invoke-P20TestHost -File $targetScript -Arguments $all | ForEach-Object { "$_" }) -join "`n"
     $exitCode = $LASTEXITCODE
     $created = ''
     $m = [regex]::Match($output, 'Created (\S+\.prompt\.md)')
@@ -351,6 +353,27 @@ try {
     Assert-True 'the card is byte for byte what it was' ([System.Linq.Enumerable]::SequenceEqual($before, $after))
     Assert-Equal 'and it is still the only card' 1 @(Get-ChildItem (Join-Path $sandbox 'current') -Filter '*.prompt.md').Count
 
+    # A name no id reads: a Bug titled like a date. The scan by id cannot see it,
+    # so the write asks the file itself.
+    $dated = Invoke-NewPrompt $sandbox @('-Title', '11-06 outage', '-Type', 'Bug', '-Id', '2026')
+    $datedPath = Join-Path (Join-Path $sandbox 'current') $dated.Created
+    Add-FixtureText $datedPath "`nA day of notes.`n"
+    $datedBefore = [System.IO.File]::ReadAllBytes($datedPath)
+    $datedAgain = Invoke-NewPrompt $sandbox @('-Title', '11-06 outage', '-Type', 'Bug', '-Id', '2026')
+    Assert-Equal 'a date-shaped card is not written over: a stated refusal' 2 $datedAgain.ExitCode
+    Assert-True 'and names it' ($datedAgain.Output -match 'already exists') $datedAgain.Output
+    Assert-True 'and the card is byte for byte what it was' ([System.Linq.Enumerable]::SequenceEqual($datedBefore, [System.IO.File]::ReadAllBytes($datedPath)))
+
+    # A hub path holding a bracket: read as a pattern, the scan finds nothing.
+    $bracket = Join-Path $sandbox 'Work [old]'
+    New-Item -ItemType Directory -Path (Join-Path $bracket 'current') -Force | Out-Null
+    $inBracket = Invoke-NewPrompt $bracket @('-Title', 'In a bracketed hub', '-Type', 'Bug', '-Id', '141')
+    $bracketPath = Join-Path (Join-Path $bracket 'current') $inBracket.Created
+    [System.IO.File]::WriteAllText($bracketPath, "# Worked on`n`nA day of notes.`n", [System.Text.UTF8Encoding]::new($false))
+    $bracketAgain = Invoke-NewPrompt $bracket @('141')
+    Assert-True 'a bracket in the path does not hide the card: it is returned' ($bracketAgain.ExitCode -eq 0 -and $bracketAgain.Output -match 'already in') $bracketAgain.Output
+    Assert-True 'and it is not written over' ([System.IO.File]::ReadAllText($bracketPath) -match 'A day of notes') $bracketAgain.Output
+
     # -Force means "reassign from another user" on this path. It must not become
     # a way to overwrite.
     $forced = Invoke-NewPrompt $sandbox @('140', '-Force')
@@ -495,7 +518,7 @@ try {
     # The repo: one design of its own, and the board-ideas id promoted into it.
     Write-Doc (Join-Path $dRepo 'design/repo-note.md') $repoOnly 'Repo note'
     Write-Doc (Join-Path $dRepo 'design/board-ideas.md') $boardId 'Board ideas, in the product'
-    $gitQuiet = { param([string[]]$GitArgs) & git @GitArgs 2>&1 | Out-Null }
+    $gitQuiet = { param([string[]]$GitArgs) $null = Invoke-P20TestGit @GitArgs }
     & $gitQuiet @('-C', $dRepo, 'init', '-q')
     & $gitQuiet @('-C', $dRepo, 'remote', 'add', 'origin', 'https://github.com/acme/widgets.git')
     & $gitQuiet @('-C', $elsewhere, 'init', '-q')
@@ -511,7 +534,7 @@ try {
         $pre = "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $dHub)'; `$env:P20_ACTIVE_SPACE = '$Space'; " +
             "`$env:P20_USAGE_LOG_DIR = '$(& $q $dLog)'; Set-Location '$(& $q $Where)'; " +
             "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
-        $out = (& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $out = (Invoke-P20TestHost -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") | ForEach-Object { "$_" }) -join "`n"
         return $out
     }
     function Get-NewCard([string]$Space, [string]$Filter) {
@@ -618,7 +641,7 @@ try {
             "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $fHub)'; `$env:P20_ACTIVE_SPACE = 'solo'; " +
             "`$env:P20_USAGE_LOG_DIR = '$(& $q $fLog)'; Set-Location '$(& $q $fBase)'; " +
             "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
-        return ((& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n")
+        return ((Invoke-P20TestHost -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") | ForEach-Object { "$_" }) -join "`n")
     }
     function Get-FromCard([string]$Folder, [string]$Filter) {
         return @(Get-ChildItem (Join-Path $fHub "solo/$Folder") -Filter $Filter -File -ErrorAction SilentlyContinue)
@@ -675,6 +698,70 @@ catch {
 }
 finally { if (Test-Path $fBase) { Remove-Item -Path $fBase -Recurse -Force -ErrorAction SilentlyContinue } }
 
+# -- A hub under a folder whose name holds [ and ] ----------------------------
+# "Work [old]" is a folder name. Handed to a cmdlet as -Path it is a wildcard
+# pattern that matches nothing: hub.json reads as absent (the Space is unknown),
+# Status finds no folder, Archive cannot move. TYPED as the verbs, in a fresh
+# shell that imports this package alone, against a hub inside such a folder.
+
+Write-Host ""
+Write-Host "-- A hub under a bracketed folder, typed as the verbs ---" -ForegroundColor Cyan
+
+$bBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-np-bracket-" + [System.Guid]::NewGuid().Guid.Substring(0, 8))
+try {
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $bHub = Join-Path (Join-Path $bBase 'Work [old]') 'hub'
+    $bLog = Join-Path $bBase 'log'
+    foreach ($d in @($bLog, (Join-Path $bHub 'solo/current'), (Join-Path $bHub 'solo/backlog'), (Join-Path $bHub 'solo/archive'))) {
+        [void][System.IO.Directory]::CreateDirectory($d)
+    }
+    [System.IO.File]::WriteAllText((Join-Path $bHub 'hub.json'), (@'
+{
+  "hub": 1,
+  "spaces": [
+    { "slug": "solo", "name": "Solo Bracket", "status": "local", "promptsFolder": "solo", "org": "" }
+  ]
+}
+'@), $utf8)
+    $bPrefix = (Get-Content -LiteralPath (Join-Path $pkgRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json).commandPrefix
+    function Invoke-BracketVerb {
+        param([string]$Commands)
+        $ErrorActionPreference = 'Continue'
+        $q = { param([string]$s) $s -replace "'", "''" }
+        $pre = "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $bHub)'; `$env:P20_ACTIVE_SPACE = 'solo'; " +
+            "`$env:P20_USAGE_LOG_DIR = '$(& $q $bLog)'; Set-Location -LiteralPath '$(& $q $bBase)'; " +
+            "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
+        return ((Invoke-P20TestHost -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") | ForEach-Object { "$_" }) -join "`n")
+    }
+
+    $out = Invoke-BracketVerb "${bPrefix}NewPrompt -Now -Title 'Inside brackets' -Type Bug"
+    $bCard = @(Get-ChildItem -LiteralPath (Join-Path $bHub 'solo/current') -Filter '*inside-brackets.prompt.md' -File -ErrorAction SilentlyContinue)
+    Assert-True 'in a bracketed hub, NewPrompt -Title writes the card into the Space hub.json declares' ($out -match 'EXIT=0' -and $bCard.Count -eq 1) $out
+    $bId = if ($bCard.Count -eq 1) { [regex]::Match($bCard[0].Name, '^([A-Z0-9]{4})-').Groups[1].Value } else { '' }
+    if ($bCard.Count -eq 1) { [System.IO.File]::AppendAllText($bCard[0].FullName, "`nA day of notes.`n", $utf8) }
+    $bHeld = if ($bCard.Count -eq 1) { [System.IO.File]::ReadAllText($bCard[0].FullName) } else { '' }
+
+    $out = Invoke-BracketVerb "${bPrefix}Env"
+    Assert-True 'Env reads the hub.json there: hub.json read, and the Space it declares named' ($out -match 'hub\.json\s+read, 1 Space declared' -and $out -match 'solo \(Solo Bracket\)') $out
+
+    $out = Invoke-BracketVerb "${bPrefix}Status"
+    Assert-True 'Status lists the card in current/' ($bId -and $out -match [regex]::Escape($bId) -and $out -match 'EXIT=0' -and $out -notmatch 'not found') $out
+
+    $out = Invoke-BracketVerb "${bPrefix}NewPrompt $bId -Title 'Inside brackets' -Type Bug"
+    Assert-True 'NewPrompt <id> returns the card already there, exit 0' ($out -match 'EXIT=0' -and $out -match "already in") $out
+    Assert-True 'and does not write over it' ($bCard.Count -eq 1 -and [System.IO.File]::ReadAllText($bCard[0].FullName) -ceq $bHeld) $out
+
+    $out = Invoke-BracketVerb "${bPrefix}Archive $bId"
+    $bArchived = @(Get-ChildItem -LiteralPath (Join-Path $bHub 'solo/archive') -Filter '*inside-brackets.prompt.md' -File -ErrorAction SilentlyContinue)
+    Assert-True 'Archive <id> moves the card from current/ to archive/' (
+        $out -match 'EXIT=0' -and $bArchived.Count -eq 1 -and @(Get-ChildItem -LiteralPath (Join-Path $bHub 'solo/current') -File).Count -eq 0) $out
+    Assert-True 'and the archived card is the one that was written, notes and all' ($bArchived.Count -eq 1 -and [System.IO.File]::ReadAllText($bArchived[0].FullName) -match 'A day of notes') $out
+}
+catch {
+    Assert-True 'the bracketed-hub cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { if (Test-Path -LiteralPath $bBase) { Remove-Item -LiteralPath $bBase -Recurse -Force -ErrorAction SilentlyContinue } }
+
 # -- A new card on an Azure DevOps Space starts in play -----------------------
 # The team's backlog lives in Azure DevOps and that Space's board draws no Backlog
 # lane (issue #178), so NewPrompt writes current/. TYPED as the verb, in a fresh
@@ -711,7 +798,7 @@ try {
         $pre = "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $tHub)'; `$env:P20_ACTIVE_SPACE = '$Space'; " +
             "`$env:P20_USAGE_LOG_DIR = '$(& $q $tLog)'; Set-Location '$(& $q $tBase)'; " +
             "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
-        return ((& pwsh -NoProfile -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") 2>&1 | ForEach-Object { "$_" }) -join "`n")
+        return ((Invoke-P20TestHost -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") | ForEach-Object { "$_" }) -join "`n")
     }
     function Get-TrackerCard([string]$Space, [string]$Folder, [string]$Filter) {
         return @(Get-ChildItem (Join-Path $tHub "$Space/$Folder") -Filter $Filter -File -ErrorAction SilentlyContinue)
@@ -731,6 +818,96 @@ catch {
     Assert-True 'the tracker cases ran to the end without a terminating error' $false $_.Exception.Message
 }
 finally { if (Test-Path $tBase) { Remove-Item -Path $tBase -Recurse -Force -ErrorAction SilentlyContinue } }
+
+# -- -OutputFolder: a bare card-folder name is the active Space's -------------
+# A bare `backlog` used to be joined onto the store root, where no
+# Space looks, while the default built `<promptsFolder>/backlog`. Now a bare
+# current, backlog or archive is the active Space's folder; `<space>/<folder>`
+# stays relative to the store, a rooted path is taken as given, and with no
+# Space active a bare name keeps the store root. TYPED as the verb, in a fresh
+# shell, against a scratch hub; every row also follows the card's > Template:
+# link, which is computed from the folder the card actually landed in.
+
+Write-Host ""
+Write-Host "-- -OutputFolder: a bare folder name is the active Space's, typed as the verb ---" -ForegroundColor Cyan
+
+$oBase = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-np-outfolder-" + [System.Guid]::NewGuid().Guid.Substring(0, 8))
+try {
+    . (Join-Path $pkgRoot 'Scripts/Get-Consts.ps1')
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $oHub = Join-Path $oBase 'hub'
+    $oLog = Join-Path $oBase 'log'
+    $oAbs = Join-Path $oBase 'elsewhere'
+    New-Item -ItemType Directory -Path $oHub, $oLog -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $oHub 'hub.json'), (@'
+{
+  "hub": 1,
+  "spaces": [
+    { "slug": "example", "name": "Example", "status": "local", "promptsFolder": "example", "org": "" },
+    { "slug": "other", "name": "Other", "status": "local", "promptsFolder": "other", "org": "" }
+  ]
+}
+'@), $utf8)
+    $oPrefix = (Get-Content (Join-Path $pkgRoot 'config.default.json') -Raw | ConvertFrom-Json).commandPrefix
+    $oFolders = (Get-P20Consts).folders
+    function Invoke-OutFolderVerb {
+        # -NoSpace stands the config in for a hub with no Space active: the shipped
+        # config always resolves one, so the module's own answer is blanked after import.
+        param([string]$Commands, [switch]$NoSpace)
+        $ErrorActionPreference = 'Continue'
+        $q = { param([string]$s) $s -replace "'", "''" }
+        $pre = "`$env:PSModulePath = '$(& $q $pkgRoot)'; `$env:PROMPTS_ROOT = '$(& $q $oHub)'; `$env:P20_ACTIVE_SPACE = 'example'; " +
+            "`$env:P20_USAGE_LOG_DIR = '$(& $q $oLog)'; Set-Location '$(& $q $oBase)'; " +
+            "Import-Module '$(& $q $pkgRoot)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; "
+        if ($NoSpace) { $pre += "`$global:P20Config.PromptsFolder = ''; " }
+        return ((Invoke-P20TestHost -NonInteractive -Command ($pre + $Commands + "; 'EXIT=' + `$LASTEXITCODE") | ForEach-Object { "$_" }) -join "`n")
+    }
+    function Get-OutFolderCard([string]$Folder, [string]$Filter) {
+        return @(Get-ChildItem $Folder -Filter $Filter -File -ErrorAction SilentlyContinue)
+    }
+    # Where the scratch hub and the package share a drive, the card's link is a
+    # relative hop that must resolve from the folder it landed in. Where they do
+    # not -- a Windows runner keeps its temp folder on another drive -- there is
+    # no hop to write, and the card keeps the template's file NAME instead. Each
+    # host asserts the line it should carry, so the row counts the same on both.
+    $oSameDrive = [string]::Equals(
+        [System.IO.Path]::GetPathRoot([System.IO.Path]::GetFullPath($oHub)),
+        [System.IO.Path]::GetPathRoot([System.IO.Path]::GetFullPath($pkgRoot)),
+        [System.StringComparison]::OrdinalIgnoreCase)
+    function Test-TemplateLinkResolves([System.IO.FileInfo]$Card) {
+        $text = [System.IO.File]::ReadAllText($Card.FullName)
+        if (-not $oSameDrive) { return ($text -match '(?m)^> Template: Task\.template\.md\r?$') }
+        $m = [regex]::Match($text, '(?m)^> Template: \[[^\]]*\]\(([^)]+)\)')
+        if (-not $m.Success) { return $false }
+        return (Test-Path -LiteralPath (Join-Path $Card.DirectoryName $m.Groups[1].Value) -PathType Leaf)
+    }
+
+    $rows = @(
+        @{ Label = "a bare 'backlog'"; Arg = 'backlog'; Id = 'C4RK'; Where = (Join-Path $oHub "example/$($oFolders.backlog)"); NotAt = (Join-Path $oHub $oFolders.backlog) }
+        @{ Label = "a bare 'current'"; Arg = 'current'; Id = 'C4RR'; Where = (Join-Path $oHub "example/$($oFolders.current)"); NotAt = (Join-Path $oHub $oFolders.current) }
+        @{ Label = "'other/backlog', relative to the store"; Arg = 'other/backlog'; Id = 'R3MT'; Where = (Join-Path $oHub "other/$($oFolders.backlog)"); NotAt = (Join-Path $oHub "example/other/$($oFolders.backlog)") }
+        @{ Label = 'an absolute path'; Arg = $oAbs; Id = 'A6XT'; Where = $oAbs; NotAt = (Join-Path $oHub "example/$($oFolders.backlog)") }
+        @{ Label = "a bare 'backlog' with no Space active"; Arg = 'backlog'; Id = 'N7CK'; NoSpace = $true; Where = (Join-Path $oHub $oFolders.backlog); NotAt = (Join-Path $oHub "example/$($oFolders.backlog)") }
+        @{ Label = "a bare 'current' with no Space active"; Arg = 'current'; Id = 'N7CR'; NoSpace = $true; Where = (Join-Path $oHub $oFolders.current); NotAt = (Join-Path $oHub "example/$($oFolders.current)") }
+    )
+    foreach ($row in $rows) {
+        $q = { param([string]$s) $s -replace "'", "''" }
+        $cmd = "${oPrefix}NewPrompt -Title 'Out folder card' -Type Task -Id $($row.Id) -OutputFolder '$(& $q $row.Arg)'"
+        $out = if ($row.NoSpace) { Invoke-OutFolderVerb $cmd -NoSpace } else { Invoke-OutFolderVerb $cmd }
+        $card = Get-OutFolderCard $row.Where "Task$($row.Id)-*.prompt.md"
+        Assert-True "$($row.Label): the card is written where it was meant, and exits 0" ($card.Count -eq 1 -and $out -match 'EXIT=0') "$($row.Where)`n$out"
+        Assert-Equal "$($row.Label): and not anywhere else" 0 (Get-OutFolderCard $row.NotAt "Task$($row.Id)-*.prompt.md").Count
+        if ($card.Count -eq 1) {
+            Assert-True "$($row.Label): its > Template: line is right for where it landed" (Test-TemplateLinkResolves $card[0]) ([System.IO.File]::ReadAllText($card[0].FullName))
+        }
+    }
+    $out = Invoke-OutFolderVerb "${oPrefix}NewPrompt -Title 'Archive card' -Type Task -Id R7CH -OutputFolder 'Archive/'"
+    Assert-True "a bare 'Archive/' in another case, with a slash, is the Space's archive/ too" ((Get-OutFolderCard (Join-Path $oHub "example/$($oFolders.archive)") 'TaskR7CH-*.prompt.md').Count -eq 1 -and $out -match 'EXIT=0') $out
+}
+catch {
+    Assert-True 'the -OutputFolder cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally { if (Test-Path $oBase) { Remove-Item -Path $oBase -Recurse -Force -ErrorAction SilentlyContinue } }
 
 # -- The work item's comments cannot be read: no token ------------------------
 # The comments are fetched with a bearer token from `az account get-access-token`.
@@ -769,7 +946,7 @@ exit $LASTEXITCODE
     [System.IO.File]::WriteAllText($driver, $driverText, (New-Object System.Text.UTF8Encoding $false))
 
     $ErrorActionPreference = 'Continue'
-    $out = (& pwsh -NoProfile -File $driver -Sandbox $sandbox -Script $targetScript -Mode NoToken 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $out = (Invoke-P20TestHost -File $driver -Arguments @('-Sandbox', $sandbox, '-Script', $targetScript, '-Mode', 'NoToken') | ForEach-Object { "$_" }) -join "`n"
     $code = $LASTEXITCODE
     $ErrorActionPreference = 'Stop'
 
@@ -780,12 +957,12 @@ exit $LASTEXITCODE
     $azCalls = if (Test-Path $azLog) { [System.IO.File]::ReadAllText($azLog) } else { '' }
     Assert-True 'and the work item was never assigned or moved' ($azCalls -notmatch 'work-item update') $azCalls
 
-    $empty = (& pwsh -NoProfile -File $driver -Sandbox $sandbox -Script $targetScript -Mode EmptyToken 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $empty = (Invoke-P20TestHost -File $driver -Arguments @('-Sandbox', $sandbox, '-Script', $targetScript, '-Mode', 'EmptyToken') | ForEach-Object { "$_" }) -join "`n"
     Assert-True 'az printing nothing and exiting 0 is refused the same way' ($LASTEXITCODE -eq 2 -and $empty -match 'no ADO token was available') $empty
     Assert-Equal 'and that wrote no card either' 0 @(Get-ChildItem (Join-Path $sandbox 'current') -Filter '*.prompt.md').Count
 
     # The same stand-in with a token gets past the check: the refusal is the token, not the harness.
-    $ok = (& pwsh -NoProfile -File $driver -Sandbox $sandbox -Script $targetScript -Mode Token 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    $ok = (Invoke-P20TestHost -File $driver -Arguments @('-Sandbox', $sandbox, '-Script', $targetScript, '-Mode', 'Token') | ForEach-Object { "$_" }) -join "`n"
     Assert-True 'with a token the same run does not refuse for it' ($ok -notmatch 'no ADO token was available') $ok
 }
 catch {
@@ -828,6 +1005,127 @@ catch {
     Assert-True 'the -Description cases ran to the end without a terminating error' $false $_.Exception.Message
 }
 finally { Remove-PromptSandbox $sandbox }
+
+# -- The tracker paths: a card no id reads, typed as the verb, trackers stubbed ----
+# A Bug titled like a date gets a name Get-P20CardId skips, so the scan by id says
+# no card, the tracker is asked, and the create is the only thing left to stop it.
+# `gh`, `az` and the REST call are functions in the child that write down what they
+# were asked, Test-Land.ps1's shape; the refusal has to come before any tracker write.
+
+Write-Host "-- A tracker's card is not written over -----------------" -ForegroundColor Cyan
+
+$trackerRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-newprompt-tracker-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    $trackerPkg = Join-Path $trackerRoot 'pkg'
+    $trackerHub = Join-Path $trackerRoot 'hub'
+    $trackerCalls = Join-Path $trackerRoot 'calls.log'
+    New-Item -ItemType Directory -Path $trackerPkg, (Join-Path $trackerHub 'widgets/current'), (Join-Path $trackerHub 'board/current') -Force | Out-Null
+    foreach ($item in @('Prompt20Toolkit', 'Scripts', 'Config', 'templates', 'utilities.psm1', 'config.default.json', 'consts.json')) {
+        Copy-Item -LiteralPath (Join-Path $pkgRoot $item) -Destination $trackerPkg -Recurse
+    }
+    $hubText = '{ "hub": 1, "spaces": [ { "slug": "widgets", "name": "Widgets", "status": "active", "promptsFolder": "widgets", "org": "https://github.com/acme/widgets" }, { "slug": "board", "name": "Board", "status": "active", "promptsFolder": "board", "org": "https://dev.azure.com/acme-org" } ] }'
+    Write-FixtureText (Join-Path $trackerHub 'hub.json') $hubText
+    $issueJson = '{"number":2026,"title":"11-06 outage","body":"It stopped.","state":"OPEN","assignees":[],"labels":[{"name":"bug"}],"url":"https://github.com/acme/widgets/issues/2026","comments":[],"milestone":null}'
+    $itemJson = '{"id":2026,"fields":{"System.WorkItemType":"Bug","System.Title":"11-06 outage","System.State":"Active","System.TeamProject":"Acme Project"},"url":"https://dev.azure.com/acme-org/_apis/wit/workItems/2026"}'
+
+    $runTracker = {
+        param([string]$Space, [string]$Verb)
+        Write-FixtureText (Join-Path $trackerPkg 'config.local.json') (@{ quietStart = $true; promptsRoot = $trackerHub; activeSpace = $Space; email = 'you@example.test' } | ConvertTo-Json)
+        Remove-Item -LiteralPath $trackerCalls -ErrorAction SilentlyContinue
+        $preamble = @"
+`$env:PSModulePath = '$($trackerPkg -replace "'", "''")'
+`$env:PROMPTS_ROOT = '$($trackerHub -replace "'", "''")'
+Get-ChildItem Env: | Where-Object { `$_.Name -like 'TEAMS_WEBHOOK_*' } | ForEach-Object { Remove-Item "Env:\`$(`$_.Name)" -ErrorAction SilentlyContinue }
+function global:gh {
+    Add-Content -LiteralPath '$($trackerCalls -replace "'", "''")' -Value ("gh " + (`$args -join ' '))
+    `$global:LASTEXITCODE = 0
+    if (`$args[0] -eq 'issue' -and `$args[1] -eq 'view') { return '$issueJson' }
+    if (`$args[0] -eq 'api') { return 'you' }
+}
+function global:az {
+    Add-Content -LiteralPath '$($trackerCalls -replace "'", "''")' -Value ("az " + (`$args -join ' '))
+    `$global:LASTEXITCODE = 0
+    if (`$args[0] -eq 'account' -and `$args[1] -eq 'get-access-token') { return 'stub-token' }
+    if (`$args[0] -eq 'boards' -and `$args[2] -eq 'show') { return '$itemJson' }
+}
+function global:Invoke-RestMethod {
+    param(`$Uri, `$Headers, `$Method, `$Body)
+    Add-Content -LiteralPath '$($trackerCalls -replace "'", "''")' -Value "REST `$Method `$Uri"
+    return [pscustomobject]@{ comments = @() }
+}
+Import-Module '$($trackerPkg -replace "'", "''")/utilities.psm1' -Force -DisableNameChecking *>`$null
+`$global:P20Env = @{ Tier = 1; OrgStatus = 'active'; ActiveSpace = '$Space'; GitInstalled = `$true; RepoFound = `$true }
+"@
+        $child = Join-Path $trackerRoot 'child.ps1'
+        Write-FixtureText $child ($preamble + "`n" + $Verb + "`n'EXIT=' + `$LASTEXITCODE`n")
+        $ErrorActionPreference = 'Continue'
+        $text = (Invoke-P20TestHost -NonInteractive -File $child | ForEach-Object { "$_" }) -join "`n"
+        $calls = @()
+        if (Test-Path -LiteralPath $trackerCalls) { $calls = @(Get-Content -LiteralPath $trackerCalls) }
+        return [pscustomobject]@{ Text = $text; Calls = $calls }
+    }
+
+    foreach ($row in @(
+            @{ Space = 'widgets'; Name = 'GitHub'; Write = '^gh issue (edit|reopen|close)' }
+            @{ Space = 'board'; Name = 'Azure DevOps'; Write = '^az boards work-item update|^REST (Patch|Post)' }
+        )) {
+        $first = & $runTracker $row.Space "tkNewPrompt 2026 -ReadOnly"
+        $made = @(Get-ChildItem -LiteralPath (Join-Path $trackerHub $row.Space) -Recurse -Filter '2026-11-06-outage.prompt.md')
+        Assert-True "$($row.Name): the tracker's card is made, under a name no id reads" ($made.Count -eq 1) $first.Text
+        if ($made.Count -ne 1) { continue }
+        Add-FixtureText $made[0].FullName "`nA day of notes.`n"
+        $held = [System.IO.File]::ReadAllBytes($made[0].FullName)
+        $again = & $runTracker $row.Space "tkNewPrompt 2026"
+        Assert-True "$($row.Name): the tracker was asked, so this is the tracker path" (@($again.Calls | Where-Object { $_ -match 'issue view|work-item show' }).Count -gt 0) ($again.Calls -join ' | ')
+        Assert-True "$($row.Name): a second run is a stated refusal" ($again.Text -match 'already exists' -and $again.Text -match 'EXIT=2') $again.Text
+        Assert-True "$($row.Name): and the card is byte for byte what it was" ([System.Linq.Enumerable]::SequenceEqual($held, [System.IO.File]::ReadAllBytes($made[0].FullName)))
+        Assert-True "$($row.Name): and nothing changed on the tracker" (@($again.Calls | Where-Object { $_ -match $row.Write }).Count -eq 0) ($again.Calls -join ' | ')
+    }
+}
+catch {
+    Assert-True 'the tracker cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    Remove-Item -LiteralPath $trackerRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# -- A hub path with a non-ASCII character ----------------------------------------
+# Config writes config.local.json as UTF-8 with the character as itself. The module
+# read it back with no encoding, which Windows PowerShell 5.1 takes as ANSI, so a
+# hub under a user folder whose name has an accent resolved to a path that is not
+# there and every verb said "Hub not found". The module is imported in this suite's own host
+# (Tests/Get-TestHost.ps1), with PROMPTS_ROOT unset so the file is what answers.
+
+Write-Host "-- A hub path with a non-ASCII character ---------------" -ForegroundColor Cyan
+
+$accentRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-newprompt-accent-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    $accentPkg = Join-Path $accentRoot 'pkg'
+    $accentHub = Join-Path $accentRoot ('hub-Jos' + [char]0x00E9)
+    New-Item -ItemType Directory -Path $accentPkg, $accentHub -Force | Out-Null
+    foreach ($item in @('Prompt20Toolkit', 'Scripts', 'Config', 'templates', 'utilities.psm1', 'config.default.json', 'consts.json')) {
+        Copy-Item -LiteralPath (Join-Path $pkgRoot $item) -Destination $accentPkg -Recurse
+    }
+    Write-FixtureText (Join-Path $accentHub 'hub.json') '{ "hub": 1, "spaces": [ { "slug": "solo", "name": "Solo", "status": "local", "promptsFolder": "solo", "org": "" } ] }'
+    $accentJson = '{ "quietStart": true, "promptsRoot": "' + ($accentHub -replace '\\', '/') + '", "activeSpace": "solo" }'
+    Write-FixtureText (Join-Path $accentPkg 'config.local.json') $accentJson
+    $accentPrefix = (Get-Content (Join-Path $pkgRoot 'config.default.json') -Raw -Encoding UTF8 | ConvertFrom-Json).commandPrefix
+    $q = { param([string]$s) $s -replace "'", "''" }
+    $accentCmd = "`$env:PSModulePath = '$(& $q $accentPkg)'; `$env:PROMPTS_ROOT = ''; Set-Location '$(& $q $accentRoot)'; " +
+        "Get-ChildItem Env: | Where-Object { `$_.Name -like 'TEAMS_WEBHOOK_*' } | ForEach-Object { Remove-Item `"Env:\`$(`$_.Name)`" -ErrorAction SilentlyContinue }; " +
+        "Import-Module '$(& $q $accentPkg)/Prompt20Toolkit/Prompt20Toolkit.psd1' -Force 3>`$null 6>`$null; " +
+        "${accentPrefix}NewPrompt -Title 'Accents in the path' -Type Task; 'EXIT=' + `$LASTEXITCODE"
+    $accentOut = (Invoke-P20TestHost -NonInteractive -Command $accentCmd | ForEach-Object { "$_" }) -join "`n"
+    $accentCards = @(Get-ChildItem -LiteralPath $accentHub -Recurse -Filter '*.prompt.md' -File -ErrorAction SilentlyContinue)
+    Assert-True "a hub path with a non-ASCII character is found (PowerShell $($PSVersionTable.PSVersion.Major))" ($accentOut -notmatch 'Hub not found') $accentOut
+    Assert-True "and NewPrompt -Title writes its card there" (($accentCards.Count -eq 1) -and ($accentOut -match 'EXIT=0')) $accentOut
+}
+catch {
+    Assert-True 'the non-ASCII hub path cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    Remove-Item -LiteralPath $accentRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host ""
 Write-Host "=======================================================" -ForegroundColor Cyan

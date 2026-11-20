@@ -105,3 +105,39 @@ function Select-ScannableFile {
         if (-not (Test-ScanExcluded -Path $File.FullName -Root $Root)) { $File }
     }
 }
+
+function Get-ScanFile {
+    <#
+    .SYNOPSIS
+        The files under a folder with one of the given extensions, never
+        descending into an excluded folder.
+    .DESCRIPTION
+        Get-ChildItem -LiteralPath <folder> -Recurse -Include '*.ps1' does not
+        filter on Windows PowerShell 5.1: it returns every file, so a sweep read
+        Python and JSON as PowerShell, and a walk from the package root went
+        through web/node_modules before anything was dropped. This walks the
+        folders itself, skips an excluded one before entering it, and keeps a
+        file by its extension, the same on every host.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string[]]$Extension,
+        [switch]$Recurse,
+        [string]$Root
+    )
+
+    $wanted = @($Extension | ForEach-Object { $_.ToLowerInvariant() })
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return }
+    $pending = New-Object System.Collections.Generic.Stack[System.IO.DirectoryInfo]
+    $pending.Push((New-Object System.IO.DirectoryInfo ([System.IO.Path]::GetFullPath($Path))))
+    while ($pending.Count -gt 0) {
+        $dir = $pending.Pop()
+        foreach ($f in $dir.GetFiles()) {
+            if ($wanted -contains $f.Extension.ToLowerInvariant()) { $f }
+        }
+        if (-not $Recurse) { continue }
+        foreach ($d in $dir.GetDirectories()) {
+            if (-not (Test-ScanExcluded -Path $d.FullName -Root $Root)) { $pending.Push($d) }
+        }
+    }
+}

@@ -2,7 +2,7 @@ import { useEffect, useState, useId } from "react";
 import { Badge, Button, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { FilterBadge } from "../../shared/FilterBadge";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import {
   OpenRegular,
   CheckmarkCircleRegular,
@@ -328,7 +328,7 @@ export function Dashboard() {
       : null;
 
   return (
-    <PageCard
+    <PanelFrame
       headerLeft={
         <>
           <Subtitle2>Build</Subtitle2>
@@ -370,6 +370,7 @@ export function Dashboard() {
                 <FilterBadge
                   key={`${proj.project}/${proj.repo}`}
                   label={`${getProjectTag(proj.project)} / ${proj.repo}`}
+                  count={null} // a tab between repos, and the page holds no per-repo count
                   active={activeTab?.project === proj.project && activeTab?.repo === proj.repo}
                   onClick={() => {
                     setActiveTab({ project: proj.project, repo: proj.repo });
@@ -472,6 +473,6 @@ export function Dashboard() {
           </div>
         </>
       )}
-    </PageCard>
+    </PanelFrame>
   );
 }

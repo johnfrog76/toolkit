@@ -36,7 +36,19 @@ decided, and what changed all end up written in it, not only in this chat.
    `## Implementation Details` (one row per file you changed, matching `git diff --stat` against main).
    Write the diagnosis and every decision -- and the alternative you rejected, and why -- into the card,
    not only into this conversation.
-6. **When the code is ready**, run [pr-ship](pr-ship.prompt.md): it checks those three sections against
+6. **Sign off: confirm who did the work.** The card's `**Agent:** <model id>` line means who is working
+   it, or did. `Route <id> -Assign <size>` writes it at the hand-off, with the size's current model id
+   (and refuses a size the model map has no `current` entry for); the lead rewrites it whenever the work
+   changes hands, and confirms it at sign-off. So the session that ships the card makes sure the card
+   carries one such line, beside `**Assigned:**` (or above `**Created:**` when it has none): its own model
+   if it did the work, or the builder's model if it handed the work on. Write the model's own id, as its
+   provider writes it (`claude-sonnet-5-5`, `gpt-5`), not a display name. A builder handed this card by a
+   lead leaves the line to the lead. The card carries ONE Agent line: when the work changes hands -- you
+   take it back from a builder, or hand it on -- rewrite that line, so it always names who is doing the
+   work now, and never add a second one. Earlier values live in the hub's history. A person working
+   alone writes nothing here, and the line is never written as `Agent: none`. A commit's
+   `Co-Authored-By` trailer only says who made the commit, so it does not stand in for the line.
+7. **When the code is ready**, run [pr-ship](pr-ship.prompt.md): it checks those three sections against
    the diff, then commits, pushes and opens the draft pull request with `tkNewPR`. Stop there.
 
 ## Safety contract
@@ -46,6 +58,7 @@ decided, and what changed all end up written in it, not only in this chat.
 | Read the card, the issue and the documents it names | yes | -- |
 | Create or update the branch from current main | yes | -- |
 | Change code, tests and documentation the card asks for | yes | -- |
+| Confirm the card's `**Agent:**` line at sign-off, naming the model that did the work | yes, the session that ships the card, rewriting its one line whenever the work changes hands (`Route <id> -Assign <size>` writes it at the hand-off); a builder handed it by a lead leaves it to the lead | -- |
 | Thread commits into the card (`tkThreadHash`) | yes | -- |
 | Write Summary, Described Changes and Implementation Details | yes, as the work goes | reviews |
 | Push to or merge into main | never | yes |

@@ -29,18 +29,17 @@ import { MilestonesPage, STAGE_WORDS, countWords } from "./MilestonesPage";
 // dialog throws through useConfetti() and the burst is drawn at that root.
 const render = (ui: ReactElement) => rtlRender(ui, { wrapper: ConfettiProvider });
 
-// The Milestones tab (docs/modules/solitaire-agile.md, "Milestones: the tab and the
+// The Releases tab (docs/modules/solitaire-agile.md, "Milestones: the tab and the
 // award"): one row per milestone with the tracker's own numbers on its bar, and the
 // award dialog -- once per Space and milestone per browser -- the one place the
 // module throws confetti. The rows are the SHARED fixture's `expected`
 // (Tests/fixtures/rituals/milestones.json), the bytes Tests/test_ritual_milestones.py
 // holds the agent to.
 //
-// The dialog is Fluent's: its focus manager (tabster) marks everything outside the
-// active dialog -- and, until focus has moved in, the surface itself -- aria-hidden
-// on a 250 ms timer, so under load a role query that skips hidden nodes can miss a
-// node that is on screen. Every query that can meet the dialog is AWAITED and passes
-// `hidden: true` (the archived flake of Board.remind.test.tsx is the precedent).
+// The dialog is Fluent's, and every query that finds it or a node in it is AWAITED
+// and by role, as a screen reader would reach it. A query that says there is NO
+// dialog passes `hidden: true`, so it means none in the tree at all, not merely
+// none a screen reader can see.
 
 const FIXTURE = path.resolve(__dirname, "../../../../Tests/fixtures/rituals/milestones.json");
 const table = JSON.parse(fs.readFileSync(FIXTURE, "utf8")) as { expected: Milestone[] };
@@ -100,13 +99,13 @@ beforeEach(() => {
   })) as unknown as typeof window.matchMedia;
 });
 
-/** The award dialog as it is now, found whatever the focus manager says. */
-const dialog = () => screen.findByRole("dialog", { hidden: true });
+/** The award dialog as it is now. */
+const dialog = () => screen.findByRole("dialog");
 
 async function closeDialog() {
   const d = await dialog();
   // Two buttons close it -- the title's X and the action row's Close; this is the latter.
-  const buttons = await within(d).findAllByRole("button", { name: "Close", hidden: true });
+  const buttons = await within(d).findAllByRole("button", { name: "Close" });
   fireEvent.click(buttons.find((b) => b.textContent === "Close")!);
 }
 
@@ -171,7 +170,7 @@ describe("the award's rule (award.ts), over the shared table", () => {
   });
 });
 
-describe("the Milestones tab", () => {
+describe("the Releases tab", () => {
   it("asks about the Space you are in", () => {
     localStorage.setItem(
       AWARD_SEEN_KEY,
@@ -179,6 +178,19 @@ describe("the Milestones tab", () => {
     );
     render(<MilestonesPage />);
     expect(asked[0]).toBe(SPACE);
+  });
+
+  it("the heading is Releases, the subtitle and every row say GitHub milestone", () => {
+    localStorage.setItem(
+      AWARD_SEEN_KEY,
+      JSON.stringify(table.expected.map((m) => awardKey(SPACE, m))),
+    );
+    render(<MilestonesPage />);
+    expect(screen.getByRole("heading", { name: "Releases" })).toBeTruthy();
+    expect(screen.getByTestId("releases-subtitle").textContent).toMatch(/^GitHub milestones/);
+    const sources = screen.getAllByTestId("milestone-source");
+    expect(sources).toHaveLength(screen.getAllByTestId("milestone-row").length);
+    expect(sources.every((s) => s.textContent === "GitHub milestone")).toBe(true);
   });
 
   it("one row per milestone, in the Stats card's order, each bar the tracker's own numbers", () => {
@@ -230,7 +242,7 @@ describe("the Milestones tab", () => {
     );
     // The picture is the gold trophy, by its accessible name, and the wordmark is gone.
     const picture = within(d).getByTestId("award-picture");
-    const trophy = within(picture).getByRole("img", { name: TROPHY_NAME, hidden: true });
+    const trophy = within(picture).getByRole("img", { name: TROPHY_NAME });
     // ...and it is the ONLY drawing in the box: the wordmark stand-in is gone.
     expect(Array.from(picture.querySelectorAll("svg"))).toEqual([trophy]);
     // The confetti is the app's: one burst, drawn at the root over the viewport, so it is
@@ -329,7 +341,13 @@ describe("the Milestones tab", () => {
   it("no milestones: says so, as a fact rather than an error", () => {
     response = { isLoading: false, data: ok([]) };
     render(<MilestonesPage />);
-    expect(screen.getByText("No milestones yet")).toBeTruthy();
+    expect(screen.getByText("No GitHub milestones yet")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "GitHub milestones are made on the tracker; each one shows here with its progress.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Releases" })).toBeTruthy();
   });
 
   it("the agent away: an error, never an empty list", () => {

@@ -209,7 +209,7 @@ export function defineRowMoves<K extends string>(
   return out;
 }
 
-interface CardActionsProps {
+export interface CardActionsProps {
   primaryAction?: CardAction;
   secondaryActions?: CardAction[];
   /** Draw the `...` menu even with no secondary action (a card whose menu may fill later). */

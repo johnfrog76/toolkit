@@ -11,7 +11,7 @@ import {
 } from "@fluentui/react-components";
 import { TruncatedDropdown } from "../../shared/TruncatedDropdown";
 import { OpenRegular } from "@fluentui/react-icons";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { RefreshButton } from "../../shared/RefreshButton";
 import { StatTile, StatTiles } from "../../shared/StatTile";
 import { SprintDailyChart } from "./SprintDailyChart";
@@ -305,7 +305,7 @@ export function SprintVelocity({ snapshot }: { snapshot?: SprintVelocitySnapshot
     ) : undefined;
 
   return (
-    <PageCard
+    <PanelFrame
       loading={isLoading}
       loadingLabel="Loading sprint velocity..."
       headerLeft={headerLeft}
@@ -402,6 +402,6 @@ export function SprintVelocity({ snapshot }: { snapshot?: SprintVelocitySnapshot
       ) : (
         <SprintDailyChart repo={activeRepo} activityOverride={snapshot?.activity} />
       )}
-    </PageCard>
+    </PanelFrame>
   );
 }

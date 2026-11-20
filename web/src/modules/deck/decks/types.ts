@@ -24,6 +24,16 @@ export interface Slide {
    * derive it from the Say text. See "../deck-components/deckDuration".
    */
   approximateTime?: string;
+  /**
+   * Opt in to keeping this slide's `content` mounted across slides. By default
+   * the engine remounts the content panel on every slide, so a stateful visual
+   * arrives clean. Consecutive slides that carry the SAME `contentKey` share
+   * one mounted panel instead: React reconciles the new content into the old,
+   * so whatever is unchanged between them keeps its DOM nodes, its state and
+   * its running animations. For a deck whose slides are one scene that changes
+   * a little at a time. A slide with a different key, or with none, remounts.
+   */
+  contentKey?: string;
 }
 
 /**
@@ -124,14 +134,12 @@ export interface Deck {
   /**
    * An audiobook: a deck meant to be LISTENED to, end to end, at any width
    * (Team Agile's ritual decks; docs/modules/solitaire-agile.md, "The played view").
-   * Three things follow, all in the engine and none of them for a deck that
-   * leaves this unset, which is every hand-written deck:
-   *   - Suitcase Mode is allowed on the desktop too (DeckPlayer's gate drops
-   *     its phone-width requirement for this deck only);
-   *   - the transport keeps prev and next beside the one big button
-   *     (DeckChrome), so a tile can be skipped without leaving Suitcase;
-   *   - a slide with no baked clip is read by the browser's speechSynthesis
-   *     from its Say text (useSpeechNarration) -- D-TA7's no-key fallback.
+   * One thing follows, in the engine, and not for a deck that leaves this
+   * unset, which is every hand-written deck: a slide with no baked clip is
+   * read by the browser's speechSynthesis from its Say text
+   * (useSpeechNarration) -- D-TA7's no-key fallback. Audiobook MODE (the
+   * player's `audiobook` prop) is the host's to turn on, and runs at every
+   * width for any deck.
    */
   audiobook?: boolean;
 }

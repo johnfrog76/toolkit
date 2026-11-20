@@ -14,7 +14,13 @@ param()
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $cfg = $global:P20Config
-$tier = if ($global:ToolkitEnv) { $global:ToolkitEnv.Tier } else { 1 }
+# The tier is $global:P20Env's, which Get-Environment fills; when nothing has
+# filled it yet, ask it the way the module's own tier check does, so a machine
+# below Tier 1 gets the local view and not a full view of answers that look true.
+if (-not ($global:P20Env -and $global:P20Env.Tier)) {
+    try { & (Join-Path $PSScriptRoot 'Get-Environment.ps1') -Quiet | Out-Null } catch { $null = $_ }
+}
+$tier = if ($global:P20Env -and $global:P20Env.Tier) { [int]$global:P20Env.Tier } else { 1 }
 
 $modeTag = if ($tier -ge 2) { '  [Local Mode]  [*]' } else { '' }
 
@@ -34,8 +40,8 @@ if ($tier -ge 2) {
     Write-Host "  == Active Prompts =="  -ForegroundColor Magenta
     $folders = Get-PromptFolders
     $currentDir = $folders.Current
-    if (Test-Path $currentDir) {
-        $prompts = Get-ChildItem -Path $currentDir -File | Sort-Object LastWriteTime -Descending
+    if (Test-Path -LiteralPath $currentDir) {
+        $prompts = Get-ChildItem -LiteralPath $currentDir -File | Sort-Object LastWriteTime -Descending
         if ($prompts.Count -eq 0) {
             Write-Host "  (none)" -ForegroundColor DarkGray
         } else {
@@ -54,7 +60,7 @@ if ($tier -ge 2) {
     # Repo status
     Write-Host ""
     Write-Host "  == Repo Status ==" -ForegroundColor Magenta
-    Push-Location $cfg.PromptsRoot
+    Push-Location -LiteralPath $cfg.PromptsRoot
     try {
         # %at on this machine's clock, not %ai in the author's zone
         $lastLog = (Invoke-P20TrackerRead 'git' @('log', '-1', '--format=%at%x09%an')).Out
@@ -71,11 +77,13 @@ if ($tier -ge 2) {
         Pop-Location
     }
 
-    # Recent errors from log
-    $logPath = Join-Path (Split-Path $scriptDir -Parent) 'usage.log'
-    if (Test-Path $logPath) {
+    # Recent errors, from the log the toolkit writes: usage.<machine>.log files
+    # in Get-P20ToolkitLogDir, one per machine, as Log reads them.
+    $logDir = if (Get-Command Get-P20ToolkitLogDir -ErrorAction SilentlyContinue) { Get-P20ToolkitLogDir } else { '' }
+    $logFiles = if ($logDir) { @(Get-ChildItem -LiteralPath $logDir -Filter 'usage.*.log' -File -ErrorAction SilentlyContinue) } else { @() }
+    if ($logFiles.Count -gt 0) {
         $cutoff = (Get-Date).AddHours(-24).ToString('yyyy-MM-ddTHH:mm:ss')
-        $recentErrors = @(Get-Content $logPath -Encoding UTF8 | Where-Object {
+        $recentErrors = @($logFiles | ForEach-Object { [System.IO.File]::ReadAllLines($_.FullName) } | Where-Object {
             $parts = $_ -split "`t"
             $parts.Count -ge 2 -and $parts[1] -eq 'ERR' -and $parts[0] -gt $cutoff
         })
@@ -119,9 +127,10 @@ $bel = [char]7
 Write-P20TrackerHeader -Name $cfg.ActiveOrgName -OrgUrl $org
 if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     foreach ($repoFull in (Get-P20TrackerRepos -OrgUrl $org -Projects $cfg.Projects)) {
-        $runs = gh run list --repo $repoFull --limit 5 `
-            --json 'workflowName,conclusion,status,headBranch,updatedAt,url' 2>$null | ConvertFrom-Json
-        if ($LASTEXITCODE -ne 0) {
+        $runRead = Invoke-P20TrackerRead 'gh' @('run', 'list', '--repo', $repoFull, '--limit', '5', '--json', 'workflowName,conclusion,status,headBranch,updatedAt,url')
+        $runs = $null
+        if ($runRead.Code -eq 0 -and ($runRead.Out -join '').Trim()) { $runs = ($runRead.Out -join "`n") | ConvertFrom-Json }
+        if ($runRead.Code -ne 0) {
             Write-Host "`n  $repoFull -- GitHub did not answer for its runs." -ForegroundColor Yellow
             continue
         }
@@ -159,12 +168,10 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
 $projects = @($cfg.Projects | ForEach-Object { $_.name } | Select-Object -Unique)
 
 foreach ($proj in $projects) {
-    $runs = az pipelines runs list `
-        --org $org `
-        --project $proj `
-        --top 5 `
-        --output json 2>$null | ConvertFrom-Json
-    if ($LASTEXITCODE -ne 0) {
+    $runRead = Invoke-P20TrackerRead 'az' @('pipelines', 'runs', 'list', '--org', $org, '--project', $proj, '--top', '5', '--output', 'json')
+    $runs = $null
+    if ($runRead.Code -eq 0 -and ($runRead.Out -join '').Trim()) { $runs = ($runRead.Out -join "`n") | ConvertFrom-Json }
+    if ($runRead.Code -ne 0) {
         Write-Host "`n  $proj -- did not answer in $org; its pipeline runs are not shown." -ForegroundColor Yellow
         continue
     }

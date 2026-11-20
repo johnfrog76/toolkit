@@ -55,6 +55,8 @@ if ($Help) {
 
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'Get-TestHost.ps1')
+
 $testDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pkgRoot = Split-Path $testDir -Parent
 
@@ -520,10 +522,10 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText((Join-Path $hookHub 'reviews/x/review.md'), "# Review`n", $utf8)
 Push-Location $hookHub
 try {
-    git init --quiet 2>&1 | Out-Null
-    git config user.email 'test@example.invalid' 2>&1 | Out-Null
-    git config user.name 'Hook test' 2>&1 | Out-Null
-    git config core.autocrlf false 2>&1 | Out-Null
+    $null = Invoke-P20TestGit init --quiet
+    $null = Invoke-P20TestGit config user.email 'test@example.invalid'
+    $null = Invoke-P20TestGit config user.name 'Hook test'
+    $null = Invoke-P20TestGit config core.autocrlf false
     $hook = Join-Path $hookHub '.git/hooks/pre-commit'
     [System.IO.File]::WriteAllText($hook, "#!/bin/sh`necho 'hook says no'`nexit 1`n")
     # git runs a hook only when the file is executable; Windows has no execute bit, Unix does.
@@ -543,6 +545,24 @@ foreach ($case in @(
 $peerOut = Invoke-InScratch -Package $onPkg -Snippet ($hookEnv + "tkLogPeerReview; 'PEER-EXIT=' + `$LASTEXITCODE")
 Assert-True 'LogPeerReview with no id is a stated refusal: exit 2, no generic block' `
     ($peerOut -match 'PEER-EXIT=2' -and $peerOut -match 'Error:' -and $peerOut -notmatch 'exit code') $peerOut
+
+# Nothing overwrites a record: a second log of the same PR the same day keeps the
+# first one's notes and adds its own. One file still, because the year-end review
+# counts these files and the review is one review.
+$peerFind = { @(Get-ChildItem -LiteralPath $hookHub -Recurse -File -Filter 'reviewed-*-PR6789.md' -ErrorAction SilentlyContinue) }
+$peer1 = Invoke-InScratch -Package $onPkg -Snippet ($hookEnv + "tkLogPeerReview 6789 -Title 'Auth refactor' -Notes 'Approved with nits'; 'PEER-EXIT=' + `$LASTEXITCODE")
+$peerFiles = & $peerFind
+Assert-True 'LogPeerReview 6789 writes one record' ($peer1 -match 'PEER-EXIT=0' -and $peerFiles.Count -eq 1) $peer1
+$peer2 = Invoke-InScratch -Package $onPkg -Snippet ($hookEnv + "tkLogPeerReview 6789 -Notes 'Second pass: the fix holds'; 'PEER-EXIT=' + `$LASTEXITCODE")
+$peerFiles = & $peerFind
+$peerText = if ($peerFiles.Count -eq 1) { [System.IO.File]::ReadAllText($peerFiles[0].FullName) } else { '' }
+Assert-True 'a second LogPeerReview the same day keeps the first record and its notes, and adds its own' (
+    $peer2 -match 'PEER-EXIT=0' -and $peerFiles.Count -eq 1 -and $peerText -match '# Reviewed PR 6789 - Auth refactor' -and
+    $peerText -match 'Notes: Approved with nits' -and $peerText -match 'Notes: Second pass: the fix holds') "$peer2 $peerText"
+Assert-True 'and says it added to the record already there' ($peer2 -match 'Added to the peer review already logged today') $peer2
+$peer3 = Invoke-InScratch -Package $onPkg -Snippet ($hookEnv + "tkLogPeerReview 6789; 'PEER-EXIT=' + `$LASTEXITCODE")
+$peerAfter = if ($peerFiles.Count -eq 1) { [System.IO.File]::ReadAllText($peerFiles[0].FullName) } else { '' }
+Assert-True 'a third with nothing to add leaves the record byte for byte as it was' ($peer3 -match 'PEER-EXIT=0' -and $peerAfter -eq $peerText -and $peer3 -match 'kept as it is') $peer3
 
 # -- 8. The shipped growth data file is well formed ---------------------------
 Write-Host ""

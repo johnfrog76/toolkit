@@ -25,7 +25,7 @@ import {
   shorthands,
   tokens,
 } from "@fluentui/react-components";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { useLocalPersistedState } from "../../shared/usePersistedState";
 
 export const GO_SIZE = 9;
@@ -227,7 +227,7 @@ export function GoBoard() {
   };
 
   return (
-    <PageCard
+    <PanelFrame
       scrollable
       headerLeft={<Subtitle2>Go</Subtitle2>}
       headerRight={
@@ -289,6 +289,6 @@ export function GoBoard() {
           </div>
         ))}
       </div>
-    </PageCard>
+    </PanelFrame>
   );
 }

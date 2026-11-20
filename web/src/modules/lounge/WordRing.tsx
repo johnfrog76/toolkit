@@ -21,7 +21,7 @@ import {
   shorthands,
   tokens,
 } from "@fluentui/react-components";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { useLocalPersistedState } from "../../shared/usePersistedState";
 import { isAnimated, useSkinGrant, writeSkinGrant } from "../../shared/skinGrant";
 import { TANK_SCENES } from "./skins";
@@ -202,7 +202,7 @@ export function WordRing() {
 
   const n = state.letters.length;
   return (
-    <PageCard
+    <PanelFrame
       scrollable
       headerLeft={<Subtitle2>Words</Subtitle2>}
       headerRight={
@@ -250,6 +250,6 @@ export function WordRing() {
           ))}
         </ul>
       </div>
-    </PageCard>
+    </PanelFrame>
   );
 }

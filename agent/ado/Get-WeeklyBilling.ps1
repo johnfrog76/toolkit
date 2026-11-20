@@ -10,9 +10,12 @@
     card per day, with a status word. Output is ASCII-safe and
     copy-pasteable into billing systems.
 .NOTES
-    Module-private copy: this script belongs to the agent, not to the prompt
-    store, and is invoked by path from agent/ado/reporting.py. It is not a CLI
-    command and has no alias.
+    This script belongs to the package, not to the prompt store. Two callers run
+    it by path, always with -AsJson: the agent's GET /api/billing
+    (agent/ado/reporting.py), in a child PowerShell, and the CLI's Daily verb
+    (Scripts/Get-Daily.ps1), in its own session, which prints the `raw` it
+    answers. What -Since and -Until may say is one rule,
+    Scripts/Resolve-BillingWindow.ps1, which Daily checks first as well.
 .EXAMPLE
     pwsh -NoProfile -File agent/ado/Get-WeeklyBilling.ps1 -PromptsRoot <hub> -PromptsFolder <folder> -AsJson
 .EXAMPLE
@@ -54,7 +57,7 @@ function Show-Help {
 
 Get-WeeklyBilling - Build a week's billing log from the cards
 
-USAGE (module-private; invoked by path, not as a CLI command):
+USAGE (run by path: the agent's /api/billing and the CLI's Daily both call it):
     pwsh -NoProfile -File <pkg>/agent/ado/Get-WeeklyBilling.ps1 -PromptsRoot <hub> -PromptsFolder <folder>
     ... -LastWeek    # Previous Monday--Friday
     ... -Since <yyyy-MM-dd> -Until <yyyy-MM-dd>   # Any window; both, or neither
@@ -107,10 +110,10 @@ $cfgLocal = Join-Path $pkgRoot 'config.local.json'
 $defaults = $null; $local = $null
 # -Encoding UTF8: Windows PowerShell 5.1 reads the machine's code page by default,
 # and the shipped file is UTF-8 with no BOM -- a type's label is free text.
-if (Test-Path $cfgDefault) { $defaults = Get-Content -LiteralPath $cfgDefault -Raw -Encoding UTF8 | ConvertFrom-Json }
+if (Test-Path -LiteralPath $cfgDefault) { $defaults = Get-Content -LiteralPath $cfgDefault -Raw -Encoding UTF8 | ConvertFrom-Json }
 if (-not (Get-Command Read-P20LocalConfigJson -ErrorAction SilentlyContinue)) { . (Join-Path $pkgRoot 'Scripts/Write-ConfigParseWarning.ps1') }
 $local = Read-P20LocalConfigJson -Path $cfgLocal
-if (-not $PromptsRoot -or -not (Test-Path $PromptsRoot)) {
+if (-not $PromptsRoot -or -not (Test-Path -LiteralPath $PromptsRoot)) {
     # Stated on stderr and exit 2: the agent puts the sentence in the response's
     # `error`, and Daily shows it. It used to `return` with exit 0, so a missing
     # hub and a quiet week were the same answer.
@@ -132,9 +135,13 @@ catch {
     [Console]::Error.WriteLine("Cannot enter the hub at '$promptsRoot': $($_.Exception.Message)")
     exit 2
 }
-if (($Since -and -not $Until) -or ($Until -and -not $Since)) {
-    # Half a window used to be ignored in silence and the current week billed.
-    [Console]::Error.WriteLine("-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.")
+# The window: both ends or neither, each a yyyy-MM-dd day, the first not after
+# the last. Half a window used to be ignored in silence and the current week
+# billed, and a day was read by the machine's culture.
+. (Join-Path (Join-Path $pkgRoot 'Scripts') 'Resolve-BillingWindow.ps1')
+$window = Resolve-P20BillingWindow -Since $Since -Until $Until
+if ($window.Error) {
+    [Console]::Error.WriteLine($window.Error)
     exit 2
 }
 
@@ -146,9 +153,9 @@ $dayOfWeek = [int]$today.DayOfWeek
 if ($dayOfWeek -eq 0) { $daysBack = 6 } else { $daysBack = $dayOfWeek - 1 }
 $thisMonday = $today.AddDays(-$daysBack)
 
-if ($Since -and $Until) {
-    $startDate = [datetime]::Parse($Since)
-    $endDate = [datetime]::Parse($Until)
+if ($window.HasWindow) {
+    $startDate = $window.Since
+    $endDate = $window.Until
 }
 elseif ($LastWeek) {
     $startDate = $thisMonday.AddDays(-7)
@@ -636,7 +643,7 @@ try {
     $deletedIds = @()
     foreach ($entry in $itemInfo.GetEnumerator()) {
         $fn = $entry.Value.FileName
-        if (-not (Test-Path "${pfx}current/$fn") -and -not (Test-Path "${pfx}archive/$fn")) {
+        if (-not (Test-Path -LiteralPath "${pfx}current/$fn") -and -not (Test-Path -LiteralPath "${pfx}archive/$fn")) {
             $deletedIds += $entry.Key
         }
         # Safety net: a file live in current/ cannot be resolved. The parse loop
@@ -644,7 +651,7 @@ try {
         # but guard the invariant here so any stale ResolvedDate can't drop a live
         # item from carry-forward (line ~463). Truly resolved items live in
         # archive/, never current/, so this cannot re-activate a closed item.
-        elseif ($entry.Value.ResolvedDate -and (Test-Path "${pfx}current/$fn")) {
+        elseif ($entry.Value.ResolvedDate -and (Test-Path -LiteralPath "${pfx}current/$fn")) {
             $entry.Value.ResolvedDate = $null
         }
     }

@@ -4,10 +4,17 @@ import { MemoryRouter } from "react-router";
 import { RemindersCard } from "./RemindersCard";
 import type { Reminder } from "./api.organize";
 
-// A reminder's ref, as the card draws it: a ref the agent resolved to a card in
-// current/ is a link to that card's page; one resolved to an archived card is
-// named, not linked (the card page reads current/); any other ref stays in the
-// tag as written. And both dialogs carry a Ref field with Source.
+// A reminder's ref, as the panel draws it: a ref the agent resolved to a card in
+// current/ is named on the item and opens from its menu; one resolved to an
+// archived card is named and has nothing to open (the card page reads
+// current/); any other ref stays in the tag as written. And both dialogs carry
+// a Ref field with Source.
+
+const navigate = jest.fn();
+jest.mock("react-router", () => ({
+  ...jest.requireActual("react-router"),
+  useNavigate: () => navigate,
+}));
 
 const runReminders = jest.fn();
 const runNewReminder = jest.fn();
@@ -78,7 +85,7 @@ beforeEach(() => {
 });
 
 describe("a reminder's ref", () => {
-  it("is a link to the card when it names a card in current/", () => {
+  it("names the card and opens it from the menu when it names a card in current/", async () => {
     items = [
       reminder("T6RA", {
         ref: "401",
@@ -91,14 +98,18 @@ describe("a reminder's ref", () => {
       }),
     ];
     draw();
-    const link = screen.getByRole("link", { name: "401 Add retry" });
-    expect(link.getAttribute("href")).toBe("/prompts/Task401-add-retry.prompt.md");
-    // The tag keeps the source; the ref is the link, not repeated in the tag.
+    // An item's text is never a link: the card opens from the menu.
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText("401 Add retry")).toBeTruthy();
+    // The tag keeps the source; the ref is the card, not repeated in the tag.
     expect(screen.getByText("ado")).toBeTruthy();
     expect(screen.queryByText("ado 401")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder T6RA" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Open the card" }));
+    expect(navigate).toHaveBeenCalledWith("/prompts/Task401-add-retry.prompt.md");
   });
 
-  it("names an archived card without linking it", () => {
+  it("names an archived card and offers nothing to open", async () => {
     items = [
       reminder("T6RA", {
         ref: "388",
@@ -113,6 +124,9 @@ describe("a reminder's ref", () => {
     draw();
     expect(screen.queryByRole("link")).toBeNull();
     expect(screen.getByText("388 Old work (done)")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder T6RA" }));
+    await screen.findByRole("menuitem", { name: "Edit" });
+    expect(screen.queryByRole("menuitem", { name: "Open the card" })).toBeNull();
   });
 
   it("stays the plain tag it always was when it names no card", () => {
@@ -155,11 +169,21 @@ function expectDefaultSizeInputs(dialog: HTMLElement) {
   }
 }
 
+// The open reminder dialog, once it can be used: its textboxes reachable by
+// role, so every query after this one can stay synchronous. Why a Fluent
+// dialog could stay aria-hidden under jsdom, and what stops it, is in
+// web/tests/jest.layout.cjs.
+async function openedDialog(): Promise<HTMLElement> {
+  const dialog = await screen.findByRole("dialog");
+  await within(dialog).findAllByRole("textbox");
+  return dialog;
+}
+
 describe("the Ref field", () => {
   it("is in the New Reminder dialog, and what is typed there goes to NewReminder as -Ref", async () => {
     draw();
     fireEvent.click(screen.getByRole("button", { name: "New Reminder" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await openedDialog();
     fireEvent.change(within(dialog).getByRole("textbox", { name: /What/ }), {
       target: { value: "Chase the review" },
     });
@@ -177,7 +201,7 @@ describe("the Ref field", () => {
   it("is as wide as the New Reminder dialog's other inputs: a field of its own, not half a row", async () => {
     draw();
     fireEvent.click(screen.getByRole("button", { name: "New Reminder" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await openedDialog();
     const fieldOf = (name: RegExp) =>
       within(dialog).getByRole("textbox", { name }).closest(".fui-Field") as HTMLElement;
     const what = fieldOf(/What/);
@@ -192,7 +216,7 @@ describe("the Ref field", () => {
     draw();
     fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder Q4TN" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await openedDialog();
     const fieldOf = (name: RegExp) =>
       within(dialog).getByRole("textbox", { name }).closest(".fui-Field") as HTMLElement;
     const what = fieldOf(/What/);
@@ -205,16 +229,41 @@ describe("the Ref field", () => {
     items = [reminder("Q4TN", { ref: "41" })];
     draw();
     fireEvent.click(screen.getByRole("button", { name: "New Reminder" }));
-    let dialog = await screen.findByRole("dialog");
+    let dialog = await openedDialog();
     expect(dialog.querySelectorAll(".fui-Input").length).toBeGreaterThan(0);
     expectDefaultSizeInputs(dialog);
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder Q4TN" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
-    dialog = await screen.findByRole("dialog");
+    dialog = await openedDialog();
     expect(dialog.querySelectorAll(".fui-Input").length).toBeGreaterThan(0);
     expectDefaultSizeInputs(dialog);
+    // Two real dialogs, and every wait a by-role query: the suite's testTimeout
+    // (jest.config.mjs) gives it the time a loaded runner needs.
+  });
+
+  // Closing New Reminder queues a pass of Fluent's focus layer (Tabster)
+  // that hides whatever is outside the active modal, 250 ms on. The Edit
+  // dialog opened inside that window must be the active modal by then: its
+  // focus on a control inside it, and its fields still reachable once the
+  // pass has run. Under jsdom without web/tests/jest.layout.cjs the dialog
+  // focused its own surface, never became active, and the pass hid it.
+  it("keeps the Edit dialog reachable when it opens just after New Reminder closes", async () => {
+    items = [reminder("Q4TN", { ref: "41" })];
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: "New Reminder" }));
+    const added = await openedDialog();
+    fireEvent.click(within(added).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder Q4TN" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    const dialog = await openedDialog();
+    expect(document.activeElement).not.toBe(dialog);
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    await new Promise((settled) => setTimeout(settled, 300));
+    expect(dialog.getAttribute("aria-hidden")).toBeNull();
+    expect(within(dialog).getAllByRole("textbox").length).toBeGreaterThan(0);
   });
 
   it("is in the Edit dialog, filled in, and an emptied ref is sent as an empty -Ref", async () => {
@@ -222,7 +271,7 @@ describe("the Ref field", () => {
     draw();
     fireEvent.click(screen.getByRole("button", { name: "Actions for Reminder Q4TN" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await openedDialog();
     const ref = within(dialog).getByRole("textbox", { name: /Ref/ }) as HTMLInputElement;
     expect(ref.value).toBe("41");
     fireEvent.change(ref, { target: { value: "" } });

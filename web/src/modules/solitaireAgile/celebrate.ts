@@ -1,5 +1,5 @@
 // The once-per-thing mark behind a celebration (D-AR14; docs/modules/solitaire-agile.md,
-// "Milestones: the tab and the award"). Generic on purpose: the Milestones tab's award
+// "Milestones: the tab and the award"). Generic on purpose: the Releases tab's award
 // marks a milestone it has congratulated (award.ts), and any other surface that
 // celebrates something reached -- a shelf filled, a milestone in another world -- keeps
 // its own storage key and its own ids here. Kept out of Confetti.tsx so a test can

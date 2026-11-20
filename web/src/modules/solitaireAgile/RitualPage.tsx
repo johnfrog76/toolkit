@@ -4,37 +4,40 @@ import { StandupPage } from "./StandupPage";
 import { TriagePage } from "./TriagePage";
 import { MilestonesPage } from "./MilestonesPage";
 import { ROUTES } from "./paths";
+import { TabRows } from "../../shared/TabRows";
+import { lazyPart } from "../../shell/lazy";
 
-// The Team Agile tab's pages, Standup | Triage | Milestones: one nav entry,
+// The Team Agile tab's pages, Standup | Triage | Releases | Org: one nav entry,
 // and under it a strip of in-page tabs, each an ADDRESS -- the shape Home's
 // Focus | Board | Sprint | Actions strip has, so a tab can be linked and
 // Back walks between them. The pages themselves know nothing about the strip:
 // StandupPage is drawn exactly as it was, Play and the attend call with it.
 
-export type Ceremony = "standup" | "triage" | "milestones";
+export type Ceremony = "standup" | "triage" | "releases" | "org";
+
+// The Org page and the faces it draws are a chunk of their own, fetched when
+// the Org tab is first opened: the standup never pays for them.
+const OrgPage = lazyPart(
+  () => import("./OrgPage"),
+  (m) => m.OrgPage,
+);
 
 const CEREMONIES: { id: Ceremony; label: string; to: string }[] = [
   { id: "standup", label: "Standup", to: ROUTES.home },
   { id: "triage", label: "Triage", to: ROUTES.triage },
-  { id: "milestones", label: "Milestones", to: ROUTES.milestones },
+  { id: "releases", label: "Releases", to: ROUTES.releases },
+  { id: "org", label: "Org", to: ROUTES.org },
 ];
 
 const useStyles = makeStyles({
   page: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalS, width: "100%" },
-  // The strip's text starts flush with the card under it -- Home's rule (routes.tsx).
-  bar: { paddingLeft: tokens.spacingHorizontalS },
-  tabs: {
-    marginLeft: `calc(-1 * (${tokens.spacingHorizontalSNudge} + ${tokens.spacingHorizontalXXS}))`,
-  },
 });
 
 export function RitualTabs({ current }: { current: Ceremony }) {
-  const styles = useStyles();
   const navigate = useNavigate();
   return (
-    <div className={styles.bar}>
+    <TabRows>
       <TabList
-        className={styles.tabs}
         size="small"
         selectedValue={current}
         onTabSelect={(_e, d) => {
@@ -49,7 +52,7 @@ export function RitualTabs({ current }: { current: Ceremony }) {
           </Tab>
         ))}
       </TabList>
-    </div>
+    </TabRows>
   );
 }
 
@@ -60,8 +63,10 @@ export function RitualPage({ ceremony }: { ceremony: Ceremony }) {
       <RitualTabs current={ceremony} />
       {ceremony === "triage" ? (
         <TriagePage />
-      ) : ceremony === "milestones" ? (
+      ) : ceremony === "releases" ? (
         <MilestonesPage />
+      ) : ceremony === "org" ? (
+        <OrgPage />
       ) : (
         <StandupPage />
       )}

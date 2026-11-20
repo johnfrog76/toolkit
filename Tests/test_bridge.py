@@ -45,6 +45,7 @@ sys.path.insert(0, str(PKG_ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # Tests/, for _skipguard
 
 from _skipguard import skip_module  # noqa: E402
+from _tracker_cli import unreachable  # noqa: E402
 
 try:
     from fastapi.testclient import TestClient
@@ -92,6 +93,7 @@ class AllowlistIsTheCommandTable(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIn(name, bridge.command_map())
 
+    @unreachable("az", "gh")
     @unittest.skipUnless(HAVE_PWSH, "needs pwsh to run a command")
     def test_a_cheap_command_runs_for_real(self):
         """Env reads the machine and prints -- it writes nothing anywhere."""
@@ -227,6 +229,7 @@ class TheTableFollowsTheFlags(unittest.TestCase):
         self._flip(False)
         self.assertNotIn(self.MODULE_VERB, bridge.command_map())
 
+    @unreachable("az")
     def test_a_verb_with_no_config_local_json_does_not_open_with_the_first_run_banner(self):
         """A non-interactive caller says so with TOOLKIT_QUIET_STARTUP, and the
         not-set-up notice honours it: a dialog showing the verb's own sentence
@@ -240,12 +243,12 @@ class TheTableFollowsTheFlags(unittest.TestCase):
 
     def test_the_key_names_every_input(self):
         key = bridge._map_key_now()
-        self.assertEqual(len(key), 4)
+        self.assertEqual(len(key), 5)
         self.assertIsNotNone(key[0], "utilities.psm1")
         self.assertIsNotNone(key[1], "config.default.json")
         self.assertIsNone(key[2], "config.local.json is not there yet")
         self.assertEqual(
-            sorted(name for name, _ in key[3]),
+            sorted(name for name, _ in key[4]),
             sorted(f.name for f in (self.pkg / "Config").iterdir() if f.name.endswith(".commands.psd1")),
         )
         self._flip(True)
@@ -548,6 +551,8 @@ class StartWorkThroughTheBridge(unittest.TestCase):
         prompt = (PKG_ROOT / "agentic" / "build.prompt.md").read_text("utf-8").replace("\r\n", "\n").rstrip("\n")
         want = f"{golden}\n{prompt}"
         self.assertEqual(body["output"].replace("\r\n", "\n").strip("\n"), want)
+        # The hand-off asks an agent to name itself on the card (docs/hub/cards.md, "The Agent line").
+        self.assertIn("**Agent:**", body["output"])
 
     def test_a_refusal_is_an_error_with_the_verbs_sentence(self):
         self._config(True)
@@ -722,6 +727,7 @@ class TheHostIsResolvedNotNamed(unittest.TestCase):
         self.assertIn("pwsh", body["error"])
         self.assertIn("powershell", body["error"])
 
+    @unreachable("az", "gh")
     def test_env_reports_which_host_the_bridge_will_use(self):
         block = client.get("/api/env").json()["bridgeHost"]
         self.assertEqual(set(block), {"resolved", "path"})

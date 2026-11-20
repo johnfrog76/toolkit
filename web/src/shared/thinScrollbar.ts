@@ -6,7 +6,7 @@ import type { GriffelStyle } from "@fluentui/react-components";
 //
 //   scrollArea: { overflowY: "auto", ...thinScrollbar },
 //
-// It was typed out three times, identically (PageCard, StatusMessage,
+// It was typed out three times, identically (PanelFrame, StatusMessage,
 // TestHealth), and the board's lanes -- the fourth thing that scrolls -- had
 // none at all.
 //

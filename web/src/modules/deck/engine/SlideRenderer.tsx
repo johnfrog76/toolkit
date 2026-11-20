@@ -100,13 +100,13 @@ export function SlideRenderer({
   // Arrive at the top of every slide's copy.
   //
   // The copy panel is a scroll container that PERSISTS across slides — it has
-  // no per-slide key, unlike the content panel below, so React reuses the
-  // same DOM node and the browser keeps its scrollTop. Scroll halfway down a
-  // long slide, advance, and the next slide opens mid-paragraph with its
-  // heading above the fold. Worst in stacked/mobile, where the copy is the
-  // whole read below the art band and auto-advance (Suitcase Mode) can page
-  // for you — but it's the same bug on desktop's right-hand 40%, so this is
-  // not gated on `stacked`.
+  // no per-slide key, unlike the content panel below, so React reuses the same
+  // DOM node and the browser keeps its scrollTop. Scroll halfway down a long
+  // slide, advance, and the next slide opens mid-paragraph with its heading
+  // above the fold. Worst in stacked/mobile, where the copy is the whole read
+  // below the art band and auto-advance (Audiobook mode) can page for you — but
+  // it's the same bug on desktop's right-hand 40%, so this is not gated on
+  // `stacked`.
   //
   // Deliberately NOT fixed by keying the panel per slide the way the content
   // panel is: that remount exists there to reset stateful visuals, and
@@ -143,8 +143,16 @@ export function SlideRenderer({
       {hasContent && (
         <div
           // key per slide forces a remount so stateful visuals (e.g. the
-          // ShellEmbed run result) reset to a clean state on arrival.
-          key={`content-${slideIndex}`}
+          // ShellEmbed run result) reset to a clean state on arrival. That is
+          // the default, and every deck that says nothing gets it. A slide may
+          // opt out with `contentKey` (decks/types.ts): slides that share one
+          // share this panel, and their content is reconciled, not remounted --
+          // for a deck that is one scene changing a little a slide. The two
+          // kinds of key are spelled apart, so a contentKey can never equal an
+          // index's key.
+          key={
+            slide.contentKey !== undefined ? `scene-${slide.contentKey}` : `content-${slideIndex}`
+          }
           style={
             stacked
               ? {
@@ -180,7 +188,12 @@ export function SlideRenderer({
       <div
         ref={copyRef}
         style={{
-          flex: hasContent && !stacked ? "0 0 40%" : "1",
+          // What the content panel leaves, never a fixed 40%: that panel is 60%
+          // PLUS its inset padding and border (its style object is the
+          // authored one, above), so a 40% copy panel overflowed the stage by
+          // 2 x CONTENT_PANEL_INSET + 1 and pushed its text past the window.
+          flex: "1 1 0",
+          minWidth: 0,
           overflow: "auto",
           backgroundColor: COPY_BG,
           display: "flex",

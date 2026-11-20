@@ -221,7 +221,7 @@ else {
         # The running shell has the OLD module. Re-import it so this shell -- and
         # the sync below -- run the code that was just pulled.
         $manifest = Join-Path (Join-Path $pkgRoot 'Prompt20Toolkit') 'Prompt20Toolkit.psd1'
-        if ((Get-Module | Where-Object { $_.Path -like "$pkgRoot*" }) -and (Test-Path $manifest)) {
+        if ((Get-Module | Where-Object { $_.Path -like "$pkgRoot*" }) -and (Test-Path -LiteralPath $manifest)) {
             try {
                 Import-Module $manifest -Force -Global -WarningAction SilentlyContinue -ErrorAction Stop 3>$null
                 Write-Host "  Re-imported into this shell. Other open shells still have the old version." -ForegroundColor Gray
@@ -257,7 +257,7 @@ if (@($changed | Where-Object { $_ -like 'agent/requirements*.txt' }).Count -gt 
 # when AGENTS.md moved: a copy can already be behind before this pull.
 #
 $agentDocs = Join-Path $PSScriptRoot 'Update-AgentDocs.ps1'
-if (Test-Path $agentDocs) {
+if (Test-Path -LiteralPath $agentDocs) {
     & $agentDocs -Check *> $null
     if ($LASTEXITCODE -eq 1) {
         $next += "the agent guidance is behind AGENTS.md ->  pwsh ./Scripts/Update-AgentDocs.ps1"

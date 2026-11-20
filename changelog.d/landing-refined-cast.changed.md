@@ -1,0 +1,1 @@
+- The landing page's three people are drawn in ToolKit's new refined style.

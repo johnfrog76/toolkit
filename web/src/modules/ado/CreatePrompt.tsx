@@ -15,7 +15,7 @@ import { InfoTip } from "../../shared/InfoTip";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { TruncatedDropdown } from "../../shared/TruncatedDropdown";
 import { FilterBadge } from "../../shared/FilterBadge";
-import { PageCard } from "../../shared/PageCard";
+import { PanelFrame } from "../../shared/PanelFrame";
 import { useGetEnvQuery } from "../../shell/api";
 import {
   useCreatePromptMutation,
@@ -368,31 +368,36 @@ export function PromptActions() {
     <div className={styles.tabBar}>
       <FilterBadge
         label="Create from Work Item"
-        appearance="pink"
+        appearance="tabColorOne"
+        count={null}
         active={activeTab === "create"}
         onClick={() => setActiveTab("create")}
       />
       <FilterBadge
         label="Fetch PR Comments"
-        appearance="pink"
+        appearance="tabColorOne"
+        count={null}
         active={activeTab === "fetch"}
         onClick={() => setActiveTab("fetch")}
       />
       <FilterBadge
         label="Resolve Work Item"
-        appearance="pink"
+        appearance="tabColorOne"
+        count={null}
         active={activeTab === "resolve"}
         onClick={() => setActiveTab("resolve")}
       />
       <FilterBadge
         label="Create PR"
-        appearance="pink"
+        appearance="tabColorOne"
+        count={null}
         active={activeTab === "pr"}
         onClick={() => setActiveTab("pr")}
       />
       <FilterBadge
         label="New ADO Item"
-        appearance="pink"
+        appearance="tabColorOne"
+        count={null}
         active={activeTab === "new-item"}
         onClick={() => setActiveTab("new-item")}
       />
@@ -401,7 +406,7 @@ export function PromptActions() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <PageCard className={styles.card} headerLeft={<Subtitle2>Actions</Subtitle2>}>
+    <PanelFrame className={styles.card} headerLeft={<Subtitle2>Actions</Subtitle2>}>
       {tabs}
 
       {/* ── Create from Work Item ─────────────────────────────────────────── */}
@@ -895,6 +900,6 @@ export function PromptActions() {
           </div>
         </div>
       )}
-    </PageCard>
+    </PanelFrame>
   );
 }

@@ -142,7 +142,10 @@ function Resolve-SessionLeader {
     # child, the files are the child's own. Start-DetachedProcess sets all three
     # variables for every launch, or removes them, so a child never inherits a
     # stale one into a launch of its own.
-    $program = 'use POSIX; POSIX::setsid(); open(STDIN, q{<}, $ENV{P20_DETACHED_STDIN} // q{/dev/null}); open(STDOUT, q{>>}, $ENV{P20_DETACHED_STDOUT}) if defined $ENV{P20_DETACHED_STDOUT}; open(STDERR, q{>>}, $ENV{P20_DETACHED_STDERR}) if defined $ENV{P20_DETACHED_STDERR}; exec { $ARGV[0] } @ARGV; exit 127'
+    # With P20_DETACHED_STDIN_REMOVE set as well, the stdin file is UNLINKED as
+    # soon as it is open: the child reads it whole through the open descriptor,
+    # and nothing of it stays on disk (Start-DetachedProcess -RemoveStdInFile).
+    $program = 'use POSIX; POSIX::setsid(); open(STDIN, q{<}, $ENV{P20_DETACHED_STDIN} // q{/dev/null}); unlink($ENV{P20_DETACHED_STDIN}) if defined $ENV{P20_DETACHED_STDIN} and defined $ENV{P20_DETACHED_STDIN_REMOVE}; open(STDOUT, q{>>}, $ENV{P20_DETACHED_STDOUT}) if defined $ENV{P20_DETACHED_STDOUT}; open(STDERR, q{>>}, $ENV{P20_DETACHED_STDERR}) if defined $ENV{P20_DETACHED_STDERR}; exec { $ARGV[0] } @ARGV; exit 127'
     return @{ FilePath = $perl.Source; ArgumentList = @('-e', ('"' + $program + '"'), '--') }
 }
 
@@ -449,6 +452,14 @@ function Start-DetachedProcess {
         so nothing of the caller's is held); on macOS and Linux the session
         leader opens it in place of /dev/null, through P20_DETACHED_STDIN.
 
+        -RemoveStdInFile takes the stdin file away once the child has it open.
+        On macOS and Linux the session leader unlinks it right after opening it,
+        so the child still reads every byte through its descriptor. On Windows
+        the child holds the handle Start-Process opened, so the file goes once
+        Windows lets it: this tries for a few seconds and returns $false if the
+        file is still there (the caller says so, and sweeps it later). A launch
+        that throws removes it at once, on every host.
+
         Returns the process object, so the caller still writes its own PID file
         and does its own liveness check -- this owns the launch and nothing else.
         Throws what Start-Process throws; both callers already catch it and turn
@@ -462,7 +473,8 @@ function Start-DetachedProcess {
         [Parameter(Mandatory = $true)][string]$StdOutLog,
         [Parameter(Mandatory = $true)][string]$StdErrLog,
         [hashtable]$Environment,
-        [string]$StdInFile = ''
+        [string]$StdInFile = '',
+        [switch]$RemoveStdInFile
     )
 
     $isWin = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
@@ -487,7 +499,9 @@ function Start-DetachedProcess {
     if ($Environment) { foreach ($k in $Environment.Keys) { $childEnv[$k] = $Environment[$k] } }
     if ($leader) {
         $childEnv['P20_DETACHED_STDIN'] = $null
+        $childEnv['P20_DETACHED_STDIN_REMOVE'] = $null
         if ($StdInFile) { $childEnv['P20_DETACHED_STDIN'] = $StdInFile }
+        if ($StdInFile -and $RemoveStdInFile) { $childEnv['P20_DETACHED_STDIN_REMOVE'] = '1' }
         # The leader opens the logs itself (see Resolve-SessionLeader); the
         # redirection below still truncates them first and is never written to.
         $childEnv['P20_DETACHED_STDOUT'] = $StdOutLog
@@ -498,11 +512,27 @@ function Start-DetachedProcess {
     # The child's environment is this process's at the moment of the launch.
     $savedEnv = Push-ProcessEnvironment -Environment $childEnv
     $saved = Disable-CallerHandleInheritance
+    $proc = $null
     try {
-        return Start-Process @startArgs
+        $proc = Start-Process @startArgs
+    }
+    catch {
+        # Nothing started, so nothing holds the file: it goes now, on every host.
+        if ($StdInFile -and $RemoveStdInFile) { Remove-Item -LiteralPath $StdInFile -Force -ErrorAction SilentlyContinue }
+        throw
     }
     finally {
         Restore-CallerHandleInheritance $saved
         Pop-ProcessEnvironment -Saved $savedEnv
     }
+    # Windows: the child has the handle Start-Process opened; the file goes as
+    # soon as Windows allows it. The leader removes it on macOS and Linux; a host
+    # with no perl leaves it for the caller's sweep.
+    if ($StdInFile -and $RemoveStdInFile -and $isWin) {
+        $deadline = (Get-Date).AddSeconds(3)
+        while ((Test-Path -LiteralPath $StdInFile) -and (Get-Date) -lt $deadline) {
+            try { [System.IO.File]::Delete($StdInFile) } catch { Start-Sleep -Milliseconds 100 }
+        }
+    }
+    return $proc
 }

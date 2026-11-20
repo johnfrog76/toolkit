@@ -86,7 +86,7 @@ if (-not (Test-P20HubRoot $promptsRoot)) {
 $remindersDir = Get-P20HubFolder -Name 'reminders' -PromptsRoot $promptsRoot -PackageRoot $repoRoot
 $currentDir = Join-Path $remindersDir $consts.folders.current
 $archiveDir = Join-Path $remindersDir $consts.folders.archive
-if (-not (Test-Path $currentDir)) { New-Item -ItemType Directory -Path $currentDir -Force | Out-Null }
+if (-not (Test-Path -LiteralPath $currentDir)) { New-Item -ItemType Directory -Path $currentDir -Force | Out-Null }
 
 $id = New-P20CardId -Folders @($currentDir, $archiveDir) -WorkItemTypes @{}
 if (-not $id) {
@@ -95,7 +95,7 @@ if (-not $id) {
 }
 $fileName = "$id-$(ConvertTo-P20ReminderSlug $Title).md"
 $filePath = Join-Path $currentDir $fileName
-if (Test-Path $filePath) {
+if (Test-Path -LiteralPath $filePath) {
     Write-CliError -Message "reminders/current/$fileName already exists. Not overwriting it." -Hint 'Run it again: the id is drawn fresh each time.'
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }

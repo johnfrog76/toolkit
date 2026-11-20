@@ -28,6 +28,11 @@ from ..core.config import load_config
 FEATURE = "growth"
 
 
+def growth_enabled() -> bool:
+    """Whether the module is on, read per request."""
+    return bool((load_config().get("features") or {}).get(FEATURE, False))
+
+
 def require_growth() -> None:
     """404 when the module is switched off.
 
@@ -41,7 +46,7 @@ def require_growth() -> None:
     this one flag the only thing in the system that needs a restart, while
     /env, which the web UI gates on, would already be reporting the new value.
     """
-    if not bool((load_config().get("features") or {}).get(FEATURE, False)):
+    if not growth_enabled():
         raise HTTPException(
             status_code=404,
             detail="The growth module is not enabled. Set features.growth in config.local.json.",

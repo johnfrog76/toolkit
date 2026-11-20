@@ -19,15 +19,15 @@ import { ROUTES } from "./paths";
 // same hand-off copy box every Start work opens (one POST /api/cmd/StartWork, J2GV's).
 //
 // It does NOT celebrate. When the line reads reached it says where the celebration is
-// -- "reached: see Milestones", a link to the Milestones tab -- and the award dialog
+// -- "reached: see Releases", a link to the Releases tab -- and the award dialog
 // there is the one thing that throws confetti (AwardDialog.tsx; "Milestones: the tab
 // and the award"). Confetti over a standup nobody asked about read as a glitch.
 //
 // A lazyPart of StandupPage (shell/lazy.tsx): its bytes are fetched when the Corner
 // is first drawn.
 
-/** The words of the link a reached line carries, to the Milestones tab. */
-export const SEE_MILESTONES = "see Milestones";
+/** The words of the link a reached line carries, to the Releases tab. */
+export const SEE_RELEASES = "see Releases";
 
 const useStyles = makeStyles({
   corner: {
@@ -60,13 +60,13 @@ export function PmCorner({ corner, onStart }: { corner: Corner; onStart: (arg: s
           <>
             {": "}
             <Link
-              href={ROUTES.milestones}
+              href={ROUTES.releases}
               onClick={(e) => {
                 e.preventDefault();
-                navigate(ROUTES.milestones);
+                navigate(ROUTES.releases);
               }}
             >
-              {SEE_MILESTONES}
+              {SEE_RELEASES}
             </Link>
           </>
         )}

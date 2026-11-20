@@ -101,6 +101,7 @@ NOTES:
 . (Join-Path $PSScriptRoot 'Resolve-CardName.ps1')
 . (Join-Path $PSScriptRoot 'Get-AdoToken.ps1')
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+. (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
 
 # The line this verb writes. CLI-only: nothing in the agent or the web reads it, and
 # it is not state -- the PR URL: line above it is the gate into Code Review.
@@ -205,7 +206,15 @@ if (-not $ado.Success) {
         -Hint "${p}PublishPR reads <organisation>/<project>/_git/<repository>/pullrequest/<id>, the address ${p}NewPR writes."
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-$org = $ado.Groups['org'].Value
+# The token is the Space's Azure DevOps token, so it goes to that organisation. The
+# card's line is text: one that is not on this Space's tracker is refused before
+# anything is sent, and a GitHub Space has no Azure DevOps token to send.
+if ((Resolve-P20Tracker -OrgUrl $cfg.Org) -ne 'ado' -or -not (Test-P20UrlOnTracker -Url $prUrl -OrgUrl $cfg.Org -Projects $cfg.Projects)) {
+    Write-CliError -Message "$prUrl is not on this Space's tracker ($($cfg.Org)), so ${p}PublishPR will not send your token there." `
+        -Hint "Run ${p}PublishPR from the Space that holds it, or correct the card's $($c.tokens.prUrl) line."
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
+$org = ([string]$cfg.Org).TrimEnd('/')
 $project = $ado.Groups['project'].Value
 $repo = $ado.Groups['repo'].Value
 $prId = $ado.Groups['id'].Value
@@ -230,7 +239,7 @@ if (-not $tokenRead.Ok) {
     Write-CliError -Message $tokenRead.Message -Hint $tokenRead.Hint
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-$headers = Get-P20AdoHeaders -Token $tokenRead.Token
+$headers = Get-P20AdoHeaders -Token $tokenRead.Token -OrgUrl $org
 
 # Azure DevOps puts the reason in the response body; the exception only says the status.
 $adoSentence = {
@@ -264,7 +273,7 @@ if (-not [bool]$pr.isDraft) {
 
 # -- Publish -----------------------------------------------------------------------
 try {
-    Invoke-RestMethod -Uri $apiUri -Headers $headers -Method Patch -Body $body | Out-Null
+    Invoke-RestMethod -Uri $apiUri -Headers $headers -Method Patch -Body (ConvertTo-P20Utf8Body $body) | Out-Null
 }
 catch {
     Write-CliError -Message "Publishing pull request $prId failed -- $(& $adoSentence $_)" -Hint "Check ${p}Log -Errors."

@@ -152,6 +152,37 @@ class RecipientResolutionTests(unittest.TestCase):
         r = comms._resolve_recipient("manager", ENABLED_CFG["communication"])
         self.assertFalse(r["ok"])
 
+    def test_chat_resolves_like_a_channel(self):
+        # A Teams chat is reached through a Workflows webhook exactly as a
+        # channel is; the type that comes back is the entry's own word.
+        cfg = {"recipients": {"mom": {"type": "chat", "display": "Mom", "webhookEnv": "TEAMS_WEBHOOK_MOM"}}}
+        with mock.patch.dict(os.environ, {"TEAMS_WEBHOOK_MOM": "https://chat-hook"}, clear=True):
+            r = comms._resolve_recipient("mom", cfg)
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(r["type"], "chat")
+        self.assertEqual(r["url"], "https://chat-hook")
+        self.assertEqual(r["envName"], "TEAMS_WEBHOOK_MOM")
+
+    def test_a_chat_with_no_webhook_is_skipped_naming_the_variable(self):
+        cfg = {"recipients": {"mom": {"type": "chat"}}}
+        with mock.patch.dict(os.environ, {}, clear=True):
+            r = comms._resolve_recipient("mom", cfg)
+        self.assertFalse(r["ok"])
+        self.assertIn("TEAMS_WEBHOOK_MOM", r["reason"])
+
+    def test_unknown_type_still_refused(self):
+        cfg = {"recipients": {"p": {"type": "pager", "webhookEnv": "TEAMS_WEBHOOK_P"}}}
+        with mock.patch.dict(os.environ, {"TEAMS_WEBHOOK_P": "https://hook"}, clear=True):
+            r = comms._resolve_recipient("p", cfg)
+        self.assertFalse(r["ok"])
+        self.assertIn("unsupported type 'pager'", r["reason"])
+
+    def test_the_type_words_are_the_contracts(self):
+        from agent.core import consts as C
+
+        self.assertEqual(C.webhook_recipient_types(), ("channel", "chat"))
+        self.assertEqual(C.deferred_recipient_types(), ("person",))
+
 
 class GatingTests(unittest.TestCase):
     def test_disabled_org_never_resolves_or_posts(self):
@@ -204,6 +235,23 @@ class DryRunTests(unittest.TestCase):
         ):
             res = comms.send(_msg(dryRun=True), config=ENABLED_CFG)
         self.assertEqual(res["status"], "dry-run")
+        self.assertIn("**PR ready**", res["payload"])
+        post.assert_not_called()
+
+    def test_chat_dry_run_returns_payload_unsent(self):
+        cfg = {
+            "activeSpace": "test",
+            "features": {"communication": True},
+            "communication": {"recipients": {"mom": {"type": "chat", "display": "Mom"}}},
+        }
+        with (
+            mock.patch.dict(os.environ, {"TEAMS_WEBHOOK_MOM": "https://chat-hook"}, clear=True),
+            mock.patch.object(comms, "_post_to_webhook") as post,
+        ):
+            res = comms.send(_msg(recipient="mom", dryRun=True), config=cfg)
+        self.assertEqual(res["status"], "dry-run", res)
+        self.assertNotIn("unsupported type", res.get("detail", ""))
+        self.assertEqual(res["target"], {"recipient": "mom", "display": "Mom"})
         self.assertIn("**PR ready**", res["payload"])
         post.assert_not_called()
 

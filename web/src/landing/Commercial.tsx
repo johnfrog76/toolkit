@@ -3,6 +3,7 @@ import { MemoryRouter, useLocation } from "react-router";
 import { DeckPlayer } from "../modules/deck/engine/DeckPlayer";
 import { DeckRoom } from "../modules/deck/DeckRoom";
 import { BAKED_VOICES, voiceUrl } from "../modules/deck/bakedVoices";
+import { VIEWER_ONLY_MODES } from "../modules/deck/offeredModes";
 import { theToolkitDeck } from "../modules/deck/decks/the-toolkit";
 
 // The commercial on the landing page: the same deck, engine and baked clips
@@ -14,7 +15,8 @@ import { theToolkitDeck } from "../modules/deck/decks/the-toolkit";
 // Escape) brings the page back with focus on the call to action.
 //
 // The player is the app's DeckPlayer exactly as DeckHost.tsx hands it over,
-// with one difference: narration starts on. Its controller pages and exits
+// with two differences: narration starts on, and there is no Podium (the page
+// has no notes window to open). Its controller pages and exits
 // through a router, so it plays inside an in-memory one that holds two entries,
 // the page and the deck; the address bar is never touched, and the page itself
 // has no routes.
@@ -43,6 +45,7 @@ export function CommercialPlayer({ onExit }: { onExit: () => void }) {
           deck={theToolkitDeck}
           slides={slides}
           mode="audience"
+          offeredModes={VIEWER_ONLY_MODES}
           voices={BAKED_VOICES}
           hasApi={false}
           resolveNarrationUrl={(slide, voice) => voiceUrl(theToolkitDeck.id, slide.id, voice)}

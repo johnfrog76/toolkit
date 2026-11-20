@@ -24,14 +24,21 @@ interface Props {
   date: string;
   /** "" for the 1:1. */
   series?: string;
-  /** Icon only (a card row) or with its word (a page header). */
-  compact?: boolean;
   /** After a successful close -- the list is already invalidated. */
   onClosed?: () => void;
 }
 
-export function CloseMeetingButton({ filename, date, series, compact, onClosed }: Props) {
-  const [open, setOpen] = useState(false);
+interface DialogProps {
+  filename: string;
+  date: string;
+  series?: string;
+  /** Cancel, the dismiss, or a successful close. */
+  onClose: () => void;
+  onClosed?: () => void;
+}
+
+/** The confirm itself, mounted while it is asking: a list's menu opens it. */
+export function CloseMeetingDialog({ filename, date, series, onClose, onClosed }: DialogProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [run, { isLoading }] = useRunMeetingAgendaMutation();
 
@@ -42,7 +49,7 @@ export function CloseMeetingButton({ filename, date, series, compact, onClosed }
         params: buildMeetingAgendaParams({ date, series, action: "Close" }),
       }).unwrap();
       if (result.status === "success") {
-        setOpen(false);
+        onClose();
         onClosed?.();
         return;
       }
@@ -54,33 +61,45 @@ export function CloseMeetingButton({ filename, date, series, compact, onClosed }
   };
 
   return (
+    <ConfirmDialog
+      open
+      what={
+        <>
+          Close this meeting. <code>{filename}</code> moves to the archive, stamped with the date it
+          closed -- a closed session is the record, and is not edited or sent from here again.
+        </>
+      }
+      busy={isLoading}
+      message={message}
+      onCancel={onClose}
+      onConfirm={confirm}
+    />
+  );
+}
+
+export function CloseMeetingButton({ filename, date, series, onClosed }: Props) {
+  const [open, setOpen] = useState(false);
+
+  return (
     <>
       <Button
         icon={<ArchiveRegular />}
         size="small"
-        appearance={compact ? "subtle" : "secondary"}
+        appearance="secondary"
         title="Close this meeting"
-        aria-label={compact ? "Close this meeting" : undefined}
-        onClick={() => {
-          setMessage(null);
-          setOpen(true);
-        }}
+        onClick={() => setOpen(true)}
       >
-        {compact ? undefined : "Close"}
+        Close
       </Button>
-      <ConfirmDialog
-        open={open}
-        what={
-          <>
-            Close this meeting. <code>{filename}</code> moves to the archive, stamped with the date
-            it closed -- a closed session is the record, and is not edited or sent from here again.
-          </>
-        }
-        busy={isLoading}
-        message={message}
-        onCancel={() => setOpen(false)}
-        onConfirm={confirm}
-      />
+      {open && (
+        <CloseMeetingDialog
+          filename={filename}
+          date={date}
+          series={series}
+          onClose={() => setOpen(false)}
+          onClosed={onClosed}
+        />
+      )}
     </>
   );
 }
