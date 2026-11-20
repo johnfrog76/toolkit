@@ -1,6 +1,6 @@
 """Which orgs a person is OFFERED to pick from.
 
-ONE table, two readers: this file runs agent/core/config.py's offered_spaces over
+ONE table, two readers: this file runs agent/core/config.py's switcher_spaces over
 Tests/fixtures/offered-orgs/table.json, and Tests/Test-Config.ps1 runs
 Scripts/Select-OfferedSpaces.ps1 over the same rows.
 
@@ -15,7 +15,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from agent.core.config import offered_spaces, space_keys  # noqa: E402
+from agent.core.config import offered_spaces, space_keys, switcher_spaces  # noqa: E402
 
 TABLE = json.loads((REPO_ROOT / "Tests" / "fixtures" / "offered-orgs" / "table.json").read_text(encoding="utf-8"))[
     "rows"
@@ -27,14 +27,22 @@ class TheOfferedOrgsRule(unittest.TestCase):
         for row in TABLE:
             with self.subTest(row["why"]):
                 org = {"slug": "test", "example": row["example"]}
+                if row.get("retired"):
+                    org["status"] = "archive"
                 active = "test" if row["active"] else "other"
-                got = offered_spaces([org], active, row["dismissed"])
+                got = switcher_spaces([org], active, row["dismissed"])
                 self.assertEqual(bool(got), row["offered"])
 
     def test_order_is_kept_and_nothing_else_is_touched(self):
         orgs = [{"slug": "a"}, {"slug": "test", "example": True}, {"slug": "b"}]
         self.assertEqual([o["slug"] for o in offered_spaces(orgs, "a", True)], ["a", "b"])
         self.assertEqual([o["slug"] for o in offered_spaces(orgs, "a", False)], ["a", "test", "b"])
+
+    def test_the_offered_list_keeps_a_retired_space_only_the_switcher_drops_it(self):
+        retired = [{"slug": "a"}, {"slug": "gone", "status": "archive"}]
+        self.assertEqual([o["slug"] for o in offered_spaces(retired, "a", False)], ["a", "gone"])
+        self.assertEqual([o["slug"] for o in switcher_spaces(retired, "a", False)], ["a"])
+        self.assertEqual([o["slug"] for o in switcher_spaces(retired, "gone", False)], ["a", "gone"])
 
     def test_only_a_real_true_marks_the_example(self):
         """A string is not a flag: "false" must not hide an org."""

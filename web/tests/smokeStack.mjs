@@ -248,6 +248,62 @@ export async function openRoute(page, base, route) {
   return page.evaluate(() => document.body.innerText);
 }
 
+/**
+ * The board's lanes, by the Space's tracker, with the fixture's planned card
+ * (test/backlog/Task403-...) in the first one. /api/status reads backlog/
+ * beside current/. A GitHub or local Space draws five lanes, Backlog first,
+ * and the card is in Backlog. An Azure DevOps Space draws four, with no Backlog
+ * lane, and a card already in backlog/ is drawn in Active (lanesFor and laneFor
+ * in legalMoves.ts). The tracker is /api/env's, the one the board reads.
+ *
+ * The board is /board beside Focus, or / when it is Home's only tab. `open`
+ * is the caller's own way to open a route. `expect` names the tracker the
+ * caller set up, so a run that means to cover one shape cannot pass on the
+ * other; `required` makes a Home with no board a failure, not a skip.
+ * Shared by the plain modes (smoke.mjs) and --matrix, which CI runs.
+ */
+export const PLANNED_CARD = "Cache the thumbnails";
+export async function boardLanesCheck({ page, base, open, check, label = "", expect, required = false }) {
+  const tracker = await fetch(`${base}/api/env`)
+    .then((r) => (r.ok ? r.json() : {}))
+    .then((e) => e?.tracker ?? "")
+    .catch(() => "");
+  const ado = tracker === "ado";
+  const first = ado ? "Active" : "Backlog";
+  const count = ado ? 4 : 5;
+  const shape = ado
+    ? "four lanes on an Azure DevOps Space, Active first, holding the planned card"
+    : "five lanes, Backlog first, holding the planned card";
+  for (const route of ["/board", "/"]) {
+    await open(route);
+    const hasBoard = await page
+      .waitForSelector('section[aria-label="Board"] [role="group"]', { timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!hasBoard) continue;
+    await page
+      .waitForFunction((title) => document.body.innerText.includes(title), PLANNED_CARD, { timeout: 15000 })
+      .catch(() => {});
+    const lanes = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('section[aria-label="Board"] [role="group"]')).map((g) => ({
+        label: g.getAttribute("aria-label") ?? "",
+        text: g.textContent ?? "",
+      })),
+    );
+    check(
+      `${label}${route} draws ${shape}`,
+      (expect === undefined || tracker === expect) &&
+        lanes.length === count &&
+        lanes[0].label.startsWith(first) &&
+        lanes[0].text.includes(PLANNED_CARD),
+      `tracker ${tracker || "(none)"}, lanes ${JSON.stringify(lanes.map((l) => l.label))}`,
+    );
+    return true;
+  }
+  if (required) check(`${label}the board draws ${shape}`, false, "no board at /board or /");
+  return false;
+}
+
 /** The nav's entries -- the text of the links and buttons in the header's nav. */
 export const navText = (page) =>
   page.evaluate(() => Array.from(document.querySelectorAll("a, button")).map((e) => e.textContent?.trim()).join("|"));

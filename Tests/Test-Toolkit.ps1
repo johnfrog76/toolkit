@@ -85,6 +85,7 @@ param(
     [switch]$StandupRemind,
     [switch]$Triage,
     [switch]$StartWork,
+    [switch]$OrgChart,
     [switch]$SendTeams,
     [switch]$NewMeeting,
     [switch]$MeetingAgenda,
@@ -454,10 +455,10 @@ foreach ($r in @($suiteResults | Where-Object { $_.Status -eq 'FAIL' -and $_.Det
 }
 Write-Host ""
 
-# ── The counts, ready to paste ─────────────────────────────────────────
-# docs/TESTING.md's combined row and the three printed totals (AGENTS.md,
-# docs/TESTING.md, VERIFY.md) are built from THIS run's own verdicts, so the
-# counts commit after a merge is a paste and never a hand-typed number. Only a
+# ── The counts, for the release's writer ───────────────────────────────
+# The CLI's two lines of docs/TEST-COUNTS.md are built from THIS run's own
+# verdicts, so the release writes them from a run (Scripts/Write-TestCounts.ps1)
+# and never from a hand-typed number. Only a
 # FULL run prints it -- every suite in the registry, each passed: -Fast, -Slow,
 # -Failed or a single suite cannot know the others, and a red suite's count is
 # not the one to publish.
@@ -476,11 +477,11 @@ if ($ranEverySuite) {
             $r = $suiteResults | Where-Object { $_.Suite -eq $key } | Select-Object -First 1
             $countParts += "$key $($r.Passed)"
         }
-        Write-Host "  Counts for docs/TESTING.md's combined row, from this run:" -ForegroundColor Cyan
+        Write-Host "  $((Get-P20TestCountsFile).CliHeading)" -ForegroundColor Cyan
         Write-Host "  $($countParts -join ', ')"
         Write-Host "  $($suites.Count) suites, $grandTotal assertions" -ForegroundColor Cyan
-        # The paste block holds two more lines this runner cannot know; say so in
-        # their place rather than leave a number to copy from an older paste.
+        # The counts file holds two more lines this runner cannot know; say so in
+        # their place, so the writer refuses this block rather than take an old number.
         Write-Host "  pytest: not run by tkTestToolkit -- tkTest prints it" -ForegroundColor DarkGray
         Write-Host "  web: not run by tkTestToolkit -- tkTest prints it" -ForegroundColor DarkGray
     }

@@ -26,6 +26,7 @@ import asyncio
 import re
 import subprocess
 import time
+from datetime import date as _date
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -34,6 +35,7 @@ from pydantic import BaseModel
 from ..core import log_writer
 from ..core.config import BILLING_SCRIPT, hub_folder, hub_root, load_config
 from ..core.consts import (
+    billing_text,
     folder_archive,
     re_closed_stamp_date,
     review_file_name,
@@ -111,11 +113,42 @@ def _billing_failure(sentence: str) -> BillingResponse:
     return BillingResponse(days=[], raw=sentence, error=sentence)
 
 
+# A day as the window takes it: yyyy-MM-dd, nothing else. Checked here, before
+# the argv is built, so a value starting with "-" can never bind as a switch.
+_BILLING_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _billing_window_refusal(since: str, until: str) -> str:
+    """The sentence a window is refused with, or "" for a window the script may
+    be given. The script's own rule (Scripts/Resolve-BillingWindow.ps1) also
+    refuses a backwards window; that one comes back as the script's stderr."""
+    text = billing_text()
+    if bool(since) != bool(until):
+        return text["halfWindow"]
+    for name, value in (("-Since", since), ("-Until", until)):
+        ok = bool(_BILLING_DAY.match(value))
+        if ok:
+            try:
+                _date.fromisoformat(value)
+            except ValueError:
+                ok = False
+        if not ok:
+            return text["notADay"].replace("{name}", name).replace("{value}", value)
+    return ""
+
+
 @api.get("/billing", response_model=BillingResponse)
-async def get_billing(week: str = "current"):
-    """Delegate to Get-WeeklyBilling.ps1 -AsJson (single source of truth)."""
+async def get_billing(week: str = "current", since: str = "", until: str = ""):
+    """Delegate to Get-WeeklyBilling.ps1 -AsJson (single source of truth).
+
+    ``week=current|last``, or a window: ``since`` and ``until``, both yyyy-MM-dd.
+    A window wins over ``week``, as it does in the script."""
     import json as _json
 
+    if since or until:
+        refusal = _billing_window_refusal(since, until)
+        if refusal:
+            return _billing_failure(refusal)
     if not BILLING_SCRIPT.exists():
         return _billing_failure("Billing script not found.")
     # Same resolver the bridge uses: this is the other place the agent starts a
@@ -137,7 +170,9 @@ async def get_billing(week: str = "current"):
     # first Space and was the script's hub root). The script now refuses without it.
     folder = str(load_config().get("promptsFolder", "") or "")
     args += ["-PromptsFolder", folder or BILLING_HUB_ROOT_FOLDER]
-    if week == "last":
+    if since and until:
+        args += ["-Since", since, "-Until", until]
+    elif week == "last":
         args.append("-LastWeek")
 
     try:

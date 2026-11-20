@@ -343,7 +343,9 @@ describe("the Triage page", () => {
   it("no tracker shows the reason, and asks nothing", () => {
     answer = { data: responseFor("no-tracker") };
     render(<TriagePage />);
-    expect(screen.getByText("gh did not answer")).toBeTruthy();
+    expect(
+      screen.getByText("gh did not answer for johnfrog76/toolkit: TimeoutExpired"),
+    ).toBeTruthy();
     expect(screen.queryByTestId("triage-issue")).toBeNull();
   });
 

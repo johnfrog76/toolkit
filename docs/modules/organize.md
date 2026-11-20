@@ -44,9 +44,9 @@ and `Env`: `Organize module  off`.
 | Half | Organize's | Not Organize's, though it sits beside it |
 | --- | --- | --- |
 | CLI | `Config/organize.commands.psd1` + `.ps1` (two wrappers); `Scripts/New-Reminder.ps1`, `Scripts/Get-Reminders.ps1`, `Scripts/Reminder-Rules.ps1` (the bucket, snooze and due rules) | `Resolve-CardName.ps1` (the id rule it reuses), `Set-CardLine.ps1`, `Add-ClosedStamp.ps1`, `Write-CardText.ps1` -- shared writers it calls |
-| Agent | `agent/organize/` -- one gated router, `reminders.py`, **reads only** | the bridge, which carries its writes |
-| Web | `web/src/modules/organize/` -- `index.tsx` (`organizeModule`), `RemindersCard.tsx`, `NewReminderDialog.tsx`, `reminderEntry.ts`, `ReminderBell.tsx`, `useOverdueReminders.ts`, `api.organize.ts`, `paths.ts` | `web/src/utility/dates.ts`, the shared Luxon time helper it was the first user of; `cliBridge.ts`'s four reminder builders; the ADO module's `useRemindAbout.tsx`, the card menu's door into the dialog, and `ado/paths.ts`, the card page's address a resolved ref links to |
-| Hub | `<promptsRoot>/reminders/current/` and `reminders/archive/` | nothing else: it reads no other module's folder |
+| Agent | `agent/organize/` -- one gated router, `reminders.py` and `reference.py`, **reads only** | the bridge, which carries its writes |
+| Web | `web/src/modules/organize/` -- `index.tsx` (`organizeModule`), `RemindersCard.tsx`, `NewReminderDialog.tsx`, `EditReminderDialog.tsx`, `reminderEntry.ts`, `ReminderBell.tsx`, `useOverdueReminders.ts`, `OrganizePages.tsx` (the in-page tabs), `ReferenceCard.tsx`, `ReferencePage.tsx`, `api.organize.ts`, `paths.ts` | `web/src/utility/dates.ts`, the shared Luxon time helper it was the first user of; `cliBridge.ts`'s four reminder builders; the ADO module's `useRemindAbout.tsx`, the card menu's door into the dialog, and `ado/paths.ts`, the card page's address a resolved ref links to |
+| Hub | `<promptsRoot>/reminders/current/` and `reminders/archive/`; `<promptsRoot>/reference/current/`, read only | nothing else: it reads no other module's folder |
 | Contract | `consts.json`: `stamps.due` / `.source` / `.ref`, `regex.dueLine`, `reminders.buckets`, `reminders.snooze` | `stamps.created`, `stamps.closed`, `regex.cardId` -- reused as-is |
 
 **A module closes its own data.** `Archive` is the card verb, org-scoped, and cannot see `reminders/`;
@@ -102,12 +102,23 @@ the source tag is how the ledger tells whose a reminder is.
 | Route | Gate | Reads | Writes |
 | --- | --- | --- | --- |
 | `GET /api/reminders` | `features.organize`, per request; 404 when off | `reminders/current/` -- the folder the hub names | nothing |
+| `GET /api/reference?q=` | the same | `reference/current/` -- [the file](../hub/reference.md) | nothing |
+| `GET /api/reference/{name}` | the same | one document, by file name | nothing |
 
 It answers `{ count, buckets: {overdue, today, upcoming}, items: [...], asOf }`. Each item is `id`,
 `filename`, `title`, `due` exactly as stored, `bucket` (derived), `source`, `ref`, `created`, and `card`
 -- the card the ref names, or `null` ([A ref that names a card](#a-ref-that-names-a-card)) -- sorted by
 bucket then soonest due, undated last. A hub that has never had a reminder answers empty, not an error.
 A file in the folder whose name carries no id is not a reminder and is skipped.
+
+`GET /api/reference` answers `{ count, items: [...], query }`: each item is `name` (the file name, the
+document's address), `title`, `source`, `valid` exactly as written, `added`, `original`, `excerpt` -- the start of the content after the header as plain words, markdown dropped, cut at 240
+characters -- and, when searched, `line` -- the first line carrying a search word -- sorted by title. `?q=` keeps the documents that have every
+word, any order, case ignored: the rule the hub's other searches use. A hub with no `reference/` folder, or an
+empty one, answers empty, not an error. `GET /api/reference/{name}` returns one document's header and its
+whole text as `body` and its absolute `path`; a name that is not a plain `.md` file name, or is not there, is a 404. The folder is
+read as `reference` until the CLI's `Reference` verb ([#315](https://github.com/johnfrog76/toolkit/issues/315))
+adds the key to both halves' hub-folder tables, when a hub's own name for it starts to count.
 
 **There is no write route.** Snooze, Archive and the quick add go through the bridge:
 
@@ -146,16 +157,28 @@ The count is `useOverdueReminders()` (`useOverdueReminders.ts`), a selector over
 card moves the bell at once. It polls every minute, because a reminder becomes overdue with no write to
 invalidate anything. The bucket is still the agent's.
 
+**In-page tabs, `Reminders | Reference`**, the same `TabRows` / `TabList` Home's strip and Team Agile's use,
+each tab an address: `/organize` is Reminders, `/organize/reference` is Reference, and one document is read at
+`/organize/reference/<file name>`. With organize off none of the three exists.
+
+The Reference card is a `ListPanel`: a card item per document, its title the row, its `Valid:` dates and its
+Source the meta (`No valid dates` where the header has none), the start of its content as the description, clamped
+to two lines with an ellipsis (a search shows the line that matched instead), and **Open**, which reads the document here, read
+only, rendered as markdown, under a header that carries the file's path with the shared copy-path line
+(`FilePath`), the one every detail view of a hub file wears. The search box asks the agent once typing has rested for a moment, and a hit shows
+the line that matched. It has no create, no Archive and no menu: nothing is written, moved or archived from the
+browser, and a person files a document by hand.
+
 The Reminders card:
 
 | Part | What it is |
 | --- | --- |
-| Header | the title, a refresh, and the count badge (open reminders) |
+| Header | the title with the panel's info icon beside it, a refresh, and the count badge (open reminders). The panel is a `ListPanel` ([`web/COMPONENTS.md`](../../web/COMPONENTS.md)): it fills the kind's slots with data and draws no entry, pager or chip of its own; what a write said is shown once, over the list |
 | Chip row | `All` / `Overdue` / `Today` / `Upcoming`, each with its count -- a filter over ONE list, remembered per browser |
-| A row | the bucket badge, the source tag, the ref, the title, and the due date in words -- `Today 2:00 PM`, `Yesterday`, `Mon 28 Sep 9:00 AM`, `No due date`. A ref the agent resolved to a card in `current/` is a link to the card's page reading `<id> <title>`; one resolved to an archived card reads `<id> <title> (done)`, named and not linked, because the card page reads `current/` only; any other ref stays in the tag as written, `ado 41` ([A ref that names a card](#a-ref-that-names-a-card)) |
-| Row actions | the house row (`shared/CardActions`): **Archive** (`Reminders <id> -Archive`; the row said Done until the row vocabulary) is the one exposed action; the `...` menu (`Actions for <title>`) holds **Snooze: In an hour** / **Snooze: Tomorrow, 9:00 AM** / **Snooze: Next Monday, 9:00 AM**, then **Edit**, which corrects the entry. A snooze is one choice away |
+| An entry | a card item of the list kind, every one the same height: the title on one line with the bucket badge beside it; under it the card the ref names, where it names one; on the last line the source tag and the due date in words -- `Today 2:00 PM`, `Yesterday`, `Mon 28 Sep 9:00 AM`, `No due date`. A ref the agent resolved to a card in `current/` reads `<id> <title>` and the entry's menu opens with **Open the card**; one resolved to an archived card reads `<id> <title> (done)`, named with nothing to open, because the card page reads `current/` only; any other ref stays in the tag as written, `ado 41` ([A ref that names a card](#a-ref-that-names-a-card)). No text in an entry is a link |
+| Entry actions | the card item's (`shared/CardActions`, drawn by the kind): **Archive** (`Reminders <id> -Archive`; the row said Done until the row vocabulary) is the one exposed action; the `...` menu (`Actions for <title>`) holds **Open the card** where the ref names a card being worked, then **Snooze: In an hour** / **Snooze: Tomorrow, 9:00 AM** / **Snooze: Next Monday, 9:00 AM**, then **Edit**, which corrects the entry. A snooze is one choice away |
 | Edit | the reminder's title, due date, optional time, source and ref, filled in, the source and the ref each a full-width field of its own (the date and its time stay side by side). An emptied ref is sent as an empty `-Ref`, which removes the line. A date and a separate time rather than one date-time input, because a reminder due on a DAY has no time and one input would have to invent one (`reminderEntry.ts` splits and joins). Save is off until something changed, and sends only what changed (`buildReminderEditParams`); an emptied date is `-NoDue`. A refusal stays in the dialog in the verb's words |
-| Footer | the pager (five a page), and **+**, the quick add: what, an optional due (local date and time), an optional source and an optional ref, each a full-width field of its own. The dialog is `NewReminderDialog.tsx`, the one place the web creates a reminder |
+| Footer | the pager, with as many entries on a page as fit the panel's one height (three, under the chips and over the foot line), and **+**, the quick add: what, an optional due (local date and time), an optional source and an optional ref, each a full-width field of its own. The dialog is `NewReminderDialog.tsx`, the one place the web creates a reminder; Edit's is `EditReminderDialog.tsx` |
 | Foot line | under `storeSync: git`, the one shared hub-sync line (`HubSyncLine`) while the hub is ahead of its remote or behind it, not checked yet, or its last check failed -- `The hub is ahead by 1. Sync on the System page` -- and nothing in step or under any other `storeSync`. It reads `/env` and never fetches; [`docs/CONFIGURATION.md`, "Syncing the hub from the web app"](../CONFIGURATION.md#syncing-the-hub-from-the-web-app) |
 
 The due date in words comes from `web/src/utility/dates.ts`, the Luxon-backed time utility: local zone,
@@ -190,19 +213,8 @@ clock.
 
 **The bucket rule**, implemented twice -- `Get-P20ReminderBucket` in `Scripts/Reminder-Rules.ps1` and
 `reminder_bucket` in `agent/organize/reminders.py` -- and held to one table,
-`Tests/fixtures/reminders/buckets.json`, asserted from both suites:
-
-| Due | Bucket |
-| --- | --- |
-| none | upcoming |
-| a date before today | overdue |
-| today's date, no time | today -- a date is due at the END of its day |
-| a later date | upcoming |
-| a time whose minute has passed | overdue |
-| a time later today, or this very minute | today |
-| a time on a later day (midnight included) | upcoming |
-
-Times are **local, with no offset**. That is the simplest honest answer for one engineer's hub.
+`Tests/fixtures/reminders/buckets.json`, asserted from both suites. The rule, row by row, is
+[`docs/hub/reminders.md`](../hub/reminders.md#how-it-is-read), "How it is read".
 
 ### A ref that names a card
 
@@ -228,13 +240,15 @@ link ([The web UI](#the-web-ui)).
 | --- | --- |
 | `tkTestToolkit -Reminders` (`Tests/Test-Reminders.ps1`) | every row of the shared table (bucket and snooze); what `-Due` accepts; off means no verb and no bridge entry; both verbs typed in a fresh shell against a scratch package and hub -- create, the ledger, snooze (the Due line and nothing else, a CRLF file kept CRLF), edit (each switch its own line, the filename kept, `-NoDue` and back, `-Source` with `-Ref`, an empty `-Ref` removing it, the same values again writing nothing), archive with its stamp, a second archive as a report; fifteen stated refusals, and a refused edit writing nothing; created bytes (no BOM, LF) |
 | `Tests/test_reminders.py` | the same table from the agent's side; the route over the fixture hub against a fixed clock; a file with no id skipped; a hub with no `reminders/` answering empty; the folder renamed through `hub.json`; off is 404; a ref resolved -- a number, a number with a leading zero, a lettered id, an archived card, `current/` over `archive/` -- and not resolved: prose, an id no card carries, a card in another Space, no ref |
+| `Tests/test_reference.py` | the header of every document in the shared table (`Tests/fixtures/reference/table.json`), the search of every row in it, a file that is not `.md` skipped, the list in title order, a hit's line, a document returned whole, a name that is a path or not markdown refused with 404, a hub with no folder or an empty one answering empty, and off being 404 on both routes |
 | `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | its six contract values, stated from all three halves; `**Due:**` never retyped in the CLI or the agent |
 | `tkTestToolkit -HubJson`, `Tests/test_hub_json.py` | `reminders` is a hub-root folder, and the CLI's and the agent's folder tables agree key for key |
 | `web`: `registry.organize.test.tsx`, `registry.communication.test.tsx` | its flag, nothing when off, its own tab and no card elsewhere; Meetings fills the `organize` slot and hides its own tab only when organize is on; every registry test mocks every module |
+| `web`: `ReferenceCard.test.tsx` | a document's title, Valid dates and Source drawn; no dates said so; Open going to the reading room by file name; the search asked of the agent only once typing rests, with the matching line shown; nothing that writes |
 | `web`: `ReminderBell.test.tsx` | the overdue slice of an answer (checking, unknown, a count, the last answer kept when a poll fails); the label in every state; asleep with no badge at zero or unknown, awake with the count, a click handed off; the registry test holds that the bell is the header's one organize item and absent when off |
 | `web`: `cliBridge.test.ts` | the exact argv of the four reminder builders -- an edit sends only what changed, an emptied due as `-NoDue`, an emptied ref as an empty `-Ref`, nothing changed as `null`; a new reminder's ref as `-Ref` |
 | `web`: `reminderEntry.test.ts` | a stored due split into date and time and joined back unchanged; a day keeps no invented time |
-| `web`: `RemindersCard.test.tsx` | a ref resolved to a card in `current/` drawn as a link to the card's page, one resolved to an archived card named and not linked, a plain ref (and an older agent's answer with no `card`) as the tag it was; the Ref field in the New dialog sent as `-Ref` and as wide as its sibling inputs, and in the Edit dialog filled in and in the same column as What, an emptied one sent as an empty `-Ref`; every input in both dialogs at the default size, like the app's other dialogs |
+| `web`: `RemindersCard.test.tsx` | a ref resolved to a card in `current/` named on the entry and opened from its menu's **Open the card**, with no link in the entry; one resolved to an archived card named with nothing to open; a plain ref (and an older agent's answer with no `card`) as the tag it was; the Ref field in the New dialog sent as `-Ref` and as wide as its sibling inputs, and in the Edit dialog filled in and in the same column as What, an emptied one sent as an empty `-Ref`; every input in both dialogs at the default size, like the app's other dialogs |
 | `web`: `Board.remind.test.tsx`, `cardActions.test.ts`, `scenarios.test.tsx` | **Remind me about this** absent from a card's menu with Organize off and last of its own moves with it on; chosen, the dialog filled with the card's name and id, and `NewReminder` sent with `-Ref` |
 | `web`: `utility/dates.test.ts` | the local day at 23:30 west of UTC (where the UTC date is tomorrow), and every due label |
 

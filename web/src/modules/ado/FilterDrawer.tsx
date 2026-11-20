@@ -146,6 +146,11 @@ export function FilterDrawer({
     [status?.prompts, env?.cardTypes],
   );
   const cardCount = status?.prompts.length ?? 0;
+  const stateCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of status?.prompts ?? []) counts[p.status] = (counts[p.status] ?? 0) + 1;
+    return counts;
+  }, [status?.prompts]);
   // Linked or custom, counted from the same cards. Drawn only in a MIXED
   // Space -- see showLinkRow for why an all-custom Space grows no control.
   const linkRow = useMemo(() => linkRowOf(status?.prompts ?? []), [status?.prompts]);
@@ -234,7 +239,7 @@ export function FilterDrawer({
                 label="All"
                 count={cardCount}
                 active={typeFilter === "All"}
-                appearance="pink"
+                appearance="tabColorTwo"
                 onClick={() => onTypeChange("All")}
               />
               {typeRow.map((t) => (
@@ -243,7 +248,7 @@ export function FilterDrawer({
                   label={t.label}
                   count={t.count}
                   active={typeFilter === t.label}
-                  appearance="pink"
+                  appearance="tabColorTwo"
                   onClick={() => onTypeChange(typeFilter === t.label ? "All" : t.label)}
                 />
               ))}
@@ -310,8 +315,9 @@ export function FilterDrawer({
             <div className={styles.stateRow}>
               <FilterBadge
                 label="All"
+                count={cardCount}
                 active={stateFilter === "All"}
-                appearance="orange"
+                appearance="tabColorThree"
                 onClick={() => onStateChange("All")}
               />
               {stateOptions
@@ -320,8 +326,9 @@ export function FilterDrawer({
                   <FilterBadge
                     key={s}
                     label={stateLabel(s)}
+                    count={stateCounts[s] ?? 0}
                     active={stateFilter === s}
-                    appearance="orange"
+                    appearance="tabColorThree"
                     onClick={() => onStateChange(stateFilter === s ? "All" : s)}
                   />
                 ))}

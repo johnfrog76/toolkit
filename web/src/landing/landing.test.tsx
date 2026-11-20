@@ -79,6 +79,22 @@ describe("the page draws exactly those words", () => {
     });
   });
 
+  test("each person is a card: their refined portrait, hidden from a screen reader, a plate with their title, their line quoted", () => {
+    render(<Landing />);
+    const ways = screen.getByRole("region", { name: COPY.eyebrow });
+    for (const way of COPY.ways) {
+      const who = PEOPLE.find((p) => p.way === way.id)!;
+      const card = ways.querySelector<HTMLElement>(`#way-${way.id} figure.lp-card`)!;
+      expect(card).not.toBeNull();
+      const portrait = card.querySelector(`svg[data-refined="${who.castId}"]`);
+      expect(portrait).not.toBeNull();
+      expect(portrait!.getAttribute("aria-hidden")).toBe("true");
+      expect(card.querySelector(".lp-card-plate")?.textContent).toBe(who.title);
+      expect(card.querySelector("blockquote")?.textContent).toBe(who.line);
+    }
+    expect(PEOPLE.map((p) => p.title)).toEqual(["IC", "PM", "Team lead"]);
+  });
+
   test("quick start: the five lines, character for character, with the butler beside the shell", () => {
     render(<Landing />);
     const quick = screen.getByRole("region", { name: COPY.quickStartHeading });

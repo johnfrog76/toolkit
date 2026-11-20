@@ -31,7 +31,8 @@ export interface RitualItem {
   /** What moved (RITUALS.motions): closed, started or inProgress -- already said
    *  in `text` after the ref. Absent from an agent that predates it. */
   motion?: string;
-  /** The distinct commits its card threads; 0 with no card. */
+  /** The distinct commits its card threads -- on a GitHub Space, only those
+   *  authored inside the window; 0 with no card. */
   commits?: number;
 }
 
@@ -43,6 +44,9 @@ export interface MotionCount {
   started: number;
   inProgress: number;
   commits: number;
+  /** Commits the dates read could not date: not in `commits`, said beside them.
+   *  Absent from an agent that predates it. */
+  undated?: number;
 }
 
 /** A walk item also names the worker it is routed to. */
@@ -60,8 +64,21 @@ export interface StandupWorker {
   blockers: RitualItem[];
   /** All three slots empty: the worker renders the mug and its one status sentence. */
   empty: boolean;
-  /** The empty worker's status sentence (the `nothing` family). The name is historical. */
+  /** The empty worker's status sentence: the first of `status`, kept for a reader that
+   *  knows only this field. The name is historical. */
   excuse: string;
+  /** The empty worker's two made-up items, `[yesterday, today]` (the `nothing` and
+   *  `nothingToday` families); `[]` for a worker with something to say. */
+  status: string[];
+  /** In the room today (the team size, docs/modules/solitaire-agile.md, "The team
+   *  size: who is in the room"): the round -- `work.workers`, the stage -- is the
+   *  present only; the detail and the brief keep every worker. Absent from an agent
+   *  that predates the room, which reads as present. */
+  present?: boolean;
+  /** The plate a member a card names wears when its family keeps no window
+   *  (`GROK`, an unknown id in capitals); `""` or absent for everyone else, who
+   *  wears their window's persona. */
+  plate?: string;
 }
 
 /** One group at the work grain (D-TA20): what a slot's items belong to --
@@ -82,10 +99,17 @@ export interface WorkWorker {
   yesterday: WorkGroup[];
   today: WorkGroup[];
   blockers: WorkGroup[];
-  /** The prose: this worker's sentences, in order -- one a group, then
-   *  "Nothing blocked." when it has something to say and no blockers; empty
-   *  for a worker with nothing, who is its status sentence. */
+  /** The prose: this worker's turn, in order -- `turnOpen`, one sentence a
+   *  group, a slot with nothing beside one with something its fixed line
+   *  (`proseYesterdayNone`, `proseYesterdayWorked`, `proseTodayNone`), a worker
+   *  with nothing at all its two made-up items, then `proseBlockersNone` when
+   *  nothing blocks it, then `turnClose`. */
   prose: string[];
+  /** An invented cast member (the team size, docs/modules/solitaire-agile.md, "The
+   *  team size: who is in the room"): it fills a seat the size counts and no member
+   *  takes. Its label is its cast id, its name the plate, its turn made-up status;
+   *  it is in the round only, never in `workers`. Absent from an agent that predates it. */
+  cast?: boolean;
 }
 
 /** The standup at the grain of the work: the same items, grouped, and its text. */
@@ -94,6 +118,11 @@ export interface StandupWork {
   workers: WorkWorker[];
   /** The prose: the queue's sentences, one a group, kind by kind. */
   queueProse: string[];
+  /** The chair's own turn, last, in the workers' frame and its own first person:
+   *  `turnOpen`, its yesterday (what you walked, else a made-up line), its today
+   *  (what waits, kind by kind, or `chairTodayNone`), `proseBlockersNone`,
+   *  `turnClose`. Never the queue's sentences again. Absent from an agent that predates it. */
+  chairProse?: string[];
   /** One line for the queue and one a worker, each its sentences, LF-joined --
    *  the same string `Standup -Grain work` prints. */
   text: string;
@@ -120,9 +149,17 @@ export interface StandupResponse {
    * on the id ("both"), a local Space's cards, or none when nothing answered
    * (an ADO Space, gh down). "issues" is what an agent that predates the join says. */
   source?: "issues" | "cards" | "both" | "none";
-  /** false: no tracker answered. The ritual still happens (principle 3). */
-  tracker: { ok: boolean; reason: string };
-  chair: { open: string; close: string };
+  /** ok false: no tracker answered. The ritual still happens (principle 3).
+   * workerLabels: how many worker labels the tracker answered (0 where none was read). */
+  tracker: { ok: boolean; reason: string; workerLabels?: number };
+  /** The chair's two phrasebook lines, and `walked`: the walk items closed inside
+   *  the window, by number -- what the chair's turn says it walked. `walked` is
+   *  absent from an agent that predates it. */
+  chair: { open: string; close: string; walked?: RitualItem[] };
+  /** The room: its windows, the chair included (`spaces.<slug>.features.teamSize`,
+   *  3, 6 or 9, unset 9) -- `size - 1` workers sit. The web never reads the setting;
+   *  it draws what this says. Absent from an agent that predates it. */
+  team?: { size: number };
   queue: { walk: QueueItem[]; decide: QueueItem[]; look: QueueItem[] };
   workers: StandupWorker[];
   /** The work grain: the items grouped, one phrase a group. Absent from
@@ -281,6 +318,7 @@ export const solitaireAgileEndpoints = ritualsApi.injectEndpoints({
     // GET /api/ritual/standup?space=<slug> -- today's standup, derived now
     getStandup: builder.query<StandupResponse, string>({
       query: standupQuery,
+      providesTags: ["Standup"],
       keepUnusedDataFor: CACHE_TTL,
     }),
 
@@ -436,7 +474,7 @@ export const startWorkEndpoints = api.injectEndpoints({
 
 export const { useRunStartWorkMutation } = startWorkEndpoints;
 
-// -- Milestones (the Milestones tab) ----------------------------------------
+// -- Milestones (the Releases tab) ----------------------------------------
 //
 // The Space's tracker milestones with the tracker's own counts. Each row is the
 // ado core's own Milestone -- the shape GET /api/milestones serves the Stats
@@ -470,3 +508,73 @@ export const milestonesEndpoints = api.injectEndpoints({
 });
 
 export const { useGetRitualMilestonesQuery } = milestonesEndpoints;
+
+// -- The org chart (the Org tab) ------------------------------------------
+//
+// The hub's org.json, the tree in use, as GET /api/ritual/org serves it
+// (docs/hub/org.md, "The response"): the positions in tree order, each with its
+// level and seats, and the two fields only the agent adds -- the prompt's title
+// and the ref that opens it in the Studio's reading room. A READ: nothing here
+// writes, and there is no Space parameter -- the file is the engineer's.
+
+/** One seat of a position: a model, or a person (the owner), or nobody. */
+export interface OrgSeat {
+  id: string;
+  model: string | null;
+  person: string | null;
+  machine: string | null;
+  space: string | null;
+  /** Allowed by the file's shape; nothing draws it yet. */
+  active: boolean | null;
+  /** Derived by the reader: vacant is a seat with no model and no person. */
+  state: "staffed" | "vacant";
+}
+
+export interface OrgPosition {
+  id: string;
+  title: string;
+  prompt: string | null;
+  reportsTo: string | null;
+  defaultModel: string | null;
+  /** The root is 0. */
+  level: number;
+  /** Empty for a pool (the builders): its default-model line is what it says. */
+  seats: OrgSeat[];
+  /** The prompt's title, as the reading room reads it; null with no prompt. */
+  promptTitle: string | null;
+  /** The address after /studio/prompts/ (promptPath); null with no prompt, or one
+   *  the reading room does not list. */
+  promptRef: string | null;
+}
+
+export interface OrgTree {
+  id: string;
+  name: string;
+  machines: string[];
+  positions: OrgPosition[];
+}
+
+export interface OrgResponse {
+  activeTree: string;
+  tree: OrgTree;
+}
+
+/** A refusal's detail: the kind is the contract, the message the sentence. */
+export interface OrgRefusal {
+  kind: string;
+  message: string;
+}
+
+export const ORG_QUERY = underBase(RITUALS.orgRoute);
+
+export const orgEndpoints = api.injectEndpoints({
+  endpoints: (builder) => ({
+    // GET /api/ritual/org -- the tree in use, read from the hub's org.json
+    getOrgChart: builder.query<OrgResponse, void>({
+      query: () => ORG_QUERY,
+      keepUnusedDataFor: CACHE_TTL,
+    }),
+  }),
+});
+
+export const { useGetOrgChartQuery } = orgEndpoints;

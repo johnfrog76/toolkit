@@ -1,0 +1,37 @@
+{
+  "_comment": "The sample org chart (docs/hub/org.md): who the positions are and which model or person sits in each seat. It rides Team Agile, so OrgChart prints it where Team Agile is on. One tree here; add another under trees and name the one in use with activeTree. A position may name a prompt in the hub's agentic folder with \"prompt\" (a file name), which this sample does not.",
+  "activeTree": "mine",
+  "trees": [
+    {
+      "id": "mine",
+      "name": "My team",
+      "machines": ["this-machine"],
+      "positions": [
+        {
+          "id": "owner",
+          "title": "Owner",
+          "seats": [
+            { "id": "owner", "person": "You" }
+          ]
+        },
+        {
+          "id": "lead",
+          "title": "Team lead",
+          "reportsTo": "owner",
+          "defaultModel": "opus",
+          "seats": [
+            { "id": "demo", "model": "opus", "machine": "this-machine", "space": "demo" },
+            { "id": "github-demo", "machine": "this-machine", "space": "github-demo" }
+          ]
+        },
+        {
+          "id": "builder",
+          "title": "Builder",
+          "reportsTo": "lead",
+          "defaultModel": "sonnet for the cards a lead hands out",
+          "seats": []
+        }
+      ]
+    }
+  ]
+}

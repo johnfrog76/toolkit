@@ -4,14 +4,14 @@
 # because Windows is slow and the Ubuntu jobs are the merge gate:
 #
 #   changes   every pull request, every push to main, and the Actions tab's button:
-#             which of the jobs below this run needs (Scripts/Get-CiScope.ps1).
+#             which of the jobs below this run needs (Scripts/Get-CiScope.ps1),
+#             and on a pull request, that docs/TEST-COUNTS.md changes only with
+#             consts.json's version (Scripts/Test-TestCountsChange.ps1).
 #   cli       the CLI half,      )
 #   agent     the agent half,    ) side by side, each with its own installs and lints,
 #   web       the web UI half,   ) each when `changes` says the change can reach it.
 #   contract  a pull request that leaves a half out: the cross-half suites of the
-#             halves that did not run, the markdown lint when the web job did not,
-#             and the check that their paste lines in docs/TESTING.md are main's
-#             (Scripts/Test-CarriedCounts.ps1).
+#             halves that did not run, and the markdown lint when the web job did not.
 #   verify    the one check that sums the run up: green when every job the
 #             change needed passed, whatever the filter skipped.
 #   windows   the browser smoke and the CLI in PowerShell 7 on Windows.
@@ -27,9 +27,7 @@
 # half each changed path can reach: web/ the web job; changelog.d/, CHANGELOG.md,
 # docs/modules/*.md, docs/SCENARIOS.md and docs/KNOWN-GAPS.md no half, only the
 # contract job, which runs every suite that reads them; and a shared path -- or one
-# the rule does not know -- all three. A change to the count lines of
-# docs/TESTING.md, AGENTS.md or VERIFY.md and nothing else in them reaches no half
-# by itself.
+# the rule does not know -- all three.
 #
 # Windows runs against main once each weekday evening, so a change that only 5.1 or
 # the browser would show is caught the same day. A pull request that is heavy on
@@ -103,13 +101,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      # One step: the changed files, then the rule over them (Get-P20CiScope in
+      # The changed files, then the rule over them (Get-P20CiScope in
       # Scripts/TestAll-Rules.ps1). --no-renames lists a moved file at both ends, so
-      # a file moved out of a shared folder still counts as a change there. The
-      # three documents that carry counts also go in as their changed lines and
-      # their text at the base, so a change to their count lines alone reaches no
-      # half (Get-P20CountOnlyPaths). Any other event lists nothing, and the script
-      # answers every half.
+      # a file moved out of a shared folder still counts as a change there. A pull
+      # request also writes consts.json as it stood at the base, and whether the
+      # counts page existed there, for the next step.
+      # Any other event lists nothing, and the script answers every half.
       - name: The files changed, and the jobs they need
         id: scope
         env:
@@ -117,17 +114,25 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           : > "$RUNNER_TEMP/changed.txt"
-          : > "$RUNNER_TEMP/counts.diff"
-          mkdir -p "$RUNNER_TEMP/base/docs"
+          : > "$RUNNER_TEMP/base-consts.json"
+          base_page=true
           if [ "$EVENT" = "pull_request" ]; then
             git diff --name-only --no-renames "$BASE...HEAD" > "$RUNNER_TEMP/changed.txt"
-            git diff -U0 --no-renames "$BASE...HEAD" -- docs/TESTING.md AGENTS.md VERIFY.md > "$RUNNER_TEMP/counts.diff"
             from=$(git merge-base "$BASE" HEAD)
-            for f in docs/TESTING.md AGENTS.md VERIFY.md; do
-              git show "$from:$f" > "$RUNNER_TEMP/base/$f" 2>/dev/null || : > "$RUNNER_TEMP/base/$f"
-            done
+            git show "$from:consts.json" > "$RUNNER_TEMP/base-consts.json" 2>/dev/null || :
+            git cat-file -e "$from:docs/TEST-COUNTS.md" 2>/dev/null || base_page=false
           fi
-          pwsh -NoProfile -File Scripts/Get-CiScope.ps1 -Event "$EVENT" -PathsFile "$RUNNER_TEMP/changed.txt" -CountDiffFile "$RUNNER_TEMP/counts.diff" -BaseRoot "$RUNNER_TEMP/base"
+          echo "base_counts=$base_page" >> "$GITHUB_OUTPUT"
+          pwsh -NoProfile -File Scripts/Get-CiScope.ps1 -Event "$EVENT" -PathsFile "$RUNNER_TEMP/changed.txt"
+
+      # The counts file changes only with the version: docs/TEST-COUNTS.md is
+      # written in a release pull request, which sets consts.json's version beside
+      # it, and any other change to it -- an edit or a deletion -- is refused, unless
+      # the base has no page and this change introduces it
+      # (Get-P20TestCountsChangeFindings). A refusal fails this job, so Verify fails with it.
+      - name: The counts file changes only with the version
+        if: ${{ github.event_name == 'pull_request' }}
+        run: pwsh -NoProfile -File Scripts/Test-TestCountsChange.ps1 -PathsFile "$RUNNER_TEMP/changed.txt" -BaseConstsPath "$RUNNER_TEMP/base-consts.json" -BaseHadPage "${{ steps.scope.outputs.base_counts }}"
 
   cli:
     name: The CLI on Ubuntu
@@ -272,8 +277,9 @@ jobs:
         run: npm run lint
 
       # The documentation lints: markdownlint over the root README.md and the other
-      # root documents, docs/, web/README.md and agent/README.md, with the tree's
-      # own settings (.markdownlint-cli2.jsonc). A documentation path that reaches
+      # root documents, docs/, changelog.d/ (each waiting entry and its README),
+      # web/README.md and agent/README.md, with the tree's own settings
+      # (.markdownlint-cli2.jsonc). A documentation path that reaches
       # no half is linted by the contract job's copy of this step instead.
       - name: The documentation -- npm run lint:md
         if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
@@ -289,12 +295,12 @@ jobs:
   contract:
     name: The contracts between the halves
     # A pull request that leaves a half out. The suites in the other halves that
-    # read what this change touched, for each half whose job did not run, and the
-    # carried paste lines. The CLI's set runs Portability's sweeps over web/ and
-    # the documents, Menu's parity over every document, the constants, DocCounts
-    # and the changelog fragments' shape; the agent's reads the web UI's agreed
-    # string, the artwork notices and the constants; and the web job's markdown
-    # lint, when that job did not run.
+    # read what this change touched, for each half whose job did not run. The
+    # CLI's set runs Portability's sweeps over web/ and the documents, Menu's
+    # parity over every document, the constants, DocCounts and the changelog
+    # fragments' shape; the agent's reads the web UI's agreed string, the artwork
+    # notices and the constants; and the web job's markdown lint, when that job
+    # did not run.
     needs: changes
     if: ${{ needs.changes.outputs.contract == 'true' }}
     runs-on: ubuntu-latest
@@ -302,15 +308,8 @@ jobs:
     defaults:
       run:
         shell: bash
-    env:
-      RAN_CLI: ${{ needs.changes.outputs.cli }}
-      RAN_AGENT: ${{ needs.changes.outputs.agent }}
-      RAN_WEB: ${{ needs.changes.outputs.web }}
     steps:
-      # The whole history, so main's docs/TESTING.md is here to compare with.
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-python@v7
         if: ${{ needs.changes.outputs.agent != 'true' }}
@@ -365,24 +364,11 @@ jobs:
         working-directory: web
         run: npm run lint:md
 
-      # A half that did not run here cannot have a new count: its paste lines in
-      # docs/TESTING.md must be main's, as they stand. One that differs was typed.
-      - name: The carried paste lines are main's
-        if: ${{ !cancelled() }}
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          git show "$BASE:docs/TESTING.md" > "$RUNNER_TEMP/base-TESTING.md"
-          ran=""
-          if [ "$RAN_CLI" = "true" ]; then ran="$ran,cli"; fi
-          if [ "$RAN_AGENT" = "true" ]; then ran="$ran,agent"; fi
-          if [ "$RAN_WEB" = "true" ]; then ran="$ran,web"; fi
-          pwsh -NoProfile -File Scripts/Test-CarriedCounts.ps1 -BasePath "$RUNNER_TEMP/base-TESTING.md" -HeadPath docs/TESTING.md -Ran "${ran#,}"
-
   verify:
     # The one check that sums the run up. A job the filter skipped is fine; a job the change
     # needed that failed, was cancelled or never started fails this one, and so
-    # does a filter that did not answer. ps51 is needed on exactly the runs its own
+    # does a changes job that did not pass: a filter that did not answer, or a
+    # counts file changed without a release. ps51 is needed on exactly the runs its own
     # `if` starts it on -- the same expression, in WANT_PS51 -- so the button and a
     # `ci`-labelled pull request that reaches the CLI wait for it, and any other
     # run reads it as not needed. The windows job is not behind this check.
@@ -411,7 +397,7 @@ jobs:
         run: |
           fail=0
           if [ "$CHANGES" != "success" ]; then
-            echo "::error title=The filter did not answer::changes is $CHANGES"
+            echo "::error title=The changes job did not pass::changes is $CHANGES -- the filter did not answer, or the counts file changed without a release"
             fail=1
           fi
           for job in cli agent web contract ps51; do
@@ -474,17 +460,27 @@ jobs:
             agent/requirements.txt
             agent/requirements-dev.txt
 
-      # The smoke starts its own agent with this interpreter; it runs no pytest.
+      # The smoke starts its own agent with this interpreter. pytest comes later,
+      # for the one file that needs it.
       - name: pip install (agent)
         id: pip
         if: ${{ !cancelled() }}
         run: python -m pip install -r agent/requirements.txt
 
-      # What run_read hands to a real Windows console. Plain unittest: this job
-      # installs no pytest.
+      # What run_read hands to a real Windows console. Plain unittest: it needs
+      # no pytest.
       - name: The agent's child reads, on Windows
         if: ${{ !cancelled() }}
         run: python Tests/test_child_windows.py
+
+      # The guard that keeps az and gh out of the agent's tests, where its
+      # stand-ins are .cmd files beside a real gh.exe. It lives in conftest, so
+      # this one file runs under pytest; the dev file is where pytest's floor is.
+      - name: The agent's tests reach no real az or gh, on Windows
+        if: ${{ !cancelled() }}
+        run: |
+          python -m pip install -r agent/requirements-dev.txt
+          python -m pytest Tests/test_tracker_cli_guard.py
 
       - name: Versions
         if: ${{ !cancelled() }}

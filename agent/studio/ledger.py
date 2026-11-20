@@ -31,6 +31,17 @@ declared GitHub Space:
    not kept, so the next mount asks again, as the visibility cache never holds
    an unknown.
 
+**And the designs in flight.** A Space whose address names one repository
+(``design.space_repo``) has that repository's two LIVE folders, ``design/`` and
+``spec/``, read in the same alias, texts inline (the ``ledgerDesign`` fragment);
+the archives are not read. The files are grouped by the Design tab's own
+``group_designs``, so the foyer counts what the tab shows: designs in flight
+(state Design or Spec), the specs among them (state Spec), and the files with no
+``id:``. A repository with no ``design/`` has no counts, not zeros. One rule
+differs, and only because the archive is not read: a note left in ``design/``
+after its spec was archived is counted in flight here, where the tab reads it
+Complete and flags the mismatch.
+
 **The pane reads it too.** ``GET /api/issue-report`` is ``read_space_report``: this
 same disk entry for one Space, no ``gh`` call of its own when it is warm, one
 ledger read of that Space alone when it is not. ``mark_written`` is how a verb
@@ -63,6 +74,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from ..ado import accounting, repo_read
+from ..ado import design as design_tab
 from ..ado.accounting import (
     _LABEL_TO_TYPE,
     DeploysResponse,
@@ -76,7 +88,7 @@ from ..ado.accounting import (
 )
 from ..core import disk_cache, log_writer
 from ..core.config import API_PREFIX, hub_root, load_config, tracker, tracker_repos
-from ..core.consts import studio_ledger_route, visibility_unknown
+from ..core.consts import design_states, studio_ledger_route, visibility_unknown
 
 # How long a Space's ledger is good for: the visibility cache's own TTL, read
 # from it, so the two can never disagree about how stale a foyer may be.
@@ -90,7 +102,7 @@ PAGE = 100
 MAX_PAGES = 10
 # The disk namespace, with a version in it: bump it when SpaceLedger's shape or
 # the counting changes, and every Space is read again.
-LEDGER_DIR = "ledger-1"
+LEDGER_DIR = "ledger-2"
 DEPLOY_WORKERS = 8
 SEV_LABELS = ("sev1", "sev2", "sev3")
 
@@ -103,13 +115,24 @@ api = APIRouter()
 ROUTE = studio_ledger_route().removeprefix(API_PREFIX)
 
 
+class DesignCounts(BaseModel):
+    """A product's design work, from its live ``design/`` and ``spec/``: the
+    designs in flight, the specs among them, and the files with no ``id:``."""
+
+    in_flight: int = 0
+    specs: int = 0
+    not_stamped: int = 0
+
+
 class SpaceLedger(BaseModel):
     """One GitHub Space's row facts: the same three answers the foyer used to
-    ask three routes for, in those routes' own shapes."""
+    ask three routes for, in those routes' own shapes -- and, for a Space whose
+    address names a repository with a ``design/``, its design counts."""
 
     report: IssueReport
     deploys: DeploysResponse
     visibility: SpaceVisibility
+    design: DesignCounts | None = None
 
 
 class StudioLedger(BaseModel):
@@ -135,14 +158,36 @@ def _rows(kind: str, after: str = "") -> str:
     )
 
 
-def _ledger_query(n: int) -> str:
-    """``n`` repositories, one alias each, through one fragment. Open issues are
-    read newest-created first, as ``gh issue list`` reads them, so milestones
-    that tie keep the order they always had; closed ones by last update, so
-    every issue closed this week is on the first page (``closedAt`` is never
-    after ``updatedAt``)."""
+def _live_folders() -> list[str]:
+    """The Design tab's live folders, in its reading order: ``design``, ``spec``."""
+    return [folder for folder, _kind, where in design_tab.design_folders() if where == design_tab.LIVE]
+
+
+def _design_fragment() -> str:
+    """The live folders of a design repository, one ``lf<i>`` alias each, every
+    blob's text inline: the archives are not read, so their blobs are not loaded."""
+    block = repo_read._entries_block(1, True)
+    parts = "\n".join(
+        f"  lf{i}: object(expression: $lf{i}) {{ ... on Tree {{ {block} }} }}" for i in range(len(_live_folders()))
+    )
+    return f"fragment ledgerDesign on Repository {{\n{parts}\n}}\n"
+
+
+def _ledger_query(n: int, design: frozenset[int] = frozenset()) -> str:
+    """``n`` repositories, one alias each, through one fragment; the aliases in
+    ``design`` spread ``ledgerDesign`` too. Open issues are read newest-created
+    first, as ``gh issue list`` reads them, so milestones that tie keep the
+    order they always had; closed ones by last update, so every issue closed
+    this week is on the first page (``closedAt`` is never after ``updatedAt``).
+    A query with no design repository declares neither the fragment nor its
+    variables: GraphQL refuses an unused one."""
     params = ", ".join(f"$o{i}: String!, $n{i}: String!" for i in range(n))
-    parts = "\n".join(f"  r{i}: repository(owner: $o{i}, name: $n{i}) {{ ...ledger }}" for i in range(n))
+    if design:
+        params += "".join(f", $lf{i}: String!" for i in range(len(_live_folders())))
+    parts = "\n".join(
+        f"  r{i}: repository(owner: $o{i}, name: $n{i}) {{ ...ledger{' ...ledgerDesign' if i in design else ''} }}"
+        for i in range(n)
+    )
     return (
         f"query({params}) {{\n{parts}\n}}\n"
         "fragment ledger on Repository {\n"
@@ -151,8 +196,12 @@ def _ledger_query(n: int) -> str:
         "  closed: issues(states: CLOSED) { totalCount }\n"
         f"  openRows: {_rows('openRows')}\n"
         f"  recentRows: {_rows('recentRows')}\n"
-        "}\n"
+        "}\n" + (_design_fragment() if design else "")
     )
+
+
+def _design_fields() -> list[str]:
+    return [a for i, folder in enumerate(_live_folders()) for a in ("-f", f"lf{i}=HEAD:{folder}")]
 
 
 def _page_query(kind: str) -> str:
@@ -207,9 +256,12 @@ def _more(repo: str, kind: str, conn: dict, week_ago: datetime) -> tuple[list[di
     return nodes, calls
 
 
-def _read_repos(repos: list[str]) -> tuple[dict[str, dict], dict[str, str], str | None, int]:
+def _read_repos(
+    repos: list[str], design_repos: set[str] | frozenset[str] = frozenset()
+) -> tuple[dict[str, dict], dict[str, str], str | None, int]:
     """({repo: its alias's answer, nodes complete}, {repo: why it failed},
-    why the whole call failed, gh calls). One GraphQL call per LEDGER_CHUNK."""
+    why the whole call failed, gh calls). One GraphQL call per LEDGER_CHUNK;
+    a repository in ``design_repos`` has its live design folders in its alias."""
     answers: dict[str, dict] = {}
     errors: dict[str, str] = {}
     calls = 0
@@ -219,7 +271,10 @@ def _read_repos(repos: list[str]) -> tuple[dict[str, dict], dict[str, str], str 
         fields: list[str] = []
         for i, repo in enumerate(chunk):
             fields += _repo_fields(i, repo)
-        data, alias_errors, why = repo_read.graphql_aliases(_ledger_query(len(chunk)), fields)
+        design = frozenset(i for i, repo in enumerate(chunk) if repo in design_repos)
+        if design:
+            fields += _design_fields()
+        data, alias_errors, why = repo_read.graphql_aliases(_ledger_query(len(chunk), design), fields)
         calls += 1
         if why:
             # The call itself did not answer: say so for this chunk only.
@@ -279,6 +334,50 @@ def issue_report(repos: list[str], answers: dict[str, dict], errors: dict[str, s
     rep.milestones = [MilestoneCount(title=t, open=n) for t, n in sorted(mil.items(), key=lambda x: -x[1])]
     rep.reason = failures[0] if (failures and rep.open == 0 and rep.closed == 0) else None
     return rep
+
+
+# -- The designs: the Design tab's grouping, over the live folders ---------------
+
+
+def design_counts(node: dict | None) -> DesignCounts | None:
+    """A design repository's counts from its alias's answer, or None when it has
+    no ``design/`` (or was not asked). The files go through the Design tab's own
+    ``design_fields``, ``design_doc`` and ``group_designs``: there is no second
+    rule. A blob GitHub would not inline (binary, or too big) is read from the
+    tab's parsed-row cache by its sha when it is there, and otherwise left out
+    -- never asked for (the call count) and never called unstamped."""
+    if not isinstance(node, dict):
+        return None
+    folders = _live_folders()
+    trees = [node.get(f"lf{i}") for i in range(len(folders))]
+    if not isinstance(trees[0], dict) or not isinstance(trees[0].get("entries"), list):
+        return None  # no design/: nothing to count, not zero
+    docs: list[design_tab.DesignDoc] = []
+    cached: dict[str, dict] | None = None
+    for folder, tree in zip(folders, trees, strict=True):
+        if not isinstance(tree, dict) or not isinstance(tree.get("entries"), list):
+            continue
+        for row in tree["entries"]:
+            name = str(row.get("name") or "")
+            if row.get("type") != "blob" or not design_tab._is_design_file(name):
+                continue
+            text = (row.get("object") or {}).get("text")
+            if isinstance(text, str):
+                fields = design_tab.design_fields(text)
+            else:
+                if cached is None:
+                    cached = repo_read._load_rows(design_tab.DESIGN_ROWS)
+                fields = cached.get(str(row.get("oid") or ""))
+                if not isinstance(fields, dict):
+                    continue
+            docs.append(design_tab.design_doc(fields, f"{folder}/{name}"))
+    designs, not_shown = design_tab.group_designs(docs)
+    s_design, s_spec, *_ = design_states()
+    return DesignCounts(
+        in_flight=sum(1 for d in designs if d.state in (s_design, s_spec)),
+        specs=sum(1 for d in designs if d.state == s_spec),
+        not_stamped=sum(1 for n in not_shown if n.reason == design_tab.NO_ID_REASON),
+    )
 
 
 def _visibility(repos: list[str], answers: dict[str, dict]) -> tuple[SpaceVisibility, dict[str, dict]]:
@@ -438,7 +537,8 @@ def _read_ledger(spaces: list[dict], refresh: bool, declared: list[dict] | None 
     calls = 0
     if stale:
         wanted = list(dict.fromkeys(r for *_, repos in stale for r in repos))
-        answers, errors, why, calls = _read_repos(wanted)
+        design_repos = {r for _s, org, *_rest in stale if (r := design_tab.space_repo(org))}
+        answers, errors, why, calls = _read_repos(wanted, design_repos)
         live: list[tuple[str, str, str, list[dict], list[str]]] = []
         for item in stale:
             slug, org, status, projects, repos = item
@@ -460,12 +560,14 @@ def _read_ledger(spaces: list[dict], refresh: bool, declared: list[dict] | None 
                 )
             )
         calls += sum(len(repos) for *_, repos in live)
-        for slug, _org, status, _projects, repos in live:
+        for slug, org, status, _projects, repos in live:
             visibility, records = _visibility(repos, answers)
+            repo = design_tab.space_repo(org)
             ledger = SpaceLedger(
                 report=issue_report(repos, answers, errors),
                 deploys=runs[slug],
                 visibility=visibility,
+                design=design_counts(answers.get(repo)) if repo else None,
             )
             _keep(slug, repos, status, ledger, records)
             out[slug] = ledger

@@ -31,6 +31,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # Tests/, for _skipgua
 from _rmtree import remove_tree
 from _shortpath import short_path
 
+from agent.core import consts as C
+
 REPO = Path(__file__).resolve().parent.parent
 SCRIPT = REPO / "agent" / "ado" / "Get-WeeklyBilling.ps1"
 HAVE_PWSH = shutil.which("pwsh") is not None
@@ -77,6 +79,8 @@ def _scratch_package(root: Path, local_config: dict) -> Path:
         # tracker rule it dot-sources for a card's milestone (#187).
         "Get-PromptFileStatus.ps1",
         "Resolve-Tracker.ps1",
+        # The one rule for what -Since and -Until may say, shared with Daily.
+        "Resolve-BillingWindow.ps1",
     ):
         shutil.copy(REPO / "Scripts" / name, root / "Scripts" / name)
     shutil.copy(REPO / "consts.json", root / "consts.json")
@@ -199,7 +203,32 @@ class BillingScript(unittest.TestCase):
         script = _scratch_package(self.tmp / "pkg", {})
         result = _run_raw(script, self.hub, "-Since", "2026-09-14")
         self.assertEqual(result.returncode, 2, result.stdout)
-        self.assertIn("-Since and -Until go together", result.stderr)
+        self.assertIn(C.billing_text()["halfWindow"], result.stderr)
+
+    def test_a_day_that_is_not_yyyy_mm_dd_is_refused(self):
+        """A day used to be read by the machine's culture: '10/5/2026' was a day
+        in one place and another day somewhere else, and junk threw a .NET error."""
+        script = _scratch_package(self.tmp / "pkg", {})
+        for since in ("2026-13-01", "10/5/2026", "2026-9-14"):
+            with self.subTest(since=since):
+                result = _run_raw(script, self.hub, "-Since", since, "-Until", "2026-09-18")
+                self.assertEqual(result.returncode, 2, result.stdout)
+                sentence = C.billing_text()["notADay"].replace("{name}", "-Since").replace("{value}", since)
+                self.assertIn(sentence, result.stderr)
+
+    def test_a_backwards_window_is_refused(self):
+        script = _scratch_package(self.tmp / "pkg", {})
+        result = _run_raw(script, self.hub, "-Since", "2026-09-18", "-Until", "2026-09-14")
+        self.assertEqual(result.returncode, 2, result.stdout)
+        sentence = C.billing_text()["backwards"].replace("{since}", "2026-09-18").replace("{until}", "2026-09-14")
+        self.assertIn(sentence, result.stderr)
+
+    def test_one_day_is_a_window(self):
+        script = _scratch_package(self.tmp / "pkg", {})
+        self._commit_card("test", "140-a-card.prompt.md")
+        result = _run_raw(script, self.hub, "-Since", "2026-09-16", "-Until", "2026-09-16")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([d["date"] for d in json.loads(result.stdout)["days"]], ["2026-09-16"])
 
     def test_a_re_archived_round_still_reads_code_review_on_its_review_day(self):
         """The PR-URL check used to look for the item's NEWEST name (X-r2) at the

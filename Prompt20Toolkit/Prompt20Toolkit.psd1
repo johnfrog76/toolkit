@@ -34,6 +34,7 @@
         'tkConfig',
         'tkConnect',
         'tkCover',
+        'tkDaily',
         'tkDashboard',
         'tkEditItem',
         'tkEditWorkItem',

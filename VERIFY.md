@@ -39,8 +39,8 @@ halves talking to each other, and the flag that makes a whole module appear and 
 three halves at once. A check that can be automated belongs in a suite; one that cannot is a gate here,
 or it is not verified.
 
-Every verb `config.default.json` defines is in the table below -- 48 always-on, and the 15 the modules
-contribute through `Config/*.commands.psd1` (63 in all; `docs/CLI.md` prints both counts) -- with the
+Every verb `config.default.json` defines is in the table below -- 49 always-on, and the 16 the modules
+contribute through `Config/*.commands.psd1` (65 in all; `docs/CLI.md` prints both counts) -- with the
 suite that types it and the gate that walks it. `Tests/Test-DocCounts.ps1` reads the table back, so a
 verb added without a row fails a suite. **A row that says "neither" is a verb nothing verifies**; it is
 left in the table rather than dropped, because a verb the reader cannot see in it is indistinguishable
@@ -61,6 +61,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Sync` | `Sync` (typed, against a bare repo; hook cases skip where there is no `hooks/pre-commit`, and a skip is not a pass) | 6, 12 |
 | `Move` | `Move` (typed) | neither |
 | `Billable` | `Billable` (typed) | neither |
+| `Daily` | `Billable` (typed: a past window byte for byte against the billing script's `raw`, `-Compact`, and the three refusals) | 12 (Windows PowerShell 5.1 and a real hub: the row under "Rows added by a fix") |
 | `Plan` | `Plan` (typed) | neither |
 | `Tag` | `Tag` (typed) | neither |
 | `Backlog` | `Backlog` (typed) | 12 (a Western code page: the row under "Rows added by a fix") |
@@ -116,6 +117,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Triage` | `Triage` (typed, with `gh` stubbed) | neither |
 | `Route` | `Triage` (typed, with `gh` stubbed -- the exact argv per switch, never a real write) | 12 (one real write against a GitHub Space) |
 | `StartWork` | `StartWork` (typed, the block byte for byte; `gh` stubbed for an issue) | 12 (the cold-agent walk) |
+| `OrgChart` | `OrgChart` (typed in a fresh shell over a scratch copy of `samples/hub`: off means no verb, the text and `-AsJson` against `Tests/fixtures/org/`, every refusal exit 2 writing nothing) | 12 (Windows PowerShell 5.1: the row under "Rows added by a fix") |
 
 Gate numbers are this file's `## Gate N` headings (8c is gate 8c). The four `Test*` verbs after
 `Test` are the CLI runner itself, so their rows say what covers the runner.
@@ -291,19 +293,19 @@ tkTestToolkit
 ```
 
 **Expect:** every suite green, exit code 0, and the PS 5.1 compatibility suite reporting zero
-findings. On this commit that is **52 suites, 10127 assertions** with a `config.local.json`, every one
-of them reporting. `Sync`'s hook-interaction cases skip on their own where there is no
-`hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`: the Compat
-sweep does not descend into `web/node_modules`. That total is the one from the host that built the change; a Windows run reads a few
-fewer on the same commit, every suite green on both -- `docs/TESTING.md`, "The CLI total is per
-platform".
+findings, with a `config.local.json`, every suite reporting. What the last release counted is
+[`docs/TEST-COUNTS.md`](docs/TEST-COUNTS.md); a run on a later commit, or on another host, reads differently
+on purpose, and the gate is the green, not the number. `Sync`'s hook-interaction cases skip on their own
+where there is no `hooks/pre-commit`, and the total does not depend on whether `npm ci` has run in `web/`:
+the Compat sweep does not descend into `web/node_modules`. A Windows run reads a few fewer on the same
+commit, every suite green on both -- `docs/TESTING.md`, "The CLI total is per platform".
 
 Then the other two halves -- or all three at once with `tkTest`, which runs these same three and
 names any half it had to skip:
 
 ```bash
 python -m pytest Tests/      # Windows (python3 is the Store stub there); macOS/Linux: python3 -m pytest Tests/
-cd web && npm test           # the shell; the current counts are in docs/TESTING.md
+cd web && npm test           # the shell; the last release's counts are in docs/TEST-COUNTS.md
 ```
 
 - [ ] All suites pass
@@ -759,7 +761,8 @@ opens a browser and names it.
 - [ ] `/skills` renders
 - [ ] A **Meetings** nav entry, and `/communication` lists the three fixture sessions with their
       stages -- Plan, Prep, Retro
-- [ ] The retro session's send button is **present, disabled, and names `TEAMS_WEBHOOK_MANAGER`**
+- [ ] The retro session's send button is **present, disabled, and says `Sending off on this server`**
+      (`Webhook not set` on a server not started as a test run)
 - [ ] No page errors across the six routes
 
 > The send button is never pressed, by the runner or by you. A press posts to a real webhook, and
@@ -799,7 +802,9 @@ curl -s localhost:4100/api/env | python -c "import json,sys; print(json.load(sys
 - [ ] The block **names the variable** (`"webhookEnv": "TEAMS_WEBHOOK_MANAGER"`) and does not
       contain a URL anywhere
 - [ ] On a Retro-stage session, the send button is **visible and disabled**, with the reason on the
-      line below it naming `TEAMS_WEBHOOK_MANAGER` -- not hidden, and not an error
+      line below it reading `Webhook not set` and `TEAMS_WEBHOOK_MANAGER` named only in the info
+      icon beside it -- not hidden, and not an error. The System page's Environment card reads the
+      same phrase on that recipient's row, under *Teams messages*
 - [ ] `tkSendTeams manager 'test' -WhatIf` prints the same refusal, names the variable, and
       **exits 0** -- an unset variable is a configuration fact, not a failure
 
@@ -1237,26 +1242,104 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `~/...` in `config.local.json` and no `PROMPTS_ROOT`, `tkStatus` still finds the hub: `-LiteralPath` expands a
   leading `~` on pwsh 7, and this row is the check on 5.1. The NewPrompt suite types the same verbs against a
   scratch hub in such a folder on the two Windows jobs, one per host; this row is a real hub and the `~` path.
-- [ ] **Backlog reads every heading on a Western code page, from Windows PowerShell 5.1 (#260).** On the Windows
+- [x] **Backlog reads every heading on a Western code page, from Windows PowerShell 5.1 (#260).** On the Windows
   PC, in `powershell` (5.1), check `[System.Text.Encoding]::Default.CodePage` first and note it: the row means most on
-  1252. On a local Space, put four cards in `backlog/` whose headings are plain (`# Task K7M2: Plain`), start with an
+  1252. On a local Space, put four cards in `backlog/` whose headings are plain (`# Task W3R7: Plain`; any id no
+  card in the hub has, and an id never holds 0, O, 1, I, L, B, 8, S, 5 or Z), start with an
   emoji outside the BMP (U+1F52C), start with a BMP symbol (U+2705 or U+26A0), and start with a lowercase accented
   letter (`# écrire le guide`). `tkBacklog` lists all four with their titles intact: the emoji and the symbol
   dropped, the accented letter kept, and no `is not valid` error. The `ps51` job runs the Backlog suite on 5.1 and
   prints the code page it ran on; this row is a real console and a real hub.
-- [ ] **A refresh of the Lounge in the Docker image draws the app (#226).** With Docker Desktop running, on the merged
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13, on code page 1252, with
+  four cards: plain, an emoji (U+1F52C), a symbol (U+2705) and an accented letter. Exit 0 and no `is not valid`;
+  the emoji and the symbol were dropped from the titles and the `é` kept.
+- [x] **A refresh of the Lounge in the Docker image draws the app (#226).** With Docker Desktop running, on the merged
   head, `tkWeb -Restart`, then open the Lounge and refresh the page: the room draws again, and the address bar still
   says `localhost:5174`, not `5173` (a browser that met the old redirect keeps it: refresh with Cmd+Shift+R). Then
   the four `curl` lines of Gate 12b for `/system`, `/lounge`, `/lounge/` and `/lounge/temple.html` each print `200`. `Tests/test_consts.py` holds the template to it; this row is the image.
-- [ ] **A worktree's test run reaches the Health card on Windows, under Windows PowerShell 5.1 too (#317).** On the
-  Windows PC, in `powershell` (5.1), from a git worktree of the package (`git worktree add ..\toolkit-wt-317`), run
+  CONFIRMED on Windows: walked at 663ce6a, on 2026-11-13, with Docker 29.6.1. The Lounge drew on load and on two
+  reloads, and the address stayed `:5174/lounge`. `/`, `/system`, `/lounge` and `/lounge/temple.html` each
+  answered 200.
+- [x] **A worktree's test run reaches the Health card on Windows, under Windows PowerShell 5.1 too (#317).** On the
+  Windows PC, in `powershell` (5.1), from a git worktree of the package whose branch is not named after its folder
+  (`git worktree add -b verify-317 ..\toolkit-wt-317`), run
   `tkTestToolkit -Consts` there. `%LOCALAPPDATA%\ToolKit\TestHistory` now holds `test-summary.<MACHINE>.json` and
-  `test-results.<MACHINE>.log`, the summary's `checkout` reads `toolkit-wt-317` and its `commit` is the worktree's
+  `test-results.<MACHINE>.log`, the summary's `checkout` reads `toolkit-wt-317`, the worktree folder's name and not
+  the branch's, and its `commit` is the worktree's
   `git rev-parse --short HEAD`, and neither file is in the worktree. Then, with the agent started from the main
-  checkout, the System page's Test Health card shows that run. On a machine that had a `test-summary.<MACHINE>.json`
+  checkout, the System page's Test Health card shows that run. The card mounts only at tier 2 or below, so the
+  checkout needs a hub first, or the page shows no card at all: `tkStart`, or `PROMPTS_ROOT` pointing at a copy of
+  `samples/hub`. On a machine that had a `test-summary.<MACHINE>.json`
   in the main checkout before the upgrade and no folder yet, the card's first read shows that old record, not "not
   run". `tkTestToolkit -TestAll` holds the rule over `Tests/fixtures/test-history/paths.json`, whose Windows rows
   only a Windows host reads live.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13, with the runner started
+  in `powershell.exe`. For the last clause, with a scratch `LOCALAPPDATA` and a copy of the sample hub, the first
+  read of the System page showed the old root record, not "not run"; that read created the `TestHistory` folder
+  and copied both files byte for byte, leaving the root files in place, and the next run wrote into the folder.
+  The summary carried the worktree's folder name and its HEAD, and the Health card showed it.
+- [ ] **`Invoke-P20TestGit` hands git an empty argument, a double quote and a trailing backslash under Windows
+  PowerShell 5.1 (#356).** On the Windows PC, in `powershell` (5.1), run `tkTestToolkit -Portability`. Every
+  `Clause 23: git is handed ...` line passes, and there are 18 of them, each ending `as the host passes arguments`:
+  5.1 has no `$PSNativeCommandArgumentPassing`, so its own passing is the only one run. The rows that only 5.1 on
+  Windows reads live are `an empty value, and the one after it`, the four with a double quote, and `a trailing
+  backslash after a space`. On macOS and Linux the same rows run a second time with `Legacy` passing, which is
+  5.1's rule in PowerShell 7; this row is 5.1's own command line and git for Windows reading it. The `ps51` job
+  runs the suite on 5.1 too.
+- [x] **Daily prints any week from Windows PowerShell 5.1 (#291).** On the Windows PC, in `powershell` (5.1), on a
+  Space with cards, run `tkDaily -LastWeek`: the days print, with no `Error:` and nothing copied to the clipboard.
+  Open the web UI's Daily page, step back three weeks with *Earlier week*, press Copy All, and compare it with
+  `tkDaily -Since <that Monday> -Until <that Friday>`: the same text. `tkDaily -Since 2026-01-05` prints one
+  `Error:` naming `-Since and -Until go together`, and `$LASTEXITCODE` is 2. The `ps51` job runs the Billable
+  suite on 5.1; this row is a real console, a real hub and the page.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 663ce6a, on 2026-11-13. `-LastWeek` printed,
+  exit 0, the clipboard unchanged. `-Since` alone gave one `Error:` and its `Hint:`, exit 2. The page three weeks
+  back, with Copy All, matched `-Since`/`-Until` line for line, 160 lines.
+- [x] **A Space's checkout whose path has a space and ends in a backslash is found under Windows PowerShell 5.1
+  (#407).** On the Windows PC, clone a repository a Space names into a folder with a space in its path, say
+  `C:\My Repos\product`. In `powershell` (5.1), in that Space, run
+  `tkConfig -Set "spaceCheckouts.<slug>.path=C:\My Repos\product\"` (the trailing backslash is the point), then
+  `tkMoveDesign <id> -To Spec -Space <slug> -WhatIf` for a note in that product. It names the clone at
+  `C:\My Repos\product` and the move it would make; it does not say `it is not inside a git repository`. Then run
+  `tkTestToolkit -Design -Portability`: the line `a clone in a folder with a space, asked for with a trailing
+  separator, is found (Desktop 5.1...)` passes, the one after it too, and so does every `Clause 23: the shipped
+  reader hands git ...` line, `a checkout path with a space and a trailing backslash, and the arguments after it`
+  among them. Those rows are `Invoke-P20TrackerRead` escaping for 5.1's own command line, which no other host
+  builds; the `ps51` job runs both suites on 5.1 too.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 3824c0c, on 2026-11-16. `tkMoveDesign -WhatIf`
+  named the clone at `C:\My Repos\product` and the spec it would scaffold, exit 0. `-Design -Portability` in 5.1:
+  518/518, the trailing-separator line and all nineteen Clause 23 reader lines passing.
+- [x] **The agent's checkout tests pass under Python on Windows (#410).** On the Windows PC, from the package root,
+  run `py -3 -m pytest Tests/test_space_checkout.py`. It reads `13 passed`, with no failure naming `/srv/clones/r`:
+  the shared table's absolute-path rows carry `os`, and on Windows the `posix` rows are not run and the two
+  `windows` rows (`C:\clones\r`, and the same with spaces around it) are. Then `tkTestToolkit -Design` in `pwsh` and
+  in `powershell` (5.1): its lines `a path written 'C:\clones\r' reads as 'C:\clones\r'` pass and none names
+  `/srv/clones/r`. The two Windows CI jobs run the Design suite; no CI job runs this pytest file on Windows, so this
+  row is the only place the agent's half reads the `windows` rows live.
+  CONFIRMED on Windows: walked at 3824c0c, on 2026-11-16. `py -3 -m pytest Tests/test_space_checkout.py`: 13 passed,
+  nothing naming `/srv/clones/r`. `-Design` 267/267 in `pwsh` and in 5.1, the `C:\clones\r` line passing in both.
+- [x] **`tkTestToolkit` typed in Windows PowerShell 5.1 runs the suites in 5.1 (#435).** On the Windows PC, in
+  `powershell` (5.1), run `tkTestToolkit -Portability`. It prints 19 `Clause 23: git is handed ...` lines, each
+  ending `as the host passes arguments`, and none ending `with Legacy passing`: the second pass exists only where
+  `$PSNativeCommandArgumentPassing` does, which is PowerShell 7, so a line of it means the verb started the runner
+  in `pwsh`. The four `Clause 22` lines about `TestToolkit` pass there too. In `pwsh`, the same command prints
+  38. The suite holds the wrapper on every host; this row is the verb typed in 5.1.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 3824c0c, on 2026-11-16. Portability 251/251, with
+  19 Clause 23 lines, all `as the host passes arguments`, none `with Legacy passing`; in `pwsh`, 289/289 and 38.
+  The row said 18 and 36 until the walk: #407 added one reader line, which runs on both passes.
+- [x] **OrgChart reads the hub's `org.json` under Windows PowerShell 5.1 (Refs #456).** In `powershell` (5.1), run
+  `tkTestToolkit -OrgChart`: green, and its shared-table half (`Tests/fixtures/org/table.json`) passing every case. Then,
+  in a Space answered `agents` with `features.solitaireAgile` on, copy `samples/hub/org.json` to a scratch hub's root,
+  point `PROMPTS_ROOT` at it and run `tkOrgChart`: you should see the header (`Org chart: My team (mine)`), the machines
+  line, and one line per seat with the middle dot between the position and the model -- in a console set to UTF-8
+  (`chcp 65001`) it reads `·`, never `Â·`; if the default code page garbles it, say so here. `tkOrgChart -AsJson |
+  ConvertFrom-Json` parses, and its `tree.positions[0].seats[0].state` is `staffed`. Then break the file (point a
+  `reportsTo` at a name that is not there): `tkOrgChart` exits 2 with the one sentence and no stack trace.
+  CONFIRMED on Windows: walked in Windows PowerShell 5.1.26100 at 3824c0c, on 2026-11-16. OrgChart 195/195. `tkOrgChart`
+  printed the header, the machines line and the seats with `·`, in a console whose default code page is already 65001,
+  so a garbling default was not tried. `-AsJson` parsed, the first seat `staffed`; a broken `reportsTo` exited 2 with
+  the sentence and its `Hint:`. The verb needed `Import-Module` by path, as every module verb does with its flag off in
+  the committed config.
 
 ## Recording a run
 

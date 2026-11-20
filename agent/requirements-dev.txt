@@ -9,6 +9,6 @@
 # httpx is not imported by the agent: fastapi.testclient imports it, and
 # without it TestClient raises at import and every file that uses it skips.
 -r requirements.txt
-pytest>=9.1.1
+pytest>=9.2.0
 httpx>=0.28.1
 ruff==0.17.3

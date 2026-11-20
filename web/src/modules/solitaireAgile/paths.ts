@@ -10,6 +10,9 @@ export const ROUTES = {
   /** Releases: one row per GitHub milestone with its bar, and the award
    *  dialog -- the module's one celebration. Under the tab root, like Triage. */
   releases: `${SOLITAIRE_AGILE_HOME}/releases`,
+  /** Org: the org chart -- the hub's org.json drawn as offices and seats, a
+   *  READ. Under the tab root, like Triage and Releases. */
+  org: `${SOLITAIRE_AGILE_HOME}/org`,
   /** The tab's earlier address, when it was named Milestones: it redirects to
    *  `releases`, so a bookmark still lands on the tab. */
   legacyMilestones: `${SOLITAIRE_AGILE_HOME}/milestones`,

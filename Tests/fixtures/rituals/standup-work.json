@@ -115,7 +115,7 @@
       "name": "no-tracker",
       "source": "issues",
       "asOf": "2026-10-02T09:00:00-04:00",
-      "tracker": { "ok": false, "reason": "gh did not answer (TimeoutExpired)" },
+      "tracker": { "ok": false, "reason": "gh did not answer for johnfrog76/toolkit: TimeoutExpired" },
       "issues": [],
       "expected": {
         "queue": { "walk": [], "decide": [], "look": [] },

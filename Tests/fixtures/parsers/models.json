@@ -1,0 +1,48 @@
+{
+  "_": "ONE table, read by both lookups of a card's **Agent:** id in the model map (consts.json models.file, Config/models.json; docs/hub/cards.md, \"The Agent line\"): Scripts/Get-PromptFileStatus.ps1 Get-P20ModelInfo (tkTestToolkit -Triage) and agent/core/models.py model_info() (Tests/test_parsers.py). Each row asks what the map says about id; expected is the whole answer. A known id takes provider, family and name from its row; an id with no row -- whatever it looks like -- is known false, its name the id as written, provider and family null, because a reader never parses an id for a family. sizes asks the other lookup, Get-P20ModelForSize and current_model(): the id a worker size (a family) resolves to when a card is routed to it, from the map's current block, matched ignoring case; expected is that id, or '' (None in the agent) for a size the map has no entry for. If the two halves ever disagree about a row, one of them is wrong.",
+  "sizes": [
+    { "name": "a size is its family's current id", "size": "sonnet", "expected": "claude-sonnet-5-5" },
+    { "name": "the owner's seat is a size like the others", "size": "fable", "expected": "claude-fable-5-2" },
+    { "name": "a size is matched ignoring case, as Route matches it", "size": "OPUS", "expected": "claude-opus-5-5" },
+    { "name": "a size the map has no entry for resolves to nothing", "size": "gpt", "expected": "" },
+    { "name": "an id is not a size", "size": "claude-sonnet-5-5", "expected": "" },
+    { "name": "no size, no id", "size": "", "expected": "" }
+  ],
+  "rows": [
+    {
+      "name": "a known Anthropic model",
+      "id": "claude-sonnet-5-5",
+      "expected": { "id": "claude-sonnet-5-5", "known": true, "provider": "anthropic", "family": "sonnet", "name": "Sonnet 5.5" }
+    },
+    {
+      "name": "another family, from its own row",
+      "id": "claude-fable-5-2",
+      "expected": { "id": "claude-fable-5-2", "known": true, "provider": "anthropic", "family": "fable", "name": "Fable 5.2" }
+    },
+    {
+      "name": "an OpenAI model",
+      "id": "gpt-5",
+      "expected": { "id": "gpt-5", "known": true, "provider": "openai", "family": "gpt", "name": "GPT-5" }
+    },
+    {
+      "name": "an xAI model",
+      "id": "grok-4",
+      "expected": { "id": "grok-4", "known": true, "provider": "xai", "family": "grok", "name": "Grok 4" }
+    },
+    {
+      "name": "an unknown id reads as written",
+      "id": "some-new-model-1",
+      "expected": { "id": "some-new-model-1", "known": false, "provider": null, "family": null, "name": "some-new-model-1" }
+    },
+    {
+      "name": "an unknown id that looks like a family is still not guessed at",
+      "id": "claude-sonnet-9-9",
+      "expected": { "id": "claude-sonnet-9-9", "known": false, "provider": null, "family": null, "name": "claude-sonnet-9-9" }
+    },
+    {
+      "name": "an id is matched exactly, case and all",
+      "id": "Claude-Sonnet-5-5",
+      "expected": { "id": "Claude-Sonnet-5-5", "known": false, "provider": null, "family": null, "name": "Claude-Sonnet-5-5" }
+    }
+  ]
+}

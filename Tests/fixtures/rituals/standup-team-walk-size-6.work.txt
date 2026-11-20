@@ -1,0 +1,14 @@
+Standup -- Friday 2 October 2026
+"Can we not adjust scope."
+
+Nothing is waiting on you.
+
+Widgets: Good morning. Yesterday I picked up where I left off. Today I'm on R4T7, Wire the export. No blockers. That's it for me.
+OPS-DEV: Good morning. Yesterday I swapped my laptop dock; no more flicker. Today I'll update my operating system and restart everything once. No blockers. That's it for me.
+MINIMALIST: Good morning. Yesterday I took a course module on the cloud platform. Today I'll set up the password manager on my phone. No blockers. That's it for me.
+NEW HIRE: Good morning. Yesterday I tidied my notes and my calendar for the week. Today I'll pair with a teammate to learn how the build runs. No blockers. That's it for me.
+AI VIBEMANCER: Good morning. Yesterday I had a quiet day: some learning and some setup. Today I'll set up my editor's formatter to match the team's. No blockers. That's it for me.
+
+Good morning. Yesterday I started configuring my dev environment. Today I'll keep the board moving. No blockers. That's it for me.
+
+"Let's circle back."

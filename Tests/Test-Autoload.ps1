@@ -294,8 +294,9 @@ try {
     Assert-True 'generator reports the alias count it discovered' `
         ($regen -match 'Discovered \d+ aliases')
 
-    # .gitattributes checks this manifest out as LF on every platform while *.ps1
-    # -- including the generator, and so its here-string -- is CRLF. A generator
+    # .gitattributes checks this manifest out as LF on every platform, and a clone
+    # that predates that line may still hold the generator (and so its here-string)
+    # as CRLF. A generator
     # that emits anything but LF produces a file that can never equal its own
     # checked-out copy, and the drift assertion below then fails forever on a
     # clean tree while telling you to regenerate and commit, which cannot clear

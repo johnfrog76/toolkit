@@ -6,14 +6,14 @@
     Never runs a real suite: it would recurse, and it would take the length of
     the three runs. A scratch package holds the verb's scripts, a fake
     Tests/Test-Toolkit.ps1 that prints a known `Total:` line and writes CLI suite
-    entries the way the runner does, and a docs/TESTING.md with known counts. A
+    entries the way the runner does, and a docs/TEST-COUNTS.md with known counts. A
     scratch PATH holds a fake python and a fake npm, each printing a known
     summary. Then:
 
       1. The parsers   pytest's closing line (with and without its rule, errors,
                        subtests), jest's Tests: and Test Suites: lines, the CLI
                        runner's Total line, the verdict rule -- and the expected
-                       counts read from the REAL docs/TESTING.md, so a doc edit
+                       counts read from the REAL docs/TEST-COUNTS.md, so a page
                        that moves those lines fails here.
       1b. CI's gate    Get-P20CiHalfVerdict over every shape of a half's
                        transcript: a pass, a failure, an exit, no
@@ -30,11 +30,11 @@
                        button alone, with no secret, the Pages permissions
                        and a read, and its actions pinned to a major version.
       1c. CI's scope   which jobs a change runs, one row per path class
-                       (Tests/fixtures/ci-scope/table.json), count lines alone
-                       reaching no half (count-lines.json) and the classifier
-                       under it, the script as the changes job runs it, and
-                       the carried paste lines:
-                       identical, typed, and a half that ran not compared.
+                       (Tests/fixtures/ci-scope/table.json), the script as the
+                       changes job runs it, and the counts file changing only
+                       with consts.json's version: the rule both ways, and
+                       Scripts/Test-TestCountsChange.ps1 as the changes job
+                       runs it.
       2. The merge     a half written replaces only that half's entries; a file
                        from before the halves reads as the CLI's alone.
       3. The verb      all three green; one failed (exit 2, stated); a half with
@@ -262,22 +262,23 @@ Assert-True 'the changes job is not on the schedule, and checks out the whole hi
 Assert-True 'the changes job sets cli, agent, web and contract from one step' `
     (@('cli', 'agent', 'web', 'contract' | Where-Object { $jChanges -notmatch ("(?m)^\s+" + $_ + ": \`$\{\{ steps\.scope\.outputs\." + $_ + " \}\}\s*$") }).Count -eq 0)
 $scopeSteps = @([regex]::Matches($jChanges, '(?m)^\s+- name: '))
-Assert-True 'that one step diffs against the base sha and runs Get-CiScope.ps1 over the list' `
-    (($scopeSteps.Count -eq 1) -and ($jChanges -match 'github\.event\.pull_request\.base\.sha') -and ($jChanges -match 'git diff --name-only --no-renames "\$BASE\.\.\.HEAD" > "\$RUNNER_TEMP/changed\.txt"') -and ($jChanges -match 'Scripts/Get-CiScope\.ps1 -Event "\$EVENT" -PathsFile "\$RUNNER_TEMP/changed\.txt" -CountDiffFile "\$RUNNER_TEMP/counts\.diff" -BaseRoot "\$RUNNER_TEMP/base"')) "$($scopeSteps.Count) named step(s)"
-Assert-True 'that step hands the rule the -U0 diff of the three count-line documents and their text at the base' `
-    (($jChanges -match 'git diff -U0 --no-renames "\$BASE\.\.\.HEAD" -- docs/TESTING\.md AGENTS\.md VERIFY\.md > "\$RUNNER_TEMP/counts\.diff"') -and ($jChanges -match 'git show "\$from:\$f" > "\$RUNNER_TEMP/base/\$f"'))
+Assert-True 'the scope step diffs against the base sha and runs Get-CiScope.ps1 over the list' `
+    (($scopeSteps.Count -eq 2) -and ($jChanges -match 'github\.event\.pull_request\.base\.sha') -and ($jChanges -match 'git diff --name-only --no-renames "\$BASE\.\.\.HEAD" > "\$RUNNER_TEMP/changed\.txt"') -and ($jChanges -match 'Scripts/Get-CiScope\.ps1 -Event "\$EVENT" -PathsFile "\$RUNNER_TEMP/changed\.txt"\s*\r?\n')) "$($scopeSteps.Count) named step(s)"
+Assert-True 'and writes consts.json as it stood at the base, for the counts step' `
+    ($jChanges -match 'git show "\$from:consts\.json" > "\$RUNNER_TEMP/base-consts\.json"')
+Assert-True 'and whether the counts page existed at the base, as a step output the counts step passes on' `
+    (($jChanges -match 'git cat-file -e "\$from:docs/TEST-COUNTS\.md" 2>/dev/null \|\| base_page=false') -and ($jChanges -match 'echo "base_counts=\$base_page" >> "\$GITHUB_OUTPUT"') -and ($jChanges -match '-BaseHadPage "\$\{\{ steps\.scope\.outputs\.base_counts \}\}"'))
+Assert-True 'the second step, on a pull request only, holds the counts file to the version through Test-TestCountsChange.ps1' `
+    (($jChanges -match "(?ms)- name: The counts file changes only with the version\s*\r?\n\s+if: \`$\{\{ github\.event_name == 'pull_request' \}\}\s*\r?\n\s+run: pwsh -NoProfile -File Scripts/Test-TestCountsChange\.ps1 -PathsFile `"\`$RUNNER_TEMP/changed\.txt`" -BaseConstsPath `"\`$RUNNER_TEMP/base-consts\.json`""))
 
 # The contract set: the CLI's five suites with the module path set inside pwsh, the
-# agent's three files, the markdown lint, the carried paste lines -- each gated on
-# its half not running.
+# agent's three files, the markdown lint -- each gated on its half not running.
 Assert-True 'the contract job runs Consts, Portability, Menu, DocCounts and Changelog with the module path set inside pwsh, read through the gate, when the cli job did not run' `
     (($jContract -match "pwsh -NoProfile -Command '\`$env:PSModulePath = \(Resolve-Path \.\); & \./Tests/Test-Toolkit\.ps1 -Consts -Portability -Menu -DocCounts -Changelog; exit \`$LASTEXITCODE' 2>&1 \| tee [^\r\n]+\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half cli\b") -and ($jContract -match "needs\.changes\.outputs\.cli != 'true'"))
 Assert-True 'the contract job runs the agent''s three contract files, read through the gate, when the agent job did not run' `
     (($jContract -match 'python -m pytest Tests/test_consts\.py Tests/test_pr_comments\.py Tests/test_third_party_notices\.py 2>&1 \| tee [^\r\n]+\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half agent\b') -and ($jContract -match "needs\.changes\.outputs\.agent != 'true'"))
 Assert-True 'the contract job runs the markdown lint, after its own npm ci, when the web job did not run' `
     (($jContract -match "(?m)^\s+run: npm run lint:md\s*$") -and ($jContract -match "(?m)^\s+run: npm ci\s*$") -and ($jContract -match "needs\.changes\.outputs\.web != 'true' && steps\.npm\.outcome == 'success'"))
-Assert-True 'the contract job holds the carried paste lines to main''s, from the base sha' `
-    (($jContract -match 'git show "\$BASE:docs/TESTING\.md"') -and ($jContract -match 'Scripts/Test-CarriedCounts\.ps1 -BasePath [^\r\n]+ -HeadPath docs/TESTING\.md -Ran ') -and ($jContract -match 'fetch-depth: 0'))
 
 # The one check that sums the run up: every job behind it, always run, each needed job held to success.
 Assert-True 'the verify job is named Verify, needs every Ubuntu job and ps51, and runs always, but not on the schedule' `
@@ -366,9 +367,9 @@ Assert-True 'a scheduled run has a concurrency group of its own and cancel-in-pr
     (($workflow -match "group: verify-\$\{\{ github\.event_name == 'schedule'") -and ($workflow -match "cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}"))
 Assert-True 'every job in verify.yml has a timeout' (($jobCount -eq $wfJobs.Count) -and ([regex]::Matches($workflow, '(?m)^\s+timeout-minutes: \d+').Count -eq $jobCount)) "$jobCount runs-on, $($wfJobs.Count) jobs"
 
-# -- 1c. CI's scope and the carried paste lines ---------------------------------
+# -- 1c. CI's scope and the counts file -----------------------------------------
 # Get-P20CiScope over one row per path class (Tests/fixtures/ci-scope/table.json),
-# the script as the changes job calls it, and the carried-lines check.
+# the script as the changes job calls it, and the counts file's rule.
 Write-Host ""
 Write-Host "-- CI's scope: which jobs a change runs --" -ForegroundColor Cyan
 $scopeFixture = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/ci-scope/table.json')) | ConvertFrom-Json
@@ -383,64 +384,6 @@ Assert-True 'scope: each path is reported with its class' `
     (((@((Get-P20CiScope -Event 'pull_request' -Paths @('web/a.ts', 'CHANGELOG.md', 'consts.json', 'x.txt')).Paths) | ForEach-Object { $_[1] }) -join ',') -eq 'web,changelog,shared,unclassified')
 Assert-True 'scope: a module document, the scenario grid and the known gaps are prose, a changelog fragment is changelog' `
     (((@((Get-P20CiScope -Event 'pull_request' -Paths @('docs/modules/studio.md', 'docs/SCENARIOS.md', 'docs/KNOWN-GAPS.md', 'changelog.d/1.fixed.md', 'docs/CLI.md')).Paths) | ForEach-Object { $_[1] }) -join ',') -eq 'prose,prose,prose,changelog,shared')
-
-# Count lines alone reach no half. The classifier first: the line numbers it reads
-# as count lines, a -U0 diff's changed lines, and a removed line that starts `--`.
-Write-Host ""
-Write-Host "-- CI's scope: count lines alone --" -ForegroundColor Cyan
-$countFixture = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/ci-scope/count-lines.json')) | ConvertFrom-Json
-$countBase = @{}
-foreach ($pr in $countFixture.base.PSObject.Properties) { $countBase[$pr.Name] = (@($pr.Value) -join "`n") + "`n" }
-$nums = Get-P20CountLineNumbers -Path 'docs/TESTING.md' -Text $countBase['docs/TESTING.md']
-Assert-True 'count lines in docs/TESTING.md: the command block''s three, the paste block''s five, the table row' `
-    ((@($nums.Keys | Sort-Object) -join ',') -eq '4,8,9,17,18,19,20,21,26') (@($nums.Keys | Sort-Object) -join ',')
-Assert-True 'count lines in AGENTS.md and VERIFY.md: the one line each that DocCounts reads' `
-    (((@((Get-P20CountLineNumbers -Path 'AGENTS.md' -Text $countBase['AGENTS.md']).Keys) -join ',') -eq '4') -and ((@((Get-P20CountLineNumbers -Path 'VERIFY.md' -Text $countBase['VERIFY.md']).Keys) -join ',') -eq '3'))
-Assert-True 'a file with no rule has no count lines' ((Get-P20CountLineNumbers -Path 'README.md' -Text "tkTestToolkit # 3 suites, 60 assertions`n").Count -eq 0)
-$handDiff = "diff --git a/VERIFY.md b/VERIFY.md`nindex 1..2 100644`n--- a/VERIFY.md`n+++ b/VERIFY.md`n@@ -3 +3 @@ ## Gate 4`n-old three`n+new three`n@@ -5,2 +4,0 @@`n--- a dash line`n-five`n@@ -9,0 +8,2 @@`n+++ a plus line`n+eight`n\ No newline at end of file`n"
-$changed = @(Get-P20DiffChangedLines -Diff $handDiff)
-$changedSaid = @($changed | ForEach-Object { "$($_.Path):$($_.Side)$($_.Line)=$($_.Text)" }) -join ' | '
-Assert-True 'a -U0 diff''s changed lines, each with its side and number, a `--` or `++` line read as a line' `
-    ($changedSaid -eq 'VERIFY.md:old3=old three | VERIFY.md:new3=new three | VERIFY.md:old5=-- a dash line | VERIFY.md:old6=five | VERIFY.md:new8=++ a plus line | VERIFY.md:new9=eight') $changedSaid
-
-# A -U0 diff of a case's edits, in git's shape: one hunk per edited line.
-function New-CountCase {
-    param($Case, [hashtable]$Base)
-    $head = @{}
-    foreach ($k in $Base.Keys) { $head[$k] = [System.Collections.Generic.List[string]]@(($Base[$k].TrimEnd("`n")) -split "`n") }
-    $hunks = @{}
-    foreach ($e in @($Case.edits)) {
-        $lines = $head[$e.path]
-        if (-not $hunks.ContainsKey($e.path)) { $hunks[$e.path] = @() }
-        if ($e.PSObject.Properties.Name -contains 'find') {
-            $n = $lines.IndexOf([string]$e.find) + 1
-            $lines[$n - 1] = [string]$e.replace
-            $hunks[$e.path] += , @($n, "@@ -$n +$n @@`n-$($e.find)`n+$($e.replace)")
-        }
-        else {
-            $n = $lines.IndexOf([string]$e.after) + 1
-            $lines.Insert($n, [string]$e.insert)
-            $hunks[$e.path] += , @($n, "@@ -$n,0 +$($n + 1) @@`n+$($e.insert)")
-        }
-    }
-    $diff = ''
-    foreach ($k in @($hunks.Keys | Sort-Object)) {
-        $diff += "diff --git a/$k b/$k`n--- a/$k`n+++ b/$k`n"
-        foreach ($h in @($hunks[$k] | Sort-Object { $_[0] })) { $diff += $h[1] + "`n" }
-    }
-    $headText = @{}
-    foreach ($k in $head.Keys) { $headText[$k] = ($head[$k] -join "`n") + "`n" }
-    return @{ Diff = $diff; Head = $headText; Edited = @($hunks.Keys) }
-}
-foreach ($case in @($countFixture.cases)) {
-    $built = New-CountCase -Case $case -Base $countBase
-    $only = Get-P20CountOnlyPaths -Diff $built.Diff -BaseTexts $countBase -HeadTexts $built.Head
-    $onlyPaths = @($only.Keys | Where-Object { $only[$_].CountOnly } | Sort-Object)
-    $sc = Get-P20CiScope -Event 'pull_request' -Paths (@($case.paths) + @($built.Edited)) -CountOnly $onlyPaths
-    $want = "countOnly=$(@($case.countOnly | Sort-Object) -join ',') cli=$($case.cli) agent=$($case.agent) web=$($case.web) contract=$($case.contract)"
-    $got = "countOnly=$($onlyPaths -join ',') cli=$($sc.cli) agent=$($sc.agent) web=$($sc.web) contract=$($sc.contract)"
-    Assert-True "count lines: $($case.why)" ($want -eq $got) "want $want, got $got"
-}
 
 . (Join-Path $scriptDir 'Get-TestHost.ps1')
 $scopeScript = Join-Path $pkgRoot 'Scripts/Get-CiScope.ps1'
@@ -458,29 +401,16 @@ try {
     $written = [System.IO.File]::ReadAllText($outFile) -replace "`r", ''
     Assert-True 'Get-CiScope.ps1, run as the changes job runs it: exit 0 and the four outputs for a web-only list' `
         (($code -eq 0) -and ($written -eq "cli=false`nagent=false`nweb=true`ncontract=true`n")) "exit $code, wrote '$written' -- $said"
-    # The same call with the count-line files: a web change that pastes its web line.
-    $built = New-CountCase -Case @($countFixture.cases)[0] -Base $countBase
-    $baseDir = Join-Path $scopeScratch 'base'
-    $headDir = Join-Path $scopeScratch 'head'
-    foreach ($pair in @(@($baseDir, $countBase), @($headDir, $built.Head))) {
-        foreach ($k in $pair[1].Keys) {
-            $dest = Join-Path $pair[0] $k
-            New-Item -ItemType Directory -Path (Split-Path -Parent $dest) -Force | Out-Null
-            [System.IO.File]::WriteAllText($dest, $pair[1][$k])
-        }
-    }
-    $diffFile = Join-Path $scopeScratch 'counts.diff'
-    [System.IO.File]::WriteAllText($diffFile, $built.Diff)
+    # A documentation change beside a web change: docs/TESTING.md is shared, so
+    # every half runs. No document line is a class of its own any more.
     [System.IO.File]::WriteAllText($listFile, "web/src/App.tsx`ndocs/TESTING.md`n")
     [System.IO.File]::WriteAllText($outFile, '')
-    $said = (Invoke-P20TestHost -File $scopeScript -Arguments @('-Event', 'pull_request', '-PathsFile', $listFile, '-CountDiffFile', $diffFile, '-BaseRoot', $baseDir, '-HeadRoot', $headDir) | ForEach-Object { [string]$_ }) -join "`n"
+    $said = (Invoke-P20TestHost -File $scopeScript -Arguments @('-Event', 'pull_request', '-PathsFile', $listFile) | ForEach-Object { [string]$_ }) -join "`n"
     $code = $LASTEXITCODE
     $written = [System.IO.File]::ReadAllText($outFile) -replace "`r", ''
-    Assert-True 'Get-CiScope.ps1 with the count-line diff: a pasted web line beside a web change is web plus contract' `
-        (($code -eq 0) -and ($written -eq "cli=false`nagent=false`nweb=true`ncontract=true`n") -and ($said -match 'count lines: docs/TESTING\.md')) "exit $code, wrote '$written' -- $said"
+    Assert-True 'Get-CiScope.ps1: docs/TESTING.md beside a web change runs every half, and no contract job' `
+        (($code -eq 0) -and ($written -eq "cli=true`nagent=true`nweb=true`ncontract=false`n") -and ($said -match 'shared: docs/TESTING\.md')) "exit $code, wrote '$written' -- $said"
     $env:GITHUB_ACTIONS = ''; $env:GITHUB_OUTPUT = ''
-    $null = Invoke-P20TestHost -File $scopeScript -Arguments @('-Event', 'pull_request', '-PathsFile', $listFile, '-CountDiffFile', (Join-Path $scopeScratch 'absent.diff'))
-    Assert-True 'Get-CiScope.ps1 with no diff at the path it was given exits 2' ($LASTEXITCODE -eq 2) "exit $LASTEXITCODE"
     $null = Invoke-P20TestHost -File $scopeScript -Arguments @('-Event', 'pull_request', '-PathsFile', (Join-Path $scopeScratch 'absent.txt'))
     Assert-True 'Get-CiScope.ps1 with no list at the path it was given exits 2' ($LASTEXITCODE -eq 2) "exit $LASTEXITCODE"
 }
@@ -493,56 +423,63 @@ finally {
 }
 
 Write-Host ""
-Write-Host "-- CI's carried paste lines --" -ForegroundColor Cyan
-function New-PasteDoc {
-    param([string]$Cli = 'Consts 10, Compat 20', [string]$Total = '2 suites, 30 assertions', [string]$Pytest = 'pytest: 12 passed, 1 skipped', [string]$Web = 'web: 7 suites, 55 tests')
-    return "# Testing`n`n**The counts, after a merge.** The block:`n`n``````text`n  Counts for docs/TESTING.md's paste block, from this run:`n  $Cli`n  $Total`n  $Pytest`n  $Web`n```````n"
-}
-$carriedBase = New-PasteDoc
-$carriedTable = @(
-    # why, head, ran, finding count, a fragment the finding must contain
-    @('identical, a web-only change', (New-PasteDoc), @('web'), 0, ''),
-    @('a typed pytest count on a web-only change', (New-PasteDoc -Pytest 'pytest: 13 passed, 1 skipped'), @('web'), 1, "the agent half's paste line 'pytest: 13 passed, 1 skipped' is not main's 'pytest: 12 passed, 1 skipped'"),
-    @('a typed CLI total on a web-only change', (New-PasteDoc -Total '2 suites, 31 assertions'), @('web'), 1, "the cli half's paste line '2 suites, 31 assertions' is not main's '2 suites, 30 assertions'"),
-    @('a new web count on a web-only change: the web half ran, so it is not compared', (New-PasteDoc -Web 'web: 7 suites, 56 tests'), @('web'), 0, ''),
-    @('a new CLI count where the CLI ran', (New-PasteDoc -Cli 'Consts 10, Compat 21' -Total '2 suites, 31 assertions'), @('cli'), 0, ''),
-    @('every half ran: nothing is compared', (New-PasteDoc -Pytest 'pytest: 99 passed' -Web 'web: 1 suites, 1 tests'), @('cli', 'agent', 'web'), 0, ''),
-    @('two typed lines, two halves named', (New-PasteDoc -Pytest 'pytest: 13 passed, 1 skipped' -Cli 'Consts 11, Compat 20'), @('web'), 2, "the cli half's paste line 'Consts 11, Compat 20'"),
-    @('a change with no paste block', "# Testing`n", @('web'), 1, "this change's docs/TESTING.md has no paste block")
+Write-Host "-- CI's rule: the counts file changes only with the version --" -ForegroundColor Cyan
+# Get-P20TestCountsChangeFindings, both ways, then the script as the changes job runs it.
+$countsTable = @(
+    # why, changed paths, base version, head version, finding count, whether the base had the page
+    @('the counts file changed and the version did not', @('docs/TEST-COUNTS.md', 'Tests/Test-Menu.ps1'), '1.6.0', '1.6.0', 1),
+    @('the counts file introduced: the base has none, the version unchanged', @('docs/TEST-COUNTS.md', 'Scripts/Write-TestCounts.ps1'), '1.6.0', '1.6.0', 0, $false),
+    @('the counts file deleted (it is in the list, the base had it), the version unchanged', @('docs/TEST-COUNTS.md'), '1.6.0', '1.6.0', 1, $true),
+    @('the counts file deleted with the version bumped', @('docs/TEST-COUNTS.md', 'consts.json'), '1.6.0', '1.7.0', 0, $true),
+    @('the counts file changed with the version', @('docs/TEST-COUNTS.md', 'consts.json', 'CHANGELOG.md'), '1.6.0', '1.7.0', 0),
+    @('the version changed and the counts file did not', @('consts.json'), '1.6.0', '1.7.0', 0),
+    @('neither changed', @('web/src/App.tsx', 'docs/TESTING.md'), '1.6.0', '1.6.0', 0),
+    @('the counts file named with a Windows separator', @('docs\TEST-COUNTS.md'), '1.6.0', '1.6.0', 1),
+    @('a file that only resembles it', @('docs/TEST-COUNTS.md.bak', 'docs/test-counts.md'), '1.6.0', '1.6.0', 0)
 )
-foreach ($row in $carriedTable) {
-    $got = @(Get-P20CarriedCountFindings -BaseText $carriedBase -HeadText $row[1] -Ran $row[2])
-    $okRow = ($got.Count -eq $row[3]) -and (($row[3] -eq 0) -or (@($got | Where-Object { $_ -like "*$($row[4])*" }).Count -gt 0))
-    Assert-True "carried lines: $($row[0])" $okRow ($got -join ' | ')
+foreach ($row in $countsTable) {
+    $hadPage = $true
+    if ($row.Count -gt 5) { $hadPage = [bool]$row[5] }
+    $got = @(Get-P20TestCountsChangeFindings -Paths $row[1] -BaseVersion $row[2] -HeadVersion $row[3] -BaseHadPage $hadPage)
+    $okRow = ($got.Count -eq $row[4]) -and (($row[4] -eq 0) -or (($got[0] -match 'docs/TEST-COUNTS\.md') -and ($got[0] -match 'release pull request') -and ($got[0] -match 'Write-TestCounts\.ps1')))
+    Assert-True "counts file rule: $($row[0]) -- $($row[4]) finding(s)" $okRow ($got -join ' | ')
 }
-$realTesting = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'docs/TESTING.md'))
-$realBlock = Get-P20PasteBlock -Text $realTesting
-Assert-True 'the real docs/TESTING.md''s paste block gives every half its lines: two for the CLI, one each for the agent and the web' `
-    (($null -ne $realBlock) -and (@($realBlock.cli).Count -eq 2) -and (@($realBlock.agent).Count -eq 1) -and (@($realBlock.web).Count -eq 1))
-Assert-True 'the real docs/TESTING.md carries its own lines: no finding against itself' (@(Get-P20CarriedCountFindings -BaseText $realTesting -HeadText $realTesting -Ran @('web')).Count -eq 0)
 
-$carriedScript = Join-Path $pkgRoot 'Scripts/Test-CarriedCounts.ps1'
-$carriedScratch = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-ci-carried-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+$countsScript = Join-Path $pkgRoot 'Scripts/Test-TestCountsChange.ps1'
+$countsScratch = Join-Path ([System.IO.Path]::GetTempPath()) ("p20-ci-counts-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
 try {
-    New-Item -ItemType Directory -Path $carriedScratch -Force | Out-Null
-    $baseFile = Join-Path $carriedScratch 'base.md'
-    $sameFile = Join-Path $carriedScratch 'same.md'
-    $typedFile = Join-Path $carriedScratch 'typed.md'
-    [System.IO.File]::WriteAllText($baseFile, $carriedBase)
-    [System.IO.File]::WriteAllText($sameFile, (New-PasteDoc))
-    [System.IO.File]::WriteAllText($typedFile, (New-PasteDoc -Pytest 'pytest: 13 passed, 1 skipped'))
-    $null = Invoke-P20TestHost -File $carriedScript -Arguments @('-BasePath', $baseFile, '-HeadPath', $sameFile, '-Ran', 'web')
-    Assert-True 'Test-CarriedCounts.ps1, run as the contract job runs it: carried lines that are main''s exit 0' ($LASTEXITCODE -eq 0) "exit $LASTEXITCODE"
-    $said = (Invoke-P20TestHost -File $carriedScript -Arguments @('-BasePath', $baseFile, '-HeadPath', $typedFile, '-Ran', 'cli,web') | ForEach-Object { [string]$_ }) -join "`n"
-    Assert-True 'a typed pytest line exits 2 and names the line' (($LASTEXITCODE -eq 2) -and ($said -match [regex]::Escape("'pytest: 13 passed, 1 skipped'")) -and ($said -match '(?m)^Error: ')) "exit $LASTEXITCODE -- $said"
-    $null = Invoke-P20TestHost -File $carriedScript -Arguments @('-BasePath', $baseFile, '-HeadPath', $sameFile, '-Ran', 'docs')
-    Assert-True 'a -Ran that names no half exits 2' ($LASTEXITCODE -eq 2) "exit $LASTEXITCODE"
+    New-Item -ItemType Directory -Path $countsScratch -Force | Out-Null
+    $list = Join-Path $countsScratch 'changed.txt'
+    $baseConsts = Join-Path $countsScratch 'base-consts.json'
+    $headSame = Join-Path $countsScratch 'head-same.json'
+    $headBumped = Join-Path $countsScratch 'head-bumped.json'
+    [System.IO.File]::WriteAllText($baseConsts, '{ "version": "1.6.0" }')
+    [System.IO.File]::WriteAllText($headSame, '{ "version": "1.6.0" }')
+    [System.IO.File]::WriteAllText($headBumped, '{ "version": "1.7.0" }')
+    [System.IO.File]::WriteAllText($list, "docs/TEST-COUNTS.md`nTests/Test-Menu.ps1`n")
+    $said = (Invoke-P20TestHost -File $countsScript -Arguments @('-PathsFile', $list, '-BaseConstsPath', $baseConsts, '-HeadConstsPath', $headSame) | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True 'Test-TestCountsChange.ps1: the counts file changed alone exits 2, the reason stated, naming the release step' `
+        (($LASTEXITCODE -eq 2) -and ($said -match '(?m)^Error: this change edits docs/TEST-COUNTS\.md') -and ($said -match 'A release is a tag on main') -and ($said -match '(?m)^Hint: ')) "exit $LASTEXITCODE -- $said"
+    $said = (Invoke-P20TestHost -File $countsScript -Arguments @('-PathsFile', $list, '-BaseConstsPath', $baseConsts, '-HeadConstsPath', $headBumped) | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True 'with the version bumped beside it, exit 0' (($LASTEXITCODE -eq 0) -and ($said -match '1\.6\.0 to 1\.7\.0')) "exit $LASTEXITCODE -- $said"
+    $said = (Invoke-P20TestHost -File $countsScript -Arguments @('-PathsFile', $list, '-BaseConstsPath', $baseConsts, '-HeadConstsPath', $headSame, '-BaseHadPage', 'false') | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True 'with -BaseHadPage false, the page introduced with the version unchanged, exit 0' (($LASTEXITCODE -eq 0) -and ($said -match 'introduced')) "exit $LASTEXITCODE -- $said"
+    $said = (Invoke-P20TestHost -File $countsScript -Arguments @('-PathsFile', $list, '-BaseConstsPath', $baseConsts, '-HeadConstsPath', $headSame, '-BaseHadPage', 'true') | ForEach-Object { [string]$_ }) -join "`n"
+    Assert-True 'with -BaseHadPage true, the same change (an edit or a deletion) is refused, exit 2' ($LASTEXITCODE -eq 2) "exit $LASTEXITCODE -- $said"
+    [System.IO.File]::WriteAllText($list, "web/src/App.tsx`n")
+    $null = Invoke-P20TestHost -File $countsScript -Arguments @('-PathsFile', $list, '-BaseConstsPath', (Join-Path $countsScratch 'absent.json'))
+    Assert-True 'a change that leaves the counts file alone exits 0, whatever the base''s consts.json' ($LASTEXITCODE -eq 0) "exit $LASTEXITCODE"
+    [System.IO.File]::WriteAllText($list, "docs/TEST-COUNTS.md`n")
+    $null = Invoke-P20TestHost -File $countsScript -Arguments @('-PathsFile', $list, '-BaseConstsPath', (Join-Path $countsScratch 'absent.json'))
+    Assert-True 'a counts change with no base version to compare exits 2' ($LASTEXITCODE -eq 2) "exit $LASTEXITCODE"
+    $null = Invoke-P20TestHost -File $countsScript -Arguments @('-PathsFile', (Join-Path $countsScratch 'absent.txt'), '-BaseConstsPath', $baseConsts)
+    Assert-True 'no list at the path it was given exits 2' ($LASTEXITCODE -eq 2) "exit $LASTEXITCODE"
 }
 catch {
-    Assert-True 'the carried-lines script cases ran to the end without a terminating error' $false $_.Exception.Message
+    Assert-True 'the counts-change script cases ran to the end without a terminating error' $false $_.Exception.Message
 }
 finally {
-    Remove-Item -LiteralPath $carriedScratch -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $countsScratch -Recurse -Force -ErrorAction SilentlyContinue
 }
 
 # The landing page's workflow: every push to main and the button, no secret, the
@@ -596,10 +533,10 @@ Assert-True 'every action codeql.yml uses is pinned to a major version' `
 Assert-True 'codeql.yml runs the default queries: init names no queries or config file' (($codeql -ne '') -and ($codeql -notmatch '(?m)^\s+(queries|config-file|config):'))
 Assert-True 'every job in codeql.yml has a timeout' (($codeql -ne '') -and ([regex]::Matches($codeql, '(?m)^\s+runs-on:').Count -eq [regex]::Matches($codeql, '(?m)^\s+timeout-minutes: \d+').Count))
 
-$real = Read-P20ExpectedCounts -Path (Join-Path $pkgRoot 'docs/TESTING.md')
-Assert-True 'docs/TESTING.md: the tkTestToolkit line is read' ($null -ne $real.cli -and $real.cli.Total -gt 0)
-Assert-True 'docs/TESTING.md: the pytest line is read' ($null -ne $real.agent -and $real.agent.Passed -gt 0)
-Assert-True 'docs/TESTING.md: the npm test line is read' ($null -ne $real.web -and $real.web.Total -gt 0 -and $real.web.Suites -gt 0)
+$real = Read-P20ExpectedCounts -Path (Join-Path $pkgRoot 'docs/TEST-COUNTS.md')
+Assert-True 'docs/TEST-COUNTS.md: the CLI total is read' ($null -ne $real.cli -and $real.cli.Total -gt 0)
+Assert-True 'docs/TEST-COUNTS.md: the pytest line is read' ($null -ne $real.agent -and $real.agent.Passed -gt 0)
+Assert-True 'docs/TEST-COUNTS.md: the web line is read' ($null -ne $real.web -and $real.web.Total -gt 0 -and $real.web.Suites -gt 0)
 
 # -- 2. The merge -----------------------------------------------------------------
 Write-Host ""
@@ -637,8 +574,8 @@ try {
     Copy-Item (Join-Path $pkgRoot 'Scripts/*.ps1') (Join-Path $pkg 'Scripts')
     Copy-Item (Join-Path $pkgRoot 'consts.json'), (Join-Path $pkgRoot 'config.default.json') $pkg
     [System.IO.File]::WriteAllText((Join-Path $pkg 'web/package.json'), '{ "name": "fake" }')
-    $docsPath = Join-Path $pkg 'docs/TESTING.md'
-    $docsSame = "# Testing`n`n``````powershell`ntkTestToolkit            # 9 suites, 10 assertions`n```````n`n``````bash`npython3 -m pytest Tests/     # 12 passed, 2 skipped, 5 subtests -- the agent`ncd web && npm test           # 5 build-contract checks, then 3 suites, 40 tests -- the shell`n```````n"
+    $docsPath = Join-Path $pkg 'docs/TEST-COUNTS.md'
+    $docsSame = Format-P20TestCountsFile -Version '0.0.1' -Lines @('Alpha 6, Beta 4, Gamma 0', '3 suites, 10 assertions', 'pytest: 12 passed, 2 skipped, 5 subtests', 'web: 3 suites, 40 tests')
     [System.IO.File]::WriteAllText($docsPath, $docsSame)
 
     # The fake CLI runner: prints the runner's Total line, writes CLI suites the
@@ -690,7 +627,7 @@ exit 0
                 $body = "#!/bin/sh`nd=`"`${0%/*}`"`nif [ `"`$1`" = `"-m`" ]; then`n  while IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/python-out.txt`"`n  read code < `"`$d/python-exit.txt`"; exit `$code`nfi`ncase `"`$2`" in`n  *'import sys'*) echo 3.12.0; exit 0;;`n  *'import httpx'*) if [ -f `"`$d/nohttpx`" ]; then exit 1; fi; exit 0;;`nesac`nexit 0`n"
             }
             else {
-                $body = "#!/bin/sh`nd=`"`${0%/*}`"`necho `"NPM-ARGS: `$*`"`necho `"HOOK=[`$TEAMS_WEBHOOK_TESTALL43] MARKER=[`$P20_TEST_RUN]`"`necho `"OVERRIDES=[`$P20_ACTIVE_SPACE][`$PROMPTS_ROOT]`"`nwhile IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/npm-out.txt`"`nread code < `"`$d/npm-exit.txt`"; exit `$code`n"
+                $body = "#!/bin/sh`nd=`"`${0%/*}`"`necho `"NPM-ARGS: `$*`"`necho `"HOOK=[`$TEAMS_WEBHOOK_TESTALL43] MARKER=[`$P20_TEST_RUN]`"`necho `"OVERRIDES=[`$P20_ACTIVE_SPACE][`$PROMPTS_ROOT]`"`necho `"ISO-HOME=[`$HOME] ISO-TMPDIR=[`$TMPDIR] ISO-CACHE=[`$XDG_CACHE_HOME] ISO-HISTORY=[`$P20_TEST_HISTORY_DIR]`"`nwhile IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/npm-out.txt`"`nread code < `"`$d/npm-exit.txt`"; exit `$code`n"
             }
             $stubPath = Join-Path $bin $Name
             [System.IO.File]::WriteAllText($stubPath, $body, $enc)
@@ -727,6 +664,8 @@ exit 0
     $summaryFile = Join-Path $stubHistory (Get-P20TestHistoryFileName -Kind summary)
     [System.Environment]::SetEnvironmentVariable('TEAMS_WEBHOOK_TESTALL43', 'not-a-url')
 
+    $sweepSeamBase = Join-Path $base 'sweep-base'
+    New-Item -ItemType Directory -Path $sweepSeamBase -Force | Out-Null
     function Invoke-TestVerb {
         param([string[]]$Arguments = @(), [string]$PathValue = $stubPath, [string]$HostExe = $hostExe)
         $env:PATH = $PathValue
@@ -734,6 +673,9 @@ exit 0
         # running this suite must not answer for the stub PATH.
         $savedHome = $env:HOME; $savedProfile = $env:USERPROFILE
         $env:HOME = $fakeHome; $env:USERPROFILE = $fakeHome
+        # The sweep of stale run folders looks in a scratch base, never the real /tmp.
+        $savedSweep = $env:P20_ISOLATED_SWEEP_BASE
+        $env:P20_ISOLATED_SWEEP_BASE = $sweepSeamBase
         try {
             $global:LASTEXITCODE = 0
             $out = & $HostExe -NoProfile -ExecutionPolicy Bypass -File $verb @Arguments 2>&1
@@ -742,6 +684,7 @@ exit 0
         finally {
             $env:PATH = $savedPath
             $env:HOME = $savedHome; $env:USERPROFILE = $savedProfile
+            $env:P20_ISOLATED_SWEEP_BASE = $savedSweep
         }
         return @{ Text = (@($out | ForEach-Object { [string]$_ }) -join "`n"); Exit = $code }
     }
@@ -796,7 +739,7 @@ exit 0
     [System.IO.File]::WriteAllText($docsPath, $docsSame.Replace('12 passed, 2 skipped', '13 passed, 2 skipped'))
     $r = Invoke-TestVerb @('-Half', 'agent')
     Assert-True 'a count that differs from the doc is still exit 0' ($r.Exit -eq 0) "exit $($r.Exit)"
-    Assert-True 'and is marked, with the one-line note' ($r.Text -match 'expected 13 passed, 2 skipped; actual 12 passed, 2 skipped\s+\(differs\)' -and $r.Text -match 'Note: agent differs from docs/TESTING\.md')
+    Assert-True 'and is marked, with the one-line note' ($r.Text -match 'expected 13 passed, 2 skipped; actual 12 passed, 2 skipped\s+\(differs\)' -and $r.Text -match 'Note: agent differs from docs/TEST-COUNTS\.md')
     [System.IO.File]::WriteAllText($docsPath, $docsSame)
 
     # -Half: one half, and the other halves' record kept.
@@ -904,7 +847,85 @@ exit 0
 
     # -Help.
     $r = Invoke-TestVerb @('-Help')
-    Assert-True '-Help renders the usage from config' ($r.Exit -eq 0 -and $r.Text -match [regex]::Escape('Test [-Half cli|agent|web] [-Fast] [-Help]')) $r.Text
+    Assert-True '-Help renders the usage from config' ($r.Exit -eq 0 -and $r.Text -match [regex]::Escape('Test [-Half cli|agent|web] [-Fast] [-Isolated] [-Keep] [-Help]')) $r.Text
+
+    # -- 3f. -Isolated: refusals on every host, a stubbed run on macOS --------
+    Write-Host ""
+    Write-Host "-- -Isolated: the refusals, and a stubbed run in a folder of its own --" -ForegroundColor Cyan
+    $r = Invoke-TestVerb @('-Keep')
+    Assert-True '-Keep without -Isolated: exit 2' ($r.Exit -eq 2) "exit $($r.Exit)"
+    Assert-True 'stated once, naming -Isolated, and no half ran' (@($r.Text -split "`n" | Where-Object { $_ -match '^Error: -Keep keeps an isolated run' }).Count -eq 1 -and $r.Text -match 'Test -Isolated -Keep' -and $r.Text -notmatch 'the agent half') $r.Text
+    . (Join-Path $pkgRoot 'Scripts/TestAll-Isolated.ps1')
+    $onMac = ((Get-P20TestHistoryPlatform) -eq 'macos')
+    if (-not $onMac) {
+        $r = Invoke-TestVerb @('-Isolated')
+        Assert-True '-Isolated off macOS: exit 2' ($r.Exit -eq 2) "exit $($r.Exit)"
+        Assert-True 'stated once, naming macOS, and no half ran' (@($r.Text -split "`n" | Where-Object { $_ -match '^Error: -Isolated runs on macOS only' }).Count -eq 1 -and $r.Text -notmatch 'the agent half') $r.Text
+        $r = Invoke-TestVerb @('-Isolated', '-Keep')
+        Assert-True '-Isolated -Keep off macOS: the same refusal, exit 2' ($r.Exit -eq 2 -and $r.Text -match 'runs on macOS only') "exit $($r.Exit)"
+    }
+    else {
+        # The real home's test venv and git settings are carried: the venv's
+        # stub prints its own count, so the agent line shows which ran.
+        $venvBin = Join-Path $fakeHome '.venv-toolkit/bin'
+        New-Item -ItemType Directory -Path $venvBin -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $venvBin 'python'), "#!/bin/sh`nif [ `"`$1`" = `"-m`" ]; then echo '===== 7 passed in 1.0s ====='; exit 0; fi`nexit 0`n", $enc)
+        & chmod +x (Join-Path $venvBin 'python')
+        [System.IO.File]::WriteAllText((Join-Path $fakeHome '.venv-toolkit/keep-me'), 'x', $enc)
+        [System.IO.File]::WriteAllText((Join-Path $fakeHome '.gitconfig'), "[user]`n`tname = fixture`n", $enc)
+        $machineSummary = ''
+        if (Test-Path -LiteralPath $summaryFile) { $machineSummary = [System.IO.File]::ReadAllText($summaryFile) }
+
+        $r = Invoke-TestVerb @('-Isolated', '-Keep')
+        $km = [regex]::Match($r.Text, '(?m)^\s*Kept (\S+) -- ')
+        $kept = ''
+        if ($km.Success) { $kept = $km.Groups[1].Value }
+        Assert-True '-Isolated -Keep: exit 0, the folder named' ($r.Exit -eq 0 -and $kept -and (Test-Path -LiteralPath $kept)) "exit $($r.Exit)`n$($r.Text)"
+        Assert-True 'the folder is in /tmp, with the run folder''s name' ((Test-P20IsolatedRunDir $kept) -and $kept.StartsWith('/tmp/p20-isolated-')) $kept
+        Assert-True 'the same summary and verdict as a plain run' ((Get-Line $r.Text 'cli') -match 'PASS\s+10 passed, 0 failed, 1 skipped' -and (Get-Line $r.Text 'web') -match 'PASS\s+40 passed' -and $r.Text -match 'Verdict: PASSED -- agent, cli, web\.') $r.Text
+        Assert-True 'the agent half ran the carried test venv' ((Get-Line $r.Text 'agent') -match 'PASS\s+7 passed' -and (Get-Line $r.Text 'agent') -match [regex]::Escape('[via ~/.venv-toolkit/bin/python]')) (Get-Line $r.Text 'agent')
+        if ($kept -and (Test-Path -LiteralPath $kept)) {
+            $iso = [regex]::Escape($kept)
+            Assert-True 'the child''s HOME, TMPDIR, cache and history are the run''s' ($r.Text -match ('ISO-HOME=\[' + $iso + '/home\] ISO-TMPDIR=\[' + $iso + '/tmp\] ISO-CACHE=\[' + $iso + '/cache\] ISO-HISTORY=\[' + $iso + '/history\]')) (@($r.Text -split "`n" | Where-Object { $_ -match 'ISO-HOME' }) -join ' ')
+            $isoSummary = Read-P20TestSummary -Path (Join-Path (Join-Path $kept 'history') (Get-P20TestHistoryFileName -Kind summary))
+            Assert-True 'the run''s own summary file has the three halves' ($null -ne $isoSummary -and (@($isoSummary['halves'].Keys) -join ',') -eq 'agent,cli,web')
+            $afterSummary = ''
+            if (Test-Path -LiteralPath $summaryFile) { $afterSummary = [System.IO.File]::ReadAllText($summaryFile) }
+            Assert-True 'and the history the launcher was given is untouched' ($afterSummary -eq $machineSummary)
+            $linkPath = Join-Path $kept 'home/.venv-toolkit'
+            $linkType = ''
+            if (Test-Path -LiteralPath $linkPath) { $linkType = [string](Get-Item -LiteralPath $linkPath -Force).LinkType }
+            Assert-True 'the test venv is a link to the real one' ($linkType -eq 'SymbolicLink') $linkType
+            Assert-True 'git''s global settings are a copy' ((Test-Path -LiteralPath (Join-Path $kept 'home/.gitconfig')) -and -not (Get-Item -LiteralPath (Join-Path $kept 'home/.gitconfig') -Force).LinkType)
+            Assert-True 'Remove-P20IsolatedRunDir removes the kept folder' (Remove-P20IsolatedRunDir -Path $kept)
+            Assert-True 'and unlinks the venv without following the link' (Test-Path -LiteralPath (Join-Path $fakeHome '.venv-toolkit/keep-me'))
+        }
+
+        # A stale run folder planted in the REAL /tmp must survive a stubbed run;
+        # one planted in the scratch sweep base is the one it removes. Each name
+        # carries a random part, so two runs of this suite never share a folder.
+        $realStale = Join-Path (Get-P20IsolatedRunPrefix).Base (Get-P20IsolatedRunName -ProcessId 99999999)
+        $scratchStale = Join-Path $sweepSeamBase (Get-P20IsolatedRunName -ProcessId 99999999)
+        try {
+            foreach ($d in @($realStale, $scratchStale)) {
+                New-Item -ItemType Directory -Path $d -Force | Out-Null
+                (Get-Item -LiteralPath $d).LastWriteTime = (Get-Date).AddDays(-3)
+            }
+            $r = Invoke-TestVerb @('-Isolated', '-Half', 'web')
+            Assert-True 'the stubbed run sweeps the scratch base, and says which folder it removed' ($r.Text -match [regex]::Escape($scratchStale) -and -not (Test-Path -LiteralPath $scratchStale)) $r.Text
+            Assert-True 'and leaves a stale run folder in the real /tmp untouched' (Test-Path -LiteralPath $realStale)
+        }
+        finally {
+            Remove-P20IsolatedRunDir -Path $realStale | Out-Null
+        }
+        $nm = [regex]::Match($r.Text, 'caches and test history are in (\S+)')
+        $named = ''
+        if ($nm.Success) { $named = $nm.Groups[1].Value }
+        Assert-True '-Isolated without -Keep: exit 0, -Half passed through' ($r.Exit -eq 0 -and $r.Text -match 'the web half' -and $r.Text -notmatch 'the agent half') "exit $($r.Exit)`n$($r.Text)"
+        Assert-True 'the folder it named is gone after the summary' ($named -and -not (Test-Path -LiteralPath $named) -and $r.Text -notmatch 'Kept ') $named
+        Assert-True 'and the real venv is still there' (Test-Path -LiteralPath (Join-Path $fakeHome '.venv-toolkit/keep-me'))
+        Remove-Item (Join-Path $fakeHome '.venv-toolkit'), (Join-Path $fakeHome '.gitconfig') -Recurse -Force
+    }
 }
 catch {
     Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
@@ -1306,6 +1327,92 @@ finally {
     Remove-Item $ovBase -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# -- 3g. -Isolated's plan, on every host --------------------------------------
+Write-Host ""
+Write-Host "-- -Isolated's plan: the variables, the folders, what is carried --" -ForegroundColor Cyan
+. (Join-Path $pkgRoot 'Scripts/TestAll-Isolated.ps1')
+$planConsts = Get-P20Consts
+$runDir = Join-Path 'R' 'p20-isolated-1-abc'
+$realHome = Join-Path 'H' 'me'
+$plan = Get-P20IsolatedRunPlan -RunDir $runDir -Environment @{ HOME = $realHome; XDG_CACHE_HOME = 'should-not-matter' }
+$wantVars = [ordered]@{
+    HOME = (Join-Path $runDir 'home'); TMPDIR = (Join-Path $runDir 'tmp'); TMP = (Join-Path $runDir 'tmp'); TEMP = (Join-Path $runDir 'tmp')
+    XDG_CACHE_HOME = (Join-Path $runDir 'cache'); XDG_DATA_HOME = (Join-Path $runDir 'data'); XDG_CONFIG_HOME = (Join-Path $runDir 'config')
+}
+$wantVars[[string]$planConsts.env.testHistoryDir] = (Join-Path $runDir 'history')
+Assert-True 'the plan sets exactly these variables, in this order' ((@($plan.Variables.Keys) -join ',') -eq (@($wantVars.Keys) -join ',')) (@($plan.Variables.Keys) -join ',')
+foreach ($k in $wantVars.Keys) {
+    Assert-True "the plan sets $k into the run folder" ($plan.Variables[$k] -eq $wantVars[$k]) "$($plan.Variables[$k])"
+}
+Assert-True 'the history variable is the contract''s name' ($plan.Variables.Contains('P20_TEST_HISTORY_DIR'))
+Assert-True 'the folders: the run folder first, then each one a variable names' ($plan.Folders[0] -eq $runDir -and $plan.Folders.Count -eq 7 -and @($plan.Folders | Where-Object { -not $_.StartsWith($runDir) }).Count -eq 0) ($plan.Folders -join ' ')
+$link = @($plan.Carry | Where-Object { $_.Kind -eq 'link' })
+Assert-True 'one link: the real home''s test venv, into the run''s home' ($link.Count -eq 1 -and $link[0].From -eq (Join-Path $realHome (Get-P20TestVenvHomeName)) -and $link[0].To -eq (Join-Path (Join-Path $runDir 'home') '.venv-toolkit'))
+$copies = @($plan.Carry | Where-Object { $_.Kind -eq 'copy' })
+Assert-True 'copies: ~/.gitconfig and the git folder''s config, ignore and attributes' ($copies.Count -eq 4 -and $copies[0].From -eq (Join-Path $realHome '.gitconfig') -and $copies[0].To -eq (Join-Path (Join-Path $runDir 'home') '.gitconfig'))
+$gitDefault = Join-Path (Join-Path $realHome '.config') 'git'
+Assert-True 'with no XDG_CONFIG_HOME, the git folder is ~/.config/git' ($copies[1].From -eq (Join-Path $gitDefault 'config') -and $copies[2].From -eq (Join-Path $gitDefault 'ignore') -and $copies[3].From -eq (Join-Path $gitDefault 'attributes') -and $copies[1].To -eq (Join-Path (Join-Path (Join-Path $runDir 'config') 'git') 'config')) $copies[1].From
+$plan2 = Get-P20IsolatedRunPlan -RunDir $runDir -Environment @{ HOME = $realHome; XDG_CONFIG_HOME = 'X' }
+Assert-True 'with XDG_CONFIG_HOME set, the git folder is under it' (@($plan2.Carry | Where-Object { $_.Kind -eq 'copy' })[1].From -eq (Join-Path (Join-Path 'X' 'git') 'config'))
+$plan3 = Get-P20IsolatedRunPlan -RunDir $runDir -Environment @{ HOME = '  ' }
+Assert-True 'with no home to carry from, nothing is carried and the variables are the same' (@($plan3.Carry).Count -eq 0 -and (@($plan3.Variables.Keys) -join ',') -eq (@($wantVars.Keys) -join ','))
+$n1 = Get-P20IsolatedRunName -ProcessId 4242
+$n2 = Get-P20IsolatedRunName -ProcessId 4242
+Assert-True 'the name: prefix, process id, random part' ((Get-P20IsolatedRunName -ProcessId 7 -Random 'ab12cd34') -eq 'p20-isolated-7-ab12cd34' -and $n1 -match '^p20-isolated-4242-[a-z0-9]{8}$') $n1
+Assert-True 'two runs with one process id in one second get two names' ($n1 -ne $n2) "$n1 $n2"
+Assert-True 'a run folder is recognised by its name' ((Test-P20IsolatedRunDir (Join-Path '/tmp' $n1)) -and (Test-P20IsolatedRunDir ($n1 + '/')))
+Assert-True 'and nothing else is' (-not (Test-P20IsolatedRunDir '/tmp') -and -not (Test-P20IsolatedRunDir '') -and -not (Test-P20IsolatedRunDir (Join-Path $realHome '.venv-toolkit')) -and -not (Test-P20IsolatedRunDir '/tmp/p20-isolated-x-ab'))
+Assert-True 'Remove refuses a folder that is not a run folder' (-not (Remove-P20IsolatedRunDir -Path $scriptDir) -and (Test-Path -LiteralPath $scriptDir))
+
+# -- 3h. The sweep of folders a killed run left, in a scratch base ---------------
+Write-Host ""
+Write-Host "-- -Isolated's sweep: stale folders go, kept and live ones stay --" -ForegroundColor Cyan
+$isoCfg = Get-P20IsolatedRunPrefix
+Assert-True 'a day is the age, and the kept marker and swept line are named once' ($isoCfg.MaxAgeDays -eq 1 -and $isoCfg.KeptMarker -and $isoCfg.SweptLine -match '\{0\}')
+if (Test-Path -LiteralPath '/bin/rm') {
+    $sweepBase = Join-Path ([System.IO.Path]::GetTempPath()) ('p20-sweep-test-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Path $sweepBase -Force | Out-Null
+    try {
+        $deadId = 99999999
+        $old = (Get-Date).AddDays(-3)
+        $mk = {
+            param([string]$Name, [datetime]$When)
+            $d = Join-Path $sweepBase $Name
+            New-Item -ItemType Directory -Path (Join-Path $d 'home') -Force | Out-Null
+            (Get-Item -LiteralPath $d).LastWriteTime = $When
+            return $d
+        }
+        $stale = & $mk "p20-isolated-$deadId-aaaa1111" $old
+        $fresh = & $mk "p20-isolated-$deadId-bbbb2222" (Get-Date).AddHours(-2)
+        $keptDir = & $mk "p20-isolated-$deadId-cccc3333" $old
+        $live = & $mk "p20-isolated-$PID-dddd4444" $old
+        $other = & $mk 'some-other-folder' $old
+        $nearName = & $mk 'p20-isolated-x-ab' $old
+        Assert-True 'Set-P20IsolatedRunKept marks a run folder, and refuses a name that is not one' ((Set-P20IsolatedRunKept -Path $keptDir) -and (Test-Path -LiteralPath (Join-Path $keptDir $isoCfg.KeptMarker)) -and -not (Set-P20IsolatedRunKept -Path $other))
+        (Get-Item -LiteralPath $keptDir).LastWriteTime = $old
+        $gone = @(Remove-P20StaleIsolatedRunDirs -Base $sweepBase)
+        Assert-True 'a stale folder is removed, and named in what is returned' ($gone.Count -eq 1 -and $gone[0] -eq $stale -and -not (Test-Path -LiteralPath $stale)) ($gone -join ',')
+        Assert-True 'a fresh folder is kept' (Test-Path -LiteralPath $fresh)
+        Assert-True 'a -Keep folder is kept, however old' (Test-Path -LiteralPath $keptDir)
+        Assert-True 'a folder of a live process is kept, however old' (Test-Path -LiteralPath $live)
+        Assert-True 'a folder that is not a run folder is untouched, and so is a near miss' ((Test-Path -LiteralPath $other) -and (Test-Path -LiteralPath $nearName))
+        Assert-True 'a second sweep removes nothing' (@(Remove-P20StaleIsolatedRunDirs -Base $sweepBase).Count -eq 0)
+        Assert-True 'a base that does not exist is no error and removes nothing' (@(Remove-P20StaleIsolatedRunDirs -Base (Join-Path $sweepBase 'absent')).Count -eq 0)
+        Assert-True 'the age is the caller''s to move: a later clock takes the fresh one' ((@(Remove-P20StaleIsolatedRunDirs -Base $sweepBase -Now (Get-Date).AddDays(5)) | ForEach-Object { Split-Path -Leaf $_ }) -contains (Split-Path -Leaf $fresh) -and (Test-Path -LiteralPath $keptDir) -and (Test-Path -LiteralPath $live))
+    }
+    finally {
+        Remove-Item -LiteralPath $sweepBase -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+$isoSource = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/TestAll-Isolated.ps1'))
+Assert-True 'the child is waited on after a kill, so the folder is not removed under it' ($isoSource -match '(?s)finally \{.*\$p\.Kill\(\);\s*\$null = \$p\.WaitForExit')
+# .NET puts a socket per process in TMPDIR, and a socket path on macOS holds
+# 104 bytes with its terminator: the longest name, with the longest process id,
+# must fit, or two processes aim at one cut-short name.
+$isoBase = (Get-P20IsolatedRunPrefix).Base
+$longest = $isoBase + '/' + (Get-P20IsolatedRunName -ProcessId 99999999) + '/tmp/' + 'dotnet-diagnostic-99999999-9999999999-socket'
+Assert-True 'the longest diagnostics socket path fits in 103 bytes' ($longest.Length -le 103) "$($longest.Length): $longest"
+
 # -- 4. The wiring -----------------------------------------------------------------
 Write-Host ""
 Write-Host "-- The wiring --" -ForegroundColor Cyan
@@ -1318,6 +1425,12 @@ Assert-True 'and hands its children a scratch one, put back in the finally' ($ru
 Assert-True 'its own records go to the folder it resolved, by name' (([regex]::Matches($runnerSource, 'Write-P20TestResult [^\r\n]*-Dir \$historyDir')).Count -eq 2)
 $verbSource = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Invoke-TestAll.ps1'))
 Assert-True 'Test resolves the folder once, before the web half sets the marker' ($verbSource -match '(?s)\$historyDir = Get-P20TestHistoryDir.*\$runWeb = ')
+$isoBlock = [regex]::Match($verbSource, '(?s)if \(\$Isolated\) \{.*?\r?\n    exit \$code\r?\n\}').Value
+Assert-True '-Isolated is handled before any half runs, and ends in its own exit' ($isoBlock -and $verbSource.IndexOf($isoBlock) -lt $verbSource.IndexOf('$runners = @{'))
+Assert-True 'and changes no variable in the launcher: the child gets the plan''s' ($isoBlock -notmatch '(?m)^\s*\$env:\w+\s*=' -and $isoBlock -notmatch 'SetEnvironmentVariable' -and $isoBlock -match 'Invoke-P20IsolatedChild [^\r\n]*-Variables \$plan\.Variables')
+Assert-True 'and the folder is removed in a finally unless -Keep' ($isoBlock -match '(?s)finally \{.*if \(\$Keep\).*Remove-P20IsolatedRunDir')
+Assert-True 'the folder is marked kept under -Keep, before the finally ends' ($isoBlock -match '(?s)finally \{.*if \(\$Keep\).*Set-P20IsolatedRunKept')
+Assert-True 'a sweep of stale folders runs before the run''s own folder is made, and cannot stop the run' ($isoBlock -match '(?s)try \{\s*foreach \(\$swept in @\(Remove-P20StaleIsolatedRunDirs\)\).*?catch \{ \$null = \$_ \}.*Get-P20IsolatedRunName' -and $isoBlock -match '(?s)Remove-P20StaleIsolatedRunDirs.*Initialize-P20IsolatedRun')
 Assert-True 'the CLI runner names each suite before it starts it' ($runnerSource -match "(?s)--\s+started\s+\{1\}.{0,400}Invoke-P20TestHost\s+-File")
 $cfg = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'config.default.json')) | ConvertFrom-Json
 Assert-True 'config: Test outlasts the bridge''s default timeout' ([int]$cfg.commands.Test.bridgeTimeoutSeconds -ge 1800)

@@ -318,12 +318,9 @@ class TheRoute(unittest.TestCase):
         res, _calls = self._get("/api/ritual/triage?space=toolkit", gh_fails=True)
         body = res.json()
         self.assertEqual(
-            body["tracker"], {"ok": False, "reason": "johnfrog76/toolkit: gh did not answer (TimeoutExpired)"}
+            body["tracker"], {"ok": False, "reason": "gh did not answer for johnfrog76/toolkit: TimeoutExpired"}
         )
-        self.assertEqual(
-            body["text"].replace("johnfrog76/toolkit: ", "").replace(" (TimeoutExpired)", ""),
-            _golden("triage-no-tracker.txt"),
-        )
+        self.assertEqual(body["text"], _golden("triage-no-tracker.txt"))
 
     def test_an_unknown_space_is_404_naming_it(self):
         res, calls = self._get("/api/ritual/triage?space=nowhere")

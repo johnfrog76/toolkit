@@ -257,9 +257,16 @@ if (-not $Log) {
         -CacheHours $cache.Hours -Buckets $buckets -Entries $weekReadings.Entries -Product $product
     $sum['burndown'] = $burndown
     $sum.skipped['readings'] = [long]$weekReadings.Skipped
-    $burnCost = { param($v) if ($null -eq $v) { 'no priced model' } else { '$' + ([decimal]$v).ToString('0.00', $inv) + ' derived' } }
+    $unpricedPhrase = (Get-P20Consts).usage.unpricedPhrase
+    $burnCost = {
+        param($v, $names)
+        $text = 'no priced model'
+        if ($null -ne $v) { $text = '$' + ([decimal]$v).ToString('0.00', $inv) + ' derived' }
+        if (@($names).Count -gt 0) { $text += ", $unpricedPhrase $(@($names) -join ', ')" }
+        $text
+    }
     if (Get-Command Write-ToolkitLog -ErrorAction SilentlyContinue) {
-        Write-ToolkitLog -Type CMD -Source "${prefix}Burn" -Detail ("today $($sum.today.totals.messages) messages, $(& $burnCost $sum.today.totals.costUsdDerived); week $($sum.week.totals.messages) messages, $(& $burnCost $sum.week.totals.costUsdDerived)" + $(if ($AsJson) { ' (-AsJson)' } else { '' }))
+        Write-ToolkitLog -Type CMD -Source "${prefix}Burn" -Detail ("today $($sum.today.totals.messages) messages, $(& $burnCost $sum.today.totals.costUsdDerived $sum.today.unpriced); week $($sum.week.totals.messages) messages, $(& $burnCost $sum.week.totals.costUsdDerived $sum.week.unpriced)" + $(if ($AsJson) { ' (-AsJson)' } else { '' }))
     }
     if ($AsJson) {
         Write-Output (ConvertTo-P20ConfigJson $sum)
@@ -270,7 +277,7 @@ if (-not $Log) {
         param($Title, $Block)
         $t = $Block.totals
         Write-Host ""
-        Write-Host ("  {0}  {1} messages, {2}" -f $Title, $t.messages, (& $burnCost $t.costUsdDerived)) -ForegroundColor Cyan
+        Write-Host ("  {0}  {1} messages, {2}" -f $Title, $t.messages, (& $burnCost $t.costUsdDerived $Block.unpriced)) -ForegroundColor Cyan
         if (@($Block.byModel).Count -eq 0) { Write-Host "      nothing counted" -ForegroundColor DarkGray }
         foreach ($m in @($Block.byModel)) {
             $c = 'unpriced'
@@ -355,6 +362,7 @@ Write-CardText -Path $recordPath -Content ((ConvertTo-P20ConfigJson $record) + "
 $t = $record.totals
 $costText = 'no priced model'
 if ($null -ne $t.costUsdDerived) { $costText = '$' + ([decimal]$t.costUsdDerived).ToString('0.00', $inv) + ' derived' }
+if (@($record.unpriced).Count -gt 0) { $costText += ", $((Get-P20Consts).usage.unpricedPhrase) $(@($record.unpriced) -join ', ')" }
 if (Get-Command Write-ToolkitLog -ErrorAction SilentlyContinue) {
     Write-ToolkitLog -Type CMD -Source "${prefix}Burn" -Detail "-Log $dayKey -> $($t.messages) messages, $costText"
 }

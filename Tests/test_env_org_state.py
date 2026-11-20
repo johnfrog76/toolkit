@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _skipguard import skip_module
 
 try:
-    from agent.core.env import _ado_access_check, _git_history_check, _identity_check
+    from agent.core.env import _ado_access_check, _config_block, _git_history_check, _identity_check
 except Exception as exc:  # pragma: no cover - a machine without the agent's deps
     skip_module(f"the agent's dependencies are not installed: {exc}")
 
@@ -76,3 +76,26 @@ class TheIdentityRow(unittest.TestCase):
     def test_an_identity_is_ok_and_says_where_it_came_from(self):
         row = _identity_check({"email": "me@example.com", "source": "config"}, False)
         self.assertEqual(row, {"ok": True, "detail": "me@example.com (from config)"})
+
+
+class TheSwitcherList(unittest.TestCase):
+    """/env's `spaces` keeps a retired Space; only `switcherSpaces` leaves it off."""
+
+    def _block(self, active):
+        cfg = {
+            "spaces": [
+                {"slug": "a", "name": "A", "status": "active"},
+                {"slug": "gone", "name": "Gone", "status": "archive"},
+            ],
+            "activeSpace": active,
+            "isDemoDismissed": False,
+        }
+        return _config_block(cfg)
+
+    def test_a_retired_space_is_in_spaces_but_not_in_the_switcher(self):
+        block = self._block("a")
+        self.assertEqual([s["slug"] for s in block["spaces"]], ["a", "gone"])
+        self.assertEqual(block["switcherSpaces"], ["a"])
+
+    def test_the_retired_space_you_are_in_stays_in_the_switcher(self):
+        self.assertEqual(self._block("gone")["switcherSpaces"], ["a", "gone"])

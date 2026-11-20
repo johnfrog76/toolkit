@@ -32,6 +32,7 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # Tests/, for _skipguard
 
 from _skipguard import skip_module  # noqa: E402
+from _tracker_cli import unreachable  # noqa: E402
 
 try:
     from fastapi import FastAPI
@@ -582,6 +583,7 @@ class FlagOff(ManagerRouteTestCase):
         self.client.post("/api/manager", json={"date": "2026-03-05"})
         self.assertFalse(self.session("2026-03-05.md").exists())
 
+    @unreachable("az")
     def test_env_carries_no_communication_block(self):
         self.assertNotIn("communication", self.client.get("/api/env").json())
 
@@ -590,30 +592,82 @@ class EnvReportsGateTwo(ManagerRouteTestCase):
     def _block(self) -> dict:
         return self.client.get("/api/env").json()["communication"]
 
+    @unreachable("az")
     def test_the_manager_recipient_is_unconfigured_when_the_variable_is_unset(self):
         entry = next(r for r in self._block()["recipients"] if r["key"] == "manager")
         self.assertFalse(entry["configured"])
         self.assertEqual(entry["webhookEnv"], "TEAMS_WEBHOOK_MANAGER")
 
+    @unreachable("az")
     def test_the_manager_recipient_is_configured_when_the_variable_is_set(self):
         with mock.patch.dict(os.environ, {"TEAMS_WEBHOOK_MANAGER": DUMMY_WEBHOOK}):
             entry = next(r for r in self._block()["recipients"] if r["key"] == "manager")
         self.assertTrue(entry["configured"])
 
+    @unreachable("az")
     def test_the_block_says_where_the_recipient_came_from(self):
         # C7: two places hold recipients. The UI renders that honestly rather
         # than pretending there is one list.
         entry = next(r for r in self._block()["recipients"] if r["key"] == "manager")
         self.assertEqual(entry["scope"], "managerWorkflow")
 
+    @unreachable("az")
+    def test_a_chat_recipient_is_reported_with_its_type_and_gate(self):
+        # A Teams chat (type chat) is a recipient like a channel: /env carries
+        # its own type word, the variable it reads, and whether that is set.
+        from agent.communication import comms
+
+        block = {
+            "postRetroSummary": True,
+            "communication": {
+                "recipients": {
+                    "manager": {"type": "channel", "webhookEnv": "TEAMS_WEBHOOK_MANAGER"},
+                    "mom": {"type": "chat", "display": "Mom", "webhookEnv": "TEAMS_WEBHOOK_MOM"},
+                }
+            },
+        }
+        with mock.patch.object(comms, "manager_workflow", return_value=block):
+            entry = next(r for r in self._block()["recipients"] if r["key"] == "mom")
+            self.assertEqual(entry["type"], "chat")
+            self.assertEqual(entry["display"], "Mom")
+            self.assertEqual(entry["webhookEnv"], "TEAMS_WEBHOOK_MOM")
+            self.assertFalse(entry["configured"])
+            with mock.patch.dict(os.environ, {"TEAMS_WEBHOOK_MOM": DUMMY_WEBHOOK}):
+                entry = next(r for r in self._block()["recipients"] if r["key"] == "mom")
+            self.assertTrue(entry["configured"])
+
+    @unreachable("az")
     def test_post_retro_summary_is_reported(self):
         self.assertTrue(self._block()["postRetroSummary"])
+
+    @unreachable("az")
+    def test_sending_off_follows_the_run_marker(self):
+        # A server started for review or testing sets the marker, and nothing
+        # posts from it. /env says so, so a page can tell "sending is off here"
+        # from "no webhook is set".
+        marker = consts.env_test_run_marker()
+        with mock.patch.dict(os.environ, {marker: "1"}):
+            self.assertIs(self._block()["sendingOff"], True)
+        without = {k: v for k, v in os.environ.items() if k != marker}
+        with mock.patch.dict(os.environ, without, clear=True):
+            self.assertIs(self._block()["sendingOff"], False)
+
+    @unreachable("az")
+    def test_sending_off_is_the_engine_s_own_answer(self):
+        # One rule for the page and the POST: where /env says sending is off,
+        # the engine refuses to post.
+        with mock.patch.dict(os.environ, {consts.env_test_run_marker(): "1"}):
+            self.assertTrue(self._block()["sendingOff"])
+            ok, detail = manager.comms._post_to_webhook(DUMMY_WEBHOOK, "x")
+        self.assertFalse(ok)
+        self.assertIn("refused", detail)
 
 
 class EnvWhenTheModuleCannotDescribeItself(ManagerRouteTestCase):
     """A module that raises while describing itself is left out of /env, and the
     log says so: an empty answer is stated, never silent."""
 
+    @unreachable("az")
     def test_env_answers_without_the_block_and_writes_one_warn(self):
         with (
             mock.patch.object(manager, "communication_env", side_effect=RuntimeError("recipients unreadable")),
