@@ -217,6 +217,10 @@ $runAgent = {
         return $rec
     }
     $rec.python = $pick.Via
+    # Before the tests: the installed packages against the requirements files'
+    # floors, read by this same interpreter. A warning in the summary, never the
+    # verdict (Get-P20RequirementFloors in Resolve-Python.ps1).
+    $script:floorCheck = Get-P20RequirementFloors -PackageRoot $packageRoot -Python $python
     $savedIo = $env:PYTHONIOENCODING
     $env:PYTHONIOENCODING = 'utf-8'
     $start = Get-Date
@@ -351,6 +355,7 @@ $suiteKeys = @{ agent = 'pytest'; web = 'jest' }
 
 # -- Run -------------------------------------------------------------------------
 $script:cliPasteLines = @()
+$script:floorCheck = $null
 $records = [ordered]@{}
 $overallStart = Get-Date
 # The shell's own overrides (P20_ACTIVE_SPACE, PROMPTS_ROOT) are out of every
@@ -508,6 +513,17 @@ if ($halves.Count -eq 3 -and -not $Fast) {
 }
 else {
     Write-Host "  No counts block: it needs all three halves and no -Fast." -ForegroundColor DarkGray
+}
+
+# -- The requirements' floors ---------------------------------------------------
+# Only when a package is below its floor (or is not the pinned version): a run
+# with every package at or above prints nothing here. A warning, never the
+# verdict -- the tests decide that -- and nothing is installed for the user.
+if ($null -ne $script:floorCheck -and @($script:floorCheck.Findings).Count -gt 0) {
+    Write-Host ""
+    Write-Host "  Warning: the agent's Python packages are not what agent/requirements*.txt state, so this run did not test the versions main supports:" -ForegroundColor Yellow
+    foreach ($finding in @($script:floorCheck.Findings)) { Write-Host "    $finding" -ForegroundColor Yellow }
+    Write-Host "  Fix: $($script:floorCheck.Fix)" -ForegroundColor Yellow
 }
 
 # -- One verdict -----------------------------------------------------------------

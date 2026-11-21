@@ -334,6 +334,31 @@ if ($azCliInstalled) {
     }
 }
 
+# The agent's Python packages against the floors in agent/requirements*.txt, for
+# the interpreter the Test verb would hand pytest to -- the same check, from the
+# same file, as that run's summary (Get-P20RequirementFloors). Below a floor is a
+# note, not a failure: the agent may still start, and nothing is installed here.
+if (-not (Get-Command Resolve-P20TestPython -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Resolve-Python.ps1')
+}
+$floorRoot = Split-Path $PSScriptRoot -Parent
+$floorPick = Resolve-P20TestPython -PackageRoot $floorRoot
+if ($null -eq $floorPick.Python) {
+    Write-Check $true 'Python packages' 'not checked -- no Python 3 on the PATH' -Note
+}
+else {
+    $floors = Get-P20RequirementFloors -PackageRoot $floorRoot -Python $floorPick.Python
+    if ($null -eq $floors) {
+        Write-Check $true 'Python packages' "not checked -- $($floorPick.Python.Display) did not answer" -Note
+    }
+    elseif (@($floors.Findings).Count -eq 0) {
+        Write-Check $true 'Python packages' "at or above the floors in agent/requirements*.txt ($($floorPick.Python.Display))"
+    }
+    else {
+        Write-Check $true 'Python packages' "$(@($floors.Findings) -join '; ') -- $($floors.Fix)" -Note
+    }
+}
+
 # -- Optional surfaces ---------------------------------------------------------
 # The inventory of everything that is not the ADO core: what exists, whether it
 # is on, and the line that changes it. This is the report a reader opens when
