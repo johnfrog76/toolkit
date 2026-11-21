@@ -136,6 +136,24 @@ class TheRoutesRunTheVerb(unittest.TestCase):
         self.assertIn("-Local", seen[0])
         self.assertIn("-Hub", seen[2])
 
+    def test_an_unset_with_hub_hands_the_verb_both(self):
+        # A Space field the hub holds is removed only with -Hub: without it the
+        # verb removes this machine's patch and the hub's value stands.
+        seen = []
+
+        async def fake(name, req):
+            seen.append(list(req.params))
+            if "-List" in req.params:
+                return _ok(json.dumps({"activeSpace": "", "files": {}, "settings": []}))
+            return _ok("ok")
+
+        with mock.patch.object(config_routes, "run_command", fake):
+            client.put("/api/config", json={"unset": ["spaces.acme.features.teamSize"], "hub": True})
+            client.put("/api/config", json={"unset": ["email"]})
+
+        self.assertEqual(seen[0], ["-Unset", json.dumps(["spaces.acme.features.teamSize"]), "-Hub"])
+        self.assertEqual(seen[2], ["-Unset", json.dumps(["email"])])
+
     def test_a_refusal_comes_back_as_a_body_not_an_exception(self):
         async def fake(name, req):
             if "-List" in req.params:

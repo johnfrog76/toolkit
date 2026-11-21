@@ -109,40 +109,106 @@ describe("FieldRow: a field with allowed values", () => {
   });
 });
 
-// The whole section, with the agent stood in: choosing Default for a value the
-// hub holds is an unset with -Hub, and the re-read list the write hands back
-// is what the row draws afterwards.
+// The whole section, with the agent stood in: what each save sends, and the
+// re-read list the write hands back is what the rows draw afterwards. A Space
+// field the hub holds is unset with -Hub, in its own write -- without it the
+// verb removes only this machine's patch and the save changes nothing.
 const teamKey = "spaces.acme.features.teamSize";
-let configReply = { settings: [setting(teamKey, "6", "hub")] };
+const hoursKey = "spaces.acme.features.trainingHoursPerQuarter";
+const hoursRow: ConfigSchemaRow = {
+  key: "spaces.<slug>.features.trainingHoursPerQuarter",
+  scope: "org",
+  type: "int",
+  allowed: [],
+  required: false,
+  file: "hub.json",
+  help: "Training hours each quarter.",
+};
+const emailRow: ConfigSchemaRow = {
+  key: "email",
+  scope: "machine",
+  type: "string",
+  allowed: [],
+  required: false,
+  file: "config.local.json",
+  help: "Your work email.",
+};
+const machine = (key: string, value: string, source: ConfigSetting["source"]): ConfigSetting => ({
+  key,
+  scope: "machine",
+  file: "config.local.json",
+  value,
+  source,
+});
+
+let configReply: { settings: ConfigSetting[] } = { settings: [] };
+let schemaRows: ConfigSchemaRow[] = [];
 const writeConfig = jest.fn();
 
 jest.mock("./api.ado", () => ({
   useGetConfigQuery: () => ({ data: { activeSpace: "acme", ...configReply }, isLoading: false }),
-  useGetConfigSchemaQuery: () => ({ data: { schema: [teamSizeRow], error: null } }),
+  useGetConfigSchemaQuery: () => ({ data: { schema: schemaRows, error: null } }),
   useWriteConfigMutation: () => [writeConfig, { isLoading: false }],
 }));
 jest.mock("../../shell/api", () => ({
   useGetEnvQuery: () => ({ data: { config: { spaces: [] } } }),
 }));
 
-describe("ConfigSettings: choosing Default", () => {
-  it("sends an unset through the hub's writer, and the row reads unset afterwards", async () => {
-    writeConfig.mockImplementation(() => {
-      configReply = { settings: [setting(teamKey, "", "unset")] };
-      return {
-        unwrap: () => Promise.resolve({ result: { status: "success" }, config: configReply }),
-      };
-    });
-    const footer = document.createElement("div");
-    document.body.appendChild(footer);
-    const view = render(
-      <FluentProvider theme={webLightTheme}>
-        <SettingsFooterContext.Provider value={footer}>
-          <ConfigSettings />
-        </SettingsFooterContext.Provider>
-      </FluentProvider>,
-    );
-    fireEvent.click(screen.getAllByRole("combobox")[0]);
+function reply(status: "success" | "error", after?: ConfigSetting[]) {
+  return () => {
+    if (after) configReply = { settings: after };
+    return {
+      unwrap: () =>
+        Promise.resolve({
+          result: { status, error: status === "error" ? "Refused." : null },
+          config: configReply,
+        }),
+    };
+  };
+}
+
+function section() {
+  const footer = document.createElement("div");
+  document.body.appendChild(footer);
+  const tree = () => (
+    <FluentProvider theme={webLightTheme}>
+      <SettingsFooterContext.Provider value={footer}>
+        <ConfigSettings />
+      </SettingsFooterContext.Provider>
+    </FluentProvider>
+  );
+  const view = render(tree());
+  return { rerender: () => view.rerender(tree()) };
+}
+
+/** The control a row draws, found by the label that names it. */
+function controlFor(key: string): HTMLElement {
+  const id = `cfg-${key.replace(/[^A-Za-z0-9]+/g, "-")}-label`;
+  const el = document.querySelector<HTMLElement>(`[aria-labelledby="${id}"]`);
+  if (!el) throw new Error(`no control for ${key}`);
+  return el;
+}
+
+function clear(key: string) {
+  fireEvent.change(controlFor(key), { target: { value: "" } });
+}
+
+describe("ConfigSettings: what a save sends", () => {
+  beforeEach(() => {
+    writeConfig.mockReset();
+  });
+  afterEach(() => {
+    // The drafts outlive the component on purpose; a test must not leak them.
+    const discard = screen.queryByRole("button", { name: "Discard" });
+    if (discard) fireEvent.click(discard);
+  });
+
+  it("choosing Default on a hub-held select is an unset with -Hub, and the row reads unset", async () => {
+    schemaRows = [teamSizeRow];
+    configReply = { settings: [setting(teamKey, "6", "hub")] };
+    writeConfig.mockImplementation(reply("success", [setting(teamKey, "", "unset")]));
+    const view = section();
+    fireEvent.click(controlFor(teamKey));
     fireEvent.click(screen.getByRole("option", { name: defaultText }));
     fireEvent.click(await screen.findByRole("button", { name: "Save 1" }));
     await screen.findByText("Saved.", { exact: false });
@@ -150,14 +216,69 @@ describe("ConfigSettings: choosing Default", () => {
     expect(writeConfig).toHaveBeenCalledTimes(1);
     expect(writeConfig).toHaveBeenCalledWith({ set: {}, unset: [teamKey], hub: true });
 
-    view.rerender(
-      <FluentProvider theme={webLightTheme}>
-        <SettingsFooterContext.Provider value={footer}>
-          <ConfigSettings />
-        </SettingsFooterContext.Provider>
-      </FluentProvider>,
-    );
-    expect(screen.getAllByRole("combobox")[0].textContent).toBe(defaultText);
+    view.rerender();
+    expect(controlFor(teamKey).textContent).toBe(defaultText);
     expect(screen.getByText("unset")).toBeTruthy();
+  });
+
+  it("clearing a hub-held text field is an unset with -Hub", async () => {
+    schemaRows = [hoursRow];
+    configReply = { settings: [setting(hoursKey, "8", "hub")] };
+    writeConfig.mockImplementation(reply("success", [setting(hoursKey, "", "unset")]));
+    section();
+    clear(hoursKey);
+    fireEvent.click(await screen.findByRole("button", { name: "Save 1" }));
+    await screen.findByText("Saved.", { exact: false });
+
+    expect(writeConfig).toHaveBeenCalledTimes(1);
+    expect(writeConfig).toHaveBeenCalledWith({ set: {}, unset: [hoursKey], hub: true });
+  });
+
+  it("clearing a machine key is an unset without -Hub", async () => {
+    schemaRows = [emailRow];
+    configReply = { settings: [machine("email", "a@example.com", "local")] };
+    writeConfig.mockImplementation(reply("success", [machine("email", "", "unset")]));
+    section();
+    clear("email");
+    fireEvent.click(await screen.findByRole("button", { name: "Save 1" }));
+    await screen.findByText("Saved.", { exact: false });
+
+    expect(writeConfig).toHaveBeenCalledTimes(1);
+    expect(writeConfig).toHaveBeenCalledWith({ set: {}, unset: ["email"] });
+  });
+
+  it("a mixed save is two writes: the rest first, then the hub's unsets with -Hub", async () => {
+    schemaRows = [emailRow, hoursRow];
+    configReply = {
+      settings: [machine("email", "a@example.com", "local"), setting(hoursKey, "8", "hub")],
+    };
+    writeConfig.mockImplementation(reply("success"));
+    section();
+    clear("email");
+    clear(hoursKey);
+    fireEvent.click(await screen.findByRole("button", { name: "Save 2" }));
+    await screen.findByText("Saved.", { exact: false });
+
+    expect(writeConfig.mock.calls).toEqual([
+      [{ set: {}, unset: ["email"] }],
+      [{ set: {}, unset: [hoursKey], hub: true }],
+    ]);
+  });
+
+  it("a refusal stops the batch and keeps every draft", async () => {
+    schemaRows = [emailRow, hoursRow];
+    configReply = {
+      settings: [machine("email", "a@example.com", "local"), setting(hoursKey, "8", "hub")],
+    };
+    writeConfig.mockImplementation(reply("error"));
+    section();
+    clear("email");
+    clear(hoursKey);
+    fireEvent.click(await screen.findByRole("button", { name: "Save 2" }));
+    await screen.findByText("Refused.", { exact: false });
+
+    expect(writeConfig).toHaveBeenCalledTimes(1);
+    expect(writeConfig).toHaveBeenCalledWith({ set: {}, unset: ["email"] });
+    expect(screen.getByRole("button", { name: "Save 2" })).toBeTruthy();
   });
 });
