@@ -1067,7 +1067,9 @@ past the size -- none at nine, three at six, six at three
 The setting is written by `Config -Set spaces.<slug>.features.teamSize=<3|6|9> -Hub`, which refuses any
 other number by name (exit 2), and asked in the settings drawer as **How many are in my standup in
 \<Space>?**, three radios -- live on a GitHub Space, where Team Agile's standup runs --, each a pick
-through `PUT /api/config` ([`docs/CONFIGURATION.md`](../CONFIGURATION.md)). The web never reads the
+through `PUT /api/config` ([`docs/CONFIGURATION.md`](../CONFIGURATION.md)). The radios have no way
+back to unset; the drawer's Configuration section does: its row for the setting is a select of
+**Default (9)**, 3, 6 and 9, and Default is `Config -Unset spaces.<slug>.features.teamSize -Hub`. The web never reads the
 setting for the standup: the response says the size and who is present, and the stage draws that.
 
 ## The suggestion: one next move, derived

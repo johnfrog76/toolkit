@@ -23,6 +23,7 @@ import {
   buildRouteParams,
   buildMoveDesignParams,
   buildCoverParams,
+  splitHubUnsets,
 } from "./cliBridge";
 import type { CommandResponse } from "./api.ado";
 
@@ -303,6 +304,33 @@ describe("commandResultMessage", () => {
 // and the verb validates every value against the schema -- so what is pinned
 // here is the one thing the browser decides: the TYPE each form value goes out
 // as, and what an emptied field means.
+
+describe("splitHubUnsets", () => {
+  const hubHeld = (key: string) => key === "spaces.acme.features.teamSize";
+
+  it("sends a cleared Space field the hub holds as its own unset, with -Hub", () => {
+    const edits = [
+      { key: "spaces.acme.features.teamSize", type: "int" as const, value: "" },
+      { key: "email", type: "string" as const, value: "" },
+    ];
+    const { rest, hub } = splitHubUnsets(edits, hubHeld);
+    expect(buildConfigEdit(hub)).toEqual({ set: {}, unset: ["spaces.acme.features.teamSize"] });
+    expect(buildConfigEdit(rest)).toEqual({ set: {}, unset: ["email"] });
+  });
+
+  it("keeps a value, and a field the hub does not hold, in the ordinary write", () => {
+    const edits = [
+      { key: "spaces.acme.features.teamSize", type: "int" as const, value: "6" },
+      { key: "spaces.acme.status", type: "enum" as const, value: "" },
+    ];
+    const { rest, hub } = splitHubUnsets(edits, hubHeld);
+    expect(hub).toEqual([]);
+    expect(buildConfigEdit(rest)).toEqual({
+      set: { "spaces.acme.features.teamSize": 6 },
+      unset: ["spaces.acme.status"],
+    });
+  });
+});
 
 describe("buildConfigEdit", () => {
   it("sends a string field as a string", () => {

@@ -17,11 +17,17 @@ import { HairlineDivider } from "../../shared/HairlineDivider";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { TruncatedDropdown } from "../../shared/TruncatedDropdown";
 import { useGetEnvQuery } from "../../shell/api";
+import { RITUALS } from "../../shell/consts";
 import { reportUnsaved, useSettingsFooter } from "../../shell/settings";
 import { schemaKeyOf, wordsFor } from "./configLabels";
 import { useGetConfigQuery, useGetConfigSchemaQuery, useWriteConfigMutation } from "./api.ado";
 import type { ConfigSchemaRow, ConfigSetting, CommandResponse } from "./api.ado";
-import { buildConfigEdit, commandResultMessage, configEditNeedsRestart } from "./cliBridge";
+import {
+  buildConfigEdit,
+  commandResultMessage,
+  configEditNeedsRestart,
+  splitHubUnsets,
+} from "./cliBridge";
 import type { ConfigFieldEdit } from "./cliBridge";
 import { SettingsRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
@@ -207,6 +213,21 @@ function schemaFor(rows: ConfigSchemaRow[], key: string): ConfigSchemaRow | unde
   return rows.find((r) => r.key === `spaces.<slug>.${field}`);
 }
 
+/**
+ * What a field reads as while nobody has set it, where the contract says.
+ * Keyed by schema row; a field missing here is still offered "Default", with
+ * no value named, because the form will not guess one.
+ */
+const UNSET_READS: Record<string, string> = {
+  "spaces.<slug>.features.teamSize": String(RITUALS.teamSizeDefault),
+};
+
+/** The label of a select's unset entry: "Default (9)", or "Default". */
+function defaultLabel(schemaKey: string): string {
+  const reads = UNSET_READS[schemaKey];
+  return reads ? `Default (${reads})` : "Default";
+}
+
 interface FieldRowProps {
   setting: ConfigSetting;
   row: ConfigSchemaRow | undefined;
@@ -251,15 +272,25 @@ export function FieldRow({ setting, row, draft, onChange, anchor, effective }: F
         {...naming}
       />
     );
-  } else if (type === "enum" && row && row.allowed.length > 0) {
+  } else if (row && row.allowed.length > 0) {
+    // A short list of values is a select whatever the type: an int with
+    // allowed values (the standup's size) as well as an enum. A field that is
+    // not required also offers going back to unset, its first entry, which
+    // the save sends as an unset -- except an enum, whose select is unchanged.
+    const unsetLabel = !row.required && type !== "enum" ? defaultLabel(row.key) : undefined;
     control = (
       <TruncatedDropdown
         size="small"
-        value={value}
+        value={value === "" && unsetLabel ? unsetLabel : value}
         selectedOptions={[value]}
-        onOptionSelect={(_e, d) => onChange(String(d.optionValue))}
+        onOptionSelect={(_e, d) => onChange(String(d.optionValue ?? ""))}
         {...naming}
       >
+        {unsetLabel !== undefined ? (
+          <Option key="" value="" text={unsetLabel}>
+            {unsetLabel}
+          </Option>
+        ) : null}
         {row.allowed.map((allowed) => (
           <Option key={allowed} value={allowed} text={allowed}>
             {allowed}
@@ -338,13 +369,28 @@ export function ConfigSettings() {
     return reply;
   }
 
-  function saveDirty() {
+  async function saveDirty() {
     const edits: ConfigFieldEdit[] = dirtyKeys.map((key) => ({
       key,
       type: schemaFor(schema, key)?.type ?? "string",
       value: drafts[key],
     }));
-    void save(edits);
+    // A Space field the hub holds is unset with -Hub, in its own write.
+    const { rest, hub } = splitHubUnsets(edits, (key) =>
+      settings.some((s) => s.key === key && s.scope === "org" && s.source === "hub"),
+    );
+    const writes = [
+      { payload: buildConfigEdit(rest), hub: false },
+      { payload: buildConfigEdit(hub), hub: true },
+    ].filter((w) => w.payload.unset.length > 0 || Object.keys(w.payload.set).length > 0);
+    setRestartNote(writes.some((w) => configEditNeedsRestart(w.payload)));
+    for (const w of writes) {
+      const reply = await writeConfig(w.hub ? { ...w.payload, hub: true } : w.payload).unwrap();
+      setResult(reply.result);
+      // A refusal stops the batch and keeps every draft, so nothing typed is lost.
+      if (reply.result.status !== "success") return;
+    }
+    setDraftStore({});
   }
 
   function addOrg() {
@@ -391,7 +437,7 @@ export function ConfigSettings() {
             <Button appearance="subtle" onClick={() => setDraftStore({})}>
               Discard
             </Button>
-            <Button appearance="primary" onClick={saveDirty} disabled={isSaving}>
+            <Button appearance="primary" onClick={() => void saveDirty()} disabled={isSaving}>
               {isSaving ? (
                 <Spinner size="tiny" aria-label="Saving..." />
               ) : (

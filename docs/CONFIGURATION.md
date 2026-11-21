@@ -659,6 +659,9 @@ tkConfig -Set spaces.<slug>.features.teamSize=4 -Hub   # refused (exit 2): "... 
 tkConfig -Unset spaces.<slug>.features.teamSize -Hub   # back to nine
 ```
 
+In the settings drawer's Configuration section the row is a select: **Default (9)**, then 3, 6 and 9.
+Default runs the `-Unset` line above, and the row reads `unset` again, as on a new Space.
+
 `Config -Set` is the one writer: the schema row is an `int` with allowed values (`int(3|6|9)` in
 `Config -Schema`), so any other number is a stated refusal whose hint names the three, and nothing is
 written. It is declared in `consts.json` `features.spaceScoped`, so the hub keeps it on the Space's entry
