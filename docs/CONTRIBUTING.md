@@ -160,6 +160,8 @@ Dependabot opens pull requests for the web UI's npm packages, the agent's pip re
 
 The agent's Python requirements are **floors**, not pins: `agent/requirements.txt` and `agent/requirements-dev.txt` say `>=` the version the suites pass on, and Dependabot moves them. The one exception is the linter. `ruff` is pinned exactly (`==`) in `agent/requirements-dev.txt`, so "zero findings" means the same thing tomorrow; moving it is a pull request of its own that fixes whatever the new version finds. The Python version is stated in [QUICKSTART.md](QUICKSTART.md), "Requirements" (3.12 or newer), in the head of both requirements files and as `target-version` in `ruff.toml`.
 
+**After pulling a change to either requirements file, reinstall.** CI installs the files fresh on every run; your environment keeps what it had, so a floor that moved on `main` leaves it below, and the agent's tests go on passing against versions `main` no longer supports. `python -m pip install -r agent/requirements-dev.txt`, with the interpreter the tests run with (`docs/TESTING.md`, "Which Python runs pytest"), brings it up to both files. `tkTest` warns in its summary when a package is below its floor, and `tkEnv`'s `Python packages` line says the same without a run (`docs/TESTING.md`, "What a local run proves about dependency versions").
+
 `pip-audit` checks the requirements against the Python advisory database. It is not itself a requirement, since what it knows comes from the database and not from its version, so it goes in a separate environment and reads the requirements file, which it resolves in a throwaway environment of its own:
 
 ```bash
