@@ -181,3 +181,47 @@ function Resolve-P20TestPython {
     }
     return $result
 }
+
+function Get-P20RequirementFloors {
+    <#
+      Which installed packages are below the agent's requirements files, for one
+      interpreter: Scripts/requirements_floors.py, run BY that interpreter, because
+      the versions that matter are the ones it would import. The files are the one
+      list; this holds none. No network, and it installs nothing.
+
+      Returns $null when it could not ask (no script in this package, or the
+      interpreter answered with something that is not the check's JSON) -- a caller
+      then says nothing new -- or:
+        @{ Findings = @(<one sentence per package>); Fix = '<python> -m pip install -r agent/requirements-dev.txt' }
+      with Findings empty when every package is at or above its floor and the pin
+      is the pinned version.
+
+      -Python is a candidate from Resolve-P20TestPython (@{ Exe; Prefix; Display }).
+      -Files replaces the two requirements files, for a test.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$PackageRoot,
+        [Parameter(Mandatory)]$Python,
+        [string[]]$Files = @()
+    )
+    $script = Join-Path (Join-Path $PackageRoot 'Scripts') 'requirements_floors.py'
+    if (-not (Test-Path -LiteralPath $script -PathType Leaf)) { return $null }
+    # Continue for this call: the interpreter's stderr is not this check's verdict,
+    # and under Stop Windows PowerShell 5.1 turns its first line into a throw.
+    $ErrorActionPreference = 'Continue'
+    $checkArgs = @($Python.Prefix) + @($script, '--json') + @($Files)
+    $text = ''
+    try {
+        $global:LASTEXITCODE = 0
+        $text = (@(& $Python.Exe @checkArgs 2>$null) | ForEach-Object { [string]$_ }) -join "`n"
+    }
+    catch { return $null }
+    $answer = $null
+    try { $answer = $text.Trim() | ConvertFrom-Json } catch { return $null }
+    if ($null -eq $answer -or $null -eq $answer.PSObject.Properties['findings']) { return $null }
+    $found = @()
+    foreach ($f in @($answer.findings)) {
+        if ($null -ne $f -and $f.text) { $found += [string]$f.text }
+    }
+    return @{ Findings = $found; Fix = "$($Python.Display) $($answer.fix)" }
+}

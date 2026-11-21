@@ -1340,6 +1340,15 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   so a garbling default was not tried. `-AsJson` parsed, the first seat `staffed`; a broken `reportsTo` exited 2 with
   the sentence and its `Hint:`. The verb needed `Import-Module` by path, as every module verb does with its flag off in
   the committed config.
+- [ ] **The requirements-floors warning on Windows, under both hosts (Refs #526).** With the agent's requirements
+  installed for the Python `tkTest` uses (`python`, `py -3`, or `.venv-toolkit\Scripts\python.exe`), run `tkEnv` in
+  `powershell` (5.1) and in `pwsh`: you should see `[ok]  Python packages    at or above the floors in
+  agent/requirements*.txt (<that python>)`. Then copy `agent/requirements.txt` to a scratch folder, raise one floor
+  past what is installed (`anthropic>=99.0.0`), and run `python Scripts/requirements_floors.py <the copy>` with the
+  same interpreter: one line, `anthropic <installed> is below >=99.0.0 in requirements.txt`, then `Fix: ...`, exit 0.
+  `tkTest -Half agent` with every package at its floor prints no `Warning:` line. The macOS host proved the check, the
+  Env line and the runner's warning with a stubbed `python`; the `.cmd` stub's route to the check and a real
+  Windows interpreter (the `py -3` prefix, the `Scripts\python.exe` venv) are this row's.
 
 ## Recording a run
 

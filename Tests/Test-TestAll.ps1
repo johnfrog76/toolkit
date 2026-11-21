@@ -608,14 +608,15 @@ exit 0
     function Set-Stub {
         # A fake python or npm in $bin: it prints <name>-out.txt and exits with
         # <name>-exit.txt. python also answers the interpreter probe and the
-        # import probes (httpx fails while bin/nohttpx exists); npm prints what
+        # import probes (httpx fails while bin/nohttpx exists), and the
+        # requirements-floors check with bin/floors-out.txt when there is one; npm prints what
         # its environment says about the webhook and the run marker.
         param([string]$Name, [string]$Out, [int]$Exit = 0)
         [System.IO.File]::WriteAllText((Join-Path $bin "$Name-out.txt"), $Out.Replace("`r`n", "`n"), $enc)
         [System.IO.File]::WriteAllText((Join-Path $bin "$Name-exit.txt"), "$Exit", $enc)
         if ($isWin) {
             if ($Name -eq 'python') {
-                $body = "@echo off`r`nif `"%1`"==`"-m`" goto run`r`necho %2 | findstr /c:`"import sys`" >nul && (echo 3.12.0& exit /b 0)`r`necho %2 | findstr /c:`"import httpx`" >nul && if exist `"%~dp0nohttpx`" exit /b 1`r`nexit /b 0`r`n:run`r`ntype `"%~dp0python-out.txt`"`r`nset /p CODE=<`"%~dp0python-exit.txt`"`r`nexit /b %CODE%`r`n"
+                $body = "@echo off`r`nif `"%1`"==`"-m`" goto run`r`necho %1 | findstr /c:`"requirements_floors.py`" >nul && goto floors`r`necho %2 | findstr /c:`"import sys`" >nul && (echo 3.12.0& exit /b 0)`r`necho %2 | findstr /c:`"import httpx`" >nul && if exist `"%~dp0nohttpx`" exit /b 1`r`nexit /b 0`r`n:floors`r`nif exist `"%~dp0floors-out.txt`" type `"%~dp0floors-out.txt`"`r`nexit /b 0`r`n:run`r`ntype `"%~dp0python-out.txt`"`r`nset /p CODE=<`"%~dp0python-exit.txt`"`r`nexit /b %CODE%`r`n"
             }
             else {
                 $body = "@echo off`r`necho NPM-ARGS: %*`r`necho HOOK=[%TEAMS_WEBHOOK_TESTALL43%] MARKER=[%P20_TEST_RUN%]`r`necho OVERRIDES=[%P20_ACTIVE_SPACE%][%PROMPTS_ROOT%]`r`ntype `"%~dp0npm-out.txt`"`r`nset /p CODE=<`"%~dp0npm-exit.txt`"`r`nexit /b %CODE%`r`n"
@@ -624,7 +625,7 @@ exit 0
         }
         else {
             if ($Name -eq 'python') {
-                $body = "#!/bin/sh`nd=`"`${0%/*}`"`nif [ `"`$1`" = `"-m`" ]; then`n  while IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/python-out.txt`"`n  read code < `"`$d/python-exit.txt`"; exit `$code`nfi`ncase `"`$2`" in`n  *'import sys'*) echo 3.12.0; exit 0;;`n  *'import httpx'*) if [ -f `"`$d/nohttpx`" ]; then exit 1; fi; exit 0;;`nesac`nexit 0`n"
+                $body = "#!/bin/sh`nd=`"`${0%/*}`"`nif [ `"`$1`" = `"-m`" ]; then`n  while IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/python-out.txt`"`n  read code < `"`$d/python-exit.txt`"; exit `$code`nfi`ncase `"`$1`" in`n  *requirements_floors.py) if [ -f `"`$d/floors-out.txt`" ]; then while IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/floors-out.txt`"; fi; exit 0;;`nesac`ncase `"`$2`" in`n  *'import sys'*) echo 3.12.0; exit 0;;`n  *'import httpx'*) if [ -f `"`$d/nohttpx`" ]; then exit 1; fi; exit 0;;`nesac`nexit 0`n"
             }
             else {
                 $body = "#!/bin/sh`nd=`"`${0%/*}`"`necho `"NPM-ARGS: `$*`"`necho `"HOOK=[`$TEAMS_WEBHOOK_TESTALL43] MARKER=[`$P20_TEST_RUN]`"`necho `"OVERRIDES=[`$P20_ACTIVE_SPACE][`$PROMPTS_ROOT]`"`necho `"ISO-HOME=[`$HOME] ISO-TMPDIR=[`$TMPDIR] ISO-CACHE=[`$XDG_CACHE_HOME] ISO-HISTORY=[`$P20_TEST_HISTORY_DIR]`"`nwhile IFS= read -r l || [ -n `"`$l`" ]; do printf '%s\n' `"`$l`"; done < `"`$d/npm-out.txt`"`nread code < `"`$d/npm-exit.txt`"; exit `$code`n"
@@ -741,6 +742,26 @@ exit 0
     Assert-True 'a count that differs from the doc is still exit 0' ($r.Exit -eq 0) "exit $($r.Exit)"
     Assert-True 'and is marked, with the one-line note' ($r.Text -match 'expected 13 passed, 2 skipped; actual 12 passed, 2 skipped\s+\(differs\)' -and $r.Text -match 'Note: agent differs from docs/TEST-COUNTS\.md')
     [System.IO.File]::WriteAllText($docsPath, $docsSame)
+
+    # The requirements' floors: a warning in the summary, never the verdict.
+    # With no finding (above, every run) nothing new is printed; with one, each
+    # package and the fix line, and the exit is what the tests decided.
+    Assert-True 'packages at their floors: no requirements warning' ($r.Text -notmatch 'agent/requirements\*\.txt state') $r.Text
+    Copy-Item (Join-Path $pkgRoot 'Scripts/requirements_floors.py') (Join-Path $pkg 'Scripts')
+    $floorsOut = Join-Path $bin 'floors-out.txt'
+    [System.IO.File]::WriteAllText($floorsOut, '{"findings": [], "fix": "-m pip install -r agent/requirements-dev.txt"}', $enc)
+    $r = Invoke-TestVerb @('-Half', 'agent')
+    Assert-True 'the check answers with nothing below: still no warning' ($r.Exit -eq 0 -and $r.Text -notmatch 'Warning: ') $r.Text
+    [System.IO.File]::WriteAllText($floorsOut, '{"findings": [{"name": "anthropic", "kind": "below", "text": "anthropic 1.15.0 is below >=2.7.0 in agent/requirements.txt"}, {"name": "ruff", "kind": "differs", "text": "ruff 0.17.4 is not the pinned ==0.17.5 in agent/requirements-dev.txt"}], "fix": "-m pip install -r agent/requirements-dev.txt"}', $enc)
+    $r = Invoke-TestVerb @('-Half', 'agent')
+    Assert-True 'a package below its floor: the run still passes, exit 0' ($r.Exit -eq 0 -and $r.Text -match 'Verdict: PASSED -- agent\.') "exit $($r.Exit)`n$($r.Text)"
+    Assert-True 'and the summary names each package, before the verdict' ($r.Text -match 'anthropic 1\.15\.0 is below >=2\.7\.0 in agent/requirements\.txt' -and $r.Text -match 'ruff 0\.17\.4 is not the pinned ==0\.17\.5' -and $r.Text.IndexOf('anthropic 1.15.0') -lt $r.Text.IndexOf('Verdict:')) $r.Text
+    Assert-True 'with the fix line for the interpreter that ran' ($r.Text -match 'Fix: python -m pip install -r agent/requirements-dev\.txt') $r.Text
+    Set-Stub 'python' "===== 1 failed, 11 passed in 1.0s =====" 1
+    $r = Invoke-TestVerb @('-Half', 'agent')
+    Assert-True 'and a red run is still red: the warning decides nothing' ($r.Exit -eq 2 -and $r.Text -match 'anthropic 1\.15\.0') "exit $($r.Exit)"
+    Set-Stub 'python' $pytestGreen 0
+    Remove-Item $floorsOut -Force
 
     # -Half: one half, and the other halves' record kept.
     Set-Stub 'python' "===== 20 passed in 2.0s =====" 0
