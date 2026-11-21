@@ -1,8 +1,8 @@
 """THIRD-PARTY-NOTICES.md is true to the repository.
 
 The live case runs ``Scripts/third_party_notices.py``'s check against this tree: the web list
-generated from ``web/package-lock.json``, every agent requirement named, and every font, picture,
-sound and ``web/public/`` file accounted for. The other cases hand the same functions a made-up
+generated from ``web/package-lock.json``, every agent requirement listed at or above its floor, and
+every font, picture, sound and ``web/public/`` file accounted for. The other cases hand the same functions a made-up
 tree and prove each way the page can go stale is caught, by name.
 
 Stdlib only; no agent import, so it never skips.
@@ -14,6 +14,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from email.message import Message
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -120,6 +121,179 @@ class TestNoticesCases(unittest.TestCase):
         text = "# c\nfastapi>=0.1\nuvicorn[standard]>=0.5  # why\n-r other.txt\n\nPyYAML==6\n"
         self.assertEqual(N.requirement_names(text), ["fastapi", "uvicorn", "PyYAML"])
         self.assertEqual(N.norm("typing_extensions"), N.norm("Typing-Extensions"))
+
+
+# The agent section's table, as --write-agent draws it.
+AGENT_BLOCK = """
+From `agent/requirements.txt`, with the packages they pull in: 3 packages.
+
+| License | Package | Version |
+| --- | --- | --- |
+| MIT | `fastapi` | 0.162.2 |
+| BSD-3-Clause | `uvicorn` | 0.54.0 |
+| Apache-2.0 | `anthropic` | 2.11.0 |
+"""
+
+# One row per input the floor comparison distinguishes: (requirement line, the problem it raises
+# against AGENT_BLOCK, or None when it raises none).
+FLOOR_TABLE = [
+    ("fastapi>=0.163.0", "lists fastapi 0.162.2, below the floor fastapi>=0.163.0"),
+    ("fastapi>=0.162.2", None),
+    ("fastapi>=0.162", None),
+    ("anthropic>=2.7.0", None),
+    ("anthropic>=2.12", "lists anthropic 2.11.0, below the floor anthropic>=2.12"),
+    ("uvicorn[standard]>=0.54.0", None),
+    ("uvicorn[standard]>=0.55.0  # why", "lists uvicorn 0.54.0, below the floor uvicorn>=0.55.0"),
+    ("pydantic>=2.14.3", "requires pydantic, which the agent section does not list"),
+    ("Anthropic>=2.11.0", None),
+    ("anthropic", None),
+]
+
+
+class TestAgentFloors(unittest.TestCase):
+    def test_each_requirement_line_against_the_listed_versions(self):
+        for line, want in FLOOR_TABLE:
+            with self.subTest(line=line):
+                found = N.agent_problems(AGENT_BLOCK, line + "\n")
+                if want is None:
+                    self.assertEqual(found, [])
+                else:
+                    self.assertEqual(len(found), 1, found)
+                    self.assertIn(want, found[0])
+                    self.assertIn(N.REQUIREMENTS, found[0])
+                    self.assertIn("python Scripts/third_party_notices.py --write-agent", found[0])
+
+    def test_the_rows_are_read_by_normalised_name(self):
+        rows = N.listed_agent_packages(AGENT_BLOCK + "| MIT | `typing_extensions` | 4.16.0 |\n")
+        self.assertEqual(rows[N.norm("Typing-Extensions")], ("typing_extensions", "4.16.0"))
+        self.assertNotIn(N.norm("License"), rows)
+
+    def test_a_requirement_line_is_read_without_extras_markers_or_comments(self):
+        table = [
+            ("fastapi>=0.162.2", ("fastapi", set(), [(">=", "0.162.2")], "")),
+            ("uvicorn[standard]>=0.54.0", ("uvicorn", {"standard"}, [(">=", "0.54.0")], "")),
+            ("Foo_Bar[A, b] >=1.0, <2  # note", ("Foo_Bar", {"a", "b"}, [(">=", "1.0"), ("<", "2")], "")),
+            ("x (>=1.2)", ("x", set(), [(">=", "1.2")], "")),
+            ("y>=3; python_version < '3.13'", ("y", set(), [(">=", "3")], "python_version < '3.13'")),
+            ("z", ("z", set(), [], "")),
+        ]
+        for line, want in table:
+            with self.subTest(line=line):
+                self.assertEqual(N.parse_requirement(line), want)
+        for line in ("", "# only a comment", "-r requirements.txt", "--index-url x"):
+            with self.subTest(line=line):
+                self.assertIsNone(N.parse_requirement(line))
+
+    def test_the_floor_is_the_lowest_version_allowed(self):
+        self.assertEqual(N.floor([(">=", "1.2"), ("<", "2")]), "1.2")
+        self.assertEqual(N.floor([("==", "1.4.*")]), "1.4")
+        self.assertEqual(N.floor([("~=", "2.1")]), "2.1")
+        self.assertIsNone(N.floor([("<", "2"), ("!=", "1.5")]))
+        self.assertIsNone(N.floor([]))
+
+    def test_versions_order_as_pep_440_does(self):
+        ascending = ["1.0.dev1", "1.0a1", "1.0b2", "1.0rc1", "1.0", "1.0.post1", "1.1", "1.10", "2.0", "1!0.1"]
+        keys = [N.version_key(v) for v in ascending]
+        self.assertEqual(keys, sorted(keys))
+        self.assertEqual(len(set(keys)), len(keys))
+        self.assertEqual(N.version_key("2.0"), N.version_key("2.0.0"))
+        self.assertLess(N.version_key("0.162.2"), N.version_key("0.163"))
+        self.assertIsNone(N.version_key("not-a-version"))
+
+
+class Dist:
+    """A stand-in for an installed distribution: a version and its METADATA headers."""
+
+    def __init__(self, name, version, *headers):
+        self.version = version
+        self.metadata = Message()
+        self.metadata["Name"] = name
+        for key, value in headers:
+            self.metadata[key] = value
+
+
+def installed(*dists):
+    table = {N.norm(d.metadata["Name"]): d for d in dists}
+
+    def distribution(name):
+        if N.norm(name) not in table:
+            raise LookupError(name)
+        return table[N.norm(name)]
+
+    return distribution
+
+
+ENV = dict(N.marker_environment(), sys_platform="linux", python_version="3.12", python_full_version="3.12.4")
+
+
+class TestAgentResolve(unittest.TestCase):
+    def test_the_walk_follows_markers_and_only_the_extras_asked_for(self):
+        found = N.resolve_agent_packages(
+            "web>=1.0\nsrv[standard]>=0.5\n",
+            installed(
+                Dist("web", "1.2", ("License-Expression", "MIT"), ("Requires-Dist", "core>=2"),
+                     ("Requires-Dist", "old; python_version < '3.11'"), ("Requires-Dist", "full; extra == 'all'")),
+                Dist("srv", "0.6", ("License", "BSD-3-Clause"), ("Requires-Dist", "fast; extra == 'standard'"),
+                     ("Requires-Dist", "loop; sys_platform != 'win32' and extra == 'standard'")),
+                Dist("core", "2.1", ("License", "MIT License"),
+                     ("Classifier", "License :: OSI Approved :: Apache Software License"),
+                     ("Classifier", "License :: OSI Approved :: MIT License"), ("Requires-Dist", "web")),
+                Dist("fast", "3", ("License-Expression", "ISC")),
+                Dist("loop", "0.1", ("License-Expression", "MIT")),
+            ),
+            ENV,
+        )  # fmt: skip
+        self.assertEqual(
+            found,
+            [
+                ("core", "2.1", "MIT OR Apache-2.0"),
+                ("fast", "3", "ISC"),
+                ("loop", "0.1", "MIT"),
+                ("srv", "0.6", "BSD-3-Clause"),
+                ("web", "1.2", "MIT"),
+            ],
+        )
+
+    def test_a_missing_or_too_old_requirement_stops_the_walk_by_name(self):
+        with self.assertRaisesRegex(LookupError, "web .*not installed"):
+            N.resolve_agent_packages("web>=1\n", installed(), ENV)
+        with self.assertRaisesRegex(LookupError, "web 0.9 is installed, below the floor 1"):
+            N.resolve_agent_packages("web>=1\n", installed(Dist("web", "0.9", ("License-Expression", "MIT"))), ENV)
+
+    def test_a_license_nobody_declared_is_refused_rather_than_guessed(self):
+        with self.assertRaisesRegex(LookupError, "odd: .*no license classifier"):
+            N.package_license(Dist("odd", "1", ("License", "see the LICENSE file")).metadata)
+        with self.assertRaisesRegex(LookupError, "unknown classifier"):
+            N.package_license(Dist("odd", "1", ("Classifier", "License :: Other/Proprietary License")).metadata)
+
+    def test_markers_read_as_pep_508_does(self):
+        table = [
+            ("", True),
+            ("python_version < '3.13'", True),
+            ("python_version >= '3.13'", False),
+            ("python_full_version >= '3.12.4'", True),
+            ("sys_platform != 'win32' and (sys_platform != 'cygwin' and platform_python_implementation != 'PyPy')",
+             ENV["platform_python_implementation"] != "PyPy"),
+            ("sys_platform == 'win32' or python_version == '3.12'", True),
+            ("extra == 'standard'", False),
+            ("'linux' in sys_platform", True),
+            ("sys_platform not in 'win32 cygwin'", True),
+        ]  # fmt: skip
+        for marker, want in table:
+            with self.subTest(marker=marker):
+                self.assertEqual(N.marker_holds(marker, ENV), want)
+        self.assertTrue(N.marker_holds("extra == 'Standard'", dict(ENV, extra="standard")))
+        with self.assertRaises(ValueError):
+            N.marker_holds("python_version <", ENV)
+
+    def test_the_block_states_the_python_the_platform_and_the_date(self):
+        block = N.render_pip_block(
+            [("a", "1", "MIT"), ("b", "2", "ISC"), ("c", "3", "MIT")], "3.12.4", "Linux", "2026-01-02"
+        )
+        self.assertIn("3 packages", block)
+        self.assertIn("Python 3.12.4 (Linux) on 2026-01-02", block)
+        self.assertLess(block.index("| MIT | `c` | 3 |"), block.index("| ISC | `b` | 2 |"))
+        self.assertEqual(N.listed_agent_packages(block)["b"], ("b", "2"))
 
 
 class TestNoticesAreTrueOnACrlfCheckout(unittest.TestCase):
