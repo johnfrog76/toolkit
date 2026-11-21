@@ -10,14 +10,16 @@ The scans, so they can be repeated:
 ```bash
 cd web && npx license-checker@25.0.1 --production --summary    # the web bundle's packages
 npm run license:check                                          # the same scan, failing on any license not listed below
-python -m venv .venv && .venv/bin/pip install -r agent/requirements.txt pip-licenses && .venv/bin/pip-licenses
+python -m venv .venv && .venv/bin/pip install -r agent/requirements.txt                  # the agent's packages, then
+.venv/bin/python Scripts/third_party_notices.py --write-agent                            # their versions and licenses, below
 ```
 
 (On Windows the interpreter is `python` and the venv's scripts are under `.venv\Scripts\`.)
 
 This page is held true by `python Scripts/third_party_notices.py --check` (and `Tests/test_third_party_notices.py`,
 which runs it): the web list below is generated from `web/package-lock.json` and `--write` rewrites it; the agent's
-requirements must all be named; and every font, picture or sound file in the repository, and every file
+list is generated from the installed requirements by `--write-agent`, and must name every requirement at or above its
+floor; and every font, picture or sound file in the repository, and every file
 served from `web/public/`, must be covered by an entry under "Fonts, artwork and audio".
 
 ## Web UI (`web/`), production dependencies
@@ -347,36 +349,44 @@ on a developer's machine or in CI and never reach a user's browser.
 
 ## Agent (`agent/`), runtime dependencies
 
-From `agent/requirements.txt`, with the packages they pull in, as resolved by `pip-licenses` on Python 3.12
-on 2026-10-10 (the requirements are lower bounds, so a later install may resolve newer versions):
+The list below is generated; do not edit it by hand. A change to `agent/requirements.txt` regenerates it in the
+same change, from an environment with the requirements installed.
+
+<!-- notices:pip begin -->
+
+From `agent/requirements.txt`, with the packages they pull in: 27 packages, as resolved from the installed packages on Python 3.15.0 (macOS) on 2026-11-21. The requirements are lower bounds, so a later install may resolve newer versions, and a package behind a platform marker is listed as it resolved on that platform.
 
 | License | Package | Version |
 | --- | --- | --- |
-| MIT | `fastapi` | 0.143.0 |
-| MIT | `pydantic` | 2.14.0 |
-| MIT | `pydantic_core` | 2.50.0 |
-| MIT | `anyio` | 4.15.1 |
 | MIT | `annotated-doc` | 0.0.5 |
 | MIT | `annotated-types` | 0.8.0 |
-| MIT | `typing-inspection` | 0.4.4 |
+| MIT | `anyio` | 4.15.1 |
+| MIT | `docstring_parser` | 0.18.0 |
+| MIT | `fastapi` | 0.165.0 |
+| MIT | `h11` | 0.16.0 |
 | MIT | `httptools` | 0.9.0 |
 | MIT | `jiter` | 0.17.0 |
-| MIT | `anthropic` | 1.13.0 |
-| MIT | `docstring_parser` | 0.18.0 |
-| MIT | `h11` | 0.16.0 |
+| MIT | `pydantic` | 2.14.4 |
+| MIT | `pydantic_core` | 2.50.5 |
 | MIT | `PyYAML` | 6.0.3 |
+| MIT | `truststore` | 0.10.5 |
+| MIT | `typing-inspection` | 0.4.4 |
 | MIT | `watchfiles` | 1.3.0 |
-| BSD-3-Clause | `uvicorn` | 0.54.0 |
-| BSD-3-Clause | `starlette` | 1.7.0 |
 | BSD-3-Clause | `click` | 8.5.0 |
-| BSD-3-Clause | `httpx2` | 2.13.1 |
 | BSD-3-Clause | `httpcore2` | 2.13.1 |
+| BSD-3-Clause | `httpx2` | 2.13.1 |
 | BSD-3-Clause | `idna` | 3.20 |
 | BSD-3-Clause | `python-dotenv` | 1.2.4 |
+| BSD-3-Clause | `starlette` | 1.8.0 |
+| BSD-3-Clause | `uvicorn` | 0.54.0 |
 | BSD-3-Clause | `websockets` | 17.2 |
+| Apache-2.0 | `anthropic` | 2.11.0 |
 | Apache-2.0 | `opentelemetry-api` | 1.45.1 |
-| Apache-2.0 and MIT (dual) | `sniffio` | 1.3.1 |
+| MIT OR Apache-2.0 | `sniffio` | 1.3.1 |
+| MIT OR Apache-2.0 | `uvloop` | 0.23.0 |
 | PSF-2.0 | `typing_extensions` | 4.16.0 |
+
+<!-- notices:pip end -->
 
 The agent's test dependencies (`agent/requirements-dev.txt`) are not installed for a user: `pytest`, `pluggy`,
 `iniconfig` and `colorama` (MIT or BSD), `packaging` (Apache-2.0 or BSD-2-Clause), `Pygments` (BSD-2-Clause),
