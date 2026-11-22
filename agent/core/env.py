@@ -43,6 +43,7 @@ from .config import (
 )
 from .hosts import host_env_block
 from .identity import identity_block, identity_cache_clear
+from .signin import sign_in_block, signin_cache_clear
 from .tier import _resolve_tier, probe_cache_clear
 
 api = APIRouter()
@@ -115,7 +116,10 @@ def _identity_check(identity: dict, ado_on: bool) -> dict:
         return {"ok": True, "detail": f"{email} (from {identity['source']})"}
     if not ado_on:
         return {"ok": True, "detail": "not set -- only Azure DevOps uses it"}
-    return {"ok": False, "detail": "no identity -- set `email` in config.local.json, or run `az login`"}
+    return {
+        "ok": False,
+        "detail": f"no identity -- set `email` in config.local.json, or run `{consts.az_login_command()}`",
+    }
 
 
 def _ado_access_check(space_status: str, org_url: str, reachable: bool) -> dict:
@@ -149,6 +153,7 @@ class _Probe:
     ado_reachable: bool
     bridge_host: dict
     identity: dict
+    sign_in: dict
 
 
 async def _probe(cfg: dict, refresh: int) -> _Probe:
@@ -199,6 +204,11 @@ async def _probe(cfg: dict, refresh: int) -> _Probe:
     # costs one probe.
     identity = await asyncio.to_thread(identity_block, bool(refresh))
 
+    # Check 9: the sign-in strip's state -- whether az is installed and signed in, asked
+    # only on an active Azure DevOps Space (core/signin.py). Off the event loop for the
+    # same reason; behind the same TTL.
+    sign_in = await asyncio.to_thread(sign_in_block, org_url, cfg.get("status", ""), bool(refresh))
+
     return _Probe(
         prompts_readable=prompts_readable,
         prompts_writable=prompts_writable,
@@ -208,6 +218,7 @@ async def _probe(cfg: dict, refresh: int) -> _Probe:
         ado_reachable=ado_reachable,
         bridge_host=bridge_host,
         identity=identity,
+        sign_in=sign_in,
     )
 
 
@@ -458,6 +469,10 @@ async def get_env(refresh: int = 0):
         # {email, source} -- source is "config", "branchUser", "az" or "" when
         # nothing answered. tkEnv prints the same two facts.
         "identity": identity,
+        # Whether the sign-in strip is shown: {needed, installed, signedIn, command}. The
+        # key is the contract's (consts.json signIn.envField) and the command is its
+        # azCommand; the web draws the strip from `needed` and runs nothing.
+        consts.sign_in_env_field(): probe.sign_in,
         "uptime": int(time.monotonic()),
         "checks": _checks(cfg, probe, ado_on),
         # storeSync and, under git, the hub's distance from its remote:
@@ -506,4 +521,5 @@ async def switch_mode(body: SwitchModeRequest):
     # different address.
     probe_cache_clear()
     identity_cache_clear()
+    signin_cache_clear()
     return await get_env(refresh=1)

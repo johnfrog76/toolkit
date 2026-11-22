@@ -423,6 +423,9 @@ EXPECTED = {
     # Claude Code usage: /env's flag (the inventory row's key) and the burn route.
     ("usage", "envFlag"): "claudeUsage",
     ("usage", "burnRoute"): "/api/usage/burn",
+    # The Azure DevOps sign-in: the one command all three halves name, and /env's field for the strip.
+    ("signIn", "azCommand"): "az login --allow-no-subscriptions",
+    ("signIn", "envField"): "azSignIn",
     # The statuses a reply may set, per tracker.
     ("replyStatuses", "ado"): ["fixed", "active", "pending", "byDesign", "wontFix", "closed"],
     ("replyStatuses", "github"): ["fixed", "closed", "active"],
@@ -475,6 +478,7 @@ class TheFileParses(unittest.TestCase):
             "design",
             "rituals",
             "startWork",
+            "signIn",
             "billing",
             "assets",
             "tests",
@@ -635,6 +639,8 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.gh_read_limit_all_issues(), EXPECTED[("ghReads", "allIssues")])
         self.assertEqual(C.gh_read_limit_labels(), EXPECTED[("ghReads", "labels")])
         self.assertEqual(list(C.gh_repo_missing_markers()), EXPECTED[("ghReads", "repoMissing")])
+        self.assertEqual(C.az_login_command(), EXPECTED[("signIn", "azCommand")])
+        self.assertEqual(C.sign_in_env_field(), EXPECTED[("signIn", "envField")])
         self.assertEqual(C.usage_env_flag(), EXPECTED[("usage", "envFlag")])
         self.assertEqual(C.usage_burn_route(), EXPECTED[("usage", "burnRoute")])
         self.assertEqual(C.usage_readings_folder(), EXPECTED[("usage", "readingsFolder")])
@@ -758,6 +764,8 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("ghReads.openIssues", '"--limit", "100"'),
         ("ghReads.allIssues", '"--limit", "300"'),
         ("usage.burnRoute", "/api/usage/burn"),
+        # The sign-in command: said through az_login_command(), never typed in a hint.
+        ("signIn.azCommand", "az login --allow-no-subscriptions"),
         ("usage.unpricedPhrase", "not counting"),
         # Daily's window sentences: the route reads them through billing_text().
         ("billing.text.halfWindow", "-Since and -Until go together"),

@@ -33,6 +33,7 @@ import {
   TESTS,
   TOKENS,
   REPLY_STATUSES_BY_TRACKER,
+  SIGN_IN,
   USAGE,
   VISIBILITY,
   toRegExp,
@@ -506,6 +507,14 @@ describe("consts.json", () => {
       unpricedPhrase: "not counting",
     });
 
+    // The Azure DevOps sign-in: the one command all three halves name, and /env's field for the strip.
+    const { _: signInDoc, ...signInKeys } = SIGN_IN as typeof SIGN_IN & { _: string };
+    expect(signInDoc).toMatch(/Said and checked, never run/);
+    expect(signInKeys).toEqual({
+      azCommand: "az login --allow-no-subscriptions",
+      envField: "azSignIn",
+    });
+
     // The org chart's hub file (docs/hub/org.md): the name all three halves type from here.
     const { _: orgDoc, ...orgKeys } = ORG as typeof ORG & { _: string };
     expect(orgDoc).toMatch(/docs\/hub\/org\.md/);
@@ -569,6 +578,7 @@ describe("consts.json", () => {
         "reviews",
         "rituals",
         "spaces",
+        "signIn",
         "stamps",
         "startWork",
         "status",
@@ -715,6 +725,8 @@ describe("no half retypes a contract literal", () => {
     ["studio.promptsRoute", STUDIO.promptsRoute],
     ["studio.ledgerRoute", STUDIO.ledgerRoute],
     // The burn tile's read: the System page asks the route by the contract's name.
+    // The sign-in command: the strip shows what /env serves, and nothing types it.
+    ["signIn.azCommand", SIGN_IN.azCommand],
     ["usage.burnRoute", USAGE.burnRoute],
     ["usage.unpricedPhrase", USAGE.unpricedPhrase],
     ["visibility.publicLine", VISIBILITY.publicLine],

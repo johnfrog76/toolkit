@@ -1242,6 +1242,14 @@ mid-session, a banner sits over the last-known page and says nothing can be save
 heard one names the verb and points at the quick start. **A card must still tell a failed load from
 an empty answer**: Daily said "No billing activity found" for a week it had not read.
 
+**Sign in to Azure DevOps.** A third thing the shell says for itself, drawn by `src/shell/SignInStrip.tsx`
+above the routes: a short, neutral strip -- a status, never an alert, in the page's own surface and
+stroke -- with the command to copy and **Check again**, which is the System card's refresh
+(`useRefreshEnvMutation`, `GET /api/env?refresh=1`). It draws only where `/env`'s `azSignIn.needed` is
+true (an active Azure DevOps Space, `az` installed and not signed in); the agent derives it and the web
+re-derives nothing. The command is `consts.json` `signIn.azCommand`; the app shows it and never runs it
+(`SignInStrip.test.tsx`, and the grid row in `scenarios.test.tsx`).
+
 **There is no such page.** A `path="*"` route. `dormantOwner()` in the registry hands back the
 switched-off module that owns the path, so a bookmark to `/growth` with growth off says "That page is
 switched off" and opens Settings, and a stray address says "There is no page here". The shell still

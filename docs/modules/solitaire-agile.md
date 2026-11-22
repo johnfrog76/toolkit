@@ -1081,6 +1081,12 @@ nothing waits -- "Waiting on you" is the chair's obligation and stays first; the
 Next: #141 is opus-sized and well defined -- send it to the crew? (tkStartWork 141)
 ```
 
+**Signing in is not a suggestion here.** A signed-out Azure DevOps Space does not make signing in the chair's
+next move, because Team Agile cannot be on in one: an Azure DevOps Space's answer to "How do you want to
+work?" is `team`, derived and locked, and the module is on only where the answer is `agents`
+([the switch](#the-switch-and-its-scope)). The sign-in is said where it can be: the shell's
+"Sign in to Azure DevOps" strip, with the command to copy ([`ado.md`](ado.md#signing-in)).
+
 **The input** is the open work of the Space as the standup joins it: an open issue is one item, and a
 card in `current/` whose id is that issue's number adds its lane (Active without one); a card with an id
 of its own is its own item; a not-billable card is an item that is excluded first. An issue's severity and

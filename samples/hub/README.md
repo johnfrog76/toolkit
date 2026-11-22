@@ -30,7 +30,7 @@ Beside it is the **GitHub demo**: the same RecipeBox, tracked on a small public 
 link to that repo's issues. It is `local` too until you want it: sign in with `gh` and connect it from
 the tip on Home (or `Connect github-demo`), or point it at a repo of your own. And the **Azure demo**
 (its folder is `azure-demo/`) is ready for YOUR Azure DevOps organisation: give it the address from its tip on
-Home (or `Connect azure-demo -Address https://dev.azure.com/<your-org>`) and sign in with `az login`. None of
+Home (or `Connect azure-demo -Address https://dev.azure.com/<your-org>`) and sign in with `az login --allow-no-subscriptions`. None of
 this is required.
 
 | Folder | What is in it |

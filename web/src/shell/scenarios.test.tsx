@@ -56,6 +56,7 @@ import { DeckState } from "../modules/deck/decks/types";
 import type { StatusResponse } from "../modules/ado/api.ado";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { AvatarMenu } from "./AvatarMenu";
+import { signInCommand } from "./SignInStrip";
 import { SPACE_QUICK_MENU_THRESHOLD } from "./SpaceQuickMenu";
 import {
   SPACES_FILTERS,
@@ -67,7 +68,7 @@ import {
   spaceLifecycleActions,
 } from "../modules/studio/foyer";
 import { visibilityLabel } from "../shared/visibility";
-import { RITUALS, STATUS, USAGE, VISIBILITY } from "./consts";
+import { RITUALS, SIGN_IN, STATUS, USAGE, VISIBILITY } from "./consts";
 import {
   WORKFLOW_ENTRIES,
   answerLive,
@@ -1472,5 +1473,25 @@ describe("the scenario grid: the Decks card, by what this machine has archived",
     expect(deckListView(shipped, archived, ARCHIVED_FILTER).shown.map((d) => d.id)).toEqual(
       underArchived,
     );
+  });
+});
+
+describe("the scenario grid: the sign-in strip, by Space and sign-in state", () => {
+  // The agent derives `needed` (Tests/test_signin.py holds the same rows); the web draws the
+  // strip from it and the command is the contract's, never typed here.
+  const sign = (needed: boolean, installed: boolean | null, signedIn: boolean | null) =>
+    ({
+      azSignIn: { needed, installed, signedIn, command: SIGN_IN.azCommand },
+    }) as unknown as EnvStatus;
+  it.each<[string, EnvStatus | undefined, boolean]>([
+    ["Azure DevOps, active, az signed out", sign(true, true, false), true],
+    ["Azure DevOps, active, az signed in", sign(false, true, true), false],
+    ["Azure DevOps, active, az not installed", sign(false, false, null), false],
+    ["Azure DevOps, local or archived (az not asked)", sign(false, null, null), false],
+    ["GitHub, any status (az not asked)", sign(false, null, null), false],
+    ["no tracker", sign(false, null, null), false],
+    ["an older agent that serves no field", {} as unknown as EnvStatus, false],
+  ])("%s", (_name, env, shown) => {
+    expect(signInCommand(env)).toBe(shown ? SIGN_IN.azCommand : null);
   });
 });

@@ -20,7 +20,7 @@ The boxes below are the connect journey. Tick them as you go; nothing here is re
 
 ## Acceptance Criteria
 - [ ] Give this Space your organisation's address (`https://dev.azure.com/<your-org>`) -- that makes it active
-- [ ] Sign in with `az login` yourself; the wizard checks it and never runs it
+- [ ] Sign in with `az login --allow-no-subscriptions` yourself; the wizard checks it and never runs it
 - [ ] Discover your organisation's projects and tick the ones this Space covers
 - [ ] Turn on sprint awareness if your board has iterations
 - [ ] Make a card from a real work item: `NewPrompt <id>`

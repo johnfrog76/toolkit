@@ -277,7 +277,7 @@ config file, and a build that asked for the port would refuse.
   `MyPRs`, `Dashboard`, `MyWork`, and the agent's `/api/prs`, `/api/dashboard` and
   `/api/work-items`. **Set it, and you will not depend on the fallback.** With it empty, both
   halves take `branchUser` when it is an address, and otherwise ask `az account show --query user.name -o tsv` -- which is right when you are
-  signed in and slow when you are not, and a machine that has never run `az login` then has no
+  signed in and slow when you are not, and a machine that has never signed in (`az login --allow-no-subscriptions`) then has no
   identity at all. It is per machine by construction: `config.local.json` is gitignored and
   `config.default.json` ships `""` and must (the Portability suite fails the build over a real
   address). The System card's **Identity** row shows the address and whether it came from
@@ -547,6 +547,8 @@ contract instead, `consts.json` `startWork.text`, because the web shows what the
 `startWork.launchEnvFlag` (`startWorkLaunch`): the name of the top-level boolean `GET /api/env` carries for
 `StartWork <id> -Launch`, which the agent serves and the copy box reads before it draws its second button,
 **Launch** -- absent reads as off.
+
+The Azure DevOps sign-in is the contract too, `consts.json` `signIn`: `azCommand` (`az login --allow-no-subscriptions`), the one command `Setup`, `Env`, `Connect` and the web's sign-in strip say, and `envField` (`azSignIn`), the name of the object `GET /api/env` carries for the strip ([`docs/modules/ado.md`](modules/ado.md#signing-in)). It is said and checked, never run.
 
 ## `startWorkLaunch` -- whether `StartWork -Launch` can start a session
 
