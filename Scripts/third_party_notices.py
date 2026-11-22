@@ -40,6 +40,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+# A requirement line, a name and a version are read by the shared module beside this script, the
+# one reading Scripts/requirements_floors.py uses too. Its folder goes on the path so the import
+# works however this file is loaded (run, or by path).
+_HERE = str(Path(__file__).resolve().parent)
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+from requirement_rules import normalise_name as norm  # noqa: E402
+from requirement_rules import parse_requirement, version_key  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 NOTICES = "THIRD-PARTY-NOTICES.md"
 LOCKFILE = "web/package-lock.json"
@@ -170,38 +179,9 @@ def covers(entry, rel):
     return rel == entry
 
 
-def norm(name):
-    return re.sub(r"[-_.]+", "-", name).lower()
-
-
-# -- Requirements, versions and markers, without the packaging library -------------------------
-
-_REQ = re.compile(
-    r"^\s*(?P<name>[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)\s*"
-    r"(?:\[(?P<extras>[^\]]*)\])?\s*"
-    r"(?:\((?P<pspec>[^)]*)\)|(?P<spec>[^;]*))?"
-    r"(?:;(?P<marker>.*))?$"
-)
-
-
-def parse_requirement(line):
-    """(name, extras, [(op, version)], marker) for one requirement line, or None for a line that
-    names nothing: a blank, a comment, or an option such as ``-r other.txt``. The extras are a set
-    of normalised names; the marker is its text, or "" when there is none."""
-    line = re.split(r"(?:^|\s)#", line, maxsplit=1)[0].strip()
-    if not line or line.startswith("-"):
-        return None
-    m = _REQ.match(line)
-    if not m:
-        return None
-    extras = {norm(e.strip()) for e in (m.group("extras") or "").split(",") if e.strip()}
-    spec = m.group("pspec") if m.group("pspec") is not None else (m.group("spec") or "")
-    specs = []
-    for clause in spec.split(","):
-        c = re.match(r"\s*(===|==|!=|<=|>=|~=|<|>)\s*(\S+)\s*$", clause)
-        if c:
-            specs.append((c.group(1), c.group(2)))
-    return m.group("name"), extras, specs, (m.group("marker") or "").strip()
+# -- Requirements and markers, without the packaging library --------------------------------------
+# A line, a name and a version are read by Scripts/requirement_rules.py; the walk and the markers
+# are this script's own.
 
 
 def requirements(text):
@@ -219,43 +199,6 @@ def floor(specs):
         if op in (">=", "==", "===", "~="):
             return version.rstrip(".*")
     return None
-
-
-_VERSION = re.compile(
-    r"^\s*v?(?:(?P<epoch>\d+)!)?(?P<release>\d+(?:\.\d+)*)"
-    r"(?:[-_.]?(?P<pre>a|b|c|rc|alpha|beta|pre|preview)[-_.]?(?P<pren>\d*))?"
-    r"(?:-(?P<postn1>\d+)|[-_.]?(?P<post>post|rev|r)[-_.]?(?P<postn2>\d*))?"
-    r"(?:[-_.]?(?P<dev>dev)[-_.]?(?P<devn>\d*))?"
-    r"(?:\+[a-z0-9.]*)?\s*$",
-    re.IGNORECASE,
-)
-_PRE = {"a": 0, "alpha": 0, "b": 1, "beta": 1, "c": 2, "rc": 2, "pre": 2, "preview": 2}
-
-
-def version_key(text):
-    """A sortable key for a PEP 440 version, or None when the text is not one. Orders
-    X.devN < X.aN < X.bN < X.rcN < X < X.postN, and 2.0 equals 2.0.0."""
-    m = _VERSION.match(text or "")
-    if not m:
-        return None
-    release = [int(p) for p in m.group("release").split(".")]
-    while len(release) > 1 and release[-1] == 0:
-        release.pop()
-    post = m.group("postn1") or (m.group("postn2") or "0" if m.group("post") else None)
-    dev = m.group("devn") or "0" if m.group("dev") else None
-    if m.group("pre"):
-        pre = (0, _PRE[m.group("pre").lower()], int(m.group("pren") or 0))
-    elif dev is not None and post is None:
-        pre = (-1,)
-    else:
-        pre = (1,)
-    return (
-        int(m.group("epoch") or 0),
-        tuple(release),
-        pre,
-        (-1,) if post is None else (int(post),),
-        (1, 0) if dev is None else (0, int(dev)),
-    )
 
 
 def marker_environment(extra=""):
