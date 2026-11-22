@@ -22,6 +22,7 @@
  */
 import workflows from "@workflows";
 import type { SurfaceRow } from "./api";
+import { defaultLabel } from "./settingDefaults";
 
 export type WorkflowDoor = "change" | "walk" | "sentence";
 export type SurfaceState = SurfaceRow["state"];
@@ -115,6 +116,33 @@ export function answerTarget(entry: WorkflowEntry, activeSpace: string): string 
  *  the agent resolves (/env howIWork) rather than reads off the Space. */
 export function asksHowIWork(entry: WorkflowEntry): boolean {
   return !!entry.answerKey?.endsWith(".howIWork");
+}
+
+/** The schema key an asking entry writes: `spaces.<slug>.features.teamSize`,
+ *  the shape GET /api/config/schema serves and the Configuration rows match. */
+export function answerSchemaKey(entry: WorkflowEntry): string | undefined {
+  return entry.answerKey?.replace("{slug}", "<slug>");
+}
+
+/** The words under the way back to unset. */
+export const UNSET_SENTENCE = "Unset, as a new Space starts.";
+
+/** The radios an asking entry draws: its answers, and first, for any entry
+ *  but howIWork, the way back to unset -- value "" (the save sends it as
+ *  `Config -Unset <answerKey> -Hub`), labelled as the select's Default entry
+ *  is, and live wherever one of the answers is. How do you want to work? has
+ *  none: what it checks is the agent's resolved answer, which is never unset. */
+export function answerChoices(entry: WorkflowEntry): WorkflowAnswer[] {
+  const answers = entry.answers ?? [];
+  const key = answerSchemaKey(entry);
+  if (!key || asksHowIWork(entry) || answers.length === 0) return answers;
+  const live = [...new Set(answers.flatMap((a) => a.live))];
+  return [{ label: defaultLabel(key), value: "", sentence: UNSET_SENTENCE, live }, ...answers];
+}
+
+/** The asking entry for a schema key, if one asks it. */
+export function entryAsking(schemaKey: string): WorkflowEntry | undefined {
+  return WORKFLOW_ENTRIES.find((e) => !!e.answers && answerSchemaKey(e) === schemaKey);
 }
 
 /** The value a Space's own entry holds at an asking entry's key -- the key after

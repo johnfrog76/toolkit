@@ -70,6 +70,7 @@ import { visibilityLabel } from "../shared/visibility";
 import { RITUALS, STATUS, USAGE, VISIBILITY } from "./consts";
 import {
   WORKFLOW_ENTRIES,
+  answerChoices,
   answerLive,
   answerStored,
   answerTarget,
@@ -941,12 +942,15 @@ describe("the scenario grid: what each configuration shows", () => {
   });
 
   // "How many are in my standup in <Space>?" (docs/SCENARIOS.md, the "How do I…"
-  // section): the Space's own spaces[].features.teamSize checks its radio -- none
-  // while unset, when the room is nine -- and the sizes are live where Team Agile's
-  // standup runs, a GitHub Space. The web never re-reads the size for the standup:
-  // the response says team.size and who is present.
+  // section): Default first, the way back to unset, checked while the Space's own
+  // spaces[].features.teamSize is unset (the room is then nine), else the size's
+  // own radio -- and every radio is live where Team Agile's standup runs, a GitHub
+  // Space. Default writes an unset. The web never re-reads the size for the
+  // standup: the response says team.size and who is present.
   it("How many are in my standup in <Space>?: the Space's size is checked, live on GitHub", () => {
     const entry = WORKFLOW_ENTRIES.find((e) => e.id === "team-size")!;
+    const unset = `Default (${RITUALS.teamSizeDefault})`;
+    const choices = answerChoices(entry);
     const cases: [string, Tracker, number | undefined][] = [
       ["GitHub, nothing set", "github", undefined],
       ["GitHub, 6", "github", 6],
@@ -955,30 +959,30 @@ describe("the scenario grid: what each configuration shows", () => {
     ];
     const grid = cases.map(([name, tracker, size]) => {
       const space = { slug: "x", features: size === undefined ? {} : { teamSize: size } };
-      const checked = entry.answers!.find((a) => a.value === answerStored(entry, space))?.label;
-      const live = entry.answers!.filter((a) => answerLive(a, tracker, false)).map((a) => a.label);
-      const writes = live.length ? `${answerTarget(entry, "x")}=<size> -Hub` : "nothing";
+      const stored = answerStored(entry, space) ?? "";
+      const checked = choices.find((a) => a.value === stored)?.label;
+      const live = choices.filter((a) => answerLive(a, tracker, false)).map((a) => a.label);
+      const target = answerTarget(entry, "x");
+      const writes = live.length
+        ? `${target}=<size> -Hub; Default: -Unset ${target} -Hub`
+        : "nothing";
       return [name, checked ?? "none", live, entry.why?.[tracker] ?? "", writes];
     });
+    const writes =
+      "spaces.x.features.teamSize=<size> -Hub; Default: -Unset spaces.x.features.teamSize -Hub";
     expect(grid).toEqual([
-      [
-        "GitHub, nothing set",
-        "none",
-        ["3", "6", "9"],
-        "",
-        "spaces.x.features.teamSize=<size> -Hub",
-      ],
-      ["GitHub, 6", "6", ["3", "6", "9"], "", "spaces.x.features.teamSize=<size> -Hub"],
+      ["GitHub, nothing set", unset, [unset, "3", "6", "9"], "", writes],
+      ["GitHub, 6", "6", [unset, "3", "6", "9"], "", writes],
       [
         "Azure DevOps",
-        "none",
+        unset,
         [],
         "Team Agile's standup is a GitHub Space's; this Space's tracker is Azure DevOps.",
         "nothing",
       ],
       [
         "no tracker",
-        "none",
+        unset,
         [],
         "Team Agile's standup is a GitHub Space's; connect a tracker to hold one.",
         "nothing",

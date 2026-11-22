@@ -290,21 +290,22 @@ under the radios. With *With agents* chosen and Team Agile's own switch off, one
 waits for the switch.
 
 **How many are in my standup in `<Space>`?** is the second question that is asked, and the answer is
-the Space's too: three radios -- *3*, *6*, *9*, the room with the chair counted -- live where Team Agile's
-standup runs. What is checked is the Space's own `spaces.<slug>.features.teamSize`, read off the entry
-`/env` declares, and nothing is checked while it is unset (the room is then nine; the row's chip says
+the Space's too: four radios -- *Default (9)*, then *3*, *6*, *9*, the room with the chair counted -- live
+where Team Agile's standup runs. What is checked is the Space's own `spaces.<slug>.features.teamSize`, read
+off the entry `/env` declares, and *Default (9)* while it is unset (the 9 is `consts.json`
+`rituals.teamSizeDefault`; the room is then nine; the row's chip says
 `not configured` where Team Agile is on, and `off` where it is off -- the row rides Team Agile, as the
-suggestion's does -- while the radios stay live by the tracker, as the suggestion's entry has no gate of its own). A pick writes it through `PUT /api/config` -> `Config -Set -Hub`, with the same Saving
+suggestion's does -- while the radios stay live by the tracker, as the suggestion's entry has no gate of its own). A pick writes it through `PUT /api/config` -> `Config -Set -Hub`, and Default through `Config -Unset -Hub`, with the same Saving
 state; it asks for no how-we-work note and says nothing about Team Agile's switch (`scenarios.test.tsx`,
 "How many are in my standup in `<Space>`?: the Space's size is checked, live on GitHub"; the radios in
 `HowDoI.test.tsx`):
 
 | The Space | Checked | Can be picked | The sentence under the radios | A pick writes |
 | --- | --- | --- | --- | --- |
-| GitHub, nothing set | none | 3, 6, 9 | none | `spaces.<slug>.features.teamSize=<size> -Hub` |
-| GitHub, 6 | 6 | 3, 6, 9 | none | the same |
-| Azure DevOps | none | none | Team Agile's standup is a GitHub Space's; this Space's tracker is Azure DevOps. | nothing |
-| no tracker (your own cards) | none | none | Team Agile's standup is a GitHub Space's; connect a tracker to hold one. | nothing |
+| GitHub, nothing set | Default (9) | Default (9), 3, 6, 9 | none | `spaces.<slug>.features.teamSize=<size> -Hub`; Default: `-Unset spaces.<slug>.features.teamSize -Hub` |
+| GitHub, 6 | 6 | Default (9), 3, 6, 9 | none | the same |
+| Azure DevOps | Default (9) | none | Team Agile's standup is a GitHub Space's; this Space's tracker is Azure DevOps. | nothing |
+| no tracker (your own cards) | Default (9) | none | Team Agile's standup is a GitHub Space's; connect a tracker to hold one. | nothing |
 
 ### The Studio's Prompts card, by how you work (`scenarios.test.tsx`, "the Studio's Prompts card, by how you work"; the card in `PromptsCard.test.tsx`)
 

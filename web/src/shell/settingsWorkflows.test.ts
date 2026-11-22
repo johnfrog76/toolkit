@@ -10,12 +10,14 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   WORKFLOW_ENTRIES,
+  answerChoices,
   answerLive,
   answerStored,
   answerTarget,
   asksHowIWork,
   entryAnchor,
   entryQuestion,
+  entryAsking,
   entryConfigLines,
   entryRoute,
   entryState,
@@ -276,5 +278,32 @@ describe("the demo Spaces' tips", () => {
     expect(spaceHasOwnTip("azure-demo")).toBe(true);
     expect(spaceHasOwnTip("demo")).toBe(true);
     expect(spaceHasOwnTip("mine")).toBe(false);
+  });
+});
+
+// The way back to unset, as the drawer's radios draw it: first, for every asking
+// entry but How do you want to work? (whose checked answer is the agent's, never
+// unset), named as the select names it, live where an answer is.
+describe("answerChoices: Default first, but not for howIWork", () => {
+  const team = WORKFLOW_ENTRIES.find((e) => e.id === "team-size")!;
+  const how = WORKFLOW_ENTRIES.find(asksHowIWork)!;
+
+  it("the standup's size opens on Default (the contract's size), then its answers", () => {
+    const choices = answerChoices(team);
+    expect(choices.map((a) => a.label)).toEqual([
+      `Default (${RITUALS.teamSizeDefault})`,
+      ...team.answers!.map((a) => a.label),
+    ]);
+    expect(choices[0].value).toBe("");
+    expect(choices[0].live).toEqual(["github"]);
+  });
+
+  it("How do you want to work? is its answers alone", () => {
+    expect(answerChoices(how)).toEqual(how.answers);
+  });
+
+  it("an entry is found by the schema key it asks", () => {
+    expect(entryAsking("spaces.<slug>.features.teamSize")?.id).toBe("team-size");
+    expect(entryAsking("spaces.<slug>.status")).toBeUndefined();
   });
 });

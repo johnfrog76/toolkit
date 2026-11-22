@@ -28,6 +28,16 @@ const statusRow: ConfigSchemaRow = {
   help: "active runs Tier 1.",
 };
 
+const howRow: ConfigSchemaRow = {
+  key: "spaces.<slug>.howIWork",
+  scope: "org",
+  type: "enum",
+  allowed: ["agents", "alone"],
+  required: false,
+  file: "hub.json",
+  help: "How you work in this Space.",
+};
+
 function setting(key: string, value: string, source: ConfigSetting["source"]): ConfigSetting {
   return { key, scope: "org", file: "hub.json", value, source };
 }
@@ -41,6 +51,7 @@ function mount(props: Parameters<typeof FieldRow>[0]) {
 }
 
 const defaultText = `Default (${RITUALS.teamSizeDefault})`;
+const teamKey = "spaces.acme.features.teamSize";
 
 describe("FieldRow: a field with allowed values", () => {
   it("draws an int with allowed values as a select, reading Default while unset", () => {
@@ -95,17 +106,51 @@ describe("FieldRow: a field with allowed values", () => {
     );
   });
 
-  it("an enum's select is unchanged: its allowed values only", () => {
+  // One rule for every select, over the schema's field kinds: a field that is
+  // not required opens on Default, the way back to unset; a required one has
+  // none. Default names what unset reads as only where the contract fixes one
+  // value (the team size); a derived or plain unset is "Default" alone.
+  const kinds: [kind: string, row: ConfigSchemaRow, key: string, value: string, first: string][] = [
+    ["optional enum", statusRow, "spaces.acme.status", "active", "Default"],
+    ["optional enum, derived when unset", howRow, "spaces.acme.howIWork", "agents", "Default"],
+    ["required enum", { ...statusRow, required: true }, "spaces.acme.status", "active", "active"],
+    ["optional int with allowed values", teamSizeRow, teamKey, "6", defaultText],
+    ["required int with allowed values", { ...teamSizeRow, required: true }, teamKey, "6", "3"],
+  ];
+  it.each(kinds)("%s: the select's first entry", (_kind, row, key, value, first) => {
+    mount({ setting: setting(key, value, "hub"), row, draft: undefined, onChange: () => {} });
+    const select = screen.getByRole("combobox");
+    expect(select.textContent).toBe(value);
+    fireEvent.click(select);
+    const options = screen.getAllByRole("option").map((o) => o.textContent);
+    expect(options[0]).toBe(first);
+    const unset = first.startsWith("Default") ? [first] : [];
+    expect(options).toEqual([...unset, ...row.allowed]);
+  });
+
+  it("an optional enum reads Default while unset", () => {
     mount({
-      setting: setting("spaces.acme.status", "active", "hub"),
-      row: statusRow,
+      setting: setting("spaces.acme.howIWork", "", "unset"),
+      row: howRow,
       draft: undefined,
       onChange: () => {},
     });
-    const select = screen.getByRole("combobox");
-    expect(select.textContent).toBe("active");
-    fireEvent.click(select);
-    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(statusRow.allowed);
+    expect(screen.getByRole("combobox").textContent).toBe("Default");
+  });
+
+  // The question is the row's label, the Space's NAME in it, and the key stays
+  // under the control for the terminal, as every named row keeps it.
+  it("the team size's row is labelled by its question, the Space's name filled", () => {
+    mount({
+      setting: setting(teamKey, "", "unset"),
+      row: teamSizeRow,
+      draft: undefined,
+      onChange: () => {},
+      spaceName: "Acme",
+    });
+    const label = screen.getByText("How many are in my standup in Acme?");
+    expect(screen.getByRole("combobox").getAttribute("aria-labelledby")).toBe(label.id);
+    expect(screen.getByText(teamKey)).toBeTruthy();
   });
 });
 
@@ -113,7 +158,6 @@ describe("FieldRow: a field with allowed values", () => {
 // re-read list the write hands back is what the rows draw afterwards. A Space
 // field the hub holds is unset with -Hub, in its own write -- without it the
 // verb removes only this machine's patch and the save changes nothing.
-const teamKey = "spaces.acme.features.teamSize";
 const hoursKey = "spaces.acme.features.trainingHoursPerQuarter";
 const hoursRow: ConfigSchemaRow = {
   key: "spaces.<slug>.features.trainingHoursPerQuarter",
@@ -142,6 +186,7 @@ const machine = (key: string, value: string, source: ConfigSetting["source"]): C
 });
 
 let configReply: { settings: ConfigSetting[] } = { settings: [] };
+let envSpaces: { slug: string; name: string }[] = [];
 let schemaRows: ConfigSchemaRow[] = [];
 const writeConfig = jest.fn();
 
@@ -151,7 +196,7 @@ jest.mock("./api.ado", () => ({
   useWriteConfigMutation: () => [writeConfig, { isLoading: false }],
 }));
 jest.mock("../../shell/api", () => ({
-  useGetEnvQuery: () => ({ data: { config: { spaces: [] } } }),
+  useGetEnvQuery: () => ({ data: { config: { spaces: envSpaces } } }),
 }));
 
 function reply(status: "success" | "error", after?: ConfigSetting[]) {
@@ -219,6 +264,32 @@ describe("ConfigSettings: what a save sends", () => {
     view.rerender();
     expect(controlFor(teamKey).textContent).toBe(defaultText);
     expect(screen.getByText("unset")).toBeTruthy();
+  });
+
+  it("choosing Default on How you work here is an unset with -Hub", async () => {
+    const howKey = "spaces.acme.howIWork";
+    schemaRows = [howRow];
+    configReply = { settings: [setting(howKey, "agents", "hub")] };
+    writeConfig.mockImplementation(reply("success", [setting(howKey, "", "unset")]));
+    const view = section();
+    fireEvent.click(controlFor(howKey));
+    fireEvent.click(screen.getByRole("option", { name: "Default" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save 1" }));
+    await screen.findByText("Saved.", { exact: false });
+
+    expect(writeConfig).toHaveBeenCalledTimes(1);
+    expect(writeConfig).toHaveBeenCalledWith({ set: {}, unset: [howKey], hub: true });
+    view.rerender();
+    expect(controlFor(howKey).textContent).toBe("Default");
+  });
+
+  it("the team size's question names the Space you are in, by its name", () => {
+    schemaRows = [teamSizeRow];
+    configReply = { settings: [setting(teamKey, "", "unset")] };
+    envSpaces = [{ slug: "acme", name: "Acme Corp" }];
+    section();
+    expect(screen.getByText("How many are in my standup in Acme Corp?")).toBeTruthy();
+    envSpaces = [];
   });
 
   it("clearing a hub-held text field is an unset with -Hub", async () => {

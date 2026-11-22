@@ -17,7 +17,7 @@ import { HairlineDivider } from "../../shared/HairlineDivider";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { TruncatedDropdown } from "../../shared/TruncatedDropdown";
 import { useGetEnvQuery } from "../../shell/api";
-import { RITUALS } from "../../shell/consts";
+import { defaultLabel } from "../../shell/settingDefaults";
 import { reportUnsaved, useSettingsFooter } from "../../shell/settings";
 import { schemaKeyOf, wordsFor } from "./configLabels";
 import { useGetConfigQuery, useGetConfigSchemaQuery, useWriteConfigMutation } from "./api.ado";
@@ -213,21 +213,6 @@ function schemaFor(rows: ConfigSchemaRow[], key: string): ConfigSchemaRow | unde
   return rows.find((r) => r.key === `spaces.<slug>.${field}`);
 }
 
-/**
- * What a field reads as while nobody has set it, where the contract says.
- * Keyed by schema row; a field missing here is still offered "Default", with
- * no value named, because the form will not guess one.
- */
-const UNSET_READS: Record<string, string> = {
-  "spaces.<slug>.features.teamSize": String(RITUALS.teamSizeDefault),
-};
-
-/** The label of a select's unset entry: "Default (9)", or "Default". */
-function defaultLabel(schemaKey: string): string {
-  const reads = UNSET_READS[schemaKey];
-  return reads ? `Default (${reads})` : "Default";
-}
-
 interface FieldRowProps {
   setting: ConfigSetting;
   row: ConfigSchemaRow | undefined;
@@ -242,13 +227,23 @@ interface FieldRowProps {
    * a switch reading "off" beside Azure DevOps plainly working would be a lie.
    */
   effective?: boolean;
+  /** The Space's name, for a row labelled by a question that names it. */
+  spaceName?: string;
 }
 
-export function FieldRow({ setting, row, draft, onChange, anchor, effective }: FieldRowProps) {
+export function FieldRow({
+  setting,
+  row,
+  draft,
+  onChange,
+  anchor,
+  effective,
+  spaceName,
+}: FieldRowProps) {
   const styles = useStyles();
   const value = draft ?? setting.value;
   const type = row?.type ?? "string";
-  const words = wordsFor(setting.key, row?.help ?? "");
+  const words = wordsFor(setting.key, row?.help ?? "", spaceName);
   // The control is NAMED by the label and DESCRIBED by the sentence under it:
   // 22 of the drawer's 31 inputs used to have no accessible name at all.
   const id = `cfg-${setting.key.replace(/[^A-Za-z0-9]+/g, "-")}`;
@@ -274,10 +269,11 @@ export function FieldRow({ setting, row, draft, onChange, anchor, effective }: F
     );
   } else if (row && row.allowed.length > 0) {
     // A short list of values is a select whatever the type: an int with
-    // allowed values (the standup's size) as well as an enum. A field that is
-    // not required also offers going back to unset, its first entry, which
-    // the save sends as an unset -- except an enum, whose select is unchanged.
-    const unsetLabel = !row.required && type !== "enum" ? defaultLabel(row.key) : undefined;
+    // allowed values (the standup's size) as well as an enum. One rule for
+    // every select: a field that is not required offers going back to unset,
+    // its first entry, which the save sends as an unset; a required one
+    // (the schema's `required`, which `Config -Unset` refuses) has none.
+    const unsetLabel = row.required ? undefined : defaultLabel(row.key);
     control = (
       <TruncatedDropdown
         size="small"
@@ -366,6 +362,9 @@ export function ConfigSettings() {
   const orgRows = settings.filter((s) => s.scope === "org");
   const orgs = env?.config?.spaces ?? [];
   const dirtyKeys = Object.keys(drafts);
+  // The Space's own name, for a row labelled by its question ({space}).
+  const activeSpace = config?.activeSpace ?? "";
+  const spaceName = orgs.find((o) => o.slug === activeSpace)?.name || activeSpace;
 
   const setDraft = (key: string, value: string) => setDraftStore({ ...draftStore, [key]: value });
 
@@ -516,6 +515,7 @@ export function ConfigSettings() {
                     row={schemaFor(schema, setting.key)}
                     draft={drafts[setting.key]}
                     onChange={(value) => setDraft(setting.key, value)}
+                    spaceName={spaceName}
                   />
                 ))}
               </div>

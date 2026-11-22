@@ -1674,11 +1674,17 @@ value is live in one place -- `Scripts/Get-ConfigSchema.ps1` -- and this section
   is named by its label and described by its sentence (`aria-labelledby`, `aria-describedby`).
 - **The control comes from the schema's type**: a text input, a toggle for a boolean, and a select
   for any field with allowed values, whatever its type -- an enum, or an int such as the standup's
-  `spaces.<slug>.features.teamSize`. A field that is not required, other than an enum, opens on a
-  **Default** entry that means unset, named with what unset reads as where the contract says it
-  (**Default (9)** for the team size, from `consts.json` `rituals.teamSizeDefault`); choosing it is a
-  cleared field, so the save sends an unset and the row's badge goes back to `unset`. An enum's
-  select is its allowed values only.
+  `spaces.<slug>.features.teamSize`. One rule for every select: a field that is not required opens
+  on a **Default** entry that means unset, an enum's included (`spaces.<slug>.howIWork`); a required
+  one (the schema's `required`, which `Config -Unset` refuses) has none. Default is named with what
+  unset reads as where the contract fixes one value (**Default (9)** for the team size, from
+  `consts.json` `rituals.teamSizeDefault`) and is plain **Default** where unset is derived, as How you
+  work here is; `shell/settingDefaults.ts` is that one table, and the drawer's radios read it too.
+  Choosing it is a cleared field, so the save sends an unset and the row's badge goes back to `unset`.
+- **A key the drawer asks is labelled by its question.** A key `configLabels.ts` does not name, but
+  an entry of `Config/settings-workflows.json` with answers asks -- "How many are in my standup in
+  \<Space>?" -- reads as that question, the Space's name filled as the "How do I…" section fills it,
+  with the entry's sentence under it and the key as its caption.
 - **Edits are batched.** One Save is one `PUT`, one CLI call, one atomic write per file. The reply
   is a `CommandResponse` rendered through `commandResultMessage`, so `rejected`, `timeout` and
   `error` read as what they are rather than as a failed fetch.

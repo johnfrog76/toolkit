@@ -7,6 +7,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { FluentProvider } from "@fluentui/react-components";
 import { HowDoI, doorLabel } from "./HowDoI";
 import { WORKFLOW_ENTRIES } from "./settingsWorkflows";
+import { RITUALS } from "./consts";
 import type { SurfaceInventory } from "./api";
 import { fluentThemeFor } from "./theme";
 import { FIRST_LIGHT, themeById } from "./themeList";
@@ -517,13 +518,19 @@ describe("HowDoI", () => {
       howWeWorkSpy.mockClear();
     });
 
-    it("three radios, 3, 6 and 9; unset checks none, a stored size checks its own", () => {
+    // Default first, the way back to unset, named as the select's entry is:
+    // the size unset reads as is the contract's, never typed here.
+    const unset = `Default (${RITUALS.teamSizeDefault})`;
+
+    it("four radios, Default first; unset checks Default, a stored size checks its own", () => {
       renderWith();
-      expect(labels()).toEqual(["3", "6", "9"]);
+      expect(labels()).toEqual([unset, "3", "6", "9"]);
+      expect(radio(unset).checked).toBe(true);
       for (const l of ["3", "6", "9"]) {
         expect(radio(l).checked).toBe(false);
         expect(radio(l).disabled).toBe(false);
       }
+      expect(radio(unset).disabled).toBe(false);
       expect(row().textContent).not.toContain("Team Agile's own switch is off");
       cleanup();
       declaredSpaces = [
@@ -531,7 +538,35 @@ describe("HowDoI", () => {
       ];
       renderWith();
       expect(radio("6").checked).toBe(true);
+      expect(radio(unset).checked).toBe(false);
       expect(radio("9").checked).toBe(false);
+    });
+
+    it("Default unsets the Space's size in the hub, and 6 then Default round-trips", async () => {
+      declaredSpaces = [
+        { slug: "toolkit", name: "Toolkit", status: "active", features: { teamSize: 3 } },
+      ];
+      renderWith();
+      await act(async () => {
+        fireEvent.click(radio("6"));
+      });
+      expect(writeSpy).toHaveBeenLastCalledWith({
+        set: { "spaces.toolkit.features.teamSize": "6" },
+        unset: [],
+        hub: true,
+      });
+      expect(radio("6").checked).toBe(true);
+      await act(async () => {
+        fireEvent.click(radio(unset));
+      });
+      expect(writeSpy).toHaveBeenLastCalledWith({
+        set: {},
+        unset: ["spaces.toolkit.features.teamSize"],
+        hub: true,
+      });
+      expect(radio(unset).checked).toBe(true);
+      expect(radio("6").checked).toBe(false);
+      expect(howWeWorkSpy).not.toHaveBeenCalled();
     });
 
     it("a pick writes the Space's size to the hub through the one writer, and asks for no note", async () => {
@@ -551,7 +586,7 @@ describe("HowDoI", () => {
     it("on Azure DevOps every size is disabled, with the reason", () => {
       envTracker = "ado";
       renderWith();
-      for (const l of ["3", "6", "9"]) expect(radio(l).disabled).toBe(true);
+      for (const l of [unset, "3", "6", "9"]) expect(radio(l).disabled).toBe(true);
       expect(row().textContent).toContain("this Space's tracker is Azure DevOps");
     });
   });
