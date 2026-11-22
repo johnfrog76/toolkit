@@ -246,12 +246,17 @@ function Answers({
                 <Radio
                   value={a.value}
                   label={{ children: a.label, className: live ? undefined : styles.lockedLabel }}
-                  aria-describedby={`${baseId}-${a.value || "unset"}`}
+                  aria-describedby={a.sentence ? `${baseId}-${a.value || "unset"}` : undefined}
                   disabled={!live || (saving && a.value !== value)}
                 />
-                <Caption1 id={`${baseId}-${a.value || "unset"}`} className={styles.answerSentence}>
-                  {a.sentence}
-                </Caption1>
+                {a.sentence ? (
+                  <Caption1
+                    id={`${baseId}-${a.value || "unset"}`}
+                    className={styles.answerSentence}
+                  >
+                    {a.sentence}
+                  </Caption1>
+                ) : null}
               </div>
             );
           })}

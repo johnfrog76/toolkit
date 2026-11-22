@@ -124,20 +124,18 @@ export function answerSchemaKey(entry: WorkflowEntry): string | undefined {
   return entry.answerKey?.replace("{slug}", "<slug>");
 }
 
-/** The words under the way back to unset. */
-export const UNSET_SENTENCE = "Unset, as a new Space starts.";
-
 /** The radios an asking entry draws: its answers, and first, for any entry
  *  but howIWork, the way back to unset -- value "" (the save sends it as
  *  `Config -Unset <answerKey> -Hub`), labelled as the select's Default entry
- *  is, and live wherever one of the answers is. How do you want to work? has
+ *  is, with no sentence under it (the label says it), and live wherever one
+ *  of the answers is. How do you want to work? has
  *  none: what it checks is the agent's resolved answer, which is never unset. */
 export function answerChoices(entry: WorkflowEntry): WorkflowAnswer[] {
   const answers = entry.answers ?? [];
   const key = answerSchemaKey(entry);
   if (!key || asksHowIWork(entry) || answers.length === 0) return answers;
   const live = [...new Set(answers.flatMap((a) => a.live))];
-  return [{ label: defaultLabel(key), value: "", sentence: UNSET_SENTENCE, live }, ...answers];
+  return [{ label: defaultLabel(key), value: "", sentence: "", live }, ...answers];
 }
 
 /** The asking entry for a schema key, if one asks it. */

@@ -296,6 +296,8 @@ describe("answerChoices: Default first, but not for howIWork", () => {
     ]);
     expect(choices[0].value).toBe("");
     expect(choices[0].live).toEqual(["github"]);
+    // The label says it; no sentence is drawn under the way back to unset.
+    expect(choices[0].sentence).toBe("");
   });
 
   it("How do you want to work? is its answers alone", () => {
