@@ -1,4 +1,5 @@
-import { api, CACHE_TTL } from "../../shell/api";
+import { api, CACHE_TTL, SESSION_CACHE } from "../../shell/api";
+import type { AppDispatch } from "../../shell/store";
 import { workItemsPath } from "./issueAxes";
 import { docsApiPath } from "./docRooms";
 import type { IssueStateChoice } from "./issueAxes";
@@ -1293,12 +1294,15 @@ export const adoEndpoints = adoApi.injectEndpoints({
     // this is one round trip per session rather than one PowerShell start.
     getConfigSchema: builder.query<ConfigSchemaResponse, void>({
       query: () => "config/schema",
-      keepUnusedDataFor: CACHE_TTL,
+      keepUnusedDataFor: SESSION_CACHE,
     }),
 
     // GET /api/config -- every resolved setting with its source.
     getConfig: builder.query<ConfigResponse, void>({
       query: () => "config",
+      // Kept for the session, like the other reads here: the drawer shows the
+      // stored list at once and asks again in the background when it opens.
+      keepUnusedDataFor: SESSION_CACHE,
       providesTags: ["Config"],
     }),
 
@@ -1349,6 +1353,17 @@ export const adoEndpoints = adoApi.injectEndpoints({
     }),
   }),
 });
+
+/**
+ * Asks for the settings list and its schema ahead of the drawer. Dispatched by
+ * the module's `prefetch` once the app has loaded: nothing subscribes, a
+ * stored answer is not asked for again, and a read that fails is only left in
+ * the store for the drawer's own retry on opening.
+ */
+export function prefetchSettings(dispatch: AppDispatch): void {
+  void dispatch(adoEndpoints.util.prefetch("getConfig", undefined, {}));
+  void dispatch(adoEndpoints.util.prefetch("getConfigSchema", undefined, {}));
+}
 
 export const {
   useGetConnectStateQuery,

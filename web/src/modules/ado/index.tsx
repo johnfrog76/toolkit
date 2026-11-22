@@ -40,6 +40,7 @@ import { ReviewArchive, SkillsSnapshot } from "../growth";
 import { EnvCard } from "./EnvCard";
 import { ModulesCard } from "./ModulesCard";
 import { ConfigSettings } from "./ConfigSettings";
+import { prefetchSettings } from "./api.ado";
 import { ConnectAdoCard } from "./ConnectAdoCard";
 import { ToolkitLog } from "./ToolkitLog";
 import { TestHealth } from "./TestHealth";
@@ -119,6 +120,10 @@ export const adoModule: ToolkitModule = {
   // Tier-independent and unflagged, like the module: config is what a Tier 3
   // machine needs most.
   settingsSections: () => [<ConfigSettings key="config" />],
+  // The settings list and its schema are read through the CLI and the first
+  // read is slow, so they are asked for once the app is up and the drawer finds
+  // them in the store. A read that fails is left for the drawer to report.
+  prefetch: prefetchSettings,
   // Where in it a person wants to GO. The anchors are marked in ConfigSettings.
   settingsLinks: () => [
     { label: "This Space", anchor: "organisation" },
