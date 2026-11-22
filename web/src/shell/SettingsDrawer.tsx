@@ -75,6 +75,7 @@ interface SettingsDrawerProps {
 // Marks where the drawer arrived, for a moment: a wash of the accent that
 // fades. Global, because the element belongs to a module's section.
 const ARRIVED_CLASS = "settings-arrived";
+const ARRIVE_DELAY_MS = 75;
 const ARRIVED_CSS = `
 [data-settings-anchor] { scroll-margin-top: 12px; border-radius: 6px; }
 .${ARRIVED_CLASS} { animation: settings-arrived 1.6s ease-out; }
@@ -116,25 +117,41 @@ export function SettingsDrawer({
   }, [open]);
 
   // Arriving. A section's rows come from a query, so the place may not exist
-  // for a moment after the drawer does: look for it, briefly, then give up
-  // quietly at the top -- an anchor nobody marks is not an error.
+  // for a moment after the drawer does -- on the first opening of a session the
+  // read behind it can take many seconds. What decides is the row being drawn,
+  // not a clock: look now, and if it is not there yet, look again each time the
+  // page changes, for as long as the drawer is open at this place. An anchor
+  // nobody marks is not an error: the drawer simply stays at the top.
   useEffect(() => {
     if (!open || !anchor) return;
-    let tries = 0;
-    const timer = window.setInterval(() => {
+    let timer: number | undefined;
+    const arrive = (): boolean => {
       const target = document.querySelector<HTMLElement>(`[data-settings-anchor~="${anchor}"]`);
-      if (!target && ++tries < 40) return;
-      window.clearInterval(timer);
-      if (!target) return;
+      if (!target) return false;
       target.scrollIntoView({ block: "start", behavior: "auto" });
       target.classList.add(ARRIVED_CLASS);
-      window.setTimeout(() => target.classList.remove(ARRIVED_CLASS), 1600);
+      timer = window.setTimeout(() => target.classList.remove(ARRIVED_CLASS), 1600);
       const focusable = target.matches("input,button,[tabindex]")
         ? target
         : target.querySelector<HTMLElement>("input,button,[role=combobox],[role=switch]");
       focusable?.focus({ preventScroll: true });
-    }, 75);
-    return () => window.clearInterval(timer);
+      return true;
+    };
+    let observer: MutationObserver | undefined;
+    // A beat for the drawer to settle (its own focus move runs as it opens),
+    // then the place -- and if it is not drawn yet, wait for it to be.
+    const start = window.setTimeout(() => {
+      if (arrive()) return;
+      observer = new MutationObserver(() => {
+        if (arrive()) observer?.disconnect();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }, ARRIVE_DELAY_MS);
+    return () => {
+      window.clearTimeout(start);
+      observer?.disconnect();
+      window.clearTimeout(timer);
+    };
   }, [open, anchor, anchorRequest]);
 
   return (

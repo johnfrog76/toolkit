@@ -239,7 +239,7 @@ its pages are still lazy chunks, because lazy is about bytes, not about being op
 settings drawer holds machine keys, the active Space's fields and two org actions; every save is
 `PUT /api/config`, which runs `tkConfig` through the bridge. [`web/README.md`, "The Configuration
 section"](../web/README.md#the-configuration-section-and-what-it-does-not-do) has the detail; [the
-schema itself is Configuration's](CONFIGURATION.md).
+schema itself is Configuration's](CONFIGURATION.md). The list and its schema are prefetched once the app has loaded and kept for the session, so the drawer opens with them in the store and refreshes the list in the background.
 
 **The avatar menu is the one Space switcher** (`src/shell/AvatarMenu.tsx`): Theme, Space and the
 registry's settings links. Its Space entry lists the slugs in `config.switcherSpaces` from `/env` (`config.spaces` less a retired Space you are not in; `config.spaces` itself keeps it, for every other reader) and a choice runs
