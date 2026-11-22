@@ -3,7 +3,9 @@
 ``Scripts/requirements_floors.py`` is what the Test verb's summary and ``Env``'s
 "Python packages" line both ask. These cases hold the comparison over a table, with
 the installed set handed in, so nothing here depends on what this machine has; and the
-live case runs the check against this tree's two files, which proves it reads them.
+live case runs the check against this tree's two files, which proves it reads them. How a
+line, a name and a version are read is ``Scripts/requirement_rules.py``'s, held by the shared
+table in ``Tests/test_requirement_rules.py``.
 
 Stdlib only; no agent import, so it never skips.
 
@@ -59,27 +61,17 @@ class TestTable(unittest.TestCase):
                 req = F.parse_requirement(line)
                 self.assertIsNotNone(req)
                 installed = {} if have is None else {F.normalise_name(req[0]): have}
-                found = F.check([(req[0], req[1], "agent/requirements.txt")], installed)
+                found = F.check([(req[0], req[2], "agent/requirements.txt")], installed)
                 self.assertEqual([f["kind"] for f in found], [kind] if kind else [])
 
     def test_a_finding_names_the_package_the_version_the_floor_and_the_file(self):
         req = F.parse_requirement("anthropic>=2.7.0")
-        (f,) = F.check([(req[0], req[1], "agent/requirements.txt")], {"anthropic": "1.15.0"})
+        (f,) = F.check([(req[0], req[2], "agent/requirements.txt")], {"anthropic": "1.15.0"})
         self.assertEqual(f["text"], "anthropic 1.15.0 is below >=2.7.0 in agent/requirements.txt")
         (f,) = F.check([("ruff", [("==", "0.17.5")], "agent/requirements-dev.txt")], {"ruff": "0.17.4"})
         self.assertEqual(f["text"], "ruff 0.17.4 is not the pinned ==0.17.5 in agent/requirements-dev.txt")
         (f,) = F.check([("httpx", [(">=", "0.28.1")], "agent/requirements-dev.txt")], {})
         self.assertEqual(f["text"], "httpx is not installed; agent/requirements-dev.txt wants >=0.28.1")
-
-
-class TestLinesThatNameNothing(unittest.TestCase):
-    def test_comments_blanks_and_options(self):
-        for line in ["", "   ", "# a comment", "  # indented", "-r requirements.txt", "--index-url https://x"]:
-            with self.subTest(line=line):
-                self.assertIsNone(F.parse_requirement(line))
-
-    def test_a_direct_reference_is_a_name_with_no_version(self):
-        self.assertEqual(F.parse_requirement("pkg @ https://example.invalid/pkg.whl"), ("pkg", []))
 
 
 class TestFiles(unittest.TestCase):

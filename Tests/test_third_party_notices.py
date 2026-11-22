@@ -3,7 +3,9 @@
 The live case runs ``Scripts/third_party_notices.py``'s check against this tree: the web list
 generated from ``web/package-lock.json``, every agent requirement listed at or above its floor, and
 every font, picture, sound and ``web/public/`` file accounted for. The other cases hand the same functions a made-up
-tree and prove each way the page can go stale is caught, by name.
+tree and prove each way the page can go stale is caught, by name. How a requirement line, a name
+and a version are read is ``Scripts/requirement_rules.py``'s, held by the shared table in
+``Tests/test_requirement_rules.py``.
 
 Stdlib only; no agent import, so it never skips.
 
@@ -120,7 +122,6 @@ class TestNoticesCases(unittest.TestCase):
     def test_requirement_names_ignore_extras_bounds_comments_and_includes(self):
         text = "# c\nfastapi>=0.1\nuvicorn[standard]>=0.5  # why\n-r other.txt\n\nPyYAML==6\n"
         self.assertEqual(N.requirement_names(text), ["fastapi", "uvicorn", "PyYAML"])
-        self.assertEqual(N.norm("typing_extensions"), N.norm("Typing-Extensions"))
 
 
 # The agent section's table, as --write-agent draws it.
@@ -168,37 +169,12 @@ class TestAgentFloors(unittest.TestCase):
         self.assertEqual(rows[N.norm("Typing-Extensions")], ("typing_extensions", "4.16.0"))
         self.assertNotIn(N.norm("License"), rows)
 
-    def test_a_requirement_line_is_read_without_extras_markers_or_comments(self):
-        table = [
-            ("fastapi>=0.162.2", ("fastapi", set(), [(">=", "0.162.2")], "")),
-            ("uvicorn[standard]>=0.54.0", ("uvicorn", {"standard"}, [(">=", "0.54.0")], "")),
-            ("Foo_Bar[A, b] >=1.0, <2  # note", ("Foo_Bar", {"a", "b"}, [(">=", "1.0"), ("<", "2")], "")),
-            ("x (>=1.2)", ("x", set(), [(">=", "1.2")], "")),
-            ("y>=3; python_version < '3.13'", ("y", set(), [(">=", "3")], "python_version < '3.13'")),
-            ("z", ("z", set(), [], "")),
-        ]
-        for line, want in table:
-            with self.subTest(line=line):
-                self.assertEqual(N.parse_requirement(line), want)
-        for line in ("", "# only a comment", "-r requirements.txt", "--index-url x"):
-            with self.subTest(line=line):
-                self.assertIsNone(N.parse_requirement(line))
-
     def test_the_floor_is_the_lowest_version_allowed(self):
         self.assertEqual(N.floor([(">=", "1.2"), ("<", "2")]), "1.2")
         self.assertEqual(N.floor([("==", "1.4.*")]), "1.4")
         self.assertEqual(N.floor([("~=", "2.1")]), "2.1")
         self.assertIsNone(N.floor([("<", "2"), ("!=", "1.5")]))
         self.assertIsNone(N.floor([]))
-
-    def test_versions_order_as_pep_440_does(self):
-        ascending = ["1.0.dev1", "1.0a1", "1.0b2", "1.0rc1", "1.0", "1.0.post1", "1.1", "1.10", "2.0", "1!0.1"]
-        keys = [N.version_key(v) for v in ascending]
-        self.assertEqual(keys, sorted(keys))
-        self.assertEqual(len(set(keys)), len(keys))
-        self.assertEqual(N.version_key("2.0"), N.version_key("2.0.0"))
-        self.assertLess(N.version_key("0.162.2"), N.version_key("0.163"))
-        self.assertIsNone(N.version_key("not-a-version"))
 
 
 class Dist:
