@@ -339,7 +339,16 @@ export function FieldRow({ setting, row, draft, onChange, anchor, effective }: F
 export function ConfigSettings() {
   const styles = useStyles();
   const { data: env } = useGetEnvQuery();
-  const { data: config, isLoading, isError } = useGetConfigQuery();
+  // The stored list is drawn at once; opening the drawer reads it again in the
+  // background, so a change made from the command line still shows. isLoading
+  // is only the very first read with nothing stored.
+  const {
+    data: config,
+    isLoading,
+    isError,
+  } = useGetConfigQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
   const { data: schemaData } = useGetConfigSchemaQuery();
   const [writeConfig, { isLoading: isSaving }] = useWriteConfigMutation();
 
@@ -409,7 +418,8 @@ export function ConfigSettings() {
     void save([{ key: `spaces.${archiveSlug}.status`, type: "enum", value: "archive" }]);
   }
 
-  const hasReadError = isError || Boolean(config?.error);
+  // A refresh that fails while a list is stored leaves the stored list in place.
+  const hasReadError = (isError && !config) || Boolean(config?.error);
 
   // The result of a save belongs to the visit it happened in. Clearing it on
   // unmount means a reopened drawer does not greet you with yesterday's "Saved."
