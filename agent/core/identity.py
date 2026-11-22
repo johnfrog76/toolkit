@@ -39,7 +39,7 @@ import subprocess  # noqa: F401 -- the suites patch identity.subprocess.run; run
 import threading
 import time
 
-from . import log_writer
+from . import consts, log_writer
 from .child import run_read
 from .config import load_config
 from .tier import ADO_PROBE_TTL_SECONDS
@@ -48,7 +48,7 @@ from .tier import ADO_PROBE_TTL_SECONDS
 # names the missing config key AND the remedy, which is the CLI's refusal
 # contract (a stated reason and a hint, never a silent empty result) applied to
 # a route that cannot refuse outright without taking the page down with it.
-IDENTITY_MISSING_REASON = "No identity: set `email` in config.local.json, or run `az login`."
+IDENTITY_MISSING_REASON = f"No identity: set `email` in config.local.json, or run `{consts.az_login_command()}`."
 
 # Where the answer came from, for /env and the System card. "" when unresolved.
 IDENTITY_SOURCE_CONFIG = "config"

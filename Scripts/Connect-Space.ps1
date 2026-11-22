@@ -71,6 +71,9 @@ $loadHelpers = {
 }
 . $loadHelpers
 . (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
+if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
+}
 $prefix = ''
 if (Get-Command Get-CliPrefix -ErrorAction SilentlyContinue) { $prefix = Get-CliPrefix }
 if (-not $prefix) { $prefix = Resolve-P20ConfigPrefix -PackageRoot $packageRoot }
@@ -83,7 +86,7 @@ if ($Help -or -not $Slug) {
     Write-Host "    1. yours  the address        -Address https://github.com/<owner>/<repo>  (a GitHub Space IS one repo)"
     Write-Host "                                 -Address https://dev.azure.com/<org>  (an Azure DevOps Space IS an organisation, projects inside it)"
     Write-Host "                                 no address: this Space works from your cards alone -- a whole shape, not a missing step"
-    Write-Host "    2. yours  sign in            gh auth login  /  az login  -- said and checked, never run for you"
+    Write-Host "    2. yours  sign in            gh auth login  /  $((Get-P20Consts).signIn.azCommand)  -- said and checked, never run for you"
     Write-Host "    3. ours   discovery          -Discover lists what the address holds; -Repo (GitHub) or -Projects (ADO) writes what you pick"
     Write-Host "    4. ours   sprint awareness   -Sprint true  (a GitHub Space has milestones, not sprints; Azure DevOps has iterations)"
     Write-Host "  With no step, it reports where the Space stands. -As <slug> graduates a shipped demo Space (the Azure demo) into your own Space."
@@ -229,7 +232,7 @@ if ($Discover) {
     else {
         $listed = Invoke-P20TrackerRead 'az' @('devops', 'project', 'list', '--organization', $spaceAddress, '--output', 'json')
         $json = $listed.Out
-        if ($listed.Code -ne 0) { Write-CliError -Message "az could not list the projects at $spaceAddress." -Hint "Check the address, and that az login reached this organisation (az devops configure --defaults organization=$spaceAddress helps too)."; exit 2 }
+        if ($listed.Code -ne 0) { Write-CliError -Message "az could not list the projects at $spaceAddress." -Hint "Check the address, and that $((Get-P20Consts).signIn.azCommand) reached this organisation (az devops configure --defaults organization=$spaceAddress helps too)."; exit 2 }
         $parsed = ($json | Out-String) | ConvertFrom-Json
         foreach ($p in @($parsed.value)) {
             $repos = @()

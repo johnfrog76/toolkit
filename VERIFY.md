@@ -1349,6 +1349,16 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `tkTest -Half agent` with every package at its floor prints no `Warning:` line. The macOS host proved the check, the
   Env line and the runner's warning with a stubbed `python`; the `.cmd` stub's route to the check and a real
   Windows interpreter (the `py -3` prefix, the `Scripts\python.exe` venv) are this row's.
+- [ ] **The sign-in strip against a real signed-out `az` (Refs #542).** On a machine with the Azure CLI installed and
+  signed out (`az logout`), on an Azure DevOps Space that is `active`: start the agent and the web UI (`tkWeb -Dev`).
+  Every page shows the strip "Sign in to Azure DevOps" in the neutral style (no red, no yellow), with
+  `az login --allow-no-subscriptions`, **Copy** (paste it somewhere: that exact text) and **Check again**.
+  `curl -s http://127.0.0.1:<agentPort>/api/env` carries `azSignIn` with `needed: true`, `installed: true`,
+  `signedIn: false`. Sign in in a terminal with that command, then press **Check again**: the strip goes at once,
+  without a reload. On Windows the probe is `az account show` through `az.cmd`'s shell, in both PowerShell hosts for
+  `tkSetup` and `tkEnv`, which say the same command. Then switch to a `local` Space and to a GitHub Space: no strip.
+  The macOS host proved the agent's rule, the render and the hints with `az` stubbed; a real `az`, its sign-in state
+  and `az.cmd` are this row's.
 
 ## Recording a run
 

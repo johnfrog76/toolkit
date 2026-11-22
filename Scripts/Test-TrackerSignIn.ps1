@@ -7,6 +7,9 @@
 # Invoke-P20TrackerRead, which this file loads itself.
 #
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
+if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
+}
 function Test-P20TrackerSignIn {
     <#
       Returns @{ Tracker; Tool; Installed; SignedIn; Identity; Command } for
@@ -29,7 +32,7 @@ function Test-P20TrackerSignIn {
         }
         return $r
     }
-    $r.Tool = 'az'; $r.Command = 'az login'
+    $r.Tool = 'az'; $r.Command = [string](Get-P20Consts).signIn.azCommand
     $r.Installed = [bool](Get-Command az -ErrorAction SilentlyContinue)
     if (-not $r.Installed) { return $r }
     $shown = Invoke-P20TrackerRead 'az' @('account', 'show', '--output', 'json')

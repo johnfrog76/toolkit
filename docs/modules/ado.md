@@ -73,7 +73,7 @@ GitHub Space, where they answer through `gh`.
 
 ## Turning it on
 
-Nothing to install in the Toolkit. On the machine: the Azure CLI (`az`), signed in (`az login`), with the
+Nothing to install in the Toolkit. On the machine: the Azure CLI (`az`), signed in (`az login --allow-no-subscriptions`, [below](#signing-in)), with the
 `azure-devops` extension. Then one action, in one place:
 
 ```powershell
@@ -88,6 +88,34 @@ Optional per org: `tenant` (when the org is not in your default directory) and `
 projects the PR, work-item and dashboard reads cover -- `tkConfig -Set "spaces.<slug>.projects=Name/repo; Other/repo2" -Hub`,
 the same text in the Settings row, or `tkConnect <slug> -Discover` then `-Projects`).
 `email` in `config.local.json` is who "me" is; unset, it falls back to the `az` account.
+
+### Signing in
+
+Signing in is **yours**: it is said and checked, never run. The one command is
+`az login --allow-no-subscriptions` -- an Azure DevOps organisation needs a tenant sign-in, not an Azure
+subscription, and a plain `az login` fails for an account that has none. It lives in one place,
+`consts.json` `signIn.azCommand`, and every shipped hint reads it: `Setup`'s and `Env`'s `az login`
+rows, `Connect`'s step 2 (and the web's connect page, which shows what the verb says), `Status -Board`'s
+refusal, and the agent's identity sentence. A 401 or 403 from Azure DevOps (`Run 'az login' first.`,
+"Access denied") stays the remedy for an expired sign-in and says `az login` as it always did.
+
+The web says it in one short strip, **Sign in to Azure DevOps**, above the page on every page you work
+from (the shell's, not a module's; `web/src/shell/SignInStrip.tsx`): the command, **Copy**, and **Check
+again**, which asks for `GET /api/env?refresh=1` -- the System card's own refresh -- so the strip goes
+once you have signed in. It is shown in **one** state only: an `active` Space whose address names Azure
+DevOps, with `az` installed and not signed in. Not on a `local` or archived Space (nothing asks `az`), not
+on a GitHub Space, not when `az` is missing (the Environment card says install it), not when signed in.
+The agent decides, so the web re-derives nothing: `/env` carries `azSignIn` (the field's name is
+`consts.json` `signIn.envField`) as `{needed, installed, signedIn, command}`, probed by `az account show`
+behind the same 45-second cache as the reachability probe (`agent/core/signin.py`). The strip is
+informational -- a neutral surface and a status role, never the error colour: being signed out is a next
+step, not a failure. The app never signs in for you.
+
+Team Agile's chair does not name signing in as its suggested next move on an Azure DevOps Space: Team
+Agile is not on there, because an Azure DevOps Space's answer to "How do you want to work?" is `team`,
+derived and locked, and the module is on only where the answer is `agents`
+([the suggestion](solitaire-agile.md#the-suggestion-one-next-move-derived)). The strip is the next move
+there.
 
 ### The demo Spaces: one per grain
 
@@ -313,6 +341,7 @@ Known gap: [Azure DevOps verbs are hidden, not gone](../KNOWN-GAPS.md#azure-devo
 | `tkTestToolkit -Setup` (`Tests/Test-Setup.ps1`) | the on/off rule over the shared table; `Setup` and `Menu` on machines with and without ADO, `az` taken off the PATH |
 | `Tests/test_ado_enabled.py` | the agent's copy of the rule over the SAME table; what `/env` serves |
 | `Tests/test_env_org_state.py` | "never asked" is not a failure |
+| `Tests/test_signin.py`, `web/src/shell/SignInStrip.test.tsx` | the sign-in strip: `azSignIn` per Space and `az` state -- a row each -- and the strip's render, its neutral style and the one thing it never does; the grid row is in `web/src/shell/scenarios.test.tsx` |
 | `Tests/test_identity.py`, `test_env_probe.py` | who "me" is, with `az` stubbed; `/env` neither blocks on the probe nor repeats it |
 | `tkTestToolkit -PullRequest -CloseWorkItem -PRComments` | the PR description parser, the transition rule and ADO's error messages, the actionable-thread filter; `-CloseWorkItem` also holds the token helper on both PowerShells -- `az` failing with error text, or printing nothing, is a refusal and never a token |
 | `tkTestToolkit -Land` (`Tests/Test-Land.ps1`) | `Land` typed with `gh`, `az` and the REST calls stubbed: a merged Azure DevOps pull request read through `az repos pr show`, the work item closed through `CloseItem`'s PATCH with a comment naming the commit, a re-run that asks first and posts nothing, an abandoned pull request refused; the GitHub path the same way |

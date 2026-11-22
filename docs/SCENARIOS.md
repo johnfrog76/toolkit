@@ -259,6 +259,20 @@ Complete, so no state chip is drawn in any row:
 | `["the-toolkit"]` | the Trailer alone; the header counts 1 | **All 1 · archived 1** | Introducing ToolKit, whose page says `archived on this machine` |
 | both ids | nothing: `Every deck is archived on this machine -- the archived filter shows them.` | **All 0 · archived 2** | both |
 
+### The sign-in strip, by Space and sign-in state (`scenarios.test.tsx`; the render is `SignInStrip.test.tsx`, the agent's rule `Tests/test_signin.py`)
+
+"Sign in to Azure DevOps", with the one command (`az login --allow-no-subscriptions`, `consts.json` `signIn.azCommand`), **Copy** and **Check again**, above the page on every page you work from. The agent decides (`azSignIn.needed` in `GET /api/env`); the web reads it. Said and checked, never run -- the app never signs in for you -- and drawn in the neutral style, a status and never an alert.
+
+| The Space | `az` | The strip |
+| --- | --- | --- |
+| Azure DevOps, **active** | installed, **signed out** | **shown** |
+| Azure DevOps, active | installed, signed in | absent |
+| Azure DevOps, active | not installed | absent -- a different next step, which the Environment card says |
+| Azure DevOps, `local` or `archive` | any | absent -- `az` is not even asked |
+| GitHub, any status | any | absent -- `gh`'s business; `az` is not asked |
+| no tracker | any | absent |
+| an older agent that serves no `azSignIn` | -- | absent |
+
 ### The settings drawer's "How do I…" (settings by workflow; `HowDoI.test.tsx`)
 
 | Opened | What the section shows |

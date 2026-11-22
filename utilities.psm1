@@ -983,7 +983,7 @@ function script:Get-TierCause {
         return 'GitHub is not reachable'
     }
     if (-not $e.AzCliInstalled) { return 'the az CLI is not installed' }
-    if (-not $e.AzAuthenticated) { return 'az is not signed in -- run az login' }
+    if (-not $e.AzAuthenticated) { return "az is not signed in -- run $((Get-P20Consts).signIn.azCommand)" }
     if (-not $e.AdoReachable) { return "Azure DevOps did not answer for $org" }
     return 'Azure DevOps is not reachable'
 }

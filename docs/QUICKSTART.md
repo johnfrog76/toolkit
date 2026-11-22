@@ -10,7 +10,7 @@ the same install gate by gate, with what you should see at each one.
 | --- | --- |
 | **PowerShell** | 5.1 (Windows built-in) or 7+. Both supported; the installer sets up both. On 5.1 the module turns TLS 1.2 on at import, so a locked-down machine that still leads with TLS 1.0 can reach Azure DevOps, the Anthropic API and Teams. |
 | **git** | Required by `Sync`, `ThreadHash` and `Update`, and `Setup` reports it missing as a failure. The card workflow itself degrades gracefully without it. |
-| **Azure CLI** (`az`) | Only for ADO commands. Sign in with `az login`. |
+| **Azure CLI** (`az`) | Only for ADO commands. Sign in with `az login --allow-no-subscriptions`. |
 | **GitHub CLI** (`gh`) | Only for a Space tracked on GitHub: `Connect` lists your repositories with it, and every read and write of a GitHub tracker goes through it. Sign in with `gh auth login`. |
 | **Python** 3.12+ | Only for the agent (`agent/`). The CLI never calls it. Runtime deps: `agent/requirements.txt`. |
 | **Python test deps** | Only for `python3 -m pytest Tests/` (Windows: `python` or `py -3`): `pytest` and `httpx` (`fastapi.testclient` imports httpx), and `ruff`, the Python half's linter. All three live in `agent/requirements-dev.txt`, which pulls the runtime file in. |
@@ -107,7 +107,7 @@ Demo is one of three demo Spaces, one per grain, each an invitation and none req
 it, and the tip at the foot of Home -- or `tkConnect github-demo` -- connects it once `gh auth login`
 has run, or points it at a repo of your own. The **Azure demo** is ready for YOUR Azure DevOps
 organisation: give it the address (its tip, or `tkConnect azure-demo -Address https://dev.azure.com/<org>`)
-and sign in with `az login` ([the demo Spaces](modules/ado.md#the-demo-spaces-one-per-grain)).
+and sign in with `az login --allow-no-subscriptions` ([the demo Spaces](modules/ado.md#the-demo-spaces-one-per-grain)).
 
 Above the tabs, a banner offers **Introducing ToolKit**, the Toolkit deck, narrated: that is the
 *watch*. Watch it or dismiss it, and the banner does not come back (`firstRun.welcome`, in

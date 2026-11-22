@@ -17,6 +17,9 @@ param(
 )
 
 . (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
+if (-not (Get-Command Get-P20Consts -ErrorAction SilentlyContinue)) {
+    . (Join-Path $PSScriptRoot 'Get-Consts.ps1')
+}
 
 
 function Show-Help {
@@ -149,7 +152,7 @@ elseif ($hasAz) {
         $azLoggedIn = $true
     }
     else {
-        Write-ReportWarn "az CLI not logged in - run: az login"
+        Write-ReportWarn "az CLI not logged in - run: $((Get-P20Consts).signIn.azCommand)"
     }
 
     $devopsExt = $null
@@ -200,7 +203,7 @@ if (Test-Path -LiteralPath $localConfigPath) {
         }
         else {
             if ($adoEnabled) {
-                Write-ReportWarn "no identity - new work items cannot be auto-assigned. Run az login, or set 'email' in config.local.json"
+                Write-ReportWarn "no identity - new work items cannot be auto-assigned. Run $((Get-P20Consts).signIn.azCommand), or set 'email' in config.local.json"
             }
             else {
                 # Identity is who a WORK ITEM is assigned to. No Azure DevOps, no question.
