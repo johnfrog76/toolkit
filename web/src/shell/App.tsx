@@ -46,6 +46,7 @@ import {
 import type { CardContext } from "./registry";
 import { ShellProvider } from "./cards";
 import { SettingsDrawer } from "./SettingsDrawer";
+import { usePrefetchModules } from "./prefetchModules";
 import { useUnsavedTotal } from "./settings";
 import { ToolKitLogo } from "../shared/ToolKitLogo";
 import { GrantedSkin } from "../shared/GrantedSkin";
@@ -271,6 +272,8 @@ export function App() {
       setActiveSkillTag,
     ],
   );
+
+  usePrefetchModules(active, Boolean(env));
 
   const homeTabs = useMemo(() => moduleHomeTabs(active, cardContext), [active, cardContext]);
   const systemTabs = useMemo(() => moduleSystemTabs(active, cardContext), [active, cardContext]);

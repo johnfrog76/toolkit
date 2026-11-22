@@ -4,6 +4,7 @@ import { useDispatch } from "react-redux";
 import { matchPath } from "react-router";
 import type { RouteObject } from "react-router";
 import type { EnvStatus } from "./api";
+import type { AppDispatch } from "./store";
 import { adoModule } from "../modules/ado";
 import { growthModule } from "../modules/growth";
 import { communicationModule } from "../modules/communication";
@@ -218,6 +219,11 @@ export interface ToolkitModule {
    *  shell chrome and may not import a module, so a module's settings reach it
    *  the way its cards reach a page: contributed here, gated by the same flag. */
   settingsSections?: (ctx: CardContext) => ReactElement[];
+  /** Reads this module will want soon, started once the app has loaded and
+   *  /env has answered -- never before, and never for a module that is off.
+   *  Fire-and-forget: startup does not wait on it, and a read that fails is
+   *  left for the surface that needs it to report. */
+  prefetch?: (dispatch: AppDispatch) => void;
   /** Places in this module's settings a person might want to GO -- the avatar
    *  menu lists them, and choosing one opens the drawer AT that place. The
    *  shell names no setting; it is handed a label and an anchor, and the
