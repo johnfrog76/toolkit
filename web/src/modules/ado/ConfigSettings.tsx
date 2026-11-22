@@ -17,11 +17,17 @@ import { HairlineDivider } from "../../shared/HairlineDivider";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { TruncatedDropdown } from "../../shared/TruncatedDropdown";
 import { useGetEnvQuery } from "../../shell/api";
+import { defaultLabel } from "../../shell/settingDefaults";
 import { reportUnsaved, useSettingsFooter } from "../../shell/settings";
 import { schemaKeyOf, wordsFor } from "./configLabels";
 import { useGetConfigQuery, useGetConfigSchemaQuery, useWriteConfigMutation } from "./api.ado";
 import type { ConfigSchemaRow, ConfigSetting, CommandResponse } from "./api.ado";
-import { buildConfigEdit, commandResultMessage, configEditNeedsRestart } from "./cliBridge";
+import {
+  buildConfigEdit,
+  commandResultMessage,
+  configEditNeedsRestart,
+  splitHubUnsets,
+} from "./cliBridge";
 import type { ConfigFieldEdit } from "./cliBridge";
 import { SettingsRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
@@ -221,13 +227,23 @@ interface FieldRowProps {
    * a switch reading "off" beside Azure DevOps plainly working would be a lie.
    */
   effective?: boolean;
+  /** The Space's name, for a row labelled by a question that names it. */
+  spaceName?: string;
 }
 
-export function FieldRow({ setting, row, draft, onChange, anchor, effective }: FieldRowProps) {
+export function FieldRow({
+  setting,
+  row,
+  draft,
+  onChange,
+  anchor,
+  effective,
+  spaceName,
+}: FieldRowProps) {
   const styles = useStyles();
   const value = draft ?? setting.value;
   const type = row?.type ?? "string";
-  const words = wordsFor(setting.key, row?.help ?? "");
+  const words = wordsFor(setting.key, row?.help ?? "", spaceName);
   // The control is NAMED by the label and DESCRIBED by the sentence under it:
   // 22 of the drawer's 31 inputs used to have no accessible name at all.
   const id = `cfg-${setting.key.replace(/[^A-Za-z0-9]+/g, "-")}`;
@@ -251,15 +267,26 @@ export function FieldRow({ setting, row, draft, onChange, anchor, effective }: F
         {...naming}
       />
     );
-  } else if (type === "enum" && row && row.allowed.length > 0) {
+  } else if (row && row.allowed.length > 0) {
+    // A short list of values is a select whatever the type: an int with
+    // allowed values (the standup's size) as well as an enum. One rule for
+    // every select: a field that is not required offers going back to unset,
+    // its first entry, which the save sends as an unset; a required one
+    // (the schema's `required`, which `Config -Unset` refuses) has none.
+    const unsetLabel = row.required ? undefined : defaultLabel(row.key);
     control = (
       <TruncatedDropdown
         size="small"
-        value={value}
+        value={value === "" && unsetLabel ? unsetLabel : value}
         selectedOptions={[value]}
-        onOptionSelect={(_e, d) => onChange(String(d.optionValue))}
+        onOptionSelect={(_e, d) => onChange(String(d.optionValue ?? ""))}
         {...naming}
       >
+        {unsetLabel !== undefined ? (
+          <Option key="" value="" text={unsetLabel}>
+            {unsetLabel}
+          </Option>
+        ) : null}
         {row.allowed.map((allowed) => (
           <Option key={allowed} value={allowed} text={allowed}>
             {allowed}
@@ -335,6 +362,9 @@ export function ConfigSettings() {
   const orgRows = settings.filter((s) => s.scope === "org");
   const orgs = env?.config?.spaces ?? [];
   const dirtyKeys = Object.keys(drafts);
+  // The Space's own name, for a row labelled by its question ({space}).
+  const activeSpace = config?.activeSpace ?? "";
+  const spaceName = orgs.find((o) => o.slug === activeSpace)?.name || activeSpace;
 
   const setDraft = (key: string, value: string) => setDraftStore({ ...draftStore, [key]: value });
 
@@ -347,13 +377,28 @@ export function ConfigSettings() {
     return reply;
   }
 
-  function saveDirty() {
+  async function saveDirty() {
     const edits: ConfigFieldEdit[] = dirtyKeys.map((key) => ({
       key,
       type: schemaFor(schema, key)?.type ?? "string",
       value: drafts[key],
     }));
-    void save(edits);
+    // A Space field the hub holds is unset with -Hub, in its own write.
+    const { rest, hub } = splitHubUnsets(edits, (key) =>
+      settings.some((s) => s.key === key && s.scope === "org" && s.source === "hub"),
+    );
+    const writes = [
+      { payload: buildConfigEdit(rest), hub: false },
+      { payload: buildConfigEdit(hub), hub: true },
+    ].filter((w) => w.payload.unset.length > 0 || Object.keys(w.payload.set).length > 0);
+    setRestartNote(writes.some((w) => configEditNeedsRestart(w.payload)));
+    for (const w of writes) {
+      const reply = await writeConfig(w.hub ? { ...w.payload, hub: true } : w.payload).unwrap();
+      setResult(reply.result);
+      // A refusal stops the batch and keeps every draft, so nothing typed is lost.
+      if (reply.result.status !== "success") return;
+    }
+    setDraftStore({});
   }
 
   function addOrg() {
@@ -401,7 +446,7 @@ export function ConfigSettings() {
             <Button appearance="subtle" onClick={() => setDraftStore({})}>
               Discard
             </Button>
-            <Button appearance="primary" onClick={saveDirty} disabled={isSaving}>
+            <Button appearance="primary" onClick={() => void saveDirty()} disabled={isSaving}>
               {isSaving ? (
                 <Spinner size="tiny" aria-label="Saving..." />
               ) : (
@@ -470,6 +515,7 @@ export function ConfigSettings() {
                     row={schemaFor(schema, setting.key)}
                     draft={drafts[setting.key]}
                     onChange={(value) => setDraft(setting.key, value)}
+                    spaceName={spaceName}
                   />
                 ))}
               </div>

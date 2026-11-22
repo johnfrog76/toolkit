@@ -1,0 +1,355 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { FluentProvider, webLightTheme } from "@fluentui/react-components";
+import { ConfigSettings, FieldRow } from "./ConfigSettings";
+import { SettingsFooterContext } from "../../shell/settings";
+import type { ConfigSchemaRow, ConfigSetting } from "./api.ado";
+import { RITUALS } from "../../shell/consts";
+
+// A field with a short list of allowed values is a select whatever its type,
+// and one that is not required offers its way back to unset, first.
+
+const teamSizeRow: ConfigSchemaRow = {
+  key: "spaces.<slug>.features.teamSize",
+  scope: "org",
+  type: "int",
+  allowed: RITUALS.teamSizes.map(String),
+  required: false,
+  file: "hub.json",
+  help: "How many developers attend standup?",
+};
+
+const statusRow: ConfigSchemaRow = {
+  key: "spaces.<slug>.status",
+  scope: "org",
+  type: "enum",
+  allowed: ["active", "local", "archive"],
+  required: false,
+  file: "hub.json",
+  help: "active runs Tier 1.",
+};
+
+const howRow: ConfigSchemaRow = {
+  key: "spaces.<slug>.howIWork",
+  scope: "org",
+  type: "enum",
+  allowed: ["agents", "alone"],
+  required: false,
+  file: "hub.json",
+  help: "How you work in this Space.",
+};
+
+function setting(key: string, value: string, source: ConfigSetting["source"]): ConfigSetting {
+  return { key, scope: "org", file: "hub.json", value, source };
+}
+
+function mount(props: Parameters<typeof FieldRow>[0]) {
+  return render(
+    <FluentProvider theme={webLightTheme}>
+      <FieldRow {...props} />
+    </FluentProvider>,
+  );
+}
+
+const defaultText = `Default (${RITUALS.teamSizeDefault})`;
+const teamKey = "spaces.acme.features.teamSize";
+
+describe("FieldRow: a field with allowed values", () => {
+  it("draws an int with allowed values as a select, reading Default while unset", () => {
+    mount({
+      setting: setting("spaces.acme.features.teamSize", "", "unset"),
+      row: teamSizeRow,
+      draft: undefined,
+      onChange: () => {},
+    });
+    const select = screen.getByRole("combobox");
+    expect(select.textContent).toBe(defaultText);
+    expect(screen.queryByRole("textbox")).toBeNull();
+    // The row still says nobody has set it.
+    expect(screen.getByText("unset")).toBeTruthy();
+  });
+
+  it("offers Default first, then every allowed value", () => {
+    mount({
+      setting: setting("spaces.acme.features.teamSize", "6", "hub"),
+      row: teamSizeRow,
+      draft: undefined,
+      onChange: () => {},
+    });
+    fireEvent.click(screen.getByRole("combobox"));
+    const options = screen.getAllByRole("option").map((o) => o.textContent);
+    expect(options).toEqual([defaultText, ...RITUALS.teamSizes.map(String)]);
+  });
+
+  it("choosing Default hands the form an empty value, which the save sends as an unset", () => {
+    const onChange = jest.fn();
+    mount({
+      setting: setting("spaces.acme.features.teamSize", "6", "hub"),
+      row: teamSizeRow,
+      draft: undefined,
+      onChange,
+    });
+    fireEvent.click(screen.getByRole("combobox"));
+    fireEvent.click(screen.getByRole("option", { name: defaultText }));
+    expect(onChange).toHaveBeenCalledWith("");
+  });
+
+  it("a required field has no Default entry", () => {
+    mount({
+      setting: setting("spaces.acme.features.teamSize", "6", "hub"),
+      row: { ...teamSizeRow, required: true },
+      draft: undefined,
+      onChange: () => {},
+    });
+    fireEvent.click(screen.getByRole("combobox"));
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(
+      RITUALS.teamSizes.map(String),
+    );
+  });
+
+  // One rule for every select, over the schema's field kinds: a field that is
+  // not required opens on Default, the way back to unset; a required one has
+  // none. Default names what unset reads as only where the contract fixes one
+  // value (the team size); a derived or plain unset is "Default" alone.
+  const kinds: [kind: string, row: ConfigSchemaRow, key: string, value: string, first: string][] = [
+    ["optional enum", statusRow, "spaces.acme.status", "active", "Default"],
+    ["optional enum, derived when unset", howRow, "spaces.acme.howIWork", "agents", "Default"],
+    ["required enum", { ...statusRow, required: true }, "spaces.acme.status", "active", "active"],
+    ["optional int with allowed values", teamSizeRow, teamKey, "6", defaultText],
+    ["required int with allowed values", { ...teamSizeRow, required: true }, teamKey, "6", "3"],
+  ];
+  it.each(kinds)("%s: the select's first entry", (_kind, row, key, value, first) => {
+    mount({ setting: setting(key, value, "hub"), row, draft: undefined, onChange: () => {} });
+    const select = screen.getByRole("combobox");
+    expect(select.textContent).toBe(value);
+    fireEvent.click(select);
+    const options = screen.getAllByRole("option").map((o) => o.textContent);
+    expect(options[0]).toBe(first);
+    const unset = first.startsWith("Default") ? [first] : [];
+    expect(options).toEqual([...unset, ...row.allowed]);
+  });
+
+  it("an optional enum reads Default while unset", () => {
+    mount({
+      setting: setting("spaces.acme.howIWork", "", "unset"),
+      row: howRow,
+      draft: undefined,
+      onChange: () => {},
+    });
+    expect(screen.getByRole("combobox").textContent).toBe("Default");
+  });
+
+  // The question is the row's label, the Space's NAME in it, and the key stays
+  // under the control for the terminal, as every named row keeps it.
+  it("the team size's row is labelled by its question, the Space's name filled", () => {
+    mount({
+      setting: setting(teamKey, "", "unset"),
+      row: teamSizeRow,
+      draft: undefined,
+      onChange: () => {},
+      spaceName: "Acme",
+    });
+    const label = screen.getByText("How many are in my standup in Acme?");
+    expect(screen.getByRole("combobox").getAttribute("aria-labelledby")).toBe(label.id);
+    expect(screen.getByText(teamKey)).toBeTruthy();
+  });
+});
+
+// The whole section, with the agent stood in: what each save sends, and the
+// re-read list the write hands back is what the rows draw afterwards. A Space
+// field the hub holds is unset with -Hub, in its own write -- without it the
+// verb removes only this machine's patch and the save changes nothing.
+const hoursKey = "spaces.acme.features.trainingHoursPerQuarter";
+const hoursRow: ConfigSchemaRow = {
+  key: "spaces.<slug>.features.trainingHoursPerQuarter",
+  scope: "org",
+  type: "int",
+  allowed: [],
+  required: false,
+  file: "hub.json",
+  help: "Training hours each quarter.",
+};
+const emailRow: ConfigSchemaRow = {
+  key: "email",
+  scope: "machine",
+  type: "string",
+  allowed: [],
+  required: false,
+  file: "config.local.json",
+  help: "Your work email.",
+};
+const machine = (key: string, value: string, source: ConfigSetting["source"]): ConfigSetting => ({
+  key,
+  scope: "machine",
+  file: "config.local.json",
+  value,
+  source,
+});
+
+let configReply: { settings: ConfigSetting[] } = { settings: [] };
+let envSpaces: { slug: string; name: string }[] = [];
+let schemaRows: ConfigSchemaRow[] = [];
+const writeConfig = jest.fn();
+
+jest.mock("./api.ado", () => ({
+  useGetConfigQuery: () => ({ data: { activeSpace: "acme", ...configReply }, isLoading: false }),
+  useGetConfigSchemaQuery: () => ({ data: { schema: schemaRows, error: null } }),
+  useWriteConfigMutation: () => [writeConfig, { isLoading: false }],
+}));
+jest.mock("../../shell/api", () => ({
+  useGetEnvQuery: () => ({ data: { config: { spaces: envSpaces } } }),
+}));
+
+function reply(status: "success" | "error", after?: ConfigSetting[]) {
+  return () => {
+    if (after) configReply = { settings: after };
+    return {
+      unwrap: () =>
+        Promise.resolve({
+          result: { status, error: status === "error" ? "Refused." : null },
+          config: configReply,
+        }),
+    };
+  };
+}
+
+function section() {
+  const footer = document.createElement("div");
+  document.body.appendChild(footer);
+  const tree = () => (
+    <FluentProvider theme={webLightTheme}>
+      <SettingsFooterContext.Provider value={footer}>
+        <ConfigSettings />
+      </SettingsFooterContext.Provider>
+    </FluentProvider>
+  );
+  const view = render(tree());
+  return { rerender: () => view.rerender(tree()) };
+}
+
+/** The control a row draws, found by the label that names it. */
+function controlFor(key: string): HTMLElement {
+  const id = `cfg-${key.replace(/[^A-Za-z0-9]+/g, "-")}-label`;
+  const el = document.querySelector<HTMLElement>(`[aria-labelledby="${id}"]`);
+  if (!el) throw new Error(`no control for ${key}`);
+  return el;
+}
+
+function clear(key: string) {
+  fireEvent.change(controlFor(key), { target: { value: "" } });
+}
+
+describe("ConfigSettings: what a save sends", () => {
+  beforeEach(() => {
+    writeConfig.mockReset();
+  });
+  afterEach(() => {
+    // The drafts outlive the component on purpose; a test must not leak them.
+    const discard = screen.queryByRole("button", { name: "Discard" });
+    if (discard) fireEvent.click(discard);
+  });
+
+  it("choosing Default on a hub-held select is an unset with -Hub, and the row reads unset", async () => {
+    schemaRows = [teamSizeRow];
+    configReply = { settings: [setting(teamKey, "6", "hub")] };
+    writeConfig.mockImplementation(reply("success", [setting(teamKey, "", "unset")]));
+    const view = section();
+    fireEvent.click(controlFor(teamKey));
+    fireEvent.click(screen.getByRole("option", { name: defaultText }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save 1" }));
+    await screen.findByText("Saved.", { exact: false });
+
+    expect(writeConfig).toHaveBeenCalledTimes(1);
+    expect(writeConfig).toHaveBeenCalledWith({ set: {}, unset: [teamKey], hub: true });
+
+    view.rerender();
+    expect(controlFor(teamKey).textContent).toBe(defaultText);
+    expect(screen.getByText("unset")).toBeTruthy();
+  });
+
+  it("choosing Default on How you work here is an unset with -Hub", async () => {
+    const howKey = "spaces.acme.howIWork";
+    schemaRows = [howRow];
+    configReply = { settings: [setting(howKey, "agents", "hub")] };
+    writeConfig.mockImplementation(reply("success", [setting(howKey, "", "unset")]));
+    const view = section();
+    fireEvent.click(controlFor(howKey));
+    fireEvent.click(screen.getByRole("option", { name: "Default" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save 1" }));
+    await screen.findByText("Saved.", { exact: false });
+
+    expect(writeConfig).toHaveBeenCalledTimes(1);
+    expect(writeConfig).toHaveBeenCalledWith({ set: {}, unset: [howKey], hub: true });
+    view.rerender();
+    expect(controlFor(howKey).textContent).toBe("Default");
+  });
+
+  it("the team size's question names the Space you are in, by its name", () => {
+    schemaRows = [teamSizeRow];
+    configReply = { settings: [setting(teamKey, "", "unset")] };
+    envSpaces = [{ slug: "acme", name: "Acme Corp" }];
+    section();
+    expect(screen.getByText("How many are in my standup in Acme Corp?")).toBeTruthy();
+    envSpaces = [];
+  });
+
+  it("clearing a hub-held text field is an unset with -Hub", async () => {
+    schemaRows = [hoursRow];
+    configReply = { settings: [setting(hoursKey, "8", "hub")] };
+    writeConfig.mockImplementation(reply("success", [setting(hoursKey, "", "unset")]));
+    section();
+    clear(hoursKey);
+    fireEvent.click(await screen.findByRole("button", { name: "Save 1" }));
+    await screen.findByText("Saved.", { exact: false });
+
+    expect(writeConfig).toHaveBeenCalledTimes(1);
+    expect(writeConfig).toHaveBeenCalledWith({ set: {}, unset: [hoursKey], hub: true });
+  });
+
+  it("clearing a machine key is an unset without -Hub", async () => {
+    schemaRows = [emailRow];
+    configReply = { settings: [machine("email", "a@example.com", "local")] };
+    writeConfig.mockImplementation(reply("success", [machine("email", "", "unset")]));
+    section();
+    clear("email");
+    fireEvent.click(await screen.findByRole("button", { name: "Save 1" }));
+    await screen.findByText("Saved.", { exact: false });
+
+    expect(writeConfig).toHaveBeenCalledTimes(1);
+    expect(writeConfig).toHaveBeenCalledWith({ set: {}, unset: ["email"] });
+  });
+
+  it("a mixed save is two writes: the rest first, then the hub's unsets with -Hub", async () => {
+    schemaRows = [emailRow, hoursRow];
+    configReply = {
+      settings: [machine("email", "a@example.com", "local"), setting(hoursKey, "8", "hub")],
+    };
+    writeConfig.mockImplementation(reply("success"));
+    section();
+    clear("email");
+    clear(hoursKey);
+    fireEvent.click(await screen.findByRole("button", { name: "Save 2" }));
+    await screen.findByText("Saved.", { exact: false });
+
+    expect(writeConfig.mock.calls).toEqual([
+      [{ set: {}, unset: ["email"] }],
+      [{ set: {}, unset: [hoursKey], hub: true }],
+    ]);
+  });
+
+  it("a refusal stops the batch and keeps every draft", async () => {
+    schemaRows = [emailRow, hoursRow];
+    configReply = {
+      settings: [machine("email", "a@example.com", "local"), setting(hoursKey, "8", "hub")],
+    };
+    writeConfig.mockImplementation(reply("error"));
+    section();
+    clear("email");
+    clear(hoursKey);
+    fireEvent.click(await screen.findByRole("button", { name: "Save 2" }));
+    await screen.findByText("Refused.", { exact: false });
+
+    expect(writeConfig).toHaveBeenCalledTimes(1);
+    expect(writeConfig).toHaveBeenCalledWith({ set: {}, unset: ["email"] });
+    expect(screen.getByRole("button", { name: "Save 2" })).toBeTruthy();
+  });
+});

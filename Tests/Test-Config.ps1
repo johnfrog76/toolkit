@@ -544,8 +544,24 @@ try {
         Assert-True "...naming the sizes a Space may state" ($refusedTeam.Output -match '3, 6, 9') $refusedTeam.Output
     }
     Assert-Equal 'a refused size leaves the stored one as it was' 3 ([int](Get-HubSpace $box 'acme').features.teamSize)
+    # Without -Hub an -Unset removes this machine's patch only: the hub's value
+    # stands, and hub.json is not touched. This is why the settings form sends a
+    # hub-held unset with -Hub.
+    $hubBefore = Get-HubText $box
+    $noHub = Invoke-Config $box @('-Unset', 'spaces.acme.features.teamSize')
+    Assert-Equal '-Unset of a hub-held size without -Hub exits 0' 0 $noHub.ExitCode
+    Assert-Equal '...and leaves hub.json as it was' $hubBefore (Get-HubText $box)
     [void](Invoke-Config $box @('-Unset', 'spaces.acme.features.teamSize', '-Hub'))
     Assert-True '-Unset takes the size off the Space again' (-not ((Get-HubSpace $box 'acme').features -and (Get-HubSpace $box 'acme').features.PSObject.Properties['teamSize'])) (Get-HubText $box)
+
+    # The same two calls for a field the form draws as a text box.
+    $hours = Invoke-Config $box @('-Set', 'spaces.acme.features.trainingHoursPerQuarter=8', '-Hub')
+    Assert-Equal 'trainingHoursPerQuarter=8 -Hub exits 0' 0 $hours.ExitCode
+    $hubBefore = Get-HubText $box
+    [void](Invoke-Config $box @('-Unset', 'spaces.acme.features.trainingHoursPerQuarter'))
+    Assert-Equal '-Unset of hub-held training hours without -Hub leaves hub.json as it was' $hubBefore (Get-HubText $box)
+    [void](Invoke-Config $box @('-Unset', 'spaces.acme.features.trainingHoursPerQuarter', '-Hub'))
+    Assert-True '-Unset with -Hub takes the training hours off the Space' (-not ((Get-HubSpace $box 'acme').features -and (Get-HubSpace $box 'acme').features.PSObject.Properties['trainingHoursPerQuarter'])) (Get-HubText $box)
 
     # The first write of the Azure on-ramp. Setting a field on the
     # SHIPPED org must patch it -- not add an org called "test" (its slug then) with status

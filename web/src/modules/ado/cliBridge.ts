@@ -648,6 +648,27 @@ export function buildConfigEdit(
 }
 
 /**
+ * Split a batch by where its unsets land. `Config -Set` sends a Space's field
+ * to the hub, but `-Unset` of one removes this machine's patch unless `-Hub`
+ * is passed -- so clearing a field whose value the hub holds would succeed and
+ * change nothing. Those unsets go in a second write with `hub: true`; the rest
+ * stay one write without it, because `-Hub` would also turn a machine key's
+ * write into the hub's.
+ */
+export function splitHubUnsets(
+  edits: ConfigFieldEdit[],
+  hubHeld: (key: string) => boolean,
+): { rest: ConfigFieldEdit[]; hub: ConfigFieldEdit[] } {
+  const rest: ConfigFieldEdit[] = [];
+  const hub: ConfigFieldEdit[] = [];
+  for (const edit of edits) {
+    const cleared = edit.type !== "bool" && edit.value.trim() === "";
+    (cleared && hubHeld(edit.key) ? hub : rest).push(edit);
+  }
+  return { rest, hub };
+}
+
+/**
  * The keys whose value the agent reads once, at startup, so a change to one
  * genuinely needs `tkAgent -Stop; tkAgent`. Everything else is re-read per
  * request, and the two 45-second caches -- the ADO probe and the resolved

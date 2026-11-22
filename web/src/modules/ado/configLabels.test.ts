@@ -24,6 +24,21 @@ describe("configLabels", () => {
     expect(wordsFor("spaces.acme.features.sprintAwareness", "").hint).not.toMatch(/board/);
   });
 
+  // A key the drawer ASKS reads as its question, the Space's name filled the way
+  // the "How do I…" section fills it, and it still shows its key.
+  it("a key the drawer asks reads as its question, naming the Space", () => {
+    expect(wordsFor("spaces.acme.features.teamSize", "schema help", "Acme")).toEqual({
+      label: "How many are in my standup in Acme?",
+      hint: expect.stringMatching(/\.$/),
+      named: true,
+    });
+    expect(wordsFor("spaces.acme.features.teamSize", "").label).toBe(
+      "How many are in my standup in this Space?",
+    );
+    // A key named here keeps its own label, asked or not.
+    expect(wordsFor("spaces.acme.howIWork", "", "Acme").label).toBe("How you work here");
+  });
+
   it("a shortcut's label carries the shortcut's own name", () => {
     expect(wordsFor("aliases.Hub.path", "").label).toBe("Shortcut: Hub");
   });

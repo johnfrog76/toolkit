@@ -19,8 +19,10 @@
  * you want to work?, what is checked, and what can be picked, is the agent's
  * answer for the Space you are in (/env howIWork); the web never re-derives it.
  * Any other asking entry (How many are in my standup?) checks the value the
- * Space's own entry holds at its key -- none while it is unset -- and its
- * answers are live by the Space's tracker (/env tracker).
+ * Space's own entry holds at its key, opens on Default -- the way back to
+ * unset, checked while it is unset, and a pick of it is `Config -Unset
+ * <answerKey> -Hub` -- and its answers are live by the Space's tracker (/env
+ * tracker).
  */
 import { useState } from "react";
 import {
@@ -45,6 +47,7 @@ import { useWriteConfigMutation, useWriteHowWeWork } from "./registry";
 import type { HowWeWorkOutcome } from "../modules/studio/howWeWork";
 import {
   WORKFLOW_ENTRIES,
+  answerChoices,
   answerLive,
   answerStored,
   answerTarget,
@@ -184,7 +187,8 @@ function Answers({
   const [picked, setPicked] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
-  const answers = entry.answers ?? [];
+  // Default, the way back to unset, first -- for every asking entry but howIWork.
+  const answers = answerChoices(entry);
   // No answer from the agent (an older one, or not yet): nothing can be picked.
   const tracker: TrackerKind = how?.tracker ?? "none";
   const locked = how ? how.locked : true;
@@ -203,10 +207,17 @@ function Answers({
     setNote(null);
     setSaving(true);
     try {
-      const reply = await writeConfig({ set: { [target]: next }, unset: [], hub: true }).unwrap();
+      // Default is an unset, and the Space's value is the hub's: -Unset -Hub.
+      const edit =
+        next === "" ? { set: {}, unset: [target] } : { set: { [target]: next }, unset: [] };
+      const reply = await writeConfig({ ...edit, hub: true }).unwrap();
       if (reply.result.status !== "success") {
         setPicked(undefined);
-        setRefused(reply.result.error || reply.result.output || "Config -Set refused.");
+        setRefused(
+          reply.result.error ||
+            reply.result.output ||
+            (next === "" ? "Config -Unset refused." : "Config -Set refused."),
+        );
       } else if (howIWork && next === "agents" && slug) {
         setNote(await writeHowWeWork(slug));
       }
@@ -235,12 +246,17 @@ function Answers({
                 <Radio
                   value={a.value}
                   label={{ children: a.label, className: live ? undefined : styles.lockedLabel }}
-                  aria-describedby={`${baseId}-${a.value}`}
+                  aria-describedby={a.sentence ? `${baseId}-${a.value || "unset"}` : undefined}
                   disabled={!live || (saving && a.value !== value)}
                 />
-                <Caption1 id={`${baseId}-${a.value}`} className={styles.answerSentence}>
-                  {a.sentence}
-                </Caption1>
+                {a.sentence ? (
+                  <Caption1
+                    id={`${baseId}-${a.value || "unset"}`}
+                    className={styles.answerSentence}
+                  >
+                    {a.sentence}
+                  </Caption1>
+                ) : null}
               </div>
             );
           })}

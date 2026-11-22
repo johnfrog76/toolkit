@@ -589,7 +589,9 @@ Space-scoped switch, like `sprintAwareness`, and the tracker the Space's address
 | none (your own cards) | `alone` | no: derived -- connect a tracker to unlock working with agents |
 
 `tkConfig -Set spaces.<slug>.howIWork=agents -Hub` (or `=alone`), or the Settings drawer's "How do I…"
-section, whose radios run that line through `PUT /api/config`. The schema allows `alone` and `agents`
+section, whose radios run that line through `PUT /api/config`; the drawer's Configuration row for the key
+is a select that opens on **Default** -- plain, because unset is derived rather than one value -- and
+Default is `tkConfig -Unset spaces.<slug>.howIWork -Hub`. The schema allows `alone` and `agents`
 only -- `team` is what an Azure DevOps address means, and writing it is refused like any unknown value; a
 value stored on a Space whose tracker decides is ignored, never an error. The tracker is the ADDRESS's, so a
 GitHub Space that is still `local` is asked too, and its standup fills from its cards.
@@ -661,6 +663,11 @@ tkConfig -Set spaces.<slug>.features.teamSize=4 -Hub   # refused (exit 2): "... 
 tkConfig -Unset spaces.<slug>.features.teamSize -Hub   # back to nine
 ```
 
+In the settings drawer's Configuration section the row is labelled by its question, "How many are in
+my standup in \<Space>?" (the Space's name filled in), with the key under it, and is a select:
+**Default (9)**, then 3, 6 and 9. Default runs the `-Unset` line above, and the row reads `unset` again,
+as on a new Space. The 9 is `consts.json` `rituals.teamSizeDefault`, not a word the page types.
+
 `Config -Set` is the one writer: the schema row is an `int` with allowed values (`int(3|6|9)` in
 `Config -Schema`), so any other number is a stated refusal whose hint names the three, and nothing is
 written. It is declared in `consts.json` `features.spaceScoped`, so the hub keeps it on the Space's entry
@@ -672,8 +679,10 @@ cast in `consts.json` `rituals.room`. The inventory row, `Team size`, rides Team
 as the `Suggestions` row does: `off`, with `rides Team Agile, which is off in <slug>`, where Team Agile is
 off in that Space (the switch off, or the Space's `howIWork` not `agents`); where it is on, `on` with the
 number once one of the three is set and `not configured` while nothing is (the room is nine), under
-the question "How many are in my standup in \<Space>?"; the settings drawer draws that question as three
-radios, live on a GitHub Space, each writing the size through `PUT /api/config` with `-Hub`.
+the question "How many are in my standup in \<Space>?"; the settings drawer draws that question as four
+radios, live on a GitHub Space: **Default (9)** first, checked while the size is unset and writing
+`Config -Unset spaces.<slug>.features.teamSize -Hub`, then 3, 6 and 9, each writing the size through
+`PUT /api/config` with `-Hub`.
 
 ## `features.ado` is not like the other flags
 

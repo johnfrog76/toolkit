@@ -8,6 +8,8 @@
 // it shows under its own name with the schema's help, so a new key is never
 // hidden -- only plain until someone names it.
 
+import { entryAsking, entryQuestion } from "../../shell/settingsWorkflows";
+
 export interface SettingWords {
   label: string;
   hint: string;
@@ -158,9 +160,25 @@ export function schemaKeyOf(key: string): string {
   return key;
 }
 
-export function wordsFor(key: string, schemaHelp: string): SettingWords & { named: boolean } {
+/**
+ * A key named here reads as its label. One the drawer ASKS instead -- an entry
+ * of Config/settings-workflows.json with answers, "How many are in my standup
+ * in {space}?" -- reads as that question, the Space's name filled in the way
+ * the "How do I…" section fills it, and the entry's sentence. Anything else
+ * reads as its key and the schema's help.
+ */
+export function wordsFor(
+  key: string,
+  schemaHelp: string,
+  spaceName?: string,
+): SettingWords & { named: boolean } {
   const words = WORDS[schemaKeyOf(key)];
-  if (!words) return { label: key, hint: schemaHelp, named: false };
+  if (!words) {
+    const asking = entryAsking(schemaKeyOf(key));
+    if (asking)
+      return { label: entryQuestion(asking, spaceName), hint: asking.sentence, named: true };
+    return { label: key, hint: schemaHelp, named: false };
+  }
   // A shortcut's label carries its own name: "Shortcut: Hub".
   const alias = /^aliases\.([^.]+)\.path$/.exec(key);
   return { ...words, label: alias ? `${words.label}: ${alias[1]}` : words.label, named: true };
