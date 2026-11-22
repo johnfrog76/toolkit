@@ -15,9 +15,11 @@ so it runs wherever the suite would.
     python Scripts/requirements_floors.py --json     # the same, for a caller (Scripts/Resolve-Python.ps1)
     python Scripts/requirements_floors.py --json path/to/requirements.txt ...
 
-What a version may look like is PEP 440's public form: an epoch, a release number of any
-length (``2.7`` equals ``2.7.0``), and an optional pre-, post- or dev-release; a local label
-(``+cpu``) is ignored. An installed version that does not parse is reported, not guessed at.
+A requirement line, a package name and a version are read by ``Scripts/requirement_rules.py``,
+the one reading ``Scripts/third_party_notices.py`` uses too. A version is PEP 440's public form:
+an epoch, a release number of any length (``2.7`` equals ``2.7.0``), and an optional pre-, post-
+or dev-release; a local label (``+cpu``) is ignored. An installed version that does not parse is
+reported, not guessed at.
 """
 
 import argparse
@@ -27,54 +29,17 @@ import re
 import sys
 from pathlib import Path
 
+# The shared reading of a requirement line, a name and a version sits beside this script; put
+# its folder on the path so the import works however this file is loaded (run, or by path).
+_HERE = str(Path(__file__).resolve().parent)
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)
+from requirement_rules import normalise_name, parse_requirement, release, version_key  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 REQUIREMENTS = ("agent/requirements.txt", "agent/requirements-dev.txt")
 # The one line that brings an environment up to both files: the dev file includes the runtime one.
 FIX_ARGS = "-m pip install -r agent/requirements-dev.txt"
-
-_VERSION = re.compile(
-    r"""^\s*v?
-    (?:(?P<epoch>\d+)!)?
-    (?P<release>\d+(?:\.\d+)*)
-    (?:[-_.]?(?P<pre>a|b|c|rc|alpha|beta|pre|preview)[-_.]?(?P<pre_n>\d*))?
-    (?:-(?P<post_implicit>\d+)|[-_.]?(?:post|rev|r)[-_.]?(?P<post_n>\d*))?
-    (?:[-_.]?dev[-_.]?(?P<dev_n>\d*))?
-    (?:\+[a-z0-9.]*)?
-    \s*$""",
-    re.IGNORECASE | re.VERBOSE,
-)
-_PRE_RANK = {"a": 0, "alpha": 0, "b": 1, "beta": 1, "c": 2, "rc": 2, "pre": 2, "preview": 2}
-_NAME = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*(.*)$")
-_SPEC = re.compile(r"^\s*(===|~=|==|!=|<=|>=|<|>)\s*(\S+?)\s*$")
-
-
-def normalise_name(name):
-    """PEP 503: case, and any run of ``-``, ``_`` and ``.``, do not tell two names apart."""
-    return re.sub(r"[-_.]+", "-", name).lower()
-
-
-def version_key(text):
-    """A sortable key for a PEP 440 version, or None when it does not parse."""
-    m = _VERSION.match(text or "")
-    if not m:
-        return None
-    release = [int(p) for p in m.group("release").split(".")]
-    while len(release) > 1 and release[-1] == 0:
-        release.pop()
-    has_pre = m.group("pre") is not None
-    has_post = m.group("post_implicit") is not None or m.group("post_n") is not None
-    has_dev = m.group("dev_n") is not None
-    if has_pre:
-        pre = (0, _PRE_RANK[m.group("pre").lower()], int(m.group("pre_n") or 0))
-    elif has_dev and not has_post:
-        pre = (-1, 0, 0)  # 1.0.dev1 sorts before 1.0a1
-    else:
-        pre = (1, 0, 0)
-    post = (-1,)
-    if has_post:
-        post = (int(m.group("post_implicit") or m.group("post_n") or 0),)
-    dev = (1, 0) if not has_dev else (0, int(m.group("dev_n") or 0))
-    return (int(m.group("epoch") or 0), tuple(release), pre, post, dev)
 
 
 def satisfies(installed, op, wanted):
@@ -85,7 +50,7 @@ def satisfies(installed, op, wanted):
         have, prefix = version_key(installed), version_key(wanted[:-2])
         if have is None or prefix is None:
             return None
-        same = have[0] == prefix[0] and _prefix_matches(have, _release(wanted[:-2]))
+        same = have[0] == prefix[0] and _prefix_matches(have, release(wanted[:-2]))
         return same if op == "==" else not same
     have, want = version_key(installed), version_key(wanted)
     if have is None or want is None:
@@ -104,47 +69,14 @@ def satisfies(installed, op, wanted):
         return have != want
     if op == "~=":
         # ~=2.7.1 is >=2.7.1 and ==2.7.*: the release with its last part dropped is a prefix.
-        stem = _release(wanted)[:-1] or _release(wanted)
+        stem = release(wanted)[:-1] or release(wanted)
         return have >= want and _prefix_matches(have, stem)
     return None
-
-
-def _release(text):
-    """The release numbers as written (trailing zeros kept), without epoch or suffixes."""
-    m = _VERSION.match(text or "")
-    return [int(p) for p in m.group("release").split(".")] if m else []
 
 
 def _prefix_matches(key, stem):
     rel = list(key[1]) + [0] * len(stem)
     return rel[: len(stem)] == stem
-
-
-def parse_requirement(line):
-    """One requirement line as (name, [(op, version), ...]), or None for a line that names none.
-
-    A comment, a blank line and a pip option (``-r``, ``-c``, ``--index-url``) name none. Extras
-    (``uvicorn[standard]``), an environment marker (``; python_version < "3.13"``) and a trailing
-    comment are taken off; a direct reference (``name @ url``) is a name with no version to check.
-    """
-    text = line.split(" #", 1)[0].split("\t#", 1)[0]
-    if text.lstrip().startswith("#"):
-        return None
-    text = text.split(";", 1)[0].strip()
-    if not text or text.startswith("-"):
-        return None
-    m = _NAME.match(text)
-    if not m:
-        return None
-    name, rest = m.group(1), m.group(2).strip()
-    if rest.startswith("@"):
-        return (name, [])
-    specs = []
-    for part in [p for p in rest.split(",") if p.strip()]:
-        s = _SPEC.match(part)
-        if s:
-            specs.append((s.group(1), s.group(2)))
-    return (name, specs)
 
 
 def read_requirements(paths, root=ROOT):
@@ -174,7 +106,7 @@ def read_requirements(paths, root=ROOT):
                 continue
             req = parse_requirement(raw)
             if req:
-                out.append((req[0], req[1], label(path)))
+                out.append((req[0], req[2], label(path)))
 
     for p in paths:
         walk(Path(p))

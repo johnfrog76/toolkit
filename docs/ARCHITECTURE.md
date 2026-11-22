@@ -59,7 +59,7 @@ answers: `version` (the product's, `consts.json`'s -- the System page's Environm
 its footer), machine and OS, `tier` and its label, `spaceStatus`, the `features` map, whether an
 Anthropic key is configured, `displayName`, `cliPrefix`, the `cardTypes` a card may be, two derived booleans named by `consts.json`
 -- `startWorkLaunch` (`claude` on the agent's `PATH`) and `claudeUsage` (Claude Code's session files on
-this machine, the **Claude Code usage** inventory row's rule) --, `tracker`
+this machine, the **Claude Code usage** inventory row's rule) --, `azSignIn` (`{needed, installed, signedIn, command}`: whether the shell draws the Azure DevOps sign-in strip, probed by `az account show` behind the reachability probe's cache, [the add-on](modules/ado.md#signing-in)), `tracker`
 (which tracker the active board's address names -- `"ado"`, `"github"` or `"none"`), `howIWork` (the
 active Space's answer to "How do you want to work here?", `answer`, `source`, `tracker`, `locked` and
 Team Agile's `switch` as set -- `features` already carries the gate), `identity`

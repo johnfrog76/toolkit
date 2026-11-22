@@ -134,6 +134,18 @@ export interface EnvStatus {
    *  holds this to be the one place it is. The System page draws its burn tile, and
    *  asks GET /api/usage/burn, only when this is true; absent reads off. */
   claudeUsage?: boolean;
+  /** The Azure DevOps sign-in strip's state, from the agent (agent/core/signin.py) and never
+   *  re-derived here: `needed` is true only on an active Azure DevOps Space where az is installed
+   *  and not signed in. `installed` and `signedIn` are null where az was not asked. `command` is
+   *  consts.json signIn.azCommand. The field's name is consts.json signIn.envField; an interface
+   *  cannot take a computed name, so it is spelled here, and consts.test.ts holds this to be the
+   *  one place it is. Absent from an older agent, which reads as no strip. */
+  azSignIn?: {
+    needed: boolean;
+    installed: boolean | null;
+    signedIn: boolean | null;
+    command: string;
+  };
   anthropicConfigured: boolean;
   // The provider profile's model id, ai.model in config.
   aiModel?: string;

@@ -306,7 +306,7 @@ else {
 
 if ($azCliInstalled) {
     $orgIsQuiet = ($cfg.OrgStatus -eq 'local' -or $cfg.OrgStatus -eq 'archive')
-    $loginDetail = if (-not $azAuthenticated) { 'not logged in -- run az login' }
+    $loginDetail = if (-not $azAuthenticated) { "not logged in -- run $((Get-P20Consts).signIn.azCommand)" }
     elseif ($azIdentity) { $azIdentity }
     else { 'authenticated (identity not reported by az)' }
     if ($orgIsQuiet -and -not $azAuthenticated) {

@@ -291,6 +291,9 @@ $expected = [ordered]@{
     'ghReads.repoMissing'       = 'could not resolve to a repository,not found (http 404),http 404'
     # Claude Code usage: /env's flag (and the inventory row's key), and the burn route.
     'usage.envFlag'             = 'claudeUsage'
+    # The Azure DevOps sign-in: the one command the hints say, and /env's field for the strip.
+    'signIn.azCommand'          = 'az login --allow-no-subscriptions'
+    'signIn.envField'           = 'azSignIn'
     'usage.burnRoute'           = '/api/usage/burn'
     # The statuses a reply may set, per tracker: ReplyPR's GitHub refusal and the PR Comments status box read them.
     'replyStatuses.ado'         = 'fixed,active,pending,byDesign,wontFix,closed'
@@ -574,6 +577,8 @@ $guarded = [ordered]@{
     # The Claude Code usage row's key IS /env's flag: Get-OptionalSurfaces.ps1
     # reads (Get-P20Consts).usage.envFlag.
     'usage.envFlag'              = 'claudeUsage'
+    # The sign-in command: every hint that says it reads (Get-P20Consts).signIn.azCommand.
+    'signIn.azCommand'           = 'az login --allow-no-subscriptions'
     # The cost line's unpriced phrase: Write-BurnLog.ps1 reads (Get-P20Consts).usage.unpricedPhrase.
     'usage.unpricedPhrase'       = 'not counting'
     # The org chart's file name: Scripts read (Get-P20Consts).org.file.

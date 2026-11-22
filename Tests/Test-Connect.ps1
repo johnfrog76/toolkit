@@ -113,7 +113,7 @@ try {
     Assert-Equal 'the tracker is Azure DevOps' 'ado' $a.tracker
     Assert-Equal 'and the grain is an organisation (D-W17)' 'an Azure DevOps organisation, projects inside it' $a.grain
     Assert-Equal 'step 2 names the tool' 'az' $a.steps.signIn.tool
-    Assert-True 'step 2 says the command and is not done (the sandbox az answers nothing)' ($a.steps.signIn.command -eq 'az login' -and -not $a.steps.signIn.done)
+    Assert-True 'step 2 says the command and is not done (the sandbox az answers nothing)' ($a.steps.signIn.command -eq 'az login --allow-no-subscriptions' -and -not $a.steps.signIn.done)
     # A Space that SHIPS with an address and stays local -- the GitHub demo --
     # has the address and not the step: saving the same address connects it.
     $rd = Get-Json (Invoke-Connect 'tkConnect ready -AsJson')

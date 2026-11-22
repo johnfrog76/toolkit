@@ -737,6 +737,19 @@ def gh_repo_missing_markers() -> tuple[str, ...]:
     return tuple(str(m) for m in consts()["ghReads"]["repoMissing"])
 
 
+def az_login_command() -> str:
+    """``az login --allow-no-subscriptions`` -- the one command a person types to sign
+    in to Azure DevOps. Said and checked, never run: /env serves it, the CLI's hints
+    print it and the web's sign-in strip shows it from the same key."""
+    return consts()["signIn"]["azCommand"]
+
+
+def sign_in_env_field() -> str:
+    """``azSignIn`` -- the name of the object ``GET /api/env`` carries for the sign-in
+    strip; the web reads it by the same name."""
+    return consts()["signIn"]["envField"]
+
+
 def usage_env_flag() -> str:
     """``claudeUsage`` -- the name of the top-level boolean ``GET /api/env`` carries for
     Claude Code usage on this machine, and the inventory row's key; the System page's

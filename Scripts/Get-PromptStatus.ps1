@@ -125,12 +125,12 @@ if ($Board) {
     }
     elseif (-not (Get-Command az -ErrorAction SilentlyContinue)) {
         $boardRefusal = 'az (the Azure CLI) is not installed, so the board cannot be read.'
-        $boardHint = 'Install it from https://aka.ms/installazurecli, then az login.'
+        $boardHint = "Install it from https://aka.ms/installazurecli, then $($script:Consts.signIn.azCommand)."
     }
     else {
         if ((Invoke-P20TrackerRead 'az' @('account', 'show', '--output', 'none')).Code -ne 0) {
             $boardRefusal = 'az is not signed in, so the board cannot be read.'
-            $boardHint = 'Run: az login'
+            $boardHint = "Run: $($script:Consts.signIn.azCommand)"
         }
     }
     if ($boardRefusal) {

@@ -552,3 +552,13 @@ export const RE = {
    *  group 1 the name before the `<email>`, untrimmed. */
   coAuthorTrailer: toRegExp(consts.regex.coAuthorTrailer),
 };
+
+/**
+ * The Azure DevOps sign-in (docs/modules/ado.md, "Signing in"): the one command a
+ * person types, and the name of the object /env carries for the sign-in strip.
+ * Said and checked, never run -- this app only shows the command.
+ */
+export const SIGN_IN = consts.signIn as {
+  azCommand: string;
+  envField: string;
+};

@@ -157,13 +157,14 @@ def _fresh_agent_cache(tmp_path, monkeypatch):
     (agent/solitaire/tracker.py, standup.py): a fixture's repo is whatever the
     test says it holds, and a read one test kept must never answer for another."""
     monkeypatch.setenv(AGENT_CACHE_ENV, str(tmp_path / "agent-cache"))
-    from agent.core import identity, tier
+    from agent.core import identity, signin, tier
     from agent.solitaire import standup, tracker
 
     tracker.forget()
     standup.clear_dressed()
     tier.probe_cache_clear()
     identity.identity_cache_clear()
+    signin.signin_cache_clear()
     yield
 
 

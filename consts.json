@@ -446,6 +446,12 @@
     "unpricedPhrase": "not counting"
   },
 
+  "signIn": {
+    "_": "The Azure DevOps sign-in (docs/modules/ado.md, \"Signing in\"). azCommand is the one command a person types to sign in to Azure DevOps: Setup and Env print it, Connect names it, the agent's /env serves it and the web's sign-in strip shows it with a Copy button. Said and checked, never run -- no half executes it. `--allow-no-subscriptions` is part of it because an Azure DevOps organisation needs a tenant sign-in and not an Azure subscription, and a plain `az login` fails for an account that has none. envField is the literal name of the object GET /api/env carries for it ({needed, installed, signedIn, command}): the agent serves it and the web reads it by this name; `needed` is true only on an active Azure DevOps Space where az is installed and not signed in.",
+    "azCommand": "az login --allow-no-subscriptions",
+    "envField": "azSignIn"
+  },
+
   "org": {
     "_": "The org chart's hub file (docs/hub/org.md): the name of the file at the hub root, beside hub.json, that holds the org's trees, positions and seats. The CLI reads it (Scripts/Read-OrgChart.ps1, the OrgChart verb and the inventory row), the agent serves it (GET rituals.orgRoute), and the web will draw it, so all three type the name from here.",
     "file": "org.json"

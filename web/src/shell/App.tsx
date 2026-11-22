@@ -11,6 +11,7 @@ import { ThemePicker } from "./ThemePicker";
 import { AvatarMenu, switcherChoices } from "./AvatarMenu";
 import { SpaceAnchor } from "./SpaceAnchor";
 import { PageHeading } from "./PageHeading";
+import { SignInStrip } from "./SignInStrip";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -546,6 +547,10 @@ export function App() {
               {agentAway ? (
                 <AgentLostBanner onRetry={checkAgent} retrying={heartbeatFetching || envFetching} />
               ) : null}
+              {/* On an Azure DevOps Space where az is installed and not signed in, and
+                  only there: a short, neutral strip with the command to copy. The
+                  agent decides; it is the shell's, so every page you work from has it. */}
+              <SignInStrip env={env} />
               <Routes>
                 {routes.map((route) => (
                   <Route key={String(route.path)} path={route.path} element={route.element} />

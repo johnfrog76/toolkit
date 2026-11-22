@@ -262,6 +262,16 @@ follows a sign-in redirect to a 200, which reads as a false positive, and the Be
 302 even when the CLI works. What the toolkit actually uses for every real call is the CLI, so the
 CLI is what "reachable" should mean.
 
+### The sign-in strip's state
+
+`GET /env` carries `azSignIn` (the field's name is `consts.json` `signIn.envField`): `{needed, installed,
+signedIn, command}`, from `core/signin.py`. `needed` is true only on an `active` Space whose address names
+Azure DevOps, with `az` installed and `az account show` failing; a `local` or archived Space, a GitHub
+Space and a machine with no `az` are all `needed: false`, and where `az` is not asked `installed` and
+`signedIn` are `null`. The probe is off the event loop, behind the same 45-second TTL as the reachability
+probe; `?refresh=1` and `POST /switch-mode` go past it. `command` is `consts.json` `signIn.azCommand`.
+The agent only asks `az`: it never signs in (`Tests/test_signin.py`).
+
 ### One identity, three routes
 
 `/prs`, `/dashboard` and `/work-items` filter by a person, and the CLI resolves who that is with a
