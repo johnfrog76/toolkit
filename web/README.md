@@ -898,6 +898,19 @@ the drawer is open -- and closing hands focus back to it (`useRestoreFocusTarget
 It is a frame, not a settings framework: each section keeps owning its own storage, and this is
 only where they surface.
 
+**It opens with its settings already read.** The settings list is read through the CLI and the first
+read is slow, so once `/env` has answered the shell starts each active module's `prefetch`
+(`usePrefetchModules`, `src/shell/prefetchModules.ts`) -- the ado module's asks for `GET /api/config`
+and `GET /api/config/schema` and nothing waits on it; a module that is off asks for nothing, and a
+read that fails is silent, because the drawer shows its own error when it opens. Both reads are kept
+for the session (`SESSION_CACHE`). Opening the drawer draws the stored list at once and reads it again
+in the background, so a change made from the command line still shows, and a refresh that fails
+leaves the stored list in place; a save still writes the re-read list straight into the store. **A
+link to a setting lands on its row because the row is drawn**, not because a timer found it: the
+drawer looks once it has settled, and if the row is not there yet it watches the page until it is,
+for as long as the drawer stays open at that place. `SettingsDrawer.arrive.test.tsx`,
+`prefetchModules.test.tsx` and `settingsStore.test.tsx` hold it.
+
 **The Face card is NOT in it, on purpose.** The drawer holds what you *configure*; the faces are for
 fun, and `FacePicker` is drawn by the Lounge (spec D-L24).
 
