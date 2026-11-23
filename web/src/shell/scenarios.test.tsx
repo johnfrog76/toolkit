@@ -56,6 +56,7 @@ import { DeckState } from "../modules/deck/decks/types";
 import type { StatusResponse } from "../modules/ado/api.ado";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { AvatarMenu } from "./AvatarMenu";
+import { menuReleases, onLoadReleases } from "./releaseNotes";
 import { signInCommand } from "./SignInStrip";
 import { SPACE_QUICK_MENU_THRESHOLD } from "./SpaceQuickMenu";
 import {
@@ -1018,6 +1019,7 @@ describe("the scenario grid: the avatar menu's Space entry, by count", () => {
         onSwitchSpace={() => {}}
         links={[]}
         onOpenSettings={() => {}}
+        onOpenWhatsNew={() => {}}
         restoreFocusTarget={{}}
       />,
     );
@@ -1050,6 +1052,50 @@ describe("the scenario grid: the avatar menu's Space entry, by count", () => {
       rows: SPACE_QUICK_MENU_THRESHOLD,
       viewAll: true,
     });
+  });
+});
+
+// What's new, by the running version and the browser's mark
+// (docs/SCENARIOS.md, "What's new, by the running version ..."). The dialog and
+// the menu item are WhatsNew.test.tsx's; this is the rule's table.
+describe("the scenario grid: what's new, by version and mark", () => {
+  const file = ["1.7.0", "1.6.0", "1.5.0", "1.4.0"].map((version) => ({
+    version,
+    date: "",
+    groups: [],
+  }));
+  const names = (rs: { version: string }[]) => rs.map((r) => r.version);
+  it.each<[string, string, string | null, string[], string[]]>([
+    ["no mark", "1.7.0", null, ["1.7.0"], ["1.7.0"]],
+    ["the version before", "1.7.0", "1.6.0", ["1.7.0"], ["1.7.0"]],
+    ["skipped versions", "1.7.0", "1.4.0", ["1.7.0", "1.6.0", "1.5.0"], ["1.7.0"]],
+    ["already shown", "1.7.0", "1.7.0", [], ["1.7.0"]],
+    ["a downgrade", "1.5.0", "1.7.0", [], ["1.5.0"]],
+    ["an unreleased build", "1.8.0", "1.6.0", [], ["1.7.0"]],
+  ])("%s", (_label, running, seen, onItsOwn, menu) => {
+    expect(names(onLoadReleases(file, running, seen))).toEqual(onItsOwn);
+    expect(names(menuReleases(file, running))).toEqual(menu);
+  });
+
+  it("the menu item is in the Settings group after All settings, with no links and no module", async () => {
+    const view = render(
+      <AvatarMenu
+        unsaved={0}
+        spaces={[]}
+        activeSpace=""
+        onSwitchSpace={() => {}}
+        links={[]}
+        onOpenSettings={() => {}}
+        onOpenWhatsNew={() => {}}
+        restoreFocusTarget={{}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "You and your settings" }));
+    const items = (await screen.findAllByRole("menuitem")).map((i) => i.textContent);
+    const all = items.findIndex((t) => t?.startsWith("All settings"));
+    expect(all).toBeGreaterThanOrEqual(0);
+    expect(items[all + 1]).toBe("What's new");
+    view.unmount();
   });
 });
 

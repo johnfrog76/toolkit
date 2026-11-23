@@ -12,10 +12,12 @@ RUN npm ci
 # The files the build-time aliases resolve to, at the paths they resolve to:
 # /app is web/, so ../consts.json is /consts.json and
 # ../Config/settings-workflows.json is /Config/settings-workflows.json (the
-# @workflows alias, settings by workflow). tests/viteconfig.mjs holds the rule:
+# @workflows alias, settings by workflow) and ../CHANGELOG.md is /CHANGELOG.md
+# (the @changelog alias, what's new). tests/viteconfig.mjs holds the rule:
 # every alias vite.config.ts points outside web/ has a COPY line here.
 COPY consts.json /consts.json
 COPY Config/settings-workflows.json /Config/settings-workflows.json
+COPY CHANGELOG.md /CHANGELOG.md
 COPY web/ .
 RUN npm run build
 

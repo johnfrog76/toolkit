@@ -41,6 +41,9 @@ export default {
   moduleNameMapper: {
     "^@consts$": "<rootDir>/../consts.json",
     "^@workflows$": "<rootDir>/../Config/settings-workflows.json",
+    // The packaged CHANGELOG.md as text (what's new). A markdown file is not a
+    // module, so a stub reads the REAL file and exports it as the default.
+    "^@changelog$": "<rootDir>/tests/changelog.jest.cjs",
     // React Router 8's one file that reads import.meta, swapped for a stub
     // (tests/routeModules.jest.cjs says why). Only react-router imports it.
     "^\\./routeModules\\.js$": "<rootDir>/tests/routeModules.jest.cjs",
