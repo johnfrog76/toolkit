@@ -26,7 +26,7 @@ import re
 _REQ = re.compile(
     r"^\s*(?P<name>[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)\s*"
     r"(?:\[(?P<extras>[^\]]*)\])?\s*"
-    r"(?:\((?P<pspec>[^)]*)\)|(?P<spec>[^;]*))?"
+    r"(?:\((?P<pspec>[^)]*)\)\s*|(?P<spec>[^;]*))?"
     r"(?:;(?P<marker>.*))?$"
 )
 _CLAUSE = re.compile(r"\s*(===|==|!=|<=|>=|~=|<|>)\s*(\S+)\s*$")
