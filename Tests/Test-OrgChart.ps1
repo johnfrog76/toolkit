@@ -13,8 +13,11 @@
                       every way the file can be wrong -- unreadable, no trees,
                       an entry with no id, no or unknown activeTree, a repeated
                       id (trees, positions, seats), a reportsTo that names
-                      nothing, a loop, no root or several, a prompt that is not
-                      a file in the agentic folder, an unknown -Tree. Each ok
+                      nothing, a loop, no root or several, a prompt found in
+                      each of the three folders a role is looked up in (the
+                      hub's roles, the hub's agentic folder, the toolkit's
+                      roles) and the hub's winning over the toolkit's, a prompt
+                      in none of them, an unknown -Tree. Each ok
                       case says the response it returns (compared as JSON) and
                       the lines the CLI prints; each failure says its kind and
                       its sentence.
@@ -118,7 +121,27 @@ function New-CaseHub($Case, $Table) {
     if (Test-Prop $Case 'promptFolders') {
         foreach ($name in @($Case.promptFolders)) { New-Item -ItemType Directory -Path (Join-Path $hub "$folder/$name") -Force | Out-Null }
     }
+    $roles = [string](Get-P20Consts).org.rolesFolder
+    if (Test-Prop $Case 'hubOrgPrompts') {
+        New-Item -ItemType Directory -Path (Join-Path $hub "$folder/$roles") -Force | Out-Null
+        foreach ($name in @($Case.hubOrgPrompts)) { [System.IO.File]::WriteAllText((Join-Path $hub "$folder/$roles/$name"), '', $utf8) }
+    }
     return $hub
+}
+function New-CasePackage($Case) {
+    # The scratch package a table row reads against: exactly its shippedPrompts in
+    # agentic/<roles>/ and its shippedFlatPrompts in agentic/, so the real shipped
+    # roles never decide a row.
+    $pkg = Join-Path $casesDir "$($Case.name).pkg"
+    $roles = [string](Get-P20Consts).org.rolesFolder
+    New-Item -ItemType Directory -Path (Join-Path $pkg "agentic/$roles") -Force | Out-Null
+    if (Test-Prop $Case 'shippedPrompts') {
+        foreach ($name in @($Case.shippedPrompts)) { [System.IO.File]::WriteAllText((Join-Path $pkg "agentic/$roles/$name"), '', $utf8) }
+    }
+    if (Test-Prop $Case 'shippedFlatPrompts') {
+        foreach ($name in @($Case.shippedFlatPrompts)) { [System.IO.File]::WriteAllText((Join-Path $pkg "agentic/$name"), '', $utf8) }
+    }
+    return $pkg
 }
 function Get-Snapshot([string]$Dir) {
     return ((@(Get-ChildItem -LiteralPath $Dir -Recurse -Force | Sort-Object FullName | ForEach-Object {
@@ -196,9 +219,10 @@ try {
     Assert-True 'the table has cases' (@($table.cases).Count -gt 20) "$(@($table.cases).Count) cases"
     foreach ($case in $table.cases) {
         $hub = New-CaseHub $case $table
+        $casePkg = New-CasePackage $case
         $treeId = ''
         if (Test-Prop $case 'tree') { $treeId = [string]$case.tree }
-        $read = Read-P20OrgChart -PromptsRoot $hub -PackageRoot $pkgDir -TreeId $treeId
+        $read = Read-P20OrgChart -PromptsRoot $hub -PackageRoot $casePkg -TreeId $treeId
         $want = $case.expect
         Assert-Equal "$($case.name): status" $want.status $read.Status $read.Message
         if ($want.status -eq 'ok') {
@@ -311,7 +335,7 @@ try {
     $snapBefore = Get-Snapshot $hubDir
     $noPrompt = Invoke-OrgChart 'tkOrgChart'
     Assert-Equal 'a prompt that is not in the agentic folder: exit 2' '2' $noPrompt.Exit $noPrompt.All
-    Assert-True '  and names the position and the prompt' ($noPrompt.All.Contains("Position 'team-lead' in tree 'main' names the prompt 'team-lead.prompt.md', which is not a file in the hub's agentic/ folder.")) $noPrompt.All
+    Assert-True '  and names the position and the prompt' ($noPrompt.All.Contains("Position 'team-lead' in tree 'main' names the prompt 'team-lead.prompt.md', which is not a file in the hub's agentic/org/ or agentic/ folder or the toolkit's agentic/org/.")) $noPrompt.All
     Assert-True '  and writes nothing' ((Get-Snapshot $hubDir) -ceq $snapBefore)
     [System.IO.File]::WriteAllText($leadPrompt, '', $utf8)
     $unknownTree = Invoke-OrgChart 'tkOrgChart -Tree nope'
@@ -366,6 +390,16 @@ try {
         (@($sample.Chart.tree.positions | ForEach-Object { $_.seats } | Where-Object { $_.person }).Count -eq 1) -and
         (@($sample.Chart.tree.positions | ForEach-Object { $_.seats } | Where-Object { $_.state -eq 'vacant' }).Count -eq 1) -and
         (@($sample.Chart.tree.positions | Where-Object { @($_.seats).Count -eq 0 -and $_.defaultModel }).Count -eq 1))
+    $intern = $sample.Chart.tree.positions | Where-Object { $_.id -eq 'intern' } | Select-Object -First 1
+    Assert-True '  its intern names the role the toolkit ships, found in agentic/org/ (the sample hub has no copy)' (
+        $intern -and $intern.prompt -eq 'intern.prompt.md' -and $intern.reportsTo -eq 'pm' -and
+        (Test-Path -LiteralPath (Join-Path $pkgRoot 'agentic/org/intern.prompt.md') -PathType Leaf) -and
+        -not (Test-Path -LiteralPath (Join-Path $pkgRoot 'samples/hub/agentic/org/intern.prompt.md')))
+    $pmPosition = $sample.Chart.tree.positions | Where-Object { $_.id -eq 'pm' } | Select-Object -First 1
+    Assert-True '  and the seat it reports to names no prompt, which is valid' ($pmPosition -and $null -eq $pmPosition.prompt)
+    $sampleRow = @(Get-P20OptionalSurfaces -Prefix 'tk' -PackageRoot $pkgRoot -Config ([pscustomobject]@{ PromptsRoot = (Join-Path $pkgRoot 'samples/hub'); ActiveSpace = 'github-demo'; Spaces = @() }) -Features $on) | Where-Object { $_.key -eq 'orgChart' } | Select-Object -First 1
+    Assert-Equal '  the Org chart row over the sample: on, with its seats' 'on' $sampleRow.state $sampleRow.note
+    Assert-Equal '  and the note counts them' 'My team, 5 seats; tkOrgChart prints it' $sampleRow.note
 }
 catch {
     $script:failed++

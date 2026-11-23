@@ -1,5 +1,5 @@
 {
-  "_": "One table, two readers: Scripts/Read-OrgChart.ps1 (tkTestToolkit -OrgChart, Tests/Test-OrgChart.ps1) and the agent's reader. A case builds a scratch hub: hub.json when hubJson is given, org.json from `org` (an object), `orgText` (the raw file text) or `orgFile` (a file under this folder; no org.json when none is given), and an empty prompt file for each name in `prompts` (the table's `prompts` unless the case has its own) in the agentic folder -- agentic/, or `promptsFolder` -- plus an empty folder for each name in promptFolders. `tree` is the one asked for besides the file's own. `expect.status` is ok, missing or invalid. For ok: `activeTree`, `seatCount` (the seats of the tree shown), `warnings` (exact sentences, in order) and `chart` -- the response, compared as JSON, key order aside (docs/hub/org.md, \"The response\"); `text` is the CLI's lines for it and only the CLI asserts it. Otherwise `kind` is the contract both halves agree on, and `message` is the sentence the CLI says; a reader in another half may say the same sentence or only the kind (`messageStartsWith` stands in for a message that carries the parser's own words). Ids are compared exactly, character for character.",
+  "_": "One table, two readers: Scripts/Read-OrgChart.ps1 (tkTestToolkit -OrgChart, Tests/Test-OrgChart.ps1) and the agent's reader. A case builds a scratch hub: hub.json when hubJson is given, org.json from `org` (an object), `orgText` (the raw file text) or `orgFile` (a file under this folder; no org.json when none is given), and an empty prompt file for each name in `prompts` (the table's `prompts` unless the case has its own) in the agentic folder -- agentic/, or `promptsFolder` -- plus an empty folder for each name in promptFolders. A position's prompt is looked up in three folders, in order (docs/hub/org.md, \"Where a position's prompt is found\"): `hubOrgPrompts` are empty files in the hub's roles folder (agentic/org/, or `promptsFolder`/org/), `prompts` the hub's agentic folder as above, and `shippedPrompts` the toolkit's own agentic/org/ -- each case reads against a scratch package holding exactly those (none when absent), with `shippedFlatPrompts` in that package's flat agentic/, which the lookup does not read. `expect.promptRefs`, by position id, is the reading-room ref the agent's route gives the prompt it chose (`yours/<name>` for the hub's copy, `<name>` for the toolkit's), and only the agent asserts it. `tree` is the one asked for besides the file's own. `expect.status` is ok, missing or invalid. For ok: `activeTree`, `seatCount` (the seats of the tree shown), `warnings` (exact sentences, in order) and `chart` -- the response, compared as JSON, key order aside (docs/hub/org.md, \"The response\"); `text` is the CLI's lines for it and only the CLI asserts it. Otherwise `kind` is the contract both halves agree on, and `message` is the sentence the CLI says; a reader in another half may say the same sentence or only the kind (`messageStartsWith` stands in for a message that carries the parser's own words). Ids are compared exactly, character for character.",
   "prompts": [
     "vp-of-product.prompt.md",
     "vp-of-engineering.prompt.md",
@@ -645,8 +645,199 @@
       }
     },
     {
+      "name": "prompt-in-the-hubs-roles-folder",
+      "why": "The prompt is only in the hub's agentic/org/: the first place a role is looked for.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "positions": [
+              {
+                "id": "root",
+                "title": "Root",
+                "prompt": "role.prompt.md",
+                "seats": [
+                  {
+                    "id": "r",
+                    "model": "haiku"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "prompts": [],
+      "hubOrgPrompts": [
+        "role.prompt.md"
+      ],
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/role-prompt.json",
+        "text": "text/role-prompt.txt",
+        "seatCount": 1,
+        "warnings": [],
+        "promptRefs": {
+          "root": "yours/role"
+        }
+      }
+    },
+    {
+      "name": "prompt-in-the-hubs-agentic-folder",
+      "why": "The prompt is only in the hub's agentic/, as it has always been read: an org.json written before the roles folder keeps validating.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "positions": [
+              {
+                "id": "root",
+                "title": "Root",
+                "prompt": "role.prompt.md",
+                "seats": [
+                  {
+                    "id": "r",
+                    "model": "haiku"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "prompts": [
+        "role.prompt.md"
+      ],
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/role-prompt.json",
+        "text": "text/role-prompt.txt",
+        "seatCount": 1,
+        "warnings": [],
+        "promptRefs": {
+          "root": "yours/role"
+        }
+      }
+    },
+    {
+      "name": "prompt-shipped-in-the-toolkits-roles-folder",
+      "why": "The prompt is only in the toolkit's own agentic/org/: a shipped role a hub names without copying it.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "positions": [
+              {
+                "id": "root",
+                "title": "Root",
+                "prompt": "role.prompt.md",
+                "seats": [
+                  {
+                    "id": "r",
+                    "model": "haiku"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "prompts": [],
+      "shippedPrompts": [
+        "role.prompt.md"
+      ],
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/role-prompt.json",
+        "text": "text/role-prompt.txt",
+        "seatCount": 1,
+        "warnings": [],
+        "promptRefs": {
+          "root": "role"
+        }
+      }
+    },
+    {
+      "name": "a-hubs-role-wins-over-a-shipped-one",
+      "why": "The hub's agentic/org/ and the toolkit's agentic/org/ both have the name: the hub's own role is the one used.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "positions": [
+              {
+                "id": "root",
+                "title": "Root",
+                "prompt": "role.prompt.md",
+                "seats": [
+                  {
+                    "id": "r",
+                    "model": "haiku"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "prompts": [],
+      "hubOrgPrompts": [
+        "role.prompt.md"
+      ],
+      "shippedPrompts": [
+        "role.prompt.md"
+      ],
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/role-prompt.json",
+        "text": "text/role-prompt.txt",
+        "seatCount": 1,
+        "warnings": [],
+        "promptRefs": {
+          "root": "yours/role"
+        }
+      }
+    },
+    {
+      "name": "a-shipped-prompt-outside-the-roles-folder-is-not-a-role",
+      "why": "A name only in the toolkit's flat agentic/ (a task prompt, not a role) is not looked up: it is an unknown prompt.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "positions": [
+              {
+                "id": "root",
+                "title": "Root",
+                "prompt": "role.prompt.md",
+                "seats": [
+                  {
+                    "id": "r",
+                    "model": "haiku"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "prompts": [],
+      "shippedFlatPrompts": [
+        "role.prompt.md"
+      ],
+      "expect": {
+        "status": "invalid",
+        "kind": "unknown-prompt",
+        "message": "Position 'root' in tree 't' names the prompt 'role.prompt.md', which is not a file in the hub's agentic/org/ or agentic/ folder or the toolkit's agentic/org/."
+      }
+    },
+    {
       "name": "unknown-prompt",
-      "why": "A position names a prompt that is not a file in the agentic folder.",
+      "why": "A position names a prompt that is in none of the three folders a role is looked up in.",
       "org": {
         "trees": [
           {
@@ -671,7 +862,7 @@
       "expect": {
         "status": "invalid",
         "kind": "unknown-prompt",
-        "message": "Position 'y' in tree 'a' names the prompt 'missing.prompt.md', which is not a file in the hub's agentic/ folder."
+        "message": "Position 'y' in tree 'a' names the prompt 'missing.prompt.md', which is not a file in the hub's agentic/org/ or agentic/ folder or the toolkit's agentic/org/."
       }
     },
     {
@@ -694,7 +885,7 @@
       "expect": {
         "status": "invalid",
         "kind": "unknown-prompt",
-        "message": "Position 'x' in tree 'a' names the prompt '../hub.json', which is not a file in the hub's agentic/ folder."
+        "message": "Position 'x' in tree 'a' names the prompt '../hub.json', which is not a file in the hub's agentic/org/ or agentic/ folder or the toolkit's agentic/org/."
       }
     },
     {
@@ -719,7 +910,7 @@
       "expect": {
         "status": "invalid",
         "kind": "unknown-prompt",
-        "message": "Position 'x' in tree 'a' names the prompt 'a-folder', which is not a file in the hub's agentic/ folder."
+        "message": "Position 'x' in tree 'a' names the prompt 'a-folder', which is not a file in the hub's agentic/org/ or agentic/ folder or the toolkit's agentic/org/."
       }
     },
     {

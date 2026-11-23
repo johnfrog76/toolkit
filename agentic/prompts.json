@@ -1,5 +1,5 @@
 {
-  "_about": "Which way of working each shipped prompt belongs to, who sends it, and its category. workflows: alone (by myself), team (on a team in Azure), agents (with agents) -- the three answers to How do you want to work in <Space>? sender: 'by hand' for a prompt a person opens in their assistant, else the verb or route that sends it. category: one of categories, the vocabulary agentic/README.md describes under The shape of a prompt. Read by the Studio's Prompts card and held to the folder by Tests/test_agentic_index.py.",
+  "_about": "Which way of working each shipped prompt belongs to -- the flat ones in agentic/ and the org's roles in agentic/org/, one name space -- who sends it, and its category. workflows: alone (by myself), team (on a team in Azure), agents (with agents) -- the three answers to How do you want to work in <Space>? sender: 'by hand' for a prompt a person opens in their assistant, else the verb or route that sends it. category: one of categories, the vocabulary agentic/README.md describes under The shape of a prompt. Read by the Studio's Prompts card and held to the folder by Tests/test_agentic_index.py.",
   "categories": [
     "ship",
     "review",
@@ -7,7 +7,8 @@
     "growth",
     "meetings",
     "rituals",
-    "design"
+    "design",
+    "org"
   ],
   "prompts": {
     "ado-comments": {
@@ -139,6 +140,15 @@
       "module": "core",
       "drives": "Suggest a reply on the PR Comments page",
       "category": "review"
+    },
+    "intern": {
+      "workflows": [
+        "agents"
+      ],
+      "sender": "by hand",
+      "module": "solitaireAgile",
+      "drives": "Proposals only, to the seat it assists: milestones (placed by that seat with Route -Milestone), breakdowns, close-outs, bug severities (Route -Severity) and shipped designs to archive (MoveDesign)",
+      "category": "org"
     }
   }
 }

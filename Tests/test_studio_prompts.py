@@ -59,6 +59,8 @@ class PromptsCase(unittest.TestCase):
     org = ""
     status = ""
     space_name = ""
+    # The Space's answer to How do you want to work? -- Team Agile (and its roles) is on only at agents.
+    how_i_work = ""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -83,7 +85,16 @@ class PromptsCase(unittest.TestCase):
         # local, named Example) over the shipped entry; a case that wants another
         # address, status or name patches it from this machine's layer, which
         # has the last word.
-        patch = {k: v for k, v in (("org", self.org), ("status", self.status), ("name", self.space_name)) if v}
+        patch = {
+            k: v
+            for k, v in (
+                ("org", self.org),
+                ("status", self.status),
+                ("name", self.space_name),
+                ("howIWork", self.how_i_work),
+            )
+            if v
+        }
         local = base / "config.local.json"
         local.write_text(json.dumps({"spaces": {"test": patch}} if patch else {}), encoding="utf-8")
         self._patches = [
@@ -173,13 +184,44 @@ class TheShippedSet(PromptsCase):
 
 
 class WithTheAddOnsOn(PromptsCase):
-    features = {"growth": True, "communication": True}
+    features = {"growth": True, "communication": True, "solitaireAgile": True}
+    # Team Agile is on only on a Space worked with agents, and only a GitHub Space is asked that.
+    org = "https://github.com/acme/widgets"
+    how_i_work = "agents"
 
     def test_their_prompts_are_listed(self):
         rows = self.rows()
         self.assertEqual({r for r, p in rows.items() if p["group"] == "toolkit"}, set(INDEX))
         self.assertEqual(rows["manager1on1"]["module"], "communication")
         self.assertEqual(self.client.get(f"{ROUTE}/generate-review").status_code, 200)
+
+    def test_a_role_is_a_shipped_prompt_one_folder_down(self):
+        # The org's roles ship in agentic/org/: the same <name> address, the path saying the folder.
+        row = self.rows()["intern"]
+        self.assertEqual(
+            (row["group"], row["path"], row["module"], row["category"], row["workflows"]),
+            ("toolkit", "agentic/org/intern.prompt.md", "solitaireAgile", "org", ["agents"]),
+        )
+        res = self.client.get(f"{ROUTE}/intern")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["body"], (PKG_ROOT / "agentic" / "org" / "intern.prompt.md").read_text(encoding="utf-8-sig"))
+
+    def test_the_hubs_own_roles_folder_is_yours_and_wins_over_its_agentic_folder(self):
+        roles = self.hub / "agentic" / "org"
+        roles.mkdir(parents=True)
+        (roles / "scout.prompt.md").write_text("# Our scout\n", encoding="utf-8")
+        (self.hub / "agentic" / "scout.prompt.md").write_text("# A flat scout\n", encoding="utf-8")
+        row = self.rows()["yours/scout"]
+        self.assertEqual((row["group"], row["title"], row["path"]), ("yours", "Our scout", "agentic/org/scout.prompt.md"))
+
+
+class WithTeamAgileOff(PromptsCase):
+    # The switch is on, but the Space is not worked with agents: Team Agile is off here.
+    features = {"growth": True, "communication": True, "solitaireAgile": True}
+
+    def test_the_roles_are_absent(self):
+        self.assertNotIn("intern", self.rows())
+        self.assertEqual(self.client.get(f"{ROUTE}/intern").status_code, 404)
 
 
 class Yours(PromptsCase):

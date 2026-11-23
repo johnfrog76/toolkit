@@ -8,10 +8,12 @@ it and where it lives, and copy it into a chat. ``agentic/prompts.json`` is the
 index: for each shipped prompt the ways of working it belongs to (``alone``,
 ``team``, ``agents`` -- the answers to How do you want to work?), who sends it,
 its module and what it drives. ``Tests/test_agentic_index.py`` holds the index to
-the folder.
+the folder. The org's roles ship one folder down, in ``agentic/org/`` (consts.json
+``org.rolesFolder``), and are shipped prompts like the rest: one index entry each,
+one name space with the flat ones, the same ``<name>`` address.
 
 Beside them, YOURS: the ``*.prompt.md`` files in the hub's own ``agentic/``
-folder (``hub.json`` ``folders.agentic``) and in this machine's
+folder (``hub.json`` ``folders.agentic``) and its ``org/`` roles folder, and in this machine's
 ``agenticExtensionPath``, where a copy under a shipped prompt's name runs
 instead of the shipped one (Scripts/Resolve-AgenticPrompt.ps1). They have no
 index entry, so they belong to every way of working.
@@ -85,7 +87,7 @@ from ..core.config import (
     hub_root,
     load_config,
 )
-from ..core.consts import repository_url, startwork_how_we_work_note, studio_prompts_route
+from ..core.consts import org_roles_folder, repository_url, startwork_how_we_work_note, studio_prompts_route
 from ..core.git_history import GITHUB_REMOTE as _GITHUB_REMOTE
 from ..core.git_history import folder_history
 from ..core.git_history import git_read as _git
@@ -213,6 +215,30 @@ def stem(file_name: str) -> str:
     return file_name.removesuffix(PROMPT_SUFFIX)
 
 
+def shipped_roles_dir() -> Path:
+    """The package's own roles folder, ``agentic/org/``: the org's role prompts."""
+    return AGENTIC_DIR / org_roles_folder()
+
+
+def shipped_folders() -> list[Path]:
+    """The package's prompt folders: ``agentic/`` and its roles folder below it."""
+    return [AGENTIC_DIR, shipped_roles_dir()]
+
+
+def shipped_files() -> list[Path]:
+    """Every shipped ``<name>.prompt.md``, the flat ones then the roles."""
+    return [path for folder in shipped_folders() for path in _files(folder)]
+
+
+def shipped_names() -> set[str]:
+    return {stem(p.name) for p in shipped_files()}
+
+
+def _where(folder: Path) -> str:
+    """A shipped folder as a row's path names it: ``agentic`` or ``agentic/org``."""
+    return folder.relative_to(AGENTIC_DIR.parent).as_posix()
+
+
 def _label(folder: Path) -> str:
     """Where a folder of yours lives, as a person names it: hub-relative when it
     is inside the hub, else its absolute path."""
@@ -227,15 +253,18 @@ def _label(folder: Path) -> str:
 def yours_folders() -> list[tuple[Path, bool]]:
     """(folder, is the extension folder) for each folder of yours that exists:
     agenticExtensionPath first -- its copy is the one that runs -- then the
-    hub's agentic/ when it is a different folder."""
+    hub's agentic/org/ (its own roles, which win over the folder above them, as
+    the org chart's lookup reads them), then the hub's agentic/, each when it is
+    a different folder."""
     out: list[tuple[Path, bool]] = []
     ext = agentic_extension_path()
     if ext is not None:
         out.append((ext, True))
     if hub_configured():
         hub = hub_folder("agentic")
-        if hub.is_dir() and (ext is None or hub.resolve() != ext):
-            out.append((hub.resolve(), False))
+        for folder in (hub / org_roles_folder(), hub):
+            if folder.is_dir() and (ext is None or folder.resolve() != ext):
+                out.append((folder.resolve(), False))
     return out
 
 
@@ -269,9 +298,9 @@ def _row(path: Path, group: str, where: str, history: tuple[dict, str], name: st
 
 def shipped_rows(features: dict) -> list[PromptRow]:
     index = read_index()
-    history = folder_history(AGENTIC_DIR)
+    histories = {folder: folder_history(folder) for folder in shipped_folders() if folder.is_dir()}
     rows: list[PromptRow] = []
-    for path in _files(AGENTIC_DIR):
+    for path in shipped_files():
         entry = index.get(stem(path.name)) or {}
         module = str(entry.get("module") or CORE)
         if not module_on(module, features):
@@ -281,8 +310,8 @@ def shipped_rows(features: dict) -> list[PromptRow]:
             _row(
                 path,
                 TOOLKIT,
-                AGENTIC_DIR.name,
-                history,
+                _where(path.parent),
+                histories[path.parent],
                 workflows=[str(w) for w in entry.get("workflows") or []],
                 sender=sender,
                 by_hand=sender == BY_HAND,
@@ -454,7 +483,7 @@ def list_prompts(repo: str | None = None) -> PromptsResponse:
     cfg = load_config()
     features = cfg.get("features") or {}
     shipped = shipped_rows(features)
-    rows = shipped + yours_rows({stem(p.name) for p in _files(AGENTIC_DIR)})
+    rows = shipped + yours_rows(shipped_names())
     space = space_info(cfg, repo)
     if space.repo and not space.isToolkit:
         rows += owned_by(space_rows(space.repo), space.slug)
@@ -465,8 +494,8 @@ def _absent(ref: str) -> HTTPException:
     return HTTPException(
         status_code=404,
         detail=(
-            f"No prompt {ref} -- a prompt is one <name>{PROMPT_SUFFIX} in agentic/, in your hub's, "
-            "or in the Space's repository."
+            f"No prompt {ref} -- a prompt is one <name>{PROMPT_SUFFIX} in agentic/ or agentic/{org_roles_folder()}/, "
+            "in your hub's, or in the Space's repository."
         ),
     )
 
@@ -489,9 +518,9 @@ def read_prompt(ref: str, repo: str | None = None) -> PromptRow:
                     raise _absent(ref)
                 rows = [row.model_copy(update={"body": text or ""})]
     elif group == YOURS:
-        rows = yours_rows({stem(p.name) for p in _files(AGENTIC_DIR)})
+        rows = yours_rows(shipped_names())
     else:
-        if not (AGENTIC_DIR / f"{name}{PROMPT_SUFFIX}").is_file():
+        if name not in shipped_names():
             raise _absent(ref)
         entry = read_index().get(name) or {}
         module = str(entry.get("module") or CORE)

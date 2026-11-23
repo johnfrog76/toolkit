@@ -775,6 +775,13 @@ def org_file() -> str:
     return consts()["org"]["file"]
 
 
+def org_roles_folder() -> str:
+    """``org`` -- the folder inside an agentic folder that holds the org's role
+    prompts (docs/hub/org.md, "Where a position's prompt is found"). The CLI and
+    the agent look a position's prompt up through it."""
+    return consts()["org"]["rolesFolder"]
+
+
 def models_file() -> str:
     """``Config/models.json`` -- the model map, relative to the package root: every
     reader of a card's ``**Agent:**`` line takes provider, family and display name from it."""

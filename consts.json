@@ -453,8 +453,9 @@
   },
 
   "org": {
-    "_": "The org chart's hub file (docs/hub/org.md): the name of the file at the hub root, beside hub.json, that holds the org's trees, positions and seats. The CLI reads it (Scripts/Read-OrgChart.ps1, the OrgChart verb and the inventory row), the agent serves it (GET rituals.orgRoute), and the web will draw it, so all three type the name from here.",
-    "file": "org.json"
+    "_": "The org chart's hub file (docs/hub/org.md): the name of the file at the hub root, beside hub.json, that holds the org's trees, positions and seats. The CLI reads it (Scripts/Read-OrgChart.ps1, the OrgChart verb and the inventory row), the agent serves it (GET rituals.orgRoute), and the web will draw it, so all three type the name from here. rolesFolder is the folder inside an agentic folder that holds the org's role prompts, one <role>.prompt.md each: a position's prompt is looked for in the hub's agentic/<rolesFolder>/, then the hub's agentic/, then the toolkit's agentic/<rolesFolder>/. The CLI and the agent both resolve it.",
+    "file": "org.json",
+    "rolesFolder": "org"
   },
 
   "replyStatuses": {

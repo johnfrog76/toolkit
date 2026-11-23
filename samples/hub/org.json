@@ -1,5 +1,5 @@
 {
-  "_comment": "The sample org chart (docs/hub/org.md): who the positions are and which model or person sits in each seat. It rides Team Agile, so OrgChart prints it where Team Agile is on. One tree here; add another under trees and name the one in use with activeTree. A position may name a prompt in the hub's agentic folder with \"prompt\" (a file name), which this sample does not.",
+  "_comment": "The sample org chart (docs/hub/org.md): who the positions are and which model or person sits in each seat. It rides Team Agile, so OrgChart prints it where Team Agile is on. One tree here; add another under trees and name the one in use with activeTree. A position names its job description with \"prompt\", a file name looked up in the hub's agentic/org/, then the hub's agentic/, then the toolkit's agentic/org/: the intern names the role the toolkit ships, and a copy of yours under the same name in agentic/org/ would win.",
   "activeTree": "mine",
   "trees": [
     {
@@ -30,6 +30,25 @@
           "reportsTo": "lead",
           "defaultModel": "sonnet for the cards a lead hands out",
           "seats": []
+        },
+        {
+          "id": "pm",
+          "title": "PM",
+          "reportsTo": "owner",
+          "defaultModel": "opus",
+          "seats": [
+            { "id": "pm", "model": "opus", "machine": "this-machine" }
+          ]
+        },
+        {
+          "id": "intern",
+          "title": "Intern",
+          "prompt": "intern.prompt.md",
+          "reportsTo": "pm",
+          "defaultModel": "haiku",
+          "seats": [
+            { "id": "intern", "model": "haiku", "machine": "this-machine" }
+          ]
         }
       ]
     }

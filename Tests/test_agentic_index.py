@@ -2,7 +2,8 @@
 entry, every entry has a file, each entry names at least one of the three ways of working
 (``alone``, ``team``, ``agents``), who sends it, and a category from the index's vocabulary. The
 Studio's Prompts card reads this index, so a prompt added without a line here would be invisible
-there."""
+there. The org's roles ship one folder down, in ``agentic/org/`` (consts.json ``org.rolesFolder``),
+and are held exactly like the flat prompts: one entry each, and one name space with them."""
 
 import json
 import re
@@ -10,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENTIC = ROOT / "agentic"
+ROLES = AGENTIC / json.loads((ROOT / "consts.json").read_text(encoding="utf-8-sig"))["org"]["rolesFolder"]
 # The three ways of working are the answers to "How do you want to work?" -- the
 # values Config/settings-workflows.json's answers write to spaces[].howIWork, the
 # words /env's howIWork answers in. The web picks a Space's prompts by them.
@@ -30,8 +32,21 @@ def _index() -> dict:
     return json.loads((AGENTIC / "prompts.json").read_text(encoding="utf-8"))
 
 
+def _prompt_files() -> list:
+    """Every shipped prompt: the flat ones, then the roles."""
+    return sorted(AGENTIC.glob("*.prompt.md")) + sorted(ROLES.glob("*.prompt.md"))
+
+
 def _shipped() -> set:
-    return {p.name[: -len(".prompt.md")] for p in AGENTIC.glob("*.prompt.md")}
+    return {p.name[: -len(".prompt.md")] for p in _prompt_files()}
+
+
+def test_a_role_and_a_flat_prompt_never_share_a_name():
+    # One address per shipped prompt (/studio/prompts/<name>): the two folders are one name space.
+    flat = {p.name for p in AGENTIC.glob("*.prompt.md")}
+    roles = {p.name for p in ROLES.glob("*.prompt.md")}
+    assert roles, "no roles found under agentic/org/"
+    assert not flat & roles, f"in both agentic/ and agentic/org/: {sorted(flat & roles)}"
 
 
 def test_every_shipped_prompt_has_an_entry_and_every_entry_a_prompt():
@@ -99,7 +114,7 @@ def _header(path: Path) -> tuple[dict, list]:
 
 
 def test_every_prompt_opens_with_one_header_shape():
-    for path in sorted(AGENTIC.glob("*.prompt.md")):
+    for path in _prompt_files():
         keys, body = _header(path)
         for key in REQUIRED_KEYS:
             assert keys.get(key), f"{path.name}: frontmatter has no {key}"
@@ -115,7 +130,7 @@ def test_every_prompt_opens_with_one_header_shape():
 def test_no_prompt_carries_its_own_history():
     # A gap that is fixed is the commit's and the tracker's record; an open one is a
     # row in docs/KNOWN-GAPS.md that the prompt links to. The instructions say the rule.
-    for path in sorted(AGENTIC.glob("*.prompt.md")):
+    for path in _prompt_files():
         text = path.read_text(encoding="utf-8-sig")
         assert not re.search(r"Known gap(?!s)", text), f"{path.name}: a known-gap note belongs in docs/KNOWN-GAPS.md"
         assert "the note stays as the record" not in text, f"{path.name}: history in the instructions"

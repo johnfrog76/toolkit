@@ -518,7 +518,7 @@ describe("consts.json", () => {
     // The org chart's hub file (docs/hub/org.md): the name all three halves type from here.
     const { _: orgDoc, ...orgKeys } = ORG as typeof ORG & { _: string };
     expect(orgDoc).toMatch(/docs\/hub\/org\.md/);
-    expect(orgKeys).toEqual({ file: "org.json" });
+    expect(orgKeys).toEqual({ file: "org.json", rolesFolder: "org" });
 
     // The model map a card's Agent id is looked up in (docs/hub/cards.md).
     const { _: modelsDoc, ...modelsKeys } = MODELS as typeof MODELS & { _: string };
