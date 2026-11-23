@@ -204,7 +204,9 @@ class WithTheAddOnsOn(PromptsCase):
         )
         res = self.client.get(f"{ROUTE}/intern")
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.json()["body"], (PKG_ROOT / "agentic" / "org" / "intern.prompt.md").read_text(encoding="utf-8-sig"))
+        self.assertEqual(
+            res.json()["body"], (PKG_ROOT / "agentic" / "org" / "intern.prompt.md").read_text(encoding="utf-8-sig")
+        )
 
     def test_the_hubs_own_roles_folder_is_yours_and_wins_over_its_agentic_folder(self):
         roles = self.hub / "agentic" / "org"
@@ -212,7 +214,9 @@ class WithTheAddOnsOn(PromptsCase):
         (roles / "scout.prompt.md").write_text("# Our scout\n", encoding="utf-8")
         (self.hub / "agentic" / "scout.prompt.md").write_text("# A flat scout\n", encoding="utf-8")
         row = self.rows()["yours/scout"]
-        self.assertEqual((row["group"], row["title"], row["path"]), ("yours", "Our scout", "agentic/org/scout.prompt.md"))
+        self.assertEqual(
+            (row["group"], row["title"], row["path"]), ("yours", "Our scout", "agentic/org/scout.prompt.md")
+        )
 
 
 class WithTeamAgileOff(PromptsCase):

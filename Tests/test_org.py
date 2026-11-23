@@ -441,15 +441,24 @@ class TheRoute(OrgBase):
         body = res.json()
         self.assertEqual((body["activeTree"], body["tree"]["name"]), ("mine", "My team"))
         positions = body["tree"]["positions"]
-        self.assertEqual([(p["id"], p["level"]) for p in positions], [
-            ("owner", 0), ("lead", 1), ("builder", 2), ("pm", 1), ("intern", 2),
-        ])
+        self.assertEqual(
+            [(p["id"], p["level"]) for p in positions],
+            [
+                ("owner", 0),
+                ("lead", 1),
+                ("builder", 2),
+                ("pm", 1),
+                ("intern", 2),
+            ],
+        )
         self.assertEqual([s["state"] for s in positions[1]["seats"]], ["staffed", "vacant"])
         by_id = {p["id"]: p for p in positions}
         # The intern names the role the toolkit ships: the sample hub has no copy,
         # so the lookup finds the toolkit's agentic/org/ and the ref is a shipped one.
         intern = by_id["intern"]
-        self.assertEqual((intern["prompt"], intern["reportsTo"], intern["promptRef"]), ("intern.prompt.md", "pm", "intern"))
+        self.assertEqual(
+            (intern["prompt"], intern["reportsTo"], intern["promptRef"]), ("intern.prompt.md", "pm", "intern")
+        )
         self.assertEqual(intern["promptTitle"], "Intern")
         self.assertFalse((sample / "agentic" / "org" / "intern.prompt.md").exists())
         for pid in ("owner", "lead", "builder", "pm"):

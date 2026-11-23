@@ -9,8 +9,9 @@ The ``kind`` of a failure is the contract; the sentence is the CLI's wording.
 Three layers, so the rule is testable without a hub:
 
 - ``read_org_chart`` -- PURE over the file's text and a test of whether a
-  prompt name is in any of the folders a role is looked up in. The same checks in the same order, the same tolerance of an
-  unknown key (said, never refused), the same derived seat ``state``, the
+  prompt name is in any of the folders a role is looked up in. The same checks
+  in the same order, the same tolerance of an unknown key (said, never
+  refused), the same derived seat ``state``, the
   positions in tree order with their ``level``. It never raises.
 - ``find_org_chart`` -- the hub layer: where the file is, whether a hub was
   named at all, and the folders a position's prompt is looked up in
@@ -426,6 +427,7 @@ def find_org_chart(tree_id: str = "") -> OrgResult:
         text = path.read_bytes().decode("utf-8", errors="replace")
     except OSError as e:
         return OrgResult("invalid", "unreadable", f"{org_file()} is not readable ({e}).", path=str(path))
+
     def prompt_exists(name: str) -> bool:
         return find_prompt(name) is not None
 
