@@ -783,7 +783,9 @@ fixture's planned card (`test/backlog/Task403-cache-the-thumbnails.prompt.md`) i
 first one. On a GitHub or local Space the same check expects five lanes, Backlog first, holding that
 card. `--matrix` runs it on both.
 
-`-Fixture` restarts this checkout's agent as a **test run** and hands it the fixture hub,
+`-Fixture` restarts this checkout's agent as a **test run** and hands it a **copy** of the fixture hub,
+made in the temp folder at the start and removed by `tkWeb -Stop`, so nothing the run saves --
+a setting in the drawer, a verb through the bridge -- changes a tracked file; then
 the fixture's Space and the flags through its environment -- `PROMPTS_ROOT`, `P20_ACTIVE_SPACE`,
 `P20_FEATURES` and the run marker `P20_TEST_RUN`, with every `TEAMS_WEBHOOK_*` removed -- so
 `config.local.json` is never written, and there is nothing to back up, swap or forget to restore

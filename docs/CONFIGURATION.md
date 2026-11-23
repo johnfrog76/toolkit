@@ -1000,13 +1000,19 @@ applies.
 | `P20_ACTIVE_SPACE` (`consts.json` `env.activeSpace`) | `config.local.json`'s `activeSpace` | A Space slug. One nobody declared falls back the way an unknown slug in the file does |
 | `P20_FEATURES` (`consts.json` `env.features`) | `config.local.json`'s top-level `features` block -- **replaced, not patched** | A JSON object: `{"growth":true,"communication":true}`. `{}` is "no flag set", the file with no `features` block; `config.default.json`'s flags still stand under it. Anything that is not a JSON object is a warning and is ignored, so a typo falls back to the file rather than switching every module off |
 
-They exist for one caller: **`Web -Dev -Fixture`**, which starts the agent against
-`Tests/fixtures/hub` for `npm run smoke` with all three set, plus the test-run marker and no
+They exist for one caller: **`Web -Dev -Fixture`**, which starts the agent against a temporary copy
+of `Tests/fixtures/hub` for `npm run smoke` with all three set, plus the test-run marker and no
 `TEAMS_WEBHOOK_*` ([the command reference](CLI.md#the-other-two-halves)), so a smoke run never
 rewrites this machine's `config.local.json` and there is no restore to forget. The agent's bridge
 children inherit them, so a verb the browser runs reads the same Space and flags the agent does, and
-`/api/surfaces` -- the CLI resolver in a child `pwsh` -- agrees with `/api/env`. Nothing writes them
-and `Config` does not know them: they are a launcher's, not a setting. One consequence to know: while
+`/api/surfaces` -- the CLI resolver in a child `pwsh` -- agrees with `/api/env`. Nothing writes them:
+they are a launcher's, not a setting. **`Config` reads them the way every other verb does.** The
+active Space it lists and writes Space rows for is `P20_ACTIVE_SPACE` when that is set, then
+`config.local.json`'s `activeSpace`, then the shipped one -- the one reader,
+`Get-P20ActiveSpaceOverride` in `Scripts/Resolve-HubConfig.ps1`, that the module and the other verbs
+use -- so `Config -List` shows that Space's rows, and its `activeSpace` row says `env`, as the
+`promptsRoot` row does under `PROMPTS_ROOT`. The settings drawer reads `Config -List` through
+`GET /api/config`, so in fixture mode it shows the fixture's Space. One consequence to know: while
 `P20_ACTIVE_SPACE` is set, a Space switch still writes `activeSpace` to the file but does not take
 effect in that process -- the override wins, which is what it is for. Without it, a shell that was open when another one wrote `activeSpace` (the GUI's switch, `Config -Set`) acts on the new Space from its next verb: the module compares the write times of `config.local.json` and `hub.json` before each verb and re-imports when either moved. `PROMPTS_ROOT` and `P20_ACTIVE_SPACE` are part of the same comparison, so one exported into a shell that had already loaded the toolkit (a profile that imports it at startup) is seen on the next verb exactly as a changed file is -- `Env`'s `Hub` check and its `Your hub` row then name one hub, and the verb acts on it, saying `Hub changed to <path> since this shell loaded (it was <path>); re-read.` once. All three names are in the
 contract (`env.promptsRoot`, `env.activeSpace`, `env.features`): the two newer ones because both halves

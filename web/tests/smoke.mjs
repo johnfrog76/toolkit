@@ -1,7 +1,7 @@
 // Playwright smoke for the Toolkit web UI -- the web half of the cold-start
 // gate (docs/TESTING.md). No ADO, no Docker: the dev
-// server and the agent are up, and the agent's promptsRoot points at
-// Tests/fixtures/hub (two cards -- one Active, one Code Review -- plus the two
+// server and the agent are up, and the agent's promptsRoot points at a copy
+// of Tests/fixtures/hub that `tkWeb -Dev -Fixture` made (two cards -- one Active, one Code Review -- plus the two
 // modules' fixtures).
 //
 //   node tests/smoke.mjs [--port=<n>] [--modules=off|on]
@@ -547,7 +547,8 @@ async function runViewport(viewportName) {
     // 7 is read in the same pass. A complete session offers Archive, the move
     // that closes it -- READ-ONLY. Presence only: choosing it and confirming
     // runs MeetingAgenda -Close through the bridge, which MOVES the fixture file
-    // into manager/archive/, and the fixture hub is the committed one. The retro
+    // into manager/archive/ -- of the copy -Fixture serves, but a smoke reads and
+    // never writes, so a second run sees the same three sessions. The retro
     // session is the only complete one of the three.
     await open("/communication");
     const meetingMenus = page
