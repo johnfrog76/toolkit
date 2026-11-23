@@ -357,8 +357,9 @@ export async function flipCase({ browser, stack, check, flag, navLabel, label = 
  * this repo runs, so a missing one is answered with the command, not a stack.
  */
 export async function launchChromium() {
+  let browser;
   try {
-    return await chromium.launch();
+    browser = await chromium.launch();
   } catch (err) {
     const msg = String(err && err.message ? err.message : err);
     if (/Executable doesn't exist|browserType\.launch/i.test(msg)) {
@@ -372,6 +373,58 @@ export async function launchChromium() {
     }
     throw err;
   }
+  return markWhatsNewSeen(browser);
+}
+
+// What's new opens on its own on a browser that has not shown this version, and
+// every smoke context is a new browser profile, so each page would sit under it.
+// The mark is the app's own (shell/releaseNotes.ts: one version string under one
+// key), and a smoke context starts with it set -- the running version is
+// consts.json's. `browser.newContextUnmarked` is the one that does not, for the
+// case that asserts the dialog opens (smokeMatrix.mjs).
+const WHATS_NEW_SEEN_KEY = "p20.whatsNew.seen";
+const RUNNING_VERSION = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "consts.json"), "utf8"),
+).version;
+
+function markWhatsNewSeen(browser) {
+  const newContext = browser.newContext.bind(browser);
+  browser.newContextUnmarked = newContext;
+  browser.newContext = async (options) => {
+    const ctx = await newContext(options);
+    await ctx.addInitScript(
+      ({ key, version }) => {
+        try {
+          localStorage.setItem(key, version);
+        } catch {
+          /* a context that refuses storage is the matrix's hostile case */
+        }
+      },
+      { key: WHATS_NEW_SEEN_KEY, version: RUNNING_VERSION },
+    );
+    return ctx;
+  };
+  // browser.newPage() makes its own context without going through the one above.
+  browser.newPage = async (options) => {
+    const ctx = await browser.newContext(options);
+    const page = await ctx.newPage();
+    page.on("close", () => void ctx.close().catch(() => {}));
+    return page;
+  };
+  return browser;
+}
+
+/** What's new's dialog, if one is open: close it. A page that has none is left alone. */
+export async function dismissWhatsNew(page) {
+  const dialog = page.locator('[data-testid="whats-new-dialog"]');
+  try {
+    await dialog.waitFor({ state: "visible", timeout: 3000 });
+  } catch {
+    return false;
+  }
+  await dialog.getByRole("button", { name: "Close" }).last().click();
+  await dialog.waitFor({ state: "detached", timeout: 5000 });
+  return true;
 }
 
 /** PASS / FAIL lines and a count of each -- the smoke's own shape. */

@@ -117,6 +117,10 @@ export default defineConfig(({ command, mode }) => ({
       "@consts": path.join(PACKAGE_ROOT, "consts.json"),
       // The settings-by-workflow entries, the same file the CLI reads (D-W8).
       "@workflows": path.join(PACKAGE_ROOT, "Config", "settings-workflows.json"),
+      // The changelog, as text: what's new reads it at build time. `?raw` is
+      // part of the replacement so one import line names the file; the image
+      // build copies it in (Dockerfile; tests/viteconfig.mjs holds the rule).
+      "@changelog": path.join(PACKAGE_ROOT, "CHANGELOG.md") + "?raw",
     },
   },
   server: {

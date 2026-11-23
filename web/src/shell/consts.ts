@@ -19,6 +19,9 @@
 
 import consts from "@consts";
 
+/** The running version: what the package says it is (`consts.json`'s `version`). */
+export const VERSION = consts.version as string;
+
 /**
  * The derived state of a card. There is no status field -- these strings are it.
  * `backlog` and `done` are FOLDER states: a card in `backlog/` is planned, not in

@@ -79,12 +79,13 @@ lint && npm test` yourself; nothing in this package does it for you.
 web/
 ├── vite.config.ts        dev server on 5174, /api -> the agent on web.agentPort (P20_AGENT_PORT,
 │                        else the two config files), outDir dist/client, and the @consts
-│                        alias -> ../consts.json (the contract file); --mode landing builds the
+│                        alias -> ../consts.json (the contract file), and @changelog ->
+│                        ../CHANGELOG.md as text (what's new); --mode landing builds the
 │                        landing page instead
 ├── landing.html          the landing page's entry -- the second entry, see "The landing page"
 ├── jest.config.mjs       ts-jest + jsdom, matches src/**/*.test.ts(x)
 ├── Dockerfile            build the SPA, serve it from nginx -- context is the PACKAGE ROOT,
-│                        because the bundle inlines ../consts.json
+│                        because the bundle inlines ../consts.json and ../CHANGELOG.md
 ├── nginx.conf.template   static + /api -> host.docker.internal:${P20_AGENT_PORT}, substituted
 │                        by the nginx image's entrypoint at container start
 ├── docker-compose.yml    127.0.0.1:5174 -> container 5173; passes P20_AGENT_PORT in
@@ -102,6 +103,11 @@ web/
     │   ├── App.tsx         theme, nav, the /env gate, Home's tabs, System's tabs, the <Routes> table
     │   ├── SpaceAnchor.tsx the Space pill at the left of the nav, which IS the Home entry
     │   ├── SettingsDrawer.tsx  the one settings surface; the avatar in the nav bar opens it
+    │   ├── WhatsNew.tsx    what's new: the hook that opens it once per version and from the menu, and the dialog as a lazy part
+    │   ├── WhatsNewDialog.tsx  the release notes drawn by MarkdownBlock, a chunk of its own
+    │   ├── releaseNotes.ts which sections open, and the browser's mark (p20.whatsNew.seen)
+    │   ├── changelogParse.ts   CHANGELOG.md as data: a pure parser
+    │   ├── changelog.ts    the one reader of CHANGELOG.md (the @changelog alias), loaded only on demand
     │   ├── main.tsx        Provider + BrowserRouter + ConfettiProvider + App
     │   ├── ConfettiProvider.tsx  the app's one confetti mount: the burst over the viewport, a lazy part, thrown through useConfetti()
     │   ├── layers.ts       the stacking layers, named once: Fluent's portal layer and the confetti's above it
@@ -1224,6 +1230,32 @@ hunt through -- in the owner's words, *"find a way to get the user there when th
   query, so it looks for the place for three seconds and then stays quietly at the top: an anchor
   nobody marks is not an error.
 - The unsaved dot and count stay on the avatar, and Escape from the drawer returns focus to it.
+- **What's new** closes the Settings group, after **All settings**, in every configuration: it is
+  core, with no feature flag. It opens the release notes (below).
+
+### What's new
+
+A dialog titled `What's new in <version>` -- the running version, `consts.json`'s `version` -- holding that
+version's section of the packaged `CHANGELOG.md`: its lines under the section's own headings (Added,
+Changed, Fixed, Removed), in the file's order, their inline markdown (code, bold, links) drawn by
+`shared/MarkdownBlock.tsx`. It opens on its own once per version per browser and from the menu item
+at any time. It reads only the packaged file and the running version: no agent, no request.
+
+- **The file is read at build time**, as `consts.json` is: the `@changelog` alias
+  (`vite.config.ts`, with `?raw`; `jest.config.mjs`, a stub that reads the real file; and an ambient
+  module in `vite-env.d.ts`) resolves `CHANGELOG.md` at the package root, `shell/changelog.ts` is
+  the one module that imports it, and `shell/changelogParse.ts` (pure) turns it into releases.
+  `web/Dockerfile` copies the file in beside `consts.json`, and `tests/viteconfig.mjs` fails a
+  build alias outside `web/` the image does not copy.
+- **Once per version.** The mark is one version string in `localStorage` under `WHATS_NEW_SEEN_KEY`
+  (`p20.whatsNew.seen`), written when the dialog opens. A browser with no mark gets the running
+  version alone; one that skipped released versions gets each section, newest first, with the running
+  version in the title. A running version with no `## [x.y.z]` section (an unreleased build) never
+  opens it on its own and writes no mark. Storage that throws falls back to the page's memory, so
+  the dialog does not loop within a session.
+- **Menu item on an unreleased build** shows the newest released section, titled with its own version.
+- **No bytes until needed.** The changelog and the markdown stack are two chunks of their own, and a
+  page load on a version already shown fetches neither; only a new version, or the menu item, does.
 
 ## What the shell says for itself
 

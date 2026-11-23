@@ -89,7 +89,7 @@ const dockerfile = fs.readFileSync(path.join(WEB_ROOT, "Dockerfile"), "utf8");
 const outside = (built.resolve?.alias ?? [])
   .map((a) => a.replacement)
   .filter((r) => typeof r === "string" && path.isAbsolute(r) && !r.startsWith(WEB_ROOT + path.sep) && r.startsWith(PACKAGE_ROOT + path.sep))
-  .map((r) => path.relative(PACKAGE_ROOT, r).split(path.sep).join("/"));
+  .map((r) => path.relative(PACKAGE_ROOT, r.split("?")[0]).split(path.sep).join("/"));
 const missing = outside.filter((rel) => !dockerfile.includes(`COPY ${rel} /${rel}`));
 check(
   "every alias outside web/ is copied into the image at the path it resolves to",

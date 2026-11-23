@@ -54,6 +54,7 @@ function draw(list: SpaceChoice[], activeSpace = list[0].slug) {
       onSwitchSpace={onSwitchSpace}
       links={[]}
       onOpenSettings={() => {}}
+      onOpenWhatsNew={() => {}}
       restoreFocusTarget={{}}
     />,
   );
