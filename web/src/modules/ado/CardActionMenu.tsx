@@ -38,7 +38,7 @@ export interface CardActionHandlers {
   onRemind?: () => void;
   /** Land -- offered on every Code Review card (cardActions.ts). */
   onLand?: () => void;
-  /** Plan milestone, Plan sprint, Tag: the form over the Plan and Tag verbs (PlanCardDialog). */
+  /** Plan release, Plan sprint, Tag: the form over the Plan and Tag verbs (PlanCardDialog). */
   onPlan?: (kind: PlanKind) => void;
 }
 

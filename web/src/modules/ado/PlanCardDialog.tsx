@@ -1,5 +1,5 @@
 /**
- * Plan milestone, Plan sprint and Tag, from a card's row menu: one small form over
+ * Plan release, Plan sprint and Tag, from a card's row menu: one small form over
  * the CLI's `Plan` and `Tag` verbs (`POST /api/cmd/Plan`, `POST /api/cmd/Tag`). The
  * verbs write the card's lines through `Set-P20CardLine`; nothing here writes a card,
  * and nothing here touches the tracker (docs/hub/cards.md, "Milestone and sprint: two
@@ -25,10 +25,11 @@ import { usePlanCardMutation, useTagCardMutation } from "./api.ado";
 import type { CommandResponse, PromptInfo } from "./api.ado";
 import { commandResultMessage } from "./cliBridge";
 
-/** Which of the card's lines the form edits. */
+/** Which of the card's lines the form edits. `milestone` is the card's release, on its
+ *  `**Milestone:**` line: the kind keeps the line's name, the words say release. */
 export type PlanKind = "milestone" | "sprint" | "tags";
 
-const NOUN: Record<PlanKind, string> = { milestone: "Milestone", sprint: "Sprint", tags: "Tags" };
+const NOUN: Record<PlanKind, string> = { milestone: "Release", sprint: "Sprint", tags: "Tags" };
 
 /** What the card says now, in words: the line's value, or "none". */
 export function currentValue(
