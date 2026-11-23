@@ -26,8 +26,9 @@ or with agents, and the cards are the record either way.
   stays in the sample hub and in the owner's, and a release is not cut on the GitHub path alone. Where
   the Azure path can only be proved against a live organisation (VERIFY.md's gates), the release walks
   them or says it did not.
-- **The GitHub milestones are the releases only**, one per version and named by it, so a visitor sees
-  what shipped and what is next without seeing the crew's cards.
+- **The GitHub milestones group the open issues by theme**, so a visitor sees what is being worked on
+  and what is next. A release is a version and a tag on main, and it names the milestones it reached; a
+  milestone is not a version.
 
 ## The road so far
 
@@ -262,5 +263,5 @@ go into this file:
 When a release's "done when" is met, mark it with the date, here, in the same commit as the tag's
 release pull request or the refactor's merge. When the order changes, change it here and say why. A card
 names its release on its `**Milestone:**` line (an older card on its `**Sprint:**` line); this file names
-the releases. This is the only place their order is written down, and the GitHub milestones carry only
-the release versions.
+the releases. This is the only place their order is written down; the GitHub milestones group the open
+issues by theme and carry no order of their own.
