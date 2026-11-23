@@ -360,6 +360,20 @@ The threshold is one constant, `SPACE_QUICK_MENU_THRESHOLD` (8) in `web/src/shel
 | 2 to 8 (at the threshold) | the plain submenu: one radio row per Space, in declaration order, the active one checked | a dropdown holds this many |
 | 9 or more (past it) | a quick menu: a focused box, then the active Space first (checked) and the rest in declaration order, capped at 8, and **View all** at the foot. Typing narrows by name or slug; Enter or a click switches through the same call; **View all** lists every Space in the same scrolling box; `No Space matches '<text>'` when nothing does; Escape returns to the Space entry | past about eight a dropdown cannot hold them; the switcher people know from GitHub's branch picker and Slack's workspace list |
 
+### What's new, by the running version and what this browser last showed (`WhatsNew.test.tsx`, `releaseNotes.test.ts`)
+
+The account menu's **What's new** item sits in the Settings group after **All settings**, in every configuration -- it is core, with no feature flag, so it is there with every module off. It opens a dialog titled `What's new in <version>`: the `CHANGELOG.md` section's lines under its own headings, in the file's order. The same dialog opens on its own once per version per browser, from a mark in `localStorage`.
+
+| The running version | This browser last showed | Opens on its own | The menu item shows |
+| --- | --- | --- | --- |
+| has a section in `CHANGELOG.md` | nothing (no mark) | that section alone | that section |
+| has a section | the version before it | that section | that section |
+| has a section | an older version, with released versions between | each section from the running version down to the one after the last shown, newest first; the title names the running version | that section alone |
+| has a section | the running version | nothing, and the changelog is not even fetched | that section |
+| has a section | a newer version (a downgrade) | nothing | that section |
+| none (an unreleased build: only `## [Unreleased]`) | anything | nothing, and no mark written | the newest released section, titled with its own version |
+| any, with storage refusing reads and writes | -- | once, then not again while the page lives | as above |
+
 ### The connect wizard, `/connect/<slug>` (settings by workflow W2; `ConnectPage.test.tsx`, `tkTestToolkit -Connect`)
 
 | The Space | What the wizard says on step 1 | Step 3 writes | Step 4 |
