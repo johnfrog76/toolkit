@@ -8,6 +8,8 @@ config.local.backup.json
 *.log
 **/*.log
 **/*.pid
+# Where `Web -Dev -Fixture` put its copy of the fixture hub, until `Web -Stop`
+.web.fixture
 test-summary.*.json
 test-results.*
 

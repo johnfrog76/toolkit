@@ -877,7 +877,7 @@ verb's own.
 
 | Command | Does |
 | --- | --- |
-| `Web` | Start, stop or check the web UI. Bare: the Docker production build. `-Dev`: Vite and the agent on the host, hot reload. `-Restart`: stop both, start again (production unless `-Dev` is given too). `-Stop`: the server, any dev server left on its port, and the agent. `-Status`: what is up, on which port. `-NoBrowser`: do not open the URL. `-Dev -Fixture [-Modules on\|off]`: the smoke's servers -- this checkout's agent restarted against `Tests/fixtures/hub` as a test run, Space and flags through its environment, no webhook, `config.local.json` never written |
+| `Web` | Start, stop or check the web UI. Bare: the Docker production build. `-Dev`: Vite and the agent on the host, hot reload. `-Restart`: stop both, start again (production unless `-Dev` is given too). `-Stop`: the server, any dev server left on its port, and the agent. `-Status`: what is up, on which port. `-NoBrowser`: do not open the URL. `-Dev -Fixture [-Modules on\|off]`: the smoke's servers -- this checkout's agent restarted against a temporary copy of `Tests/fixtures/hub` as a test run, Space and flags through its environment, no webhook, neither `config.local.json` nor the tracked fixture hub ever written; `-Stop` removes the copy |
 | `Agent` | Start, stop or check the agent alone, on `web.agentPort`. `-Dev` reloads on edit. `-Stop` ends the one this command started. `-Status`: running, healthy, which hub -- and any listener that is not ours. `-Port <n>` overrides the port for one run |
 
 **It opens the UI.** All three start paths -- production, `-Restart` and `-Dev` -- open the URL in
@@ -897,7 +897,13 @@ Vite asks for 5174 and takes the next free port, so `Web -Status` reads the URL 
 
 **`Web -Dev -Fixture` starts the servers `npm run smoke` asserts, and writes nothing**.
 The fixture hub, its Space and the module flags reach the servers through their environment and
-nothing else, so a smoke run never rewrites the machine's own `config.local.json`; and the run marker
+nothing else, so a smoke run never rewrites the machine's own `config.local.json`. The hub they get is
+a **copy** of `Tests/fixtures/hub`, made in the OS temp folder at each start, so a setting saved in the
+drawer, or any verb the browser runs, changes the copy and leaves the checkout clean. Its path is
+recorded in `.web.fixture` at the repository root, the way `.web.pid` records the dev server, and
+`Web -Stop` (or `-Restart`, or the next `-Fixture` start) removes that folder after the agent has
+stopped -- only a folder in the temp folder whose name starts `p20-fixture-hub-`; a record naming
+anything else is reported and left alone. And the run marker
 keeps a webhook in `.env` -- which the module reads into the shell at import, out of reach of any
 `unset` -- from arming a live send button. How to run the smoke itself is
 [Testing](TESTING.md); what the switch sets is this:
@@ -905,7 +911,7 @@ keeps a webhook in `.env` -- which the module reads into the shell at import, ou
 | Variable | Value | What it does |
 | --- | --- | --- |
 | `P20_TEST_RUN` (`consts.json` `env.testRunMarker`) | `fixture` | The Teams engine refuses a POST, and every bridge child skips `.env` at import |
-| `PROMPTS_ROOT` | `Tests/fixtures/hub` | The hub, as it has always been overridable |
+| `PROMPTS_ROOT` | a fresh copy of `Tests/fixtures/hub` in the temp folder | The hub, as it has always been overridable; the copy is what keeps the tracked folder unwritten |
 | `P20_ACTIVE_SPACE` (`env.activeSpace`) | `test` | Stands in for `config.local.json`'s `activeSpace` |
 | `P20_FEATURES` (`env.features`) | `{}`, or growth and communication with `-Modules on` | Stands in for its top-level `features` block |
 | every `TEAMS_WEBHOOK_*` | removed | Not handed to either server, whatever the shell holds |
