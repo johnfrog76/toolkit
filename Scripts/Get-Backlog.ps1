@@ -2,22 +2,22 @@
 .SYNOPSIS
     The Backlog: the Space's waiting cards as one ranked table.
 .DESCRIPTION
-    Prints the cards in the active Space's backlog/ -- rank, id, type, milestone,
-    tags, age and title -- in the Backlog's order, with each milestone's cards in
+    Prints the cards in the active Space's backlog/ -- rank, id, type, release,
+    tags, age and title -- in the Backlog's order, with each release's cards in
     play in their ranked place, marked 'in play', so the ranks read 1, 2, 3 (Scripts/Read-Backlog.ps1;
-    docs/hub/milestones.md, "The Backlog: the order as a table"): milestone by
-    milestone, ranked by the milestone's file, then the cards with no milestone.
-    -Milestone, -Tag and -Type filter (AND, ignoring case); a filtered row keeps its
-    rank, because the rank is the milestone's, not the table's.
+    docs/hub/milestones.md, "The Backlog: the order as a table"): release by
+    release, ranked by the release's file, then the cards with no release.
+    -Milestone (the release), -Tag and -Type filter (AND, ignoring case); a filtered row keeps its
+    rank, because the rank is the release's, not the table's.
 
     Read-only, and a folder read: it works offline and with no tracker. Plan -Rank
-    moves a card in its milestone's order; Move <id> -To Active puts it in play.
+    moves a card in its release's order; Move <id> -To Active puts it in play.
 
     On an Azure DevOps Space there is no backlog in ToolKit -- the company's is in
     Azure DevOps, and a card there is work assigned to you -- so it refuses (exit 2)
     and names MyWork.
 .PARAMETER Milestone
-    Only the cards in this milestone, matched ignoring case.
+    Only the cards in this release, matched ignoring case.
 .PARAMETER Tag
     Only the cards carrying this tag, matched ignoring case.
 .PARAMETER Type
@@ -49,15 +49,15 @@ if ($Help) {
     $p = Get-CliPrefix
     Write-Host ""
     Write-Host "  ${p}Backlog                          The Space's waiting cards, ranked" -ForegroundColor Cyan
-    Write-Host "  ${p}Backlog -Milestone ""<title>""     Only the cards in one milestone" -ForegroundColor Cyan
+    Write-Host "  ${p}Backlog -Milestone ""<title>""     Only the cards in one release" -ForegroundColor Cyan
     Write-Host "  ${p}Backlog -Tag <tag>               Only the cards carrying a tag" -ForegroundColor Cyan
     Write-Host "  ${p}Backlog -Type <type>             Only one type: Task, Bug, UserStory, ..." -ForegroundColor Cyan
     Write-Host "  ${p}Backlog -Help                    Show this help" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  The cards in backlog/, milestone by milestone: milestones with an order file" -ForegroundColor Gray
+    Write-Host "  The cards in backlog/, release by release: releases with an order file" -ForegroundColor Gray
     Write-Host "  first, by the day it was made, then the rest by title; inside one, its order." -ForegroundColor Gray
-    Write-Host "  A milestone's cards in play sit in their place, marked 'in play'. Cards with" -ForegroundColor Gray
-    Write-Host "  no milestone come last, oldest first. Rank is the place in the milestone's" -ForegroundColor Gray
+    Write-Host "  A release's cards in play sit in their place, marked 'in play'. Cards with" -ForegroundColor Gray
+    Write-Host "  no release come last, oldest first. Rank is the place in the release's" -ForegroundColor Gray
     Write-Host "  order, the count '${p}Plan <id> -Rank' uses; a card the order does not list" -ForegroundColor Gray
     Write-Host "  yet has none. The filters go together and never change a rank." -ForegroundColor Gray
     Write-Host "  Read-only, and it works offline. On an Azure DevOps Space it refuses: the" -ForegroundColor Gray
@@ -96,7 +96,7 @@ $today = (Get-Date).ToString('yyyy-MM-dd')
 $rows = Read-P20SpaceBacklog -SpaceDir $spaceDir -Today $today -WorkItemTypes (Get-P20WorkItemTypes -Config $cfg) -Milestone $Milestone -Tag $Tag -Type $Type
 
 $filters = @()
-if ($Milestone) { $filters += "milestone '$Milestone'" }
+if ($Milestone) { $filters += "release '$Milestone'" }
 if ($Tag) { $filters += "tag '$Tag'" }
 if ($Type) { $filters += "type '$Type'" }
 $scope = ''
@@ -142,13 +142,13 @@ $cells = @($rows | ForEach-Object {
             State     = $state
             Id        = [string]$_.Id
             Type      = Format-Cell ([string]$_.Type) 12
-            Milestone = Format-Cell ([string]$_.Milestone) 24
+            Release   = Format-Cell ([string]$_.Milestone) 24
             Tags      = Format-Cell (@($_.Tags) -join ', ') 20
             Age       = $age
             Title     = [string]$_.Title
         }
     })
-$columns = @('Rank', 'State', 'Id', 'Type', 'Milestone', 'Tags', 'Age', 'Title')
+$columns = @('Rank', 'State', 'Id', 'Type', 'Release', 'Tags', 'Age', 'Title')
 $width = @{}
 foreach ($col in $columns) {
     $width[$col] = $col.Length

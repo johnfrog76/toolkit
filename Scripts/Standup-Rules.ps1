@@ -1061,14 +1061,16 @@ function Get-P20StandupCards {
                     billable = (Test-P20CardBillable $content)
                     begun    = $begun
                     commits  = [object[]]$hashes
-                    # What the suggestion reads (Suggest-Rules.ps1): the milestone its
-                    # **Sprint:** line names, whole; its **Created:** day; its Tags
+                    # What the suggestion reads (Suggest-Rules.ps1): the release its
+                    # planning line names, whole (Get-P20CardMilestone), and whether that
+                    # title is its issue's GitHub milestone; its **Created:** day; its Tags
                     # (a severity, a size); and who takes it -- the card's agent's
                     # family by the one reader (Resolve-P20CardAgent, the shipped
                     # order, no messages: its Agent line, else an older card's
                     # Assigned worker), else its Assigned line as written (me, an
                     # @<login>, or '').
                     sprint   = (Get-P20CardMilestone $content)
+                    milestoneFromGitHub = (Test-P20CardMilestoneFromGitHub $content)
                     created  = $created
                     tags     = [object[]]@(Get-P20CardTags $content)
                     assigned = $who

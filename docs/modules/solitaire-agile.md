@@ -1099,10 +1099,20 @@ size are its labels (the triage ceremony's `sev1`-`sev3`, the worker labels), wh
 -- else its size; the standup asks `gh api user` once per call, the read Triage makes, and only while the
 suggestion is on), its milestone and due date are the tracker's, its age is
 `createdAt`. A card's severity and size are on its `Tags:` line, who has it is its worker -- its `**Agent:**`
-line's family, else its `**Assigned:**` line -- (else its size), its milestone is its `**Milestone:**` line read WHOLE -- or, on a card with none, its
+line's family, else its `**Assigned:**` line -- (else its size), its release is its `**Milestone:**` line read WHOLE -- or, on a card with none, its
 `**Sprint:**` line, as every card read before the two were separate -- and its age is its `**Created:**` day
-([cards](../hub/cards.md#what-the-suggestion-reads)). A milestone's open count is its billable items, once
+([cards](../hub/cards.md#what-the-suggestion-reads)). A title's open count is its billable items, once
 per id.
+
+**A GitHub milestone or a release.** The rule joins the two by title: an issue's GitHub milestone and a
+card's release with the same title are one destination, and the order below treats them as one. The words
+say which it is. A title is a **GitHub milestone** when any item in the joined list has it from GitHub: an
+open issue's milestone, or a card made from an issue that the read does not hold, whose `**Sprint:**` line
+carries that issue's milestone title (no `**Milestone:**` line, its own link a GitHub issue -- the
+`github` column of `Tests/fixtures/parsers/card-milestone.json`, read by `Test-P20CardMilestoneFromGitHub`
+and `card_milestone_from_github`). Every other title is a **release**, the card's own. An issue and a card
+that name one title make it a GitHub milestone: the tracker has a milestone of that name, so the word is
+true.
 
 **The exclusions, in order** (`consts.json` `rituals.suggestExclusions`): not billable; waiting on you --
 on the queue (a `verify-close` issue, a card in Code Review); in flight -- In Progress or Code Review;
@@ -1110,10 +1120,10 @@ theirs -- an issue assigned to someone who is not you (`@<login>`; when `gh` can
 assignee is someone else, so a suggestion is never someone else's work); dismissed on this surface in this
 session.
 
-**The order**: severity (`sev1`, `sev2`, `sev3`, then none); then the **nearest milestone** -- the open
-milestone with the fewest open items, a tie by the earlier due date (a milestone with no due date after
-every one with one), then the title, ordinal; an item with no milestone after every item with one; then
-age, the oldest created day first; a tie by the id, ordinal. The nearest milestone is one function a half
+**The order**: severity (`sev1`, `sev2`, `sev3`, then none); then the **nearest destination** -- the
+title, a GitHub milestone or a release, with the fewest open items, a tie by the earlier due date (one with
+no due date after every one with one), then the title, ordinal; an item with neither after every item with
+one; then age, the oldest created day first; a tie by the id, ordinal. The nearest destination is one function a half
 (`Get-P20NearestMilestones`, `nearest_milestones`) over the table's `nearest` rows, so the order of its
 three keys is one sentence here and one row there: to put the due date first, change this sentence and
 that row together.
@@ -1122,9 +1132,9 @@ that row together.
 
 | How you work | Who | Shape | Sentence | Command |
 | --- | --- | --- | --- | --- |
-| `alone`, or `agents` with it yours: `me`, or sized `fable` -- the owner's own seat, never the crew (D-AR10; `rituals.suggestOwnerSeat`) | -- | start | `23A3 is the last open card in milestone B -- start it?` | `StartWork 23A3` |
-| `agents` | a crew size, and the item has a milestone | delegate | `#4 is sonnet-sized and well defined -- send it to the crew?` | `StartWork 4`; `StartWork 4 -Launch` where [the launch](#the-launch-the-block-handed-to-a-session) is on (`rituals.text.suggestCommandLaunch`) |
-| `agents` | a crew size, and no milestone | place | `#5 is sonnet-sized but has no milestone -- place it?` | `Route 5 -Milestone <title>` on an issue; `Plan K7M2 -Milestone <title>` on a card, which writes its `**Milestone:**` line |
+| `alone`, or `agents` with it yours: `me`, or sized `fable` -- the owner's own seat, never the crew (D-AR10; `rituals.suggestOwnerSeat`) | -- | start | `23A3 is the last open card in release B -- start it?` | `StartWork 23A3` |
+| `agents` | a crew size, and the item has a milestone or a release | delegate | `#4 is sonnet-sized and well defined -- send it to the crew?` | `StartWork 4`; `StartWork 4 -Launch` where [the launch](#the-launch-the-block-handed-to-a-session) is on (`rituals.text.suggestCommandLaunch`) |
+| `agents` | a crew size, and neither | place | `#5 is sonnet-sized but has no milestone -- place it?` on an issue; `K7M2 is opus-sized but has no release -- place it?` on a card (`suggestPlaceCard`) | `Route 5 -Milestone <title>` on an issue; `Plan K7M2 -Milestone <title>` on a card, which writes its release on its `**Milestone:**` line |
 | `agents` | nobody | route | `#4 is the oldest open sev2 in milestone B and nobody has it -- route it?` | `Route 4 -Assign <me\|size>` |
 | any | nothing left after the exclusions | -- | `Next: nothing is waiting on you.` (today's line) | -- |
 
@@ -1135,10 +1145,11 @@ a `launch` field. The caller asks the one question `/env` and the inventory ask 
 inventory's row reads too): `claude` on the PATH. Only the delegate shape changes; the start, place and
 route commands are the same with it on.
 
-"Well defined" is not a judgement: a size label and a milestone. The reason clause is one of three
-shapes: `the last open <card|issue> in milestone <m>` when the item's milestone has one open item (it),
+"Well defined" is not a judgement: a size label and a destination. The reason clause is one of three
+shapes: `the last open <card|issue> in milestone <m>` when the item's title has one open item (it),
 `the oldest open <sev|card|issue> in milestone <m>` when it has more, and `the oldest open
-<sev|card|issue>` with no milestone -- the severity when the item has one, else its noun. The chair's
+<sev|card|issue>` with neither -- the severity when the item has one, else its noun. For a release the
+first two say `release <m>` instead (`suggestWhyLastRelease`, `suggestWhyRelease`). The chair's
 line is `Next: <sentence> (<prefix><command>)`.
 
 **Where it shows.** `Standup -Brief` (and every brief the standup carries), and the Team Agile page's
@@ -1150,7 +1161,7 @@ the dismissed refs in `localStorage` (`p20.solitaireAgile.suggest.dismissed`, un
 and holds a dismiss for the page's life; the next candidate's line takes the dismissed one's place, and
 with none left the line is today's. The CLI has no dismiss -- a line in a terminal is already gone.
 [The PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) is the second surface, and reads the same
-pick inside the nearest milestone. [The Agenda](#the-page) draws the same row as its first line, above its lanes,
+pick inside the nearest destination. [The Agenda](#the-page) draws the same row as its first line, above its lanes,
 and orders its **Waiting on you** lane by the same rule, so the top tile is the pick when the pick can be
 started; an unrouted pick is named only by the row.
 
@@ -1160,10 +1171,11 @@ chair's line is today's.
 
 `Tests/fixtures/suggestion/table.json` is the one table, asserted from `tkTestToolkit -Rituals` against
 `Scripts/Suggest-Rules.ps1` and from `Tests/test_rituals.py` against `agent/solitaire/suggest.py`: the
-nearest milestone, every shape the rule distinguishes, the delegation with the launch off and on (a `sev1` beats a nearer milestone; two in one
-milestone pick the older; one left beats three left; no milestone sorts last; a crew-sized item on an
-`agents` Space is a delegation and a `fable`-sized one a start; a sized item with no milestone is placed in
-one; an unrouted item is a route; in flight, not billable, waiting-on-you and someone else's excluded; the empty Space; a dismissed item yields the next), the switch, and three chair's readings
+nearest destination, every shape the rule distinguishes, the delegation with the launch off and on (a `sev1` beats a nearer milestone; two in one
+release pick the older; one left beats three left; a card whose title is its issue's GitHub milestone says
+milestone; no milestone sorts last; a crew-sized item on an
+`agents` Space is a delegation and a `fable`-sized one a start; a sized issue with no milestone, and a sized card
+with no release, is placed in one; an unrouted item is a route; in flight, not billable, waiting-on-you and someone else's excluded; the empty Space; a dismissed item yields the next), the switch, and three chair's readings
 end to end whose goldens (`suggestion-<case>.brief.txt`) `Tests/regenerate_joined_goldens.py` writes.
 
 ## The PM Corner: the line, the chevron, the confetti
@@ -1177,25 +1189,30 @@ nothing in it is a second rule.
 Corner: 3 more issues to get milestone B - start #5 now > (tkStartWork 5)
 ```
 
-**The milestone is the destination** (D-AR11). An issue names it on the tracker; a card names it on its
+**The destination** (D-AR11) is a GitHub milestone or a release, by the suggestion's rule ([a GitHub
+milestone or a release](#the-suggestion-one-next-move-derived)). An issue names its milestone on the tracker; a card names its release on its
 `**Milestone:**` line -- or, with none, its `**Sprint:**` line
 ([cards](../hub/cards.md#milestone-and-sprint-two-lines)) -- read WHOLE through the one card reader each half has -- never the card model's
 `sprint`, which cuts the value to eighteen characters for the board, so a long title would split one
-milestone into two ([cards](../hub/cards.md#what-the-suggestion-reads)).
+destination into two ([cards](../hub/cards.md#what-the-suggestion-reads)).
 
 **The line**, in order (`consts.json` `rituals.text.corner*`, shapes `rituals.cornerShapes`):
 
 | Shape | When | Line |
 | --- | --- | --- |
-| `reached` | an item that names a milestone closed in the standup's window -- an issue's `closedAt`, an archived card's `**Closed:**` day, the window `Standup -Since` widens -- and nothing open names it any more; the latest close first, then the title | `milestone B reached` -- and, on the page, `: see Releases` |
-| `oneLeft` | the nearest milestone among the suggestion's candidates has one open item | `one more card 23A3 to get milestone B - start it now` -- `card` or `issue` by the pick |
-| `manyLeft` | it has more | `3 more cards to get milestone B - start 23A3 now` -- `cards`, `issues`, or `items` for a mix |
-| `nothingInReach` | no candidate names a milestone | `no milestone in reach - place a card with Route or on its Sprint line` |
+| `reached` | an item that names a title closed in the standup's window -- an issue's `closedAt`, an archived card's `**Closed:**` day, the window `Standup -Since` widens -- and nothing open names it any more; the latest close first, then the title | `milestone B reached` when a closed item had it from GitHub, else `release B reached` -- and, on the page, `: see Releases` |
+| `oneLeft` | the nearest destination among the suggestion's candidates has one open item | `one more issue #9 to get milestone Later - start it now`, or `one more card 23A3 to get release B - start it now` -- `card` or `issue` by the pick |
+| `manyLeft` | it has more | `3 more issues to get milestone B - start #5 now`, or `2 more cards to get release B - start K7M2 now` -- `cards`, `issues`, or `items` for a mix |
+| `nothingInReach` | no candidate names either | `no milestone or release in reach - place an issue with Route or a card with Plan` |
 
-The nearest milestone is the suggestion's own (`Get-P20NearestMilestones`, `nearest_milestones` -- fewest
+Each of the first three shapes has two sentences, `cornerOneLeft` and `cornerOneLeftRelease` and so on:
+the milestone one where the title is a GitHub milestone by the suggestion's rule, the release one
+otherwise. The shape is the same either way, so the page treats both alike.
+
+The nearest destination is the suggestion's own (`Get-P20NearestMilestones`, `nearest_milestones` -- fewest
 open, then the earlier due date, then the title), taken over the suggestion's candidates, and the id is the
 suggestion's first candidate inside it. The remaining count is the joined list's open count for that
-milestone: its open issues plus the open cards that name it (the one card reader), **once per id** -- a card
+title: its open issues plus the open cards that name it (the one card reader), **once per id** -- a card
 that tracks an issue is that issue's row. An item in flight still counts toward what is left; it is never
 the pick, because the suggestion excludes it.
 
@@ -1214,7 +1231,7 @@ Every other shape -- a start on a Space worked `alone`, an item that is yours, o
 keeps the plain `StartWork <arg>`, with the launch on or off. How the Space works and the launch are
 inputs of the rule, as they are of the suggestion's: `corner(items, closed, how, launch)` in the agent and
 `Get-P20CornerLine -HowIWork -Launch` in the CLI, handed the same two answers the suggestion was
-(`start_work_launch()`, `Test-P20StartWorkLaunch`). Neither changes the milestone, the pick or the count.
+(`start_work_launch()`, `Test-P20StartWorkLaunch`). Neither changes the destination, the pick or the count.
 
 **The brief** prints `Corner: <line> > (<prefix><command>)` when the line has a pick, else
 `Corner: <line>`, as its LAST line, after the Next line -- its own line, never in place of another.
@@ -1243,10 +1260,12 @@ the agent's, and the brief's last line -- is unchanged.
 `Tests/fixtures/rituals/corner.json` is the one table, asserted from `tkTestToolkit -Rituals` against
 `Scripts/Corner-Rules.ps1` and from `Tests/test_rituals.py` against `agent/solitaire/corner.py`: its rows
 start from the raw read (gh's issues, and each card as its file's lines), so the join, the window and the
-whole `**Sprint:**` line are exercised -- one left, several left, reached by an issue and by a card, closed
+whole `**Sprint:**` line are exercised -- one left, several left (issues, and cards in a release), reached by
+an issue, by a card and by a card made from an issue, a card made from an issue the read does not hold (a
+milestone) beside the same card with its own `**Milestone:**` line (a release), closed
 before the window, closed in it with one still open, nothing in reach, a card and its issue counted once, a
 card and an issue in one milestone whose title is longer than twenty characters, in flight counted but not
-picked, the pick inside the nearest milestone rather than the suggestion's own, and a delegation with the
+picked, the pick inside the nearest destination rather than the suggestion's own, and a delegation with the
 launch off and on beside the two that stay a plain start with it on (a Space worked alone, an item nobody
 has sized); and four chair's readings end to end -- one with the launch on, where the Next line and the
 Corner end in the same `-Launch` -- whose goldens (`corner-<case>.brief.txt`) `Tests/regenerate_joined_goldens.py` writes.
@@ -1266,7 +1285,7 @@ tab's Milestones card, from the same reader (`accounting.github_milestone_rows`)
 (days, `""` when unset) and `reached`. There is no second milestone rule: `reached` is the core's
 `milestone_reached` -- **every issue closed, and at least one issue**, whatever GitHub's own state says. So
 a milestone closed on GitHub with an issue reopened in it is not reached, and one nobody closed on GitHub
-is. The tab reads no card: a card's milestone line feeds the suggestion and the PM Corner above, through
+is. The tab reads no card: a card's release line feeds the suggestion and the PM Corner above, through
 the one card reader, and never these counts, which are the tracker's own. What the route adds is Team Agile's shape around it: the module's gate, `?space=`, the tracker state
 the ceremonies answer with (any repo that fails fails the read, with its reason, never a raise), and the
 kept read -- one `gh` call per repo a minute ([above](#one-tracker-read-kept-a-minute)), read again on
@@ -2057,11 +2076,18 @@ These are how the rituals read, on purpose, and are not on that list:
 - **A launch is proved on macOS here, and walked on Windows.** The pipe returning on Windows PowerShell
   5.1, the model a real `claude` runs, and a real session's first message being the block are `VERIFY.md`
   rows (Gate 12, "StartWork -Launch"); the suite's launch half runs off Windows only.
-- **The Corner's milestones in reach are the suggestion's candidates.** A milestone whose every open item is
+- **The Corner's destinations in reach are the suggestion's candidates.** A milestone or a release whose every open item is
   in flight, waiting on you or someone else's has nothing to start, and the Corner moves on to the next
-  milestone with something to start, or reads `no milestone in reach`.
-- **Reached lasts the standup's window.** `milestone B reached` reads while the last close is inside
-  yesterday's window (or the one `-Since` widens); after it, the line moves on to the next milestone.
+  one with something to start, or reads `no milestone or release in reach`.
+- **Reached lasts the standup's window.** `milestone B reached` (or `release B reached`) reads while the last close is inside
+  yesterday's window (or the one `-Since` widens); after it, the line moves on to the next destination.
+- **A reached release still points at the Releases tab.** The page adds `: see Releases` to every
+  reached line, and the Releases tab shows the Space's GitHub milestones, not the hub's releases, so a
+  release reached by cards alone has no row there. The tab's name and the toolkit's word for its own
+  plan are both "release" today.
+- **A shared title reads as a milestone.** An issue in GitHub milestone `B` and a card whose release
+  is `B` are one destination, and the line says `milestone B`, because the tracker has a milestone of
+  that name.
 - **Only the played view is dressed** (why, and what the reader sees when it is off, under
   [the agentic layer](#the-agentic-layer), "Where the dressed text shows"). `spoken` is the agent's and the stage's: `Standup -Grain work`
   and the page's Work grain show the prose, Copy copies it, and the queue's sentences, the chair's turn, the turn's

@@ -162,7 +162,7 @@ The board's card and the list's row draw one action model (`cardActions.ts`), so
 
 | Organize | A card's own moves in its `...` end with (the link out, where there is one, comes after, last) |
 | --- | --- |
-| off, or not configured | the billable toggle, then **Plan milestone**, **Plan sprint** and **Tag** (on a card in play or planned) -- ending on **Tag**; no reminder item, and nothing of Organize is fetched |
+| off, or not configured | the billable toggle, then **Plan release**, **Plan sprint** and **Tag** (on a card in play or planned) -- ending on **Tag**; no reminder item, and nothing of Organize is fetched |
 | on | the same, then **Remind me about this**: Organize's New Reminder dialog, the card's title as what and its id as the ref (`docs/modules/organize.md`, "The web UI") |
 
 ### The Space summary's tiles, by the growth flag (`scenarios.test.tsx`; the model is `summaryTiles.ts`, the card `EngagementSummary.test.tsx`)
@@ -481,6 +481,7 @@ Team Agile section (the reminder: a time and the days), saved through `POST /api
 | something waiting on you, or `spaces.<slug>.features.suggestions=false` | no suggestion row: the brief as it came, its Next line the queue's (`Next: the walk -- 1 on the PC.`) or today's |
 | the suggestion on (the PM Corner) | at the head of the page, above the card, the Corner's line verbatim (`3 more issues to get milestone B - start #5 now`) and its chevron, which opens the same hand-off box as **Work it now**; the brief below stops above the Corner's line; with the switch off, on an Azure DevOps Space or with the tracker down, no Corner (`scenarios.test.tsx`, "the PM Corner") |
 | a milestone reached in the window | the Corner reads `milestone B reached: see Releases`, no chevron; the link opens the Releases tab. The standup never throws confetti |
+| a release reached in the window, by cards alone | the Corner reads `release B reached: see Releases`, the same shape and the same link -- the Releases tab shows GitHub milestones, so it has no row for it |
 | no tracker (`tracker.ok` false) | the same page: the chair's two lines and the `Tracker` line with the reason -- the ritual happens anyway; no links; Play and Team size |
 | nothing (the agent is away) | `Could not read today's standup` -- an error, never an empty standup; no Play |
 

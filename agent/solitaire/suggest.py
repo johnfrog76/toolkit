@@ -116,10 +116,12 @@ def _sentence(item: dict, how: str, launch: bool = False) -> tuple[str, str, str
     kind = str(item.get("severity") or "") or noun
     milestone = item.get("milestone") or None
     title = str((milestone or {}).get("title") or "")
+    # A title some item has from GitHub is a GitHub milestone; else it is a release.
+    github = bool((milestone or {}).get("github"))
     if title and int((milestone or {}).get("open") or 0) == 1:
-        why = _fill(t["suggestWhyLast"], {"noun": noun, "milestone": title})
+        why = _fill(t["suggestWhyLast" if github else "suggestWhyLastRelease"], {"noun": noun, "milestone": title})
     elif title:
-        why = _fill(t["suggestWhyMilestone"], {"kind": kind, "milestone": title})
+        why = _fill(t["suggestWhyMilestone" if github else "suggestWhyRelease"], {"kind": kind, "milestone": title})
     else:
         why = _fill(t["suggestWhyOldest"], {"kind": kind})
     who = str(item.get("who") or "")
@@ -134,10 +136,13 @@ def _sentence(item: dict, how: str, launch: bool = False) -> tuple[str, str, str
                 _fill(t["suggestDelegate"], {"ref": ref, "size": size}),
                 _command("suggestCommandLaunch" if launch else "suggestCommandStart", ref),
             )
-        # Sized, but no destination: route it to a milestone -- Route's write on an
-        # issue, Plan's **Sprint:** line on a card (Route takes only -Assign there).
-        key = "suggestCommandPlaceCard" if item.get("kind") == "card" else "suggestCommandPlace"
-        return place, _fill(t["suggestPlace"], {"ref": ref, "size": size}), _command(key, ref)
+        # Sized, but no destination: an issue has no milestone (Route's write on the
+        # tracker), a card no release (Plan's **Milestone:** line; Route takes only
+        # -Assign there).
+        card = item.get("kind") == "card"
+        key = "suggestCommandPlaceCard" if card else "suggestCommandPlace"
+        said = t["suggestPlaceCard"] if card else t["suggestPlace"]
+        return place, _fill(said, {"ref": ref, "size": size}), _command(key, ref)
     return (
         route,
         _fill(t["suggestRoute"], {"ref": ref, "why": why, "nobody": t["suggestNobody"]}),
@@ -233,10 +238,13 @@ def suggest_items(
     (Active without one). A card in ``current/`` whose id is no issue in the read
     is its own item: severity and size from its Tags line, who from its worker --
     its Agent line's family, else its **Assigned:** line (``resolve_card_agent`` on
-    the card row, else the Assigned line as written) -- else its size, its milestone from its **Sprint:** line,
-    its **Created:** day and its lane. A not-billable card is an item with
+    the card row, else the Assigned line as written) -- else its size, its release from its planning line
+    -- the card row's ``sprint`` -- its **Created:** day and its lane. A not-billable card is an item with
     ``billable`` false and adds nothing to an issue. ``waiting`` is every ref on
-    the queue. A milestone's ``open`` counts its billable items, once per id."""
+    the queue. A title's ``open`` counts its billable items, once per id, and its
+    ``github`` is whether any item has it from GitHub -- an issue's milestone, or a
+    card's ``milestoneFromGitHub`` (``card_milestone_from_github``): a GitHub
+    milestone, said as one; every other title is a release."""
     prefix = rituals_worker_label_prefix()
     sizes = {
         str(lab.get("name", ""))
@@ -270,7 +278,7 @@ def suggest_items(
                 "kind": "issue",
                 "title": str(issue.get("title") or ""),
                 "severity": next((t for t in tags if t in sev), ""),
-                "milestone": {"title": title, "open": 0, "due": due or None} if title else None,
+                "milestone": {"title": title, "open": 0, "due": due or None, "github": True} if title else None,
                 "created": _day(issue.get("createdAt")) or None,
                 "size": size,
                 "who": who(assignee, size, viewer),
@@ -294,7 +302,14 @@ def suggest_items(
                 "kind": "card",
                 "title": str(card.get("title") or ""),
                 "severity": next((t for t in tags if t in sev), ""),
-                "milestone": {"title": title, "open": 0, "due": None} if title else None,
+                "milestone": {
+                    "title": title,
+                    "open": 0,
+                    "due": None,
+                    "github": bool(card.get("milestoneFromGitHub")),
+                }
+                if title
+                else None,
                 "created": _day(card.get("created")) or None,
                 "size": size,
                 "who": str(card.get("assigned") or "") or size,
@@ -304,12 +319,18 @@ def suggest_items(
             }
         )
     opens: dict[str, int] = {}
+    from_github: set[str] = set()
     for item in items:
-        if item["billable"] and item["milestone"]:
+        if not item["milestone"]:
+            continue
+        if item["milestone"]["github"]:
+            from_github.add(item["milestone"]["title"])
+        if item["billable"]:
             opens[item["milestone"]["title"]] = opens.get(item["milestone"]["title"], 0) + 1
     for item in items:
         if item["milestone"]:
             item["milestone"]["open"] = opens.get(item["milestone"]["title"], 0)
+            item["milestone"]["github"] = item["milestone"]["title"] in from_github
     return items
 
 

@@ -60,8 +60,8 @@
       "howIWork": "alone",
       "dismissed": [],
       "items": [
-        { "ref": "23A3", "kind": "card", "severity": "sev2", "milestone": { "title": "B", "open": 1, "due": null }, "created": "2026-09-20", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false },
-        { "ref": "#7", "kind": "issue", "severity": "sev1", "milestone": { "title": "Later", "open": 4, "due": null }, "created": "2026-09-25", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
+        { "ref": "23A3", "kind": "card", "severity": "sev2", "milestone": { "title": "B", "open": 1, "due": null, "github": false }, "created": "2026-09-20", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false },
+        { "ref": "#7", "kind": "issue", "severity": "sev1", "milestone": { "title": "Later", "open": 4, "due": null, "github": true }, "created": "2026-09-25", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
       ],
       "expected": {
         "order": ["#7", "23A3"],
@@ -77,14 +77,14 @@
       "howIWork": "alone",
       "dismissed": [],
       "items": [
-        { "ref": "23A3", "kind": "card", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null }, "created": "2026-09-20", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false },
-        { "ref": "K7M2", "kind": "card", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null }, "created": "2026-09-01", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
+        { "ref": "23A3", "kind": "card", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null, "github": false }, "created": "2026-09-20", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false },
+        { "ref": "K7M2", "kind": "card", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null, "github": false }, "created": "2026-09-01", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
       ],
       "expected": {
         "order": ["K7M2", "23A3"],
         "pick": "K7M2",
         "shape": "start",
-        "sentence": "K7M2 is the oldest open sev2 in milestone B -- start it?",
+        "sentence": "K7M2 is the oldest open sev2 in release B -- start it?",
         "command": "StartWork K7M2",
         "excluded": {}
       }
@@ -94,15 +94,31 @@
       "howIWork": "alone",
       "dismissed": [],
       "items": [
-        { "ref": "#4", "kind": "issue", "severity": "", "milestone": { "title": "Phase 6", "open": 3, "due": null }, "created": "2026-08-01", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false },
-        { "ref": "23A3", "kind": "card", "severity": "", "milestone": { "title": "B", "open": 1, "due": null }, "created": "2026-10-01", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
+        { "ref": "#4", "kind": "issue", "severity": "", "milestone": { "title": "Phase 6", "open": 3, "due": null, "github": true }, "created": "2026-08-01", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false },
+        { "ref": "23A3", "kind": "card", "severity": "", "milestone": { "title": "B", "open": 1, "due": null, "github": false }, "created": "2026-10-01", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
       ],
       "expected": {
         "order": ["23A3", "#4"],
         "pick": "23A3",
         "shape": "start",
-        "sentence": "23A3 is the last open card in milestone B -- start it?",
+        "sentence": "23A3 is the last open card in release B -- start it?",
         "command": "StartWork 23A3",
+        "excluded": {}
+      }
+    },
+    {
+      "name": "a-card-whose-title-is-its-issues-github-milestone-says-milestone",
+      "howIWork": "alone",
+      "dismissed": [],
+      "items": [
+        { "ref": "52", "kind": "card", "severity": "", "milestone": { "title": "v0.3 -- Share", "open": 1, "due": null, "github": true }, "created": "2026-10-01", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
+      ],
+      "expected": {
+        "order": ["52"],
+        "pick": "52",
+        "shape": "start",
+        "sentence": "52 is the last open card in milestone v0.3 -- Share -- start it?",
+        "command": "StartWork 52",
         "excluded": {}
       }
     },
@@ -112,7 +128,7 @@
       "dismissed": [],
       "items": [
         { "ref": "#2", "kind": "issue", "severity": "", "milestone": null, "created": "2026-01-01", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false },
-        { "ref": "#9", "kind": "issue", "severity": "", "milestone": { "title": "B", "open": 2, "due": null }, "created": "2026-10-01", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
+        { "ref": "#9", "kind": "issue", "severity": "", "milestone": { "title": "B", "open": 2, "due": null, "github": true }, "created": "2026-10-01", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
       ],
       "expected": {
         "order": ["#9", "#2"],
@@ -163,7 +179,7 @@
       "launch": false,
       "dismissed": [],
       "items": [
-        { "ref": "#4", "kind": "issue", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null }, "created": "2026-09-10", "size": "sonnet", "who": "sonnet", "lane": "Active", "billable": true, "waiting": false }
+        { "ref": "#4", "kind": "issue", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null, "github": true }, "created": "2026-09-10", "size": "sonnet", "who": "sonnet", "lane": "Active", "billable": true, "waiting": false }
       ],
       "expected": {
         "order": ["#4"],
@@ -180,7 +196,7 @@
       "launch": true,
       "dismissed": [],
       "items": [
-        { "ref": "#4", "kind": "issue", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null }, "created": "2026-09-10", "size": "sonnet", "who": "sonnet", "lane": "Active", "billable": true, "waiting": false }
+        { "ref": "#4", "kind": "issue", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null, "github": true }, "created": "2026-09-10", "size": "sonnet", "who": "sonnet", "lane": "Active", "billable": true, "waiting": false }
       ],
       "expected": {
         "order": ["#4"],
@@ -196,7 +212,7 @@
       "howIWork": "alone",
       "dismissed": [],
       "items": [
-        { "ref": "#4", "kind": "issue", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null }, "created": "2026-09-10", "size": "sonnet", "who": "sonnet", "lane": "Active", "billable": true, "waiting": false }
+        { "ref": "#4", "kind": "issue", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null, "github": true }, "created": "2026-09-10", "size": "sonnet", "who": "sonnet", "lane": "Active", "billable": true, "waiting": false }
       ],
       "expected": {
         "order": ["#4"],
@@ -212,7 +228,7 @@
       "howIWork": "agents",
       "dismissed": [],
       "items": [
-        { "ref": "#4", "kind": "issue", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null }, "created": "2026-09-10", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
+        { "ref": "#4", "kind": "issue", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null, "github": true }, "created": "2026-09-10", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
       ],
       "expected": {
         "order": ["#4"],
@@ -250,7 +266,7 @@
         "order": ["K7M2"],
         "pick": "K7M2",
         "shape": "place",
-        "sentence": "K7M2 is opus-sized but has no milestone -- place it?",
+        "sentence": "K7M2 is opus-sized but has no release -- place it?",
         "command": "Plan K7M2 -Milestone <title>",
         "excluded": {}
       }
@@ -260,14 +276,14 @@
       "howIWork": "agents",
       "dismissed": [],
       "items": [
-        { "ref": "23A3", "kind": "card", "severity": "", "milestone": { "title": "B", "open": 1, "due": null }, "created": "2026-10-01", "size": "", "who": "me", "lane": "Active", "billable": true, "waiting": false },
+        { "ref": "23A3", "kind": "card", "severity": "", "milestone": { "title": "B", "open": 1, "due": null, "github": false }, "created": "2026-10-01", "size": "", "who": "me", "lane": "Active", "billable": true, "waiting": false },
         { "ref": "#8", "kind": "issue", "severity": "", "milestone": null, "created": "2026-09-01", "size": "", "who": "@octocat", "lane": "Active", "billable": true, "waiting": false }
       ],
       "expected": {
         "order": ["23A3"],
         "pick": "23A3",
         "shape": "start",
-        "sentence": "23A3 is the last open card in milestone B -- start it?",
+        "sentence": "23A3 is the last open card in release B -- start it?",
         "command": "StartWork 23A3",
         "excluded": { "#8": "theirs" }
       }
@@ -278,14 +294,14 @@
       "launch": true,
       "dismissed": [],
       "items": [
-        { "ref": "23A3", "kind": "card", "severity": "", "milestone": { "title": "B", "open": 1, "due": null }, "created": "2026-10-01", "size": "", "who": "me", "lane": "Active", "billable": true, "waiting": false },
+        { "ref": "23A3", "kind": "card", "severity": "", "milestone": { "title": "B", "open": 1, "due": null, "github": false }, "created": "2026-10-01", "size": "", "who": "me", "lane": "Active", "billable": true, "waiting": false },
         { "ref": "#8", "kind": "issue", "severity": "", "milestone": null, "created": "2026-09-01", "size": "", "who": "@octocat", "lane": "Active", "billable": true, "waiting": false }
       ],
       "expected": {
         "order": ["23A3"],
         "pick": "23A3",
         "shape": "start",
-        "sentence": "23A3 is the last open card in milestone B -- start it?",
+        "sentence": "23A3 is the last open card in release B -- start it?",
         "command": "StartWork 23A3",
         "excluded": { "#8": "theirs" }
       }
@@ -295,7 +311,7 @@
       "howIWork": "agents",
       "dismissed": [],
       "items": [
-        { "ref": "#4", "kind": "issue", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null }, "created": "2026-09-10", "size": "fable", "who": "fable", "lane": "Active", "billable": true, "waiting": false }
+        { "ref": "#4", "kind": "issue", "severity": "sev2", "milestone": { "title": "B", "open": 2, "due": null, "github": true }, "created": "2026-09-10", "size": "fable", "who": "fable", "lane": "Active", "billable": true, "waiting": false }
       ],
       "expected": {
         "order": ["#4"],
@@ -397,14 +413,14 @@
       "howIWork": "alone",
       "dismissed": ["#7"],
       "items": [
-        { "ref": "23A3", "kind": "card", "severity": "sev2", "milestone": { "title": "B", "open": 1, "due": null }, "created": "2026-09-20", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false },
-        { "ref": "#7", "kind": "issue", "severity": "sev1", "milestone": { "title": "Later", "open": 4, "due": null }, "created": "2026-09-25", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
+        { "ref": "23A3", "kind": "card", "severity": "sev2", "milestone": { "title": "B", "open": 1, "due": null, "github": false }, "created": "2026-09-20", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false },
+        { "ref": "#7", "kind": "issue", "severity": "sev1", "milestone": { "title": "Later", "open": 4, "due": null, "github": true }, "created": "2026-09-25", "size": "", "who": "", "lane": "Active", "billable": true, "waiting": false }
       ],
       "expected": {
         "order": ["23A3"],
         "pick": "23A3",
         "shape": "start",
-        "sentence": "23A3 is the last open card in milestone B -- start it?",
+        "sentence": "23A3 is the last open card in release B -- start it?",
         "command": "StartWork 23A3",
         "excluded": { "#7": "dismissed" }
       }

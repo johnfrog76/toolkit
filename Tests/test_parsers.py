@@ -363,7 +363,15 @@ class StatusMetadataTests(unittest.TestCase):
         Tests/fixtures/parsers/card-milestone.json."""
         import json
 
-        from agent.core.parsers import _parse_status_metadata, card_milestone, card_sprint, card_tags
+        from agent.core.config import tracker
+        from agent.core.parsers import (
+            _parse_status_metadata,
+            card_ado_url,
+            card_milestone,
+            card_milestone_from_github,
+            card_sprint,
+            card_tags,
+        )
 
         table = json.loads((FIXTURES / "card-milestone.json").read_text(encoding="utf-8"))
         self.assertGreaterEqual(len(table["rows"]), 13)
@@ -372,6 +380,7 @@ class StatusMetadataTests(unittest.TestCase):
                 eol = "\r\n" if row["crlf"] else "\n"
                 text = eol.join(row["lines"]) + eol
                 self.assertEqual(card_milestone(text), row["milestone"])
+                self.assertIs(card_milestone_from_github(text), row["github"])
                 self.assertEqual(card_sprint(text), row["sprint"])
                 self.assertEqual(card_tags(text), row["tags"])
                 # The card model serves the same two readings the board filters by.
@@ -384,6 +393,11 @@ class StatusMetadataTests(unittest.TestCase):
         )
         self.assertTrue(any(r["milestone"] and r["sprint"] and r["milestone"] != r["sprint"] for r in table["rows"]))
         self.assertTrue(any(not r["milestone"] and r["sprint"] for r in table["rows"]))
+        # Both sources: an issue's GitHub milestone on a GitHub card's Sprint line, and
+        # a GitHub card's own Milestone line, which is a release.
+        self.assertTrue(any(r["github"] for r in table["rows"]))
+        on_github = [r for r in table["rows"] if tracker(card_ado_url("\n".join(r["lines"]))) == "github"]
+        self.assertTrue(any(not r["github"] and r["milestone"] for r in on_github))
 
     def test_a_milestones_order_by_the_shared_table(self):
         """A milestone's order (docs/hub/milestones.md): the ranked ids are the

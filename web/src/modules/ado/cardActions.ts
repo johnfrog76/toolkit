@@ -66,7 +66,7 @@ import type { Lane } from "./legalMoves";
 // agent does not send it; then a card past Active is given the benefit of the
 // doubt rather than a reason that may be false.
 
-// Plan milestone, Plan sprint and Tag, decided here: a form over the CLI's Plan and
+// Plan release, Plan sprint and Tag, decided here: a form over the CLI's Plan and
 // Tag verbs (POST /api/cmd/Plan, /api/cmd/Tag), each one line of the card
 // (docs/hub/cards.md, "Milestone and sprint: two lines"). Present on every card in
 // play or planned -- the verbs find a card in current/ and backlog/ -- and absent on
@@ -94,9 +94,9 @@ export const CARD_MOVES = defineRowMoves("card", {
   markNotBillable: { word: "Mark not billable", icon: MoneyRegular },
   makeBillable: { word: "Make billable again", icon: MoneyRegular },
   planMilestone: {
-    word: "Plan milestone",
+    word: "Plan release",
     icon: FlagRegular,
-    tooltip: "Set or clear the card's milestone line",
+    tooltip: "Set or clear the card's release line",
   },
   planSprint: {
     word: "Plan sprint",

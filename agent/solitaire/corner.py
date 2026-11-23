@@ -74,10 +74,14 @@ def corner(items: list[dict], closed: list[dict], how: str = "alone", launch: bo
         if item.get("billable", True) is not False and m and m.get("title"):
             open_titles.setdefault(str(m["title"]), set()).add(str(item.get("kind") or ""))
     done: dict[str, str] = {}
+    done_github: set[str] = set()
     for c in closed or []:
         title = str(c.get("milestone") or "")
         if not title or c.get("billable", True) is False or title in open_titles:
             continue
+        # A title some closed item had from GitHub is a GitHub milestone; else a release.
+        if c.get("github"):
+            done_github.add(title)
         day = _day(c.get("day"))
         if title not in done or day > done[title]:
             done[title] = day
@@ -96,7 +100,8 @@ def corner(items: list[dict], closed: list[dict], how: str = "alone", launch: bo
     if done:
         # The latest close; a tie by title, ordinal (max keeps the first of the sorted titles).
         title = max(sorted(done), key=lambda k: done[k])
-        return {**out, "shape": reached, "milestone": title, "line": _fill(t["cornerReached"], {"milestone": title})}
+        key = "cornerReached" if title in done_github else "cornerReachedRelease"
+        return {**out, "shape": reached, "milestone": title, "line": _fill(t[key], {"milestone": title})}
     candidates, _excluded = suggest(items or [], how, launch=launch)
     in_reach = [c for c in candidates if (c.get("milestone") or {}).get("title")]
     if not in_reach:
@@ -104,15 +109,20 @@ def corner(items: list[dict], closed: list[dict], how: str = "alone", launch: bo
     title = nearest_milestones([c["milestone"] for c in in_reach])[0]
     pick = next(c for c in in_reach if c["milestone"]["title"] == title)
     remaining = int(pick["milestone"].get("open") or 0)
+    # The title's github is the joined list's (suggest_items): a GitHub milestone is
+    # said as one, every other title as a release.
+    github = bool(pick["milestone"].get("github"))
     ref = str(pick.get("ref") or "")
     kind = str(pick.get("kind") or "")
     if remaining <= 1:
         noun = t["suggestNounCard"] if kind == "card" else t["suggestNounIssue"]
-        line = _fill(t["cornerOneLeft"], {"noun": noun, "ref": ref, "milestone": title})
+        one = t["cornerOneLeft" if github else "cornerOneLeftRelease"]
+        line = _fill(one, {"noun": noun, "ref": ref, "milestone": title})
         shape = one_left
     else:
         noun = _plural(open_titles.get(title, {kind}))
-        line = _fill(t["cornerManyLeft"], {"n": str(remaining), "noun": noun, "ref": ref, "milestone": title})
+        many = t["cornerManyLeft" if github else "cornerManyLeftRelease"]
+        line = _fill(many, {"n": str(remaining), "noun": noun, "ref": ref, "milestone": title})
         shape = many_left
     return {
         **out,
@@ -144,15 +154,17 @@ def _when(stamp) -> datetime | None:
 
 
 def corner_closed(issues: list[dict], cards: list[dict], since: datetime, as_of: datetime) -> list[dict]:
-    """What named a milestone and closed in the window, once per id. Pure; the
-    mirror of ``Get-P20CornerClosed``.
+    """What named a milestone or a release and closed in the window, once per id.
+    Pure; the mirror of ``Get-P20CornerClosed``.
 
     An issue is CLOSED with a milestone and its ``closedAt`` in [since, as_of] --
     the standup's own test for yesterday's closes. A card is in ``archive/``, its
     Closed day in [since's day, as_of's day] (the cards fill's test), its
     ``**Sprint:**`` line naming the milestone, and its id no issue in the read --
     a card that tracks an issue is that issue's row, as on the joined list. Each
-    is ``{ref, kind, milestone, day, billable}``."""
+    is ``{ref, kind, milestone, day, billable, github}``: ``github`` is true for an
+    issue, and for a card whose title came from its issue's GitHub milestone (the
+    row's ``milestoneFromGitHub``)."""
     numbers = {str(int(i.get("number", 0))) for i in issues or []}
     first, last = since.date().isoformat(), as_of.date().isoformat()
     out: list[dict] = []
@@ -168,7 +180,14 @@ def corner_closed(issues: list[dict], cards: list[dict], since: datetime, as_of:
             continue
         seen.add(ref)
         out.append(
-            {"ref": ref, "kind": "issue", "milestone": title, "day": str(issue.get("closedAt"))[:10], "billable": True}
+            {
+                "ref": ref,
+                "kind": "issue",
+                "milestone": title,
+                "day": str(issue.get("closedAt"))[:10],
+                "billable": True,
+                "github": True,
+            }
         )
     for card in sorted(cards or [], key=lambda c: str(c.get("file", ""))):
         cid = str(card.get("id") or "")
@@ -186,6 +205,7 @@ def corner_closed(issues: list[dict], cards: list[dict], since: datetime, as_of:
                 "milestone": title,
                 "day": day,
                 "billable": card.get("billable", True) is not False,
+                "github": bool(card.get("milestoneFromGitHub")),
             }
         )
     return out

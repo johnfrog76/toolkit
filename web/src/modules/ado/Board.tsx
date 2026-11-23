@@ -440,8 +440,8 @@ export function Board() {
         {/* The board's filters: one dropdown per thing a card is planned or tagged
             by, each drawn only when some card names one (promptFilters.ts). */}
         <BoardFilter
-          label="Milestone"
-          all="All milestones"
+          label="Release"
+          all="All releases"
           value={milestone}
           options={milestones}
           onChange={setMilestone}

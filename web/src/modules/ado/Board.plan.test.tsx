@@ -3,10 +3,11 @@ import { MemoryRouter } from "react-router";
 import { Board } from "./Board";
 import type { PromptInfo } from "./api.ado";
 
-// Plan milestone, Plan sprint and Tag on a board card's menu: each opens one form,
+// Plan release, Plan sprint and Tag on a board card's menu: each opens one form,
 // and the form runs the CLI's verb through the bridge (POST /api/cmd/Plan,
 // /api/cmd/Tag) -- the argv is cliBridge.ts's, and nothing here writes a card.
-// The board's filter row gains a Milestone and a Tag dropdown beside Sprint.
+// The board's filter row gains a Release and a Tag dropdown beside Sprint. A card's
+// release is its **Milestone:** line, so the argv still says -Milestone.
 
 const card: PromptInfo = {
   file: "Task401-add-retry.prompt.md",
@@ -97,14 +98,16 @@ describe("planning a card from its row menu", () => {
     draw();
     fireEvent.click(screen.getByRole("button", { name: `Actions for ${card.name}` }));
     const items = (await screen.findAllByRole("menuitem")).map((m) => m.textContent ?? "");
-    expect(items).toEqual(expect.arrayContaining(["Plan milestone", "Plan sprint", "Tag"]));
+    expect(items).toEqual(expect.arrayContaining(["Plan release", "Plan sprint", "Tag"]));
   });
 
-  it("Plan milestone shows the milestone it has, and Save runs Plan -Milestone", async () => {
+  it("Plan release shows the release it has, and Save runs Plan -Milestone", async () => {
     draw();
-    const dialog = await choose("Plan milestone");
-    // The milestone it has is the box's starting value; no "Now:" line repeats it.
-    const box = within(dialog).getByRole<HTMLInputElement>("textbox");
+    const dialog = await choose("Plan release");
+    // The release it has is the box's starting value; no "Now:" line repeats it.
+    expect(within(dialog).getByText(`Release for ${card.name}`)).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Clear release" })).toBeTruthy();
+    const box = within(dialog).getByRole<HTMLInputElement>("textbox", { name: "Release" });
     expect(box.value).toBe("M2 -- 1.2.0");
     expect(within(dialog).queryByText(/^Now:/)).toBeNull();
     fireEvent.change(box, { target: { value: "M3" } });
@@ -160,9 +163,10 @@ describe("planning a card from its row menu", () => {
 });
 
 describe("the board's filters", () => {
-  it("draws a Milestone and a Tag dropdown beside Sprint when a card names one", () => {
+  it("draws a Release and a Tag dropdown beside Sprint when a card names one", () => {
     draw();
-    expect(screen.getByRole("combobox", { name: "Milestone" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Release" })).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "Milestone" })).toBeNull();
     expect(screen.getByRole("combobox", { name: "Sprint" })).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Tag" })).toBeTruthy();
   });

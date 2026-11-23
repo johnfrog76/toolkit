@@ -135,15 +135,15 @@ a leftover dev server on Linux by its PID.
 
 **Issue:** [#521](https://github.com/johnfrog76/toolkit/issues/521)
 
-### A milestone's order is not drawn
+### A release's order is not drawn
 
-**What you see:** `Plan <id> -Rank` keeps the order in `milestones/<slug>.md`, the CLI and the agent read
+**What you see:** `Plan <id> -Rank` keeps a release's order in `milestones/<slug>.md`, the CLI and the agent read
 it the same way, and `Backlog` and `GET /api/backlog` serve it as a table, but no page shows it: Team
-Agile's Releases tab lists a milestone's issues without the order, and the order is not mirrored into a
-GitHub milestone's description. A card that is archived leaves a stale line in the file until a person
-deletes it.
+Agile's Releases tab lists the Space's GitHub milestones and their issues, not a release's order, and the
+order is not mirrored into a GitHub milestone's description. A card that is archived leaves a stale line in
+the file until a person deletes it.
 
-**Where you meet it:** [Milestones](hub/milestones.md#not-yet), "Not yet"
+**Where you meet it:** [Releases](hub/milestones.md#not-yet), "Not yet"
 
 **Issue:** [#301](https://github.com/johnfrog76/toolkit/issues/301)
 

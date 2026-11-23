@@ -134,8 +134,8 @@ After a `---` rule, bold-label lines. **This is the part of the model that is st
 
 | Line | Means | Written by | Read by |
 | --- | --- | --- | --- |
-| `**Sprint:**` | The sprint: the iteration path, or any title at all once planned by hand. Only the LAST segment is shown (`Sprint 8`), cut to 20 characters for the board -- the card itself keeps the title whole. **On a card with no `**Milestone:**` line it is the card's milestone too** (never on an Azure DevOps card), as every card read before the two were separate ([below](#milestone-and-sprint-two-lines)). `stamps.sprint` | `NewPrompt`, from the work item; `(not linked)` text offline; `Plan <id> -Sprint "<title>"` for a card already made, through `Set-P20CardLine` -- never the tracker (that is `NewItem`/`EditItem`'s own, tracker-bound `-Sprint`); `Plan <id> -Remove [-Only Sprint]` deletes the line | the board's Sprint filter; the card's tag; the model's `sprint` |
-| `**Milestone:**` | The milestone the card is planned into -- the destination (D-AR11). Where the card stands IN the milestone is not on the card: it is the milestone's order file ([milestones](milestones.md)). **No line means the `**Sprint:**` line names it**; a placeholder (`(none)`) means none, and keeps the Sprint line a sprint only. `stamps.milestone` | `Plan <id> -Milestone "<title>"`, through `Set-P20CardLine`; `Plan <id> -Sprint` writes one carrying the milestone the card read, on a card that had none; `Plan <id> -Remove [-Only Milestone]` | the model's `milestone`; the board's Milestone filter; Team Agile's suggestion and PM Corner ([below](#what-the-suggestion-reads)) |
+| `**Sprint:**` | The sprint: the iteration path, or any title at all once planned by hand. Only the LAST segment is shown (`Sprint 8`), cut to 20 characters for the board -- the card itself keeps the title whole. **On a card with no `**Milestone:**` line it is the card's release too** (never on an Azure DevOps card), as every card read before the two were separate ([below](#milestone-and-sprint-two-lines)). `stamps.sprint` | `NewPrompt`, from the work item; `(not linked)` text offline; `Plan <id> -Sprint "<title>"` for a card already made, through `Set-P20CardLine` -- never the tracker (that is `NewItem`/`EditItem`'s own, tracker-bound `-Sprint`); `Plan <id> -Remove [-Only Sprint]` deletes the line | the board's Sprint filter; the card's tag; the model's `sprint` |
+| `**Milestone:**` | The release the card is planned into -- the destination (D-AR11). The line keeps its name from before the word changed, so every card already written reads as it did. Where the card stands IN the release is not on the card: it is the release's order file ([releases](milestones.md)). **No line means the `**Sprint:**` line names it**; a placeholder (`(none)`) means none, and keeps the Sprint line a sprint only. `stamps.milestone` | `Plan <id> -Milestone "<title>"`, through `Set-P20CardLine`; `Plan <id> -Sprint` writes one carrying the release the card read, on a card that had none; `Plan <id> -Remove [-Only Milestone]` | the model's `milestone`; the board's Release filter; Team Agile's suggestion and PM Corner ([below](#what-the-suggestion-reads)) |
 | `**Story Points:**` | As the work item had it | `NewPrompt` | people |
 | `**ADO Link:**` | The work item's address. **An `https://` value here is what makes a card `linked`**; offline it reads `(not linked -- created offline with -Title)` | `NewPrompt`; and `NewItem -FromCard`, which publishes a card made offline as a GitHub issue and writes the issue's URL here, through `Set-P20CardLine` (the card keeps its id) | `linked`, `ado_url`, the repo filter (a card with no ADO link is never hidden by it), *Open in ADO* |
 | `**From:**` | The meeting record an agenda line came from, by its file stem: `YYYY-MM-DD` for the 1:1, `<series>-YYYY-MM-DD` for a series -- which says the series and the date. **No line means the card came from no meeting.** The value is the first such line's, trimmed; an empty line names none | `NewPrompt -From <record>`, at birth, directly above `**Created:**` ([communication](../modules/communication.md#an-agenda-line-becomes-a-card)) | the model's `from_record` (`card_from_record`, held to `Tests/fixtures/parsers/from-lines.json`; the CLI writes the line and has no reader of it). `stamps.from` |
@@ -217,14 +217,16 @@ neither names keeps its Assigned line as written (`me`, an `@<login>`), as befor
 
 ### Milestone and sprint: two lines
 
-A card carries its milestone and its sprint on two footer lines, each its own, and can be in both at once:
-`Plan <id> -Milestone "<title>"` writes `**Milestone:**`, `Plan <id> -Sprint "<title>"` writes `**Sprint:**`
-([CLI](../CLI.md)). Until they were separate ONE `**Sprint:**` line held a sprint OR a milestone -- `Plan
--Milestone` wrote it, and a card made from a GitHub issue carries the issue's milestone there -- and
-files outlive their templates, so **the milestone is read by one rule that keeps every such card reading
+A card carries its release and its sprint on two footer lines, each its own, and can be in both at once:
+`Plan <id> -Milestone "<title>"` writes the release on `**Milestone:**`, `Plan <id> -Sprint "<title>"` writes `**Sprint:**`
+([CLI](../CLI.md)). The release line keeps the name `**Milestone:**`, the `-Milestone` switch with it, from
+before the toolkit called its own plan a release; a GitHub milestone is the tracker's, set with `Route
+-Milestone`. Until the two lines were separate ONE `**Sprint:**` line held a sprint OR a release -- `Plan
+-Milestone` wrote it, and a card made from a GitHub issue carries the issue's GitHub milestone there -- and
+files outlive their templates, so **the release is read by one rule that keeps every such card reading
 as it did**:
 
-| The card carries | Its milestone | Its sprint |
+| The card carries | Its release | Its sprint |
 | --- | --- | --- |
 | no `**Milestone:**` line, a `**Sprint:**` line | the `**Sprint:**` value -- as it always read | the same value |
 | an Azure DevOps card: no `**Milestone:**` line, a `**Sprint:**` line | none -- the Sprint line is the board's iteration path | the `**Sprint:**` value |
@@ -235,23 +237,33 @@ as it did**:
 **An Azure DevOps card** is one whose own `**ADO Link:**` is an `https://` address that the tracker rule
 (`tracker()` and `Resolve-P20Tracker`, D-G2) reads as `ado` -- the card model's `tracker`, the card's **ado**
 badge. Its `**Sprint:**` line is written by `NewPrompt` from the work item's iteration path and was never a
-milestone, so only its own `**Milestone:**` line names one. A GitHub card (its link a `github.com` issue) and
+release, so only its own `**Milestone:**` line names one. A GitHub card (its link a `github.com` issue) and
 a card with no link keep the old fallback.
 
-Each value is the first such line's, WHOLE and trimmed. `Get-P20CardMilestone` and `Get-P20CardSprint`
-(`Scripts/Get-PromptFileStatus.ps1`) and `card_milestone()` and `card_sprint()` (`agent/core/parsers.py`) are
-the readers, both halves held to one table, `Tests/fixtures/parsers/card-milestone.json`. The two stamps are
-`consts.json`'s `stamps.milestone` and `stamps.sprint`.
+**Where the title came from.** The value a GitHub card reads from its `**Sprint:**` line -- no
+`**Milestone:**` line, its own link a GitHub issue -- is the title `NewPrompt` and `StartWork` copied from
+that issue's GitHub milestone, so it is GitHub's, not the card's own. The reader says so: a second answer,
+`github`, true for that card and false for every other -- a `**Milestone:**` line is always the card's
+release, whatever the card is linked to. The card still reads the same title; only the words the suggestion
+and the PM Corner use for it change (`milestone` for GitHub's, `release` for the card's), and a card's
+release line and its issue's GitHub milestone can name different things.
+
+Each value is the first such line's, WHOLE and trimmed. `Get-P20CardMilestone`, `Test-P20CardMilestoneFromGitHub`
+and `Get-P20CardSprint` (`Scripts/Get-PromptFileStatus.ps1`) and `card_milestone()`, `card_milestone_from_github()`
+and `card_sprint()` (`agent/core/parsers.py`) are the readers, both halves held to one table,
+`Tests/fixtures/parsers/card-milestone.json`. The two stamps are `consts.json`'s `stamps.milestone` and
+`stamps.sprint`.
 
 So a write keeps the OTHER reading as it was. `-Milestone` never touches the Sprint line -- on a card
 written before the split, its old line stays and reads as its sprint. `-Sprint` on a card with no
-`**Milestone:**` line first writes one carrying the milestone the card read (its old Sprint value, or
-`(none)`), so setting a sprint never moves a card in or out of a milestone. `-Remove` deletes both lines,
-exactly as it always deleted the one; **`-Remove -Only Milestone`** takes the card out of its milestone and
+`**Milestone:**` line first writes one carrying the release the card read (its old Sprint value, or
+`(none)`), so setting a sprint never moves a card in or out of a release. `-Remove` deletes both lines,
+exactly as it always deleted the one; **`-Remove -Only Milestone`** takes the card out of its release and
 keeps its sprint (a `(none)` line where a Sprint line would otherwise be read as one), **`-Remove -Only
-Sprint`** out of its sprint and keeps its milestone (on its own line, for an old card). A call that leaves
-both readings as they were writes nothing. Nothing here writes the tracker: a GitHub issue's milestone is
-`Route -Milestone`, an Azure DevOps work item's iteration is the work item's own.
+Sprint`** out of its sprint and keeps its release (on its own line, for an old card). A call that leaves
+both readings as they were writes nothing. Nothing here writes the tracker: a card's release is its own
+line, a GitHub issue's milestone is `Route -Milestone`, and an Azure DevOps work item's iteration is the
+work item's own.
 
 ### The Tags line
 
@@ -386,7 +398,7 @@ Active only -- it refuses a card that has any of those four lines (threaded work
 backlog). `Archive` takes a card from either folder, with the same `**Closed:**` stamp: a planned card
 can be retired without ever being in play. `StartWork` on a planned card is a stated refusal naming
 `Move <id> -To Active`: starting is the decision. The bucket a planned card is planned INTO is its
-milestone, the `**Milestone:**` line (or, on a card without one, its `**Sprint:**` line), read as on any
+release, the `**Milestone:**` line (or, on a card without one, its `**Sprint:**` line), read as on any
 other card and written the same way, through `Plan <id> -Milestone "<title>"` ([CLI](../CLI.md)) -- which never pulls the card into `current/` first,
 since being planned before being pulled into play is exactly the point.
 
@@ -491,17 +503,19 @@ The standup's suggestion -- one derived next move ([Team Agile](../modules/solit
 
 | What | Read from | Rule |
 | --- | --- | --- |
-| its milestone | the first `**Milestone:**` line, else -- a card with none that is not an Azure DevOps card -- the first `**Sprint:**` line ([the rule](#milestone-and-sprint-two-lines)) | the value WHOLE and trimmed -- `M2 -- 1.2.0, the standup sees the work`, `RecipesApp\Sprint 2` -- never the model's `sprint`, which keeps the last segment and cuts it to 20 characters for the board; a parenthesised placeholder (`(not linked)`, `(none)`) is none |
+| its release | the first `**Milestone:**` line, else -- a card with none that is not an Azure DevOps card -- the first `**Sprint:**` line ([the rule](#milestone-and-sprint-two-lines)), and whether that title is its issue's GitHub milestone | the value WHOLE and trimmed -- `M2 -- 1.2.0, the standup sees the work`, `RecipesApp\Sprint 2` -- never the model's `sprint`, which keeps the last segment and cuts it to 20 characters for the board; a parenthesised placeholder (`(not linked)`, `(none)`) is none |
 | its severity and size | the `Tags:` line | split on commas or semicolons and trimmed; the first tag that is one of the triage ceremony's severities, and the first that is one of the repo's worker labels |
 | who takes it | the `**Assigned:**` line | `me`, or a size; with none, its size |
 | its age | the `**Created:**` day | the oldest first; a card with none after every one with one |
 
-`card_milestone` and `card_tags` (`agent/core/parsers.py`) and `Get-P20CardMilestone` and `Get-P20CardTags`
-(`Scripts/Get-PromptFileStatus.ps1`) are the readers, held to one table, `Tests/fixtures/parsers/card-milestone.json`.
+`card_milestone`, `card_milestone_from_github` and `card_tags` (`agent/core/parsers.py`) and `Get-P20CardMilestone`,
+`Test-P20CardMilestoneFromGitHub` and `Get-P20CardTags` (`Scripts/Get-PromptFileStatus.ps1`) are the readers, held
+to one table, `Tests/fixtures/parsers/card-milestone.json`. A title the card has from its issue is said as
+a milestone; every other as a release ([Team Agile](../modules/solitaire-agile.md#the-suggestion-one-next-move-derived)).
 
 The PM Corner ([Team Agile](../modules/solitaire-agile.md#the-pm-corner-the-line-the-chevron-the-confetti))
-reads the same milestone through the same readers, and one more thing: an archived card's
-`**Closed:**` day, so a milestone whose last card was archived in the standup's window reads reached. It
+reads the same release through the same readers, and one more thing: an archived card's
+`**Closed:**` day, so a release whose last card was archived in the standup's window reads reached. It
 writes nothing either.
 
 ### What the Agenda reads
@@ -537,7 +551,7 @@ fields, so nothing downstream parses a heading or a filename (`PromptInfo`, `age
 | `status` | derived, above | `Backlog`, `Active`, `In Progress`, `Code Review` (and `Done` for archive readers) |
 | `progress`, `checked`, `total` | the checkboxes | `--` when there are none |
 | `sprint` | `**Sprint:**`, last segment, cut to 20 | `--` when absent |
-| `milestone` | the milestone, WHOLE, by [the rule](#milestone-and-sprint-two-lines): `**Milestone:**`, else an old card's `**Sprint:**` | `""` for none; on the list and the detail route. The board's Milestone filter reads it |
+| `milestone` | the release, WHOLE, by [the rule](#milestone-and-sprint-two-lines): `**Milestone:**`, else an old card's `**Sprint:**` | `""` for none; on the list and the detail route. The field keeps its name. The board's Release filter reads it |
 | `tags` | the `Tags:` line, split on commas or semicolons and trimmed | `[]` for none or `(None)`; on the list and the detail route. The board's Tag filter reads it |
 | `ado_url`, `pr_url` | the footer; the `PR URL:` line | `null` when absent |
 | `cover`, `before` | the `**Cover:**` / `**Before:**` lines, by the rule in "A card's pictures" | the URL of `GET /api/assets/{space}/{card key}/{file}`, or `null` -- no line, a missing file, or a path outside the Space's `assets/`. On the list and the detail route. The board draws `cover` as the top of the card's face (16:10, cropped); the list as a thumbnail inside the meta line; the card page under its header, Before and After side by side. The page reads the line itself to say "the image is missing" rather than draw a broken one |
