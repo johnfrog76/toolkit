@@ -57,7 +57,7 @@ async function readCard(page) {
     null,
     { timeout: 60000 },
   );
-  return page.evaluate(() => {
+  const card = await page.evaluate(() => {
     const box = (el) => {
       if (!el) return null;
       const r = el.getBoundingClientRect();
@@ -72,9 +72,40 @@ async function readCard(page) {
     const chip = document.querySelector('[aria-label$=" Spaces"]');
     const header = chip?.parentElement?.parentElement ?? null;
     const title = header?.firstElementChild ?? null;
-    const rows = Array.from(group.parentElement.querySelectorAll("strong")).map((s) => s.textContent?.trim());
+    // The rows live in the panel's list, a sibling of the filters' wrapper and not
+    // inside it: read each item's title from the panel the filters belong to
+    // (this page of it; readCard pages on).
+    const panel = group.closest("[data-panel-kind]");
+    const rows = Array.from(panel.querySelectorAll("[data-card-item] strong")).map((s) => s.textContent?.trim());
     return { tags, rows, chip: chip?.textContent?.trim() ?? null, boxes: { group: box(group), header: box(header), title: box(title), chip: box(chip) } };
   });
+  // The list is paged by the room the panel has, so the rows of every page are
+  // read: forward while the pager has a next page, then back to the first.
+  const panel = page.locator("[data-panel-kind]").filter({ has: page.locator('[role="group"][aria-label="Filter Spaces"]') });
+  const pager = panel.locator('[role="group"][aria-label="Pages"]');
+  const pageRows = () =>
+    page.evaluate(() =>
+      Array.from(
+        document.querySelector('[role="group"][aria-label="Filter Spaces"]').closest("[data-panel-kind]").querySelectorAll("[data-card-item] strong"),
+      ).map((e) => e.textContent?.trim()),
+    );
+  if (await pager.count()) {
+    const next = pager.locator('button[aria-label="Next page"]');
+    const prev = pager.locator('button[aria-label="Previous page"]');
+    while (await next.isEnabled()) {
+      const seen = (await pageRows())[0];
+      await next.click();
+      await page.waitForFunction(
+        (was) =>
+          document.querySelector('[role="group"][aria-label="Filter Spaces"]').closest("[data-panel-kind]").querySelector("[data-card-item] strong")?.textContent?.trim() !== was,
+        seen,
+        { timeout: 10000 },
+      );
+      card.rows.push(...(await pageRows()));
+    }
+    while (await prev.isEnabled()) await prev.click();
+  }
+  return card;
 }
 
 const sameBox = (a, b) =>
