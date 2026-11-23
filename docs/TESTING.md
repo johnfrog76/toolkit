@@ -617,7 +617,7 @@ major version.
 
 **What CI does not prove, and stays a walk:** the
 5.1 rows of [`VERIFY.md`](../VERIFY.md), Gate 12; the smoke's default, `--modules=on` and `--viewport`
-modes, which run against servers someone started (Gate 8 and 9b), and its `--studio` and `--first-run` modes; the agent's and the web UI's suites on Windows;
+modes, which run against servers someone started (Gate 8 and 9b), and its `--first-run` mode; its `--studio` mode on Windows; the agent's and the web UI's suites on Windows;
 a live tracker (Gates 6 and 8c). Nor does it compare counts with a run: [`docs/TEST-COUNTS.md`](TEST-COUNTS.md) holds those
 of the host that ran the last release's full run, and a Linux or Windows run reads differently on purpose.
 
