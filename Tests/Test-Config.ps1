@@ -787,6 +787,43 @@ try {
 
     Assert-True 'no file was written by any refusal' (-not (Test-Path (Join-Path $box.Pkg 'config.local.json')))
 
+    # -Unset is a write too, so the team's file is as out of reach to it as to -Set.
+    $defaultPath = Join-Path $box.Pkg 'config.default.json'
+    $defaultBefore = Invoke-LockRetry 'read of a scratch file' { [System.IO.File]::ReadAllBytes($defaultPath) -join ',' }
+    $unsetTeam = Invoke-Config $box @('-Unset', 'commands')
+    Assert-Equal '-Unset of a key that lives only in config.default.json is refused' 2 $unsetTeam.ExitCode
+    Assert-Contains '-Unset gives the same sentence as -Set' $unsetTeam.Output 'config.default.json, which this command never writes'
+    $unsetShipped = Invoke-Config $box @('-Unset', 'spaces.azure-demo')
+    Assert-Equal "-Unset of a shipped Space without -Hub removes only this machine's patch, so there is nothing to remove and it exits 0" 0 $unsetShipped.ExitCode
+    Assert-Contains '...and says there was nothing to remove' $unsetShipped.Output 'nothing to remove'
+    $unsetShippedHub = Invoke-Config $box @('-Unset', 'spaces.azure-demo', '-Hub')
+    Assert-Equal '-Unset of a shipped Space with -Hub and no hub is refused' 2 $unsetShippedHub.ExitCode
+    Assert-Contains '...naming promptsRoot' $unsetShippedHub.Output 'promptsRoot'
+    $defaultAfter = Invoke-LockRetry 'read of a scratch file' { [System.IO.File]::ReadAllBytes($defaultPath) -join ',' }
+    Assert-True 'config.default.json is byte-identical after the -Unset cases' ($defaultBefore -eq $defaultAfter)
+    Assert-True '...and no -Unset case created config.local.json or hub.json' ((-not (Test-Path (Join-Path $box.Pkg 'config.local.json'))) -and (-not (Test-Path (Join-Path $box.Hub 'hub.json'))))
+
+    # With a hub declared the shipped Space is refused by the file's name.
+    $hubbed = New-ConfigSandbox
+    try {
+        Set-HubRoot $hubbed
+        [void](Invoke-Config $hubbed @('-Set', 'spaces.acme.name=Acme', '-Hub'))
+        [void](Invoke-Config $hubbed @('-Set', 'activeSpace=acme'))
+        $paths = @((Join-Path $hubbed.Pkg 'config.default.json'), (Join-Path $hubbed.Pkg 'config.local.json'), (Join-Path $hubbed.Hub 'hub.json'))
+        $snap = { ($paths | ForEach-Object { Invoke-LockRetry 'read of a scratch file' { [System.IO.File]::ReadAllBytes($_) -join ',' } }) -join '|' }
+        $before = & $snap
+        $teamHub = Invoke-Config $hubbed @('-Unset', 'commands')
+        Assert-Equal '-Unset of a team key with a hub declared is refused' 2 $teamHub.ExitCode
+        Assert-Contains '...by the file' $teamHub.Output 'config.default.json, which this command never writes'
+        $shipHub = Invoke-Config $hubbed @('-Unset', 'spaces.azure-demo', '-Hub')
+        Assert-Equal '-Unset of a shipped Space with -Hub is refused' 2 $shipHub.ExitCode
+        Assert-Contains '...by the file' $shipHub.Output 'config.default.json ships'
+        $shipLocal = Invoke-Config $hubbed @('-Unset', 'spaces.azure-demo')
+        Assert-Equal '-Unset of a shipped Space without -Hub has no patch to remove' 0 $shipLocal.ExitCode
+        Assert-True 'default, local and hub files are byte-identical after all three' ($before -eq (& $snap))
+    }
+    finally { Remove-Item $hubbed.Root -Recurse -Force -ErrorAction SilentlyContinue }
+
     # A refusal in the middle of a batch changes nothing, which is why every
     # pair is validated before the first write. The batch is the JSON form,
     # because that is the one a browser sends.
