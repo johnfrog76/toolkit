@@ -399,6 +399,12 @@ function Get-ResolvedSetting {
     if ($Key -eq 'promptsRoot' -and $env:PROMPTS_ROOT -and $env:PROMPTS_ROOT.Trim()) {
         $value = $env:PROMPTS_ROOT.Trim(); $source = 'env'
     }
+    # The same for the Space: the environment's stand-in is what every verb
+    # in this process will be in, whatever config.local.json says.
+    if ($Key -eq 'activeSpace') {
+        $override = Get-P20ActiveSpaceOverride
+        if ($override) { $value = $override; $source = 'env' }
+    }
     return @{ Key = $Key; Value = $value; Source = $source }
 }
 
@@ -432,9 +438,14 @@ function Get-SpaceSetting {
 }
 
 function Get-ActiveSlug {
-    $slug = ''
-    if ($defaultCfg -and $defaultCfg.activeSpace) { $slug = [string]$defaultCfg.activeSpace }
-    if ($localCfg -and $localCfg.activeSpace) { $slug = [string]$localCfg.activeSpace }
+    # The order every other verb and the agent read it in: the environment's
+    # stand-in for this process (consts.json env.activeSpace, through the one
+    # reader in Resolve-HubConfig.ps1), then config.local.json, then the default.
+    $slug = Get-P20ActiveSpaceOverride
+    if (-not $slug) {
+        if ($defaultCfg -and $defaultCfg.activeSpace) { $slug = [string]$defaultCfg.activeSpace }
+        if ($localCfg -and $localCfg.activeSpace) { $slug = [string]$localCfg.activeSpace }
+    }
     return (Resolve-P20RenamedSlug -Slug $slug -Slugs @($resolvedOrgs | ForEach-Object { [string]$_.slug }))
 }
 

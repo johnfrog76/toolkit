@@ -2005,9 +2005,9 @@ tkWeb -Dev -Fixture -Modules on     # then: npm run smoke -- --modules=on (alias
 tkWeb -Dev                          # afterwards: back on your own hub
 ```
 
-`-Fixture` restarts this checkout's agent as a test run and hands it the fixture hub, its Space and
-the flags through its environment, with no `TEAMS_WEBHOOK_*` -- `config.local.json` is never
-written. That matters to the web half because the send button's state is read from the
+`-Fixture` restarts this checkout's agent as a test run and hands it a temporary copy of the fixture
+hub (removed by `tkWeb -Stop`), its Space and the flags through its environment, with no
+`TEAMS_WEBHOOK_*` -- neither `config.local.json` nor the tracked fixture hub is ever written. That matters to the web half because the send button's state is read from the
 **agent's** environment (`/api/env` -> `communication.recipients[].configured`), which no `unset`
 in your shell reaches. The smoke refuses before it starts, exit 2, if `/api/env` reports any
 recipient `configured: true`, and it never presses the send button either way. The rest of this

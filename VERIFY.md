@@ -1360,6 +1360,14 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `tkSetup` and `tkEnv`, which say the same command. Then switch to a `local` Space and to a GitHub Space: no strip.
   The macOS host proved the agent's rule, the render and the hints with `az` stubbed; a real `az`, its sign-in state
   and `az.cmd` are this row's.
+- [ ] **Fixture mode serves a copy, and `-Stop` removes it, on Windows (Refs #539).** On the Windows PC, in
+  `powershell` (5.1) and again in `pwsh`, with a `config.local.json` whose `activeSpace` is not `test`: run
+  `tkWeb -Dev -Fixture -NoBrowser`. The start line names a copy under `%TEMP%`, `p20-fixture-hub-<32 hex>`, and
+  `.web.fixture` at the repository root holds that path. Open the settings drawer: the Space rows are `test`'s. Change
+  a Space setting and save, then `git status`: clean, and the copy's `hub.json` carries the change. `tkWeb -Stop`:
+  `Fixture hub copy removed (<path>)`, the folder and `.web.fixture` are gone, and no `Could not remove` line -- the
+  removal waits for the stopped agent's handles. The macOS host proved the copy, the record, the removal and the
+  `Config` read with the agent stubbed; a Windows temp path, a real agent holding the folder, and 5.1 are this row's.
 
 ## Recording a run
 

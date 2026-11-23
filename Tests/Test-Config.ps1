@@ -260,6 +260,49 @@ catch {
 }
 finally { Remove-Item $box.Root -Recurse -Force -ErrorAction SilentlyContinue }
 
+# -- The active Space, as every other verb reads it -----------------------------
+# The environment's stand-in for config.local.json's activeSpace (consts.json
+# env.activeSpace) decides the Space for the process it is set in -- the module
+# and the agent read it first, and `Web -Dev -Fixture` names the fixture's Space
+# through it. -List once read the two files alone, so a machine whose
+# config.local.json named another Space listed THAT Space's rows in fixture mode.
+# The runners remove the variable for a run, so this case sets it for its own
+# children and takes it away again.
+
+Write-Host ''
+Write-Host '-- The environment names the active Space ----------------' -ForegroundColor Cyan
+
+$box = New-ConfigSandbox
+$overrideName = [string]((Get-Content (Join-Path $pkgRoot 'consts.json') -Raw -Encoding UTF8 | ConvertFrom-Json).env.activeSpace)
+try {
+    Set-HubRoot $box
+    [void](Invoke-Config $box @('-Set', 'spaces.fx.name=Fixture Space', '-Hub'))
+    [void](Invoke-Config $box @('-Set', 'activeSpace=azure-demo'))
+    $plain = (Invoke-Config $box @('-List', '-AsJson')).Output | ConvertFrom-Json
+    Assert-Equal 'without the override, -List is in the file''s Space' 'azure-demo' $plain.activeSpace
+
+    [System.Environment]::SetEnvironmentVariable($overrideName, 'fx')
+    try { $over = Invoke-Config $box @('-List', '-AsJson') }
+    finally { [System.Environment]::SetEnvironmentVariable($overrideName, $null) }
+    Assert-Equal '-List -AsJson with the override exits 0' 0 $over.ExitCode
+    $overParsed = $over.Output | ConvertFrom-Json
+    Assert-Equal 'with the override set, -List is in the override''s Space' 'fx' $overParsed.activeSpace
+    $keys = @($overParsed.settings | ForEach-Object { [string]$_.key })
+    Assert-True "the Space rows are the override's" ($keys -contains 'spaces.fx.name') ($keys -join ', ')
+    Assert-True "and not config.local.json's Space" (@($keys | Where-Object { $_ -like 'spaces.azure-demo.*' }).Count -eq 0) ($keys -join ', ')
+    Assert-True "the checkout row is the override's Space too" ($keys -contains 'spaceCheckouts.fx.path') ($keys -join ', ')
+    $activeRow = @($overParsed.settings | Where-Object { $_.key -eq 'activeSpace' })
+    Assert-True 'activeSpace is reported from the environment, as PROMPTS_ROOT is' ($activeRow.Count -eq 1 -and $activeRow[0].source -eq 'env' -and $activeRow[0].value -eq 'fx') ($activeRow | ConvertTo-Json -Compress)
+    Assert-Equal 'and config.local.json still says what it said' 'azure-demo' (Get-LocalConfigText $box | ConvertFrom-Json).activeSpace
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    [System.Environment]::SetEnvironmentVariable($overrideName, $null)
+    Remove-Item $box.Root -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # -- Machine keys --------------------------------------------------------------
 
 Write-Host ''
@@ -743,6 +786,43 @@ try {
     Assert-Contains 'and says to set promptsRoot first' $noHub.Output 'promptsRoot'
 
     Assert-True 'no file was written by any refusal' (-not (Test-Path (Join-Path $box.Pkg 'config.local.json')))
+
+    # -Unset is a write too, so the team's file is as out of reach to it as to -Set.
+    $defaultPath = Join-Path $box.Pkg 'config.default.json'
+    $defaultBefore = Invoke-LockRetry 'read of a scratch file' { [System.IO.File]::ReadAllBytes($defaultPath) -join ',' }
+    $unsetTeam = Invoke-Config $box @('-Unset', 'commands')
+    Assert-Equal '-Unset of a key that lives only in config.default.json is refused' 2 $unsetTeam.ExitCode
+    Assert-Contains '-Unset gives the same sentence as -Set' $unsetTeam.Output 'config.default.json, which this command never writes'
+    $unsetShipped = Invoke-Config $box @('-Unset', 'spaces.azure-demo')
+    Assert-Equal "-Unset of a shipped Space without -Hub removes only this machine's patch, so there is nothing to remove and it exits 0" 0 $unsetShipped.ExitCode
+    Assert-Contains '...and says there was nothing to remove' $unsetShipped.Output 'nothing to remove'
+    $unsetShippedHub = Invoke-Config $box @('-Unset', 'spaces.azure-demo', '-Hub')
+    Assert-Equal '-Unset of a shipped Space with -Hub and no hub is refused' 2 $unsetShippedHub.ExitCode
+    Assert-Contains '...naming promptsRoot' $unsetShippedHub.Output 'promptsRoot'
+    $defaultAfter = Invoke-LockRetry 'read of a scratch file' { [System.IO.File]::ReadAllBytes($defaultPath) -join ',' }
+    Assert-True 'config.default.json is byte-identical after the -Unset cases' ($defaultBefore -eq $defaultAfter)
+    Assert-True '...and no -Unset case created config.local.json or hub.json' ((-not (Test-Path (Join-Path $box.Pkg 'config.local.json'))) -and (-not (Test-Path (Join-Path $box.Hub 'hub.json'))))
+
+    # With a hub declared the shipped Space is refused by the file's name.
+    $hubbed = New-ConfigSandbox
+    try {
+        Set-HubRoot $hubbed
+        [void](Invoke-Config $hubbed @('-Set', 'spaces.acme.name=Acme', '-Hub'))
+        [void](Invoke-Config $hubbed @('-Set', 'activeSpace=acme'))
+        $paths = @((Join-Path $hubbed.Pkg 'config.default.json'), (Join-Path $hubbed.Pkg 'config.local.json'), (Join-Path $hubbed.Hub 'hub.json'))
+        $snap = { ($paths | ForEach-Object { Invoke-LockRetry 'read of a scratch file' { [System.IO.File]::ReadAllBytes($_) -join ',' } }) -join '|' }
+        $before = & $snap
+        $teamHub = Invoke-Config $hubbed @('-Unset', 'commands')
+        Assert-Equal '-Unset of a team key with a hub declared is refused' 2 $teamHub.ExitCode
+        Assert-Contains '...by the file' $teamHub.Output 'config.default.json, which this command never writes'
+        $shipHub = Invoke-Config $hubbed @('-Unset', 'spaces.azure-demo', '-Hub')
+        Assert-Equal '-Unset of a shipped Space with -Hub is refused' 2 $shipHub.ExitCode
+        Assert-Contains '...by the file' $shipHub.Output 'config.default.json ships'
+        $shipLocal = Invoke-Config $hubbed @('-Unset', 'spaces.azure-demo')
+        Assert-Equal '-Unset of a shipped Space without -Hub has no patch to remove' 0 $shipLocal.ExitCode
+        Assert-True 'default, local and hub files are byte-identical after all three' ($before -eq (& $snap))
+    }
+    finally { Remove-Item $hubbed.Root -Recurse -Force -ErrorAction SilentlyContinue }
 
     # A refusal in the middle of a batch changes nothing, which is why every
     # pair is validated before the first write. The batch is the JSON form,

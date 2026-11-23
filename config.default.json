@@ -855,7 +855,7 @@
       "switches": {
         "(none)": "Start the production build -- docker compose up --build in web/, with the agent alongside it",
         "-Dev": "Start Vite on the host ({cliPrefix}Web -Dev) plus the agent, with hot reload and no Docker",
-        "-Fixture": "With -Dev: restart the agent against Tests/fixtures/hub as a test run -- no webhook, no .env, Space 'test' -- through its environment, so config.local.json is never written. What npm run smoke drives",
+        "-Fixture": "With -Dev: restart the agent against a temporary copy of Tests/fixtures/hub as a test run -- no webhook, no .env, Space 'test' -- through its environment, so neither config.local.json nor the tracked fixture hub is written. What npm run smoke drives",
         "-Modules <on|off>": "With -Fixture: 'on' starts the agent with growth and communication on (smoke --modules=on); 'off', the default, with no flag set",
         "-Restart": "Stop both halves, then start again -- production unless -Dev is given too",
         "-Stop": "Stop the web server, any dev server left on its port, AND the agent",

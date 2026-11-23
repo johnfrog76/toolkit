@@ -65,6 +65,10 @@ $agentScript = Join-Path $PSScriptRoot 'Start-Agent.ps1'
 $script:IsWin = ($PSVersionTable.PSEdition -eq 'Desktop') -or $IsWindows
 
 $pidFile = Join-Path $repoRoot '.web.pid'
+# Where fixture mode's copy of the fixture hub is, written when -Fixture makes
+# it and read by -Stop, which removes exactly that folder. See
+# New-FixtureHubCopy below.
+$fixtureCopyFile = Join-Path $repoRoot '.web.fixture'
 $logFile = Join-Path $repoRoot 'web.log'
 $errFile = Join-Path $repoRoot 'web.err.log'
 
@@ -251,7 +255,10 @@ function Export-AgentPortForProxies {
 #
 #   the run marker (consts.json env.testRunMarker)   the Teams engine refuses a
 #                    POST, and every bridge child skips .env at import
-#   PROMPTS_ROOT     Tests/fixtures/hub
+#   PROMPTS_ROOT     a COPY of Tests/fixtures/hub in the OS temp folder, made
+#                    here and removed by -Stop -- never the tracked folder, so
+#                    a save in the settings drawer, or any verb the bridge
+#                    runs, changes the copy and leaves the checkout clean
 #   env.activeSpace  the fixture's Space, standing in for config.local.json's
 #   env.features     {} or growth+communication, standing in for its features
 #   TEAMS_WEBHOOK_*  REMOVED -- the marker stops .env being read again in a
@@ -264,12 +271,71 @@ $script:FixtureHub = 'Tests/fixtures/hub'
 $script:FixtureSpace = 'test'
 $script:FixtureFlagsOn = '{"growth":true,"communication":true}'
 
+# The copy's folder name starts with this, and -Stop removes a recorded folder
+# only when it is in the temp folder under this name: a record edited by hand,
+# or left over pointing somewhere else, never takes anything else with it.
+$script:FixtureCopyPrefix = 'p20-fixture-hub-'
+
+function Remove-FixtureHubCopy {
+    # The copy the record names, then the record. Run after the agent is
+    # stopped: on Windows a live agent holds files in the folder open.
+    if (-not (Test-Path -LiteralPath $fixtureCopyFile)) { return }
+    $recorded = ''
+    try { $recorded = ([string](Get-Content -LiteralPath $fixtureCopyFile -Raw -Encoding UTF8)).Trim() }
+    catch { $recorded = '' }
+    if ($recorded) {
+        $temp = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd('\', '/')
+        $full = ''
+        $parent = ''
+        $leaf = ''
+        try {
+            $full = [System.IO.Path]::GetFullPath($recorded).TrimEnd('\', '/')
+            $parent = [System.IO.Path]::GetDirectoryName($full)
+            $leaf = [System.IO.Path]::GetFileName($full)
+        }
+        catch { $full = '' }
+        $ours = $full -and $parent -and [string]::Equals($parent.TrimEnd('\', '/'), $temp, [System.StringComparison]::OrdinalIgnoreCase) -and
+            $leaf.StartsWith($script:FixtureCopyPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+        if (-not $ours) {
+            Write-Host "  The fixture record names $recorded, which is not a fixture copy in the temp folder; not removing it." -ForegroundColor Yellow
+        }
+        elseif (Test-Path -LiteralPath $full) {
+            # A handle the stopped agent held closes a moment after the kill on
+            # Windows, so the removal tries again before it gives up.
+            $removed = $false
+            for ($attempt = 1; $attempt -le 10; $attempt++) {
+                try {
+                    Remove-Item -LiteralPath $full -Recurse -Force -ErrorAction Stop
+                    $removed = $true
+                    break
+                }
+                catch { Start-Sleep -Milliseconds 300 }
+            }
+            if ($removed) { Write-Host "  Fixture hub copy removed ($full)." -ForegroundColor Green }
+            else { Write-Host "  Could not remove the fixture hub copy at $full; delete it by hand." -ForegroundColor Yellow }
+        }
+    }
+    Remove-Item -LiteralPath $fixtureCopyFile -Force -ErrorAction SilentlyContinue
+}
+
+function New-FixtureHubCopy {
+    # A fresh copy of the tracked fixture hub, recorded for -Stop. Any copy an
+    # earlier -Fixture left behind goes first.
+    Remove-FixtureHubCopy
+    $source = Join-Path $repoRoot $script:FixtureHub
+    if (-not (Test-Path -LiteralPath $source)) { throw "there is no fixture hub at $source" }
+    $copy = Join-Path ([System.IO.Path]::GetTempPath()) ($script:FixtureCopyPrefix + [guid]::NewGuid().ToString('N'))
+    Copy-Item -LiteralPath $source -Destination $copy -Recurse -Force -ErrorAction Stop
+    Set-Content -LiteralPath $fixtureCopyFile -Value $copy -Encoding UTF8
+    return $copy
+}
+
 function Get-FixtureEnvironment {
-    param([string]$ModuleFlags)
+    param([string]$ModuleFlags, [string]$HubPath)
     $consts = Get-P20Consts
     $map = @{}
     $map[[string]$consts.env.testRunMarker] = 'fixture'
-    $map['PROMPTS_ROOT'] = (Join-Path $repoRoot $script:FixtureHub)
+    $map['PROMPTS_ROOT'] = $HubPath
     $map[[string]$consts.env.activeSpace] = $script:FixtureSpace
     $flags = '{}'
     if ($ModuleFlags -eq 'on') { $flags = $script:FixtureFlagsOn }
@@ -604,6 +670,8 @@ if ($Stop) {
         Write-Host "  Dev server is not running -- nothing to stop." -ForegroundColor Yellow
     }
     & $agentScript -Stop
+    # After the agent, which is what had the copy open.
+    Remove-FixtureHubCopy
     Write-WebLog 'CMD' 'stop'
     exit 0
 }
@@ -617,6 +685,7 @@ if ($Restart) {
     Stop-WebContainer
     $null = Stop-DevServer
     & $agentScript -Stop
+    Remove-FixtureHubCopy
 }
 
 # -- Dev -----------------------------------------------------------------------
@@ -655,13 +724,25 @@ if ($Dev) {
     # launches -- because the agent's launcher asks the same questions its child
     # will: Test-HubMismatch compares the hub a running agent reports with the
     # PROMPTS_ROOT this shell asks for, and it has to be asking for the fixture.
+    #
+    # The hub the servers get is a fresh COPY of the fixture hub, made after the
+    # old agent is stopped and recorded for -Stop, so nothing they write --
+    # a setting saved in the drawer, a card moved through the bridge -- can
+    # reach the tracked folder.
     $fixtureSaved = $null
     if ($Fixture) {
         if (-not $Restart) { & $agentScript -Stop }
-        $fixtureSaved = Push-ProcessEnvironment -Environment (Get-FixtureEnvironment -ModuleFlags $Modules)
+        try { $fixtureCopy = New-FixtureHubCopy }
+        catch {
+            Write-CliError -Message "Could not copy the fixture hub: $($_.Exception.Message)" `
+                -Hint "Fixture mode serves a copy of $($script:FixtureHub) from the temp folder, so the checkout is never written. Check that the folder exists and the temp folder is writable."
+            Write-WebLog 'ERR' 'fixture hub copy failed'
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
+        $fixtureSaved = Push-ProcessEnvironment -Environment (Get-FixtureEnvironment -ModuleFlags $Modules -HubPath $fixtureCopy)
         $flagsSaid = 'no feature flags'
         if ($Modules -eq 'on') { $flagsSaid = 'growth and communication on' }
-        Write-Host "  Fixture mode: $($script:FixtureHub), Space '$($script:FixtureSpace)', $flagsSaid, as a test run (no webhook, no .env) -- config.local.json is not touched." -ForegroundColor Cyan
+        Write-Host "  Fixture mode: a copy of $($script:FixtureHub) at $fixtureCopy, Space '$($script:FixtureSpace)', $flagsSaid, as a test run (no webhook, no .env) -- config.local.json and the tracked fixture hub are not touched; $(Get-CliPrefix)Web -Stop removes the copy." -ForegroundColor Cyan
     }
     try {
         & $agentScript -Reuse
