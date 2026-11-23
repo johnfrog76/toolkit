@@ -318,11 +318,16 @@ export const RITUALS = consts.rituals as {
     suggestDelegate: string;
     suggestRoute: string;
     suggestNobody: string;
+    /** suggestPlace / suggestWhyLast / suggestWhyMilestone name a GitHub milestone;
+     *  suggestPlaceCard / suggestWhyLastRelease / suggestWhyRelease a release. */
     suggestPlace: string;
+    suggestPlaceCard: string;
     suggestCommandPlace: string;
     suggestCommandPlaceCard: string;
     suggestWhyLast: string;
+    suggestWhyLastRelease: string;
     suggestWhyMilestone: string;
+    suggestWhyRelease: string;
     suggestWhyOldest: string;
     suggestNounCard: string;
     suggestNounIssue: string;
@@ -333,8 +338,11 @@ export const RITUALS = consts.rituals as {
      *  chevron is cornerChevron. cornerBrief / cornerBriefCommand are the brief's
      *  last line, which the page sets aside because it draws the Corner itself. */
     cornerOneLeft: string;
+    cornerOneLeftRelease: string;
     cornerManyLeft: string;
+    cornerManyLeftRelease: string;
     cornerReached: string;
+    cornerReachedRelease: string;
     cornerNothingInReach: string;
     cornerNounCards: string;
     cornerNounIssues: string;

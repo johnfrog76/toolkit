@@ -113,6 +113,7 @@ from ..core.parsers import (
     card_billable,
     card_id,
     card_milestone,
+    card_milestone_from_github,
     card_tags,
     resolve_card_agent,
 )
@@ -1038,7 +1039,7 @@ def _stamp_day(content: str, stamp: str) -> str | None:
 def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> list[dict]:
     """The thin layer: a Space's ``current/`` and ``archive/`` as card rows --
     ``{file, folder, status, closed, title, id, path, type, body, billable, begun, commits,
-    sprint, created, tags, assigned}``. A file with no id by the
+    sprint, milestoneFromGitHub, created, tags, assigned}``. A file with no id by the
     one id rule is not a card and is skipped. State is the parser's rule; a card
     in ``archive/`` is Done and carries its Closed stamp's day."""
     rows: list[dict] = []
@@ -1079,14 +1080,16 @@ def read_cards(space_dir: Path, type_names: list[str], prefixes: list[str]) -> l
                     # What moved: the day its work began, and its commit bullets.
                     "begun": _stamp_day(content, stamp_started()) or _stamp_day(content, stamp_created()),
                     "commits": re_commit_bullet().findall(content),
-                    # What the suggestion reads (suggest.py): the milestone its
-                    # **Sprint:** line names, whole; its **Created:** day; its
+                    # What the suggestion reads (suggest.py): the release its
+                    # planning line names, whole (card_milestone), and whether that
+                    # title is its issue's GitHub milestone; its **Created:** day; its
                     # Tags (a severity, a size); and who takes it -- the card's
                     # agent's family by the one reader (resolve_card_agent, the
                     # shipped order, no messages: its Agent line, else an older
                     # card's Assigned worker), else its Assigned line as written
                     # (``me``, an ``@<login>``, or "").
                     "sprint": card_milestone(content),
+                    "milestoneFromGitHub": card_milestone_from_github(content),
                     "created": _stamp_day(content, stamp_created()),
                     "tags": card_tags(content),
                     "assigned": resolve_card_agent(content, "", None, model_rows, None, current=sizes)["family"]

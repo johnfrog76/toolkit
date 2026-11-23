@@ -1334,10 +1334,14 @@ foreach ($row in @($cardTable.rows)) {
     if ($row.crlf) { $eol = "`r`n" }
     $text = ((@($row.lines | ForEach-Object { [string]$_ })) -join $eol) + $eol
     $gotM = Get-P20CardMilestone $text
+    $gotG = Test-P20CardMilestoneFromGitHub $text
     $gotS = Get-P20CardSprint $text
     $gotT = (@(Get-P20CardTags $text)) -join '|'
-    Assert-True "a card's milestone, sprint and tags: $($row.name)" ($gotM -ceq [string]$row.milestone -and $gotS -ceq [string]$row.sprint -and $gotT -ceq ((@($row.tags | ForEach-Object { [string]$_ })) -join '|')) "got '$gotM' '$gotS' [$gotT]"
+    Assert-True "a card's milestone, its source, sprint and tags: $($row.name)" ($gotM -ceq [string]$row.milestone -and $gotG -eq [bool]$row.github -and $gotS -ceq [string]$row.sprint -and $gotT -ceq ((@($row.tags | ForEach-Object { [string]$_ })) -join '|')) "got '$gotM' $gotG '$gotS' [$gotT]"
 }
+Assert-True "the card-milestone table has both sources: a GitHub issue's milestone on a card's Sprint line, and a GitHub card's own Milestone line, a release" (
+    @($cardTable.rows | Where-Object { $_.github -eq $true }).Count -gt 0 -and
+    @($cardTable.rows | Where-Object { $_.github -eq $false -and [string]$_.milestone -and (@($_.lines) -like '*github.com*') }).Count -gt 0) ''
 Assert-True 'the card-milestone table has every shape: an old card read through its sprint line, both lines, a placeholder milestone' (
     @($cardTable.rows | Where-Object { -not (@($_.lines) -like '[*][*]Milestone:[*][*]*') -and [string]$_.milestone }).Count -gt 0 -and
     @($cardTable.rows | Where-Object { [string]$_.milestone -and [string]$_.sprint -and ([string]$_.milestone -cne [string]$_.sprint) }).Count -gt 0 -and
@@ -1369,7 +1373,7 @@ function ConvertTo-CornerCardRows {
         [void]$rows.Add([ordered]@{
                 file = [string]$card.file; folder = [string]$card.folder; status = [string]$card.status
                 closed = $card.closed; id = [string]$card.id; title = [string]$card.title; created = $card.created
-                sprint = (Get-P20CardMilestone $text); tags = [object[]]@(Get-P20CardTags $text)
+                sprint = (Get-P20CardMilestone $text); milestoneFromGitHub = (Test-P20CardMilestoneFromGitHub $text); tags = [object[]]@(Get-P20CardTags $text)
                 assigned = (Get-P20CardAssigned $text); billable = (Test-P20CardBillable $text)
             })
     }
