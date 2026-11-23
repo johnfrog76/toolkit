@@ -365,6 +365,16 @@ try {
     $out = Invoke-Verbs ("${prefix}Plan H6PN -Remove; 'RM-EXIT=' + `$LASTEXITCODE; ${prefix}Plan W4CY -Remove -Only Milestone; 'RMO-EXIT=' + `$LASTEXITCODE")
     Assert-True '-Remove and -Remove -Only Milestone take the id out of the order with the line' ($out -match 'RM-EXIT=0' -and $out -match 'RMO-EXIT=0' -and (Get-Order $m2Path) -ceq 'T3MX,999' -and (Get-Order $m3Path) -ceq '') "$out $(Get-Order $m2Path)|$(Get-Order $m3Path)"
 
+    # The two refusals an order file's name can meet, each decided before anything is written.
+    $t3mx = (Find-Card 'TaskT3MX-*.prompt.md' 'current')[0].FullName
+    $t3Before = [System.IO.File]::ReadAllText($t3mx)
+    $m2Before = [System.IO.File]::ReadAllText($m2Path)
+    $out = Invoke-Verbs ("${prefix}Plan T3MX -Milestone '-- !'; 'NOSLUG-EXIT=' + `$LASTEXITCODE")
+    Assert-True "a title with no letter or digit refuses, exit 2: it cannot name an order file" ($out -match 'NOSLUG-EXIT=2' -and $out -match [regex]::Escape("'-- !' has no letter or digit to name its order file with.") -and $out -match [regex]::Escape('Give the milestone a title with a word in it.')) $out
+    $out = Invoke-Verbs ("${prefix}Plan T3MX -Milestone 'M2 1.2.0'; 'SLUGTAKEN-EXIT=' + `$LASTEXITCODE")
+    Assert-True "a title that slugs to another title's file refuses, exit 2, naming both" ($out -match 'SLUGTAKEN-EXIT=2' -and $out -match [regex]::Escape("$([string]$consts.folders.milestones)/m2-1-2-0.md is the order of 'M2 -- 1.2.0', not 'M2 1.2.0'.") -and $out -match [regex]::Escape('Two milestone titles slug to the same file. Rename one milestone, on its cards and in that file''s heading.')) $out
+    Assert-True 'and neither refusal changed the card or the order' (([System.IO.File]::ReadAllText($t3mx)) -ceq $t3Before -and ([System.IO.File]::ReadAllText($m2Path)) -ceq $m2Before)
+
     $read = Get-P20SpaceMilestoneOrders -SpaceDir $space
     $m2Read = @($read | Where-Object { $_.Title -ceq 'M2 -- 1.2.0' })
     Assert-True 'the disk reader reads the order back: one ranked, the stale line counted' ($m2Read.Count -eq 1 -and (@($m2Read[0].Ranked) -join ',') -ceq 'T3MX' -and $m2Read[0].Stale -eq 1) ''
