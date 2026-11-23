@@ -11,6 +11,174 @@ until the release folds them in here.
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-22
+
+### Added
+
+- The System page's Environment card now lists each Teams recipient with where it comes from (Every Space or This Space) and whether its webhook variable is set, when the communication module is on.
+- A second Teams recipient is declared with `Config -Set managerWorkflow.communication.recipients.<key>.type`, `.display` and `.webhookEnv` (or under `spaces.<slug>.` for one Space), and `Env` names the recipients declared. A Teams chat is a recipient type of its own, `chat`, posting through its webhook like a channel; an unknown type is refused with the allowed values named.
+- `Daily` prints a week's timesheet in the terminal -- this week, `-LastWeek`, or any window with `-Since` and `-Until` -- and the Daily page steps back to any earlier week. A window with one end, or a day that is not `yyyy-MM-dd`, is refused in the same words in both.
+- The Studio's Spaces card counts each GitHub product's designs in flight and its specs on the product's row, and says how many of its design files are not stamped with an id.
+- Organize has a Reference page beside Reminders: the documents you keep in your hub's reference folder, listed, searchable by their words and readable in the browser.
+- A Space can say how many are in its Team Agile standup: `Config -Set spaces.<slug>.features.teamSize=<3|6|9> -Hub`,
+  or the settings drawer's "How many are in my standup?" -- the room, the chair counted, nine when unset.
+  When the Space has more members than seats, the ones with work sit first, then the idle; the rest are
+  out today and say nothing in the work grain, while the detail and the brief still list everyone.
+  `Standup -AsJson` carries the room as `team.size` and each worker's `present`.
+- Team Agile has a new `OrgChart` verb that prints your org as a tree -- the positions, who each reports to, and which model or person sits in each seat -- from an `org.json` file at the top of your hub; `OrgChart -AsJson` prints it as data, and `samples/hub/org.json` is one to copy.
+- The agent serves the org chart at `GET /api/ritual/org` (where Team Agile is on), with each position's prompt title and a reference that opens it in the Studio's reading room; `?tree=<id>` asks for another tree of the file.
+- Team Agile has an Org tab beside Standup, Triage and Releases that draws your org chart as offices, one card a seat with the model or person in it, or an empty desk and its mug where nobody sits; click an office to read its role prompt in the Studio.
+- A card can name the model that works it: one `**Agent:** <model id>` line beside `**Assigned:**`,
+  meaning who is working it, or did, read on every tracker and served as the card's `agent`.
+  `Route <id> -Assign <size>` writes it at the hand-off with the size's current model id, and refuses
+  a size with no `current` entry; the lead rewrites it whenever the work changes hands, and confirms it
+  at sign-off. `Route <id> -Assign me` still writes `**Assigned:** me`, the person.
+  `Config/models.json` maps each id to its provider, family and display name, so an id the map does
+  not know is shown as written and never guessed at.
+- On a Mac, `Test -Isolated` gives a test run its own home, temp folder, PowerShell caches and test history, so two full runs can start at once without crashing each other; add `-Keep` to keep the run's folder for reading afterwards.
+- `Test` warns in its summary when an installed Python package is below the floor in the agent's requirements files, or is not the pinned version, and names the line that fixes it; `Env` shows the same as its `Python packages` line. The run itself is unchanged.
+- On an Azure DevOps Space where `az` is installed but not signed in, the web app now shows a short "Sign in to Azure DevOps" strip with the command to copy (`az login --allow-no-subscriptions`) and a **Check again** button, and `Setup`, `Env` and `Connect` name the same command; the app never signs in for you.
+- `Burn -Reading general=43,premium=54` records your plan's weekly usage as Claude's usage page shows it, one bucket or several, and `Burn` now opens with a weekly burndown: each bucket's latest reading, how far it is ahead of or behind an even pace to the reset, and when the reading was taken and renews (`Config -Set burn.cacheHours=<n>`, 4 hours by default). Readings are kept in the hub, one file per week per machine, and `Burn -AsJson` and the agent's `GET /api/usage/burn` carry the burndown too.
+
+### Changed
+
+- The CLI test runner now prints `<Suite> -- started <time>` before each suite, so a cancelled run's log shows which suite stalled.
+- The Studio tab's Spaces, Hub Designs and Prompts cards now show every row at one height, with the title on one line, up to two lines of description, and the badges and file details on a fixed bottom line; the full text shows on hover and on keyboard focus, and the top cards are short enough that both fit, with the start of Prompts, on a laptop screen.
+- Where a Space's checkout is configured, the Design tab reads that clone: a design you move from the browser changes its row at once, before anything is committed, and Search inside finds text on the clone's branch.
+- On a GitHub Space the standup counts only the commits authored inside its window, says how many it could not date (`7 commits (2 undated)`), and marks an issue with no card `started` when it got its worker label or an assignee in the window.
+- The standup's Next line now ends in `StartWork <n> -Launch` when it suggests sending an item to the crew on a machine where Claude Code is installed, so the line names the command that starts the session.
+- Active Cards, My Work and GitHub Issues, the Log, Decks and the Studio's three lists are drawn one
+  way: every entry is the same height with a plain title, one **Open** button and the rest in its
+  `...` menu, long text is cut with an ellipsis and has no tooltip, each list is one fixed height
+  beside its neighbours with a page sized to fit it, and the pager sits in the foot and reads
+  `Page 2 of 5`, with the arrow keys paging while it has focus. Active Cards shows a card's
+  checklist progress on its bottom line, a Decks entry opens from **Open the deck** instead of a click
+  anywhere on it, the Log's type, period and search sit in its header, and a hub design's docs and the
+  cards worked against it open from its menu.
+- Hub Designs' outcome chips under **Archived** read like its state chips: each shows how many
+  archived designs it holds, a chosen one is drawn the same way, and the two rows of chips have a
+  small space between them.
+- A list never cuts off its last entry: the number of entries on a page follows the room the list
+  really has, so a message or a second row of chips over the list takes an entry's place while it
+  shows. In Hub Designs, **Search inside** lists what it found as entries of the same list, a page
+  at a time, with a **Designs** chip to go back.
+- Team Agile's Milestones tab is now named Releases, at `/solitaire-agile/releases`, and says that each row is a GitHub milestone; the old `/solitaire-agile/milestones` address still lands on it.
+- On the Studio tab, every Spaces, Hub Designs and Prompts row now shows one action, Open, with everything else in the ... menu, and its title is plain text rather than a link.
+- Hub Designs filters by state with the same chip row as Prompts and Spaces, with counts, and its helper sentence moves into an info icon beside the title.
+- `ReplyPR -Status` with a word that is not a thread status now stops with one sentence naming the six it takes, before anything is posted. The verb and the PR Comments page read the same list.
+- A page's panels sit in rows you can select in the browser's developer tools, each with its own gap
+  and the panels it holds: two side by side in a wide window, stacked in a narrow one. Nothing on a
+  page moves.
+- In-page tabs (Home's views, Team Agile's ceremonies and the Standup's tabs) and a panel's filter
+  chips have even space above and below them.
+- Test Health pages its suites like the Log, so the two panels on the System page are the same height,
+  and the System page's card pager reads Page 1 of 2, centred under the panels.
+- Cards in every list sit 8 px apart, and the line of tags, ids and dates under a card's description
+  has the same room whether the description runs to one line or two.
+- Every list panel is one height, tall enough for four Studio cards a page under a row of filter chips.
+  Panels side by side line up whatever they hold.
+- Filter chips take your theme's link and tab colour when selected, so they follow dark and light and each of the themes, rows that group by colour use colours that sit with each theme's palette, and the Design tab's outcome chips now show how many designs each one holds.
+- On the System page's Environment card, a Teams recipient with no webhook now reads "Webhook not set" in a neutral tone, and "Sending off on this server" where the server was started for review or testing. Each row says what it does (for example "Your manager: Teams direct message") under the title "Teams messages", a person recipient asks for no webhook, and how to set one up is in the row's info icon. The manager session's send button gives the same two phrases as its reason.
+- On the Growth page, Reviews and Goals are drawn like every other list: the two panels and Decks
+  are one height, every entry is the same height with long text cut by an ellipsis, each has one
+  **Open** button and the rest in its `...` menu, and the pager in the foot shows as many entries as
+  fit. Goals' statuses and Reviews' kinds are chips over the list, Reviews narrows to one Space from
+  a select in its header, and how reviews work is behind the info icon beside the title.
+- Reminders and Meetings are drawn the same way: one height, entries of one height, chips with
+  counts over the list, and the pager in the foot. A reminder that names a card you are working on
+  opens it from **Open the card** in its `...` menu instead of a link in the entry. A meeting opens
+  from **Open the meeting**; **Edit or send**, and **Archive** on a complete session, are in its
+  `...` menu, where three unnamed icon buttons were.
+- The System page groups its cards under in-page tabs, Overview and Agents, the same tab row Home uses, in place of the pager.
+- In Team Agile's standup, a worker with nothing on the tracker now gives a real status about the day
+  around the work -- setting up, learning, meetings -- and two idle workers on the same day say
+  different things.
+- In Team Agile's standup, the work grain goes round the room: each worker gives status in one frame
+  ("Good morning. Yesterday I closed ... Today I'm on ... No blockers. That's it for me."), and every
+  turn has a yesterday and a today: a slot with nothing beside one with something says a fixed, honest
+  line -- "Today I'll pick up the next item from the board.", or "Yesterday I worked on #414." for work
+  begun or committed in the window, else "Yesterday I picked up where I left off." -- and only a worker
+  with nothing at all on the tracker says a made-up yesterday and today about the day around the work
+  ("Yesterday I ... Today I'll ...") in the same frame; and the chair gives its own status last in its
+  own words -- "Yesterday I walked #407." when a walk closed in the window, then "Today I'll walk #416
+  and #417." or "Today I'll keep the board moving." The detail grain shows an idle worker's two items
+  on two `Status` rows instead of one `Mug` row.
+- Team Agile's played standup is the round of the room: nine windows, the chair and each member in the
+  room today in a face of their own, plated with their label, and an empty desk with a steaming mug, a
+  different one each, in every other window. The chair opens the board, calls each member by name -- the
+  called window lights up in colour with a dashed ring -- the member answers -- a member with nothing on the tracker keeps their face and says their made-up
+  yesterday and today -- and the chair gives its own status before it closes. Team size, beside Play,
+  opens the settings at "How many are in my standup?". The voice says each name once. The speech bubble keeps its
+  size and shows a turn's first lines, and never lies over a face or a name plate.
+- A Space's team size is now how many people are in its standup: every seat it counts is filled, by you, your labelled workers, then invented cast members who report made-up status, and the empty desks are only the windows past the size. On a GitHub Space you are always in the standup, with a status row even on a day with no card in play, and you take the first turn of `Standup -Grain work`.
+- The played standup on the Team Agile page seats the whole room the Space's team size counts: you first, your labelled workers, then invented cast members, each in a window of its own, so a room of nine has no empty desk, a room of six has three and a room of three has six.
+- Every text file in the Toolkit checks out with LF line endings on Windows too, and a new hub made by `Start` gets a `.gitattributes` that does the same for your cards.
+- The standup's room is drawn in the refined cast, the one the Org page and the landing page use: the nine
+  members, the PM on the treadmill, the eight drinks on the empty desks and each window's props. Every window
+  is now in full colour. The speaker is told apart by its frame, the called window by its dashed ring and an
+  empty desk by the drink on it. What is said, where everyone sits and how the room moves are unchanged.
+- Existing standups change where a card is in play: a card is reported by the agent its `**Agent:**`
+  line names, else an older card's `**Assigned:**` worker, else the model its commits credit, else
+  you. An issue with no card stays with its label's worker, and every model a card names gets a seat.
+- The third-party notices list the agent's Python packages at the versions and licenses the requirements now allow,
+  including `anthropic`, which moved from MIT to Apache-2.0 at 2.0; the list is regenerated with one command and
+  checked against the requirements' minimum versions.
+- In the settings drawer, every setting with a few allowed values is a dropdown, the standup's size
+  included, and every one you may leave unset opens on **Default**, which takes it back to unset --
+  **Default (9)** for how many are in your standup, plain **Default** for how you work in a Space.
+- The standup's size reads as its question in the settings drawer's Configuration section -- "How
+  many are in my standup in Acme?" for a Space called Acme -- and the question's radios gain
+  **Default (9)**, first and chosen while the size is unset.
+- The landing page's three people are drawn in ToolKit's new refined style.
+
+### Fixed
+
+- On a large GitHub repository, Team Agile's standup, triage list and suggestion in the browser now read the same issues and labels as `Standup` and `Triage` in the terminal.
+- Small badges that were white on white in the light theme -- a prompt's category on the Studio tab, Archived and Read-only in the new Space dialog, Closed on a design's page -- are now readable, and a check stops the combination coming back.
+- A Space you have retired no longer appears in the Space switcher unless you are in it; it stays under Archive on the Spaces card and `SwitchSpace <slug>` still reaches it.
+- On a GitHub Space, PR Comments now offers only the statuses GitHub keeps (fixed, closed and active), and a suggested reply no longer picks one that is refused.
+- On GitHub, `GetPRComments` reads `ReplyPR`'s answer to a conversation comment or a review summary back into the thread it answers, instead of as a new thread.
+- A test run made in a git worktree now reaches the System page's Test Health card: each machine keeps its test
+  history in one folder outside every checkout (on macOS `~/Library/Application Support/ToolKit/TestHistory`), each
+  record names the checkout and commit it ran from, and the first look after upgrading still shows your last run.
+- A Space on Azure DevOps now finds its clone on your machine, so the moves and checks that need one (`MoveDesign -Space`, the `-Doc` check) work there as they do on GitHub.
+- Importing the ToolKit module no longer contacts GitHub or Azure DevOps: the startup line says only what is known without the network, and the tier is worked out the first time a command needs it.
+- `Burn` and the System page's burn tile now price Claude Fable 5.2 and Claude Haiku 4.5, and when a model has no price yet the cost itself reads "$X derived, not counting claude-new-1" instead of leaving the gap to a footnote.
+- Private and Visibility unknown badges in the New Space dialog, and the source badge of a setting that is not set on the Settings card, are now readable in the light theme instead of white on white.
+- When a Space's tracker is not GitHub, Team Agile's Releases tab now says "the Releases tab" in its explanation, not the old "Milestones tab".
+- A Space on Azure DevOps finds its clone when the clone's ssh remote is written as a URL
+  (`ssh://git@ssh.dev.azure.com/v3/<org>/<project>/<repo>`), not only in the form the clone dialog gives.
+- When the standup or triage cannot read the tracker, the `Tracker` line in the terminal and on the Team Agile page now says the same sentence for the same failure, and a missing repository says how to name one.
+- Under Windows PowerShell 5.1, a Space's checkout or a hub whose folder path has a space in it and ends in a
+  backslash (`C:\My Repos\product\`) is found: it no longer reads as not a clone, or as not a git repository.
+- The PM Corner now offers `StartWork <n> -Launch` wherever the standup's Next line does, so the two lines of a brief name the same command for the same item.
+- Typed in Windows PowerShell 5.1, `TestToolkit` now runs the test suites in 5.1; it used to run them in PowerShell 7 whichever shell it was typed in.
+- The System page's headings now follow one another in order, so a screen reader moving by headings no longer meets a skipped level.
+- On the standup's stage, the ops window's terminal sits behind him like a call's background, so it never covers his face. Its heartbeat is now a soft shift of the text between green and white, where the whole panel used to fade over him every beat; with reduced motion on there is no beat at all.
+- Changing the team size (or any other setting) now updates the Team Agile standup straight away, without a hard refresh.
+- The agent's tests no longer call a real `az` or `gh` on a machine that is signed in: both are kept out of reach
+  for the run, and a test that calls either without standing in for it fails, naming the command.
+- The standup's windows no longer replay their entrance each time the speaker changes: the room enters once,
+  and after that only the windows of whoever stops and starts speaking change.
+- A `Test -Isolated` run that was stopped no longer leaves its run folder in `/tmp`: Ctrl+C clears it, and the next `-Isolated` run removes the folders a killed run left more than a day ago, naming each one. A folder kept with `-Keep`, and the folder of a run still going, are never removed. A folder kept by an earlier version has no marker; touch `.p20-kept` inside it to keep it.
+- `tkStandup -Grain brief` on a GitHub Space with no worker labels now ends its list of members with "No worker labels in this Space." after the engineer's line, where it had said routed issues read as open when none are routed.
+- The standup seats both the engineer and a worker when a Space's slug is the same word as one of its
+  tracker's worker labels, so neither goes without a turn in `tkStandup`
+  or a window of their own on the standup's stage.
+- `tkWeb -Stop` and `-Restart` now stop only a dev server that belongs to the checkout they run from, and name any other `node` on the dev port as another checkout's instead of stopping it; the Web test suite no longer stops a real dev server on 5174.
+- The System page's Log card keeps its title, Dismiss Errors, refresh and the count together in the header, with the type, period and search filters in a row above the chart and six entries to a page.
+- The standup's brief reports each member's own cards started and commits when a Space's slug is also one of its worker labels, instead of crediting both members with the same counts.
+- The standup's brief says a Space has no worker labels from the tracker's own count, even when a card seats a member.
+- The hub's growth document says how a work review picks its files: a stamped file by its `**Created:**`
+  and `**Closed:**` dates, and git only for a file with no `**Created:**`.
+- The web UI's README says how its tests load `react-markdown`: through the `transformIgnorePatterns`
+  allow-list in `web/jest.config.mjs`, not by being unable to.
+- The documentation no longer promises that `tkWeb -Stop` recognises a `node` dev server on Linux, where it
+  does not yet; it lists every key `tkConfig -Set` accepts, the lane names and the deck and first-run keys
+  among them; and it counts the suites whose verbs run on Windows PowerShell 5.1 the same way twice.
+- Clearing a Space setting in the settings drawer now removes it when the hub holds the value; before, the save reported success and changed nothing.
+- The settings drawer opens with its settings already loaded, and a link to a setting lands on it the first time, however slowly the list arrives.
+
 ## [1.6.0] - 2026-11-09
 
 ### Added
