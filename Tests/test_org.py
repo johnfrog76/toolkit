@@ -445,23 +445,34 @@ class TheRoute(OrgBase):
             [(p["id"], p["level"]) for p in positions],
             [
                 ("owner", 0),
-                ("lead", 1),
-                ("builder", 2),
+                ("vp-product", 1),
+                ("vp-engineering", 1),
                 ("pm", 1),
+                ("team-lead", 2),
+                ("builder", 3),
                 ("intern", 2),
             ],
         )
-        self.assertEqual([s["state"] for s in positions[1]["seats"]], ["staffed", "vacant"])
         by_id = {p["id"]: p for p in positions}
-        # The intern names the role the toolkit ships: the sample hub has no copy,
+        self.assertEqual([s["state"] for s in by_id["team-lead"]["seats"]], ["staffed", "vacant"])
+        # Every office names a role the toolkit ships: the sample hub has no copy,
         # so the lookup finds the toolkit's agentic/org/ and the ref is a shipped one.
-        intern = by_id["intern"]
-        self.assertEqual(
-            (intern["prompt"], intern["reportsTo"], intern["promptRef"]), ("intern.prompt.md", "pm", "intern")
-        )
-        self.assertEqual(intern["promptTitle"], "Intern")
-        self.assertFalse((sample / "agentic" / "org" / "intern.prompt.md").exists())
-        for pid in ("owner", "lead", "builder", "pm"):
+        roles = {
+            "vp-product": ("vp-of-product", "owner", "VP of product"),
+            "vp-engineering": ("vp-of-engineering", "owner", "VP of engineering"),
+            "pm": ("pm", "owner", "PM"),
+            "team-lead": ("team-lead", "pm", "Team lead"),
+            "intern": ("intern", "pm", "Intern"),
+        }
+        for pid, (role, reports_to, title) in roles.items():
+            got = by_id[pid]
+            self.assertEqual(
+                (got["prompt"], got["reportsTo"], got["promptRef"], got["promptTitle"]),
+                (f"{role}.prompt.md", reports_to, role, title),
+                pid,
+            )
+            self.assertFalse((sample / "agentic" / "org" / f"{role}.prompt.md").exists(), pid)
+        for pid in ("owner", "builder"):
             self.assertEqual((by_id[pid]["promptTitle"], by_id[pid]["promptRef"]), (None, None), pid)
 
 

@@ -328,16 +328,17 @@ try {
         Assert-True "refused ($($r.Name)): the sentence is said once" (([regex]::Matches($ran.All, [regex]::Escape($r.Match))).Count -eq 1) $ran.All
         Assert-True "refused ($($r.Name)): nothing written" ((Get-Snapshot $hubDir) -ceq $snapBefore)
     }
-    # A prompt the valid file names that the agentic folder does not have.
-    [System.IO.File]::WriteAllText($orgPath, (Read-Fixture $validCase.orgFile), $utf8)
-    $leadPrompt = Join-Path $hubDir 'agentic/team-lead.prompt.md'
-    Remove-Item -LiteralPath $leadPrompt -Force
+    # A prompt the valid file names that none of the three folders has. The toolkit ships a
+    # team-lead role, so taking the hub's copy away would only fall through to it: the lead
+    # names a role nobody ships instead.
+    $validText = Read-Fixture $validCase.orgFile
+    [System.IO.File]::WriteAllText($orgPath, $validText.Replace('"team-lead.prompt.md"', '"our-lead.prompt.md"'), $utf8)
     $snapBefore = Get-Snapshot $hubDir
     $noPrompt = Invoke-OrgChart 'tkOrgChart'
     Assert-Equal 'a prompt that is not in the agentic folder: exit 2' '2' $noPrompt.Exit $noPrompt.All
-    Assert-True '  and names the position and the prompt' ($noPrompt.All.Contains("Position 'team-lead' in tree 'main' names the prompt 'team-lead.prompt.md', which is not a file in the hub's agentic/org/ or agentic/ folder or the toolkit's agentic/org/.")) $noPrompt.All
+    Assert-True '  and names the position and the prompt' ($noPrompt.All.Contains("Position 'team-lead' in tree 'main' names the prompt 'our-lead.prompt.md', which is not a file in the hub's agentic/org/ or agentic/ folder or the toolkit's agentic/org/.")) $noPrompt.All
     Assert-True '  and writes nothing' ((Get-Snapshot $hubDir) -ceq $snapBefore)
-    [System.IO.File]::WriteAllText($leadPrompt, '', $utf8)
+    [System.IO.File]::WriteAllText($orgPath, $validText, $utf8)
     $unknownTree = Invoke-OrgChart 'tkOrgChart -Tree nope'
     Assert-Equal 'an unknown -Tree: exit 2' '2' $unknownTree.Exit
     Assert-True 'and says which trees there are' ($unknownTree.All.Contains("-Tree names 'nope', which is not a tree in org.json. Trees: main, branch.")) $unknownTree.All
@@ -390,16 +391,26 @@ try {
         (@($sample.Chart.tree.positions | ForEach-Object { $_.seats } | Where-Object { $_.person }).Count -eq 1) -and
         (@($sample.Chart.tree.positions | ForEach-Object { $_.seats } | Where-Object { $_.state -eq 'vacant' }).Count -eq 1) -and
         (@($sample.Chart.tree.positions | Where-Object { @($_.seats).Count -eq 0 -and $_.defaultModel }).Count -eq 1))
-    $intern = $sample.Chart.tree.positions | Where-Object { $_.id -eq 'intern' } | Select-Object -First 1
-    Assert-True '  its intern names the role the toolkit ships, found in agentic/org/ (the sample hub has no copy)' (
-        $intern -and $intern.prompt -eq 'intern.prompt.md' -and $intern.reportsTo -eq 'pm' -and
-        (Test-Path -LiteralPath (Join-Path $pkgRoot 'agentic/org/intern.prompt.md') -PathType Leaf) -and
-        -not (Test-Path -LiteralPath (Join-Path $pkgRoot 'samples/hub/agentic/org/intern.prompt.md')))
-    $pmPosition = $sample.Chart.tree.positions | Where-Object { $_.id -eq 'pm' } | Select-Object -First 1
-    Assert-True '  and the seat it reports to names no prompt, which is valid' ($pmPosition -and $null -eq $pmPosition.prompt)
+    # Every office in the sample names a role the toolkit ships, and the sample hub copies none of them,
+    # so each is found in the toolkit's agentic/org/. The owner is a person and the builder a pool:
+    # neither names a role.
+    $roles = [ordered]@{
+        'vp-product' = @('vp-of-product.prompt.md', 'owner'); 'vp-engineering' = @('vp-of-engineering.prompt.md', 'owner')
+        'pm' = @('pm.prompt.md', 'owner'); 'team-lead' = @('team-lead.prompt.md', 'pm'); 'intern' = @('intern.prompt.md', 'pm')
+    }
+    foreach ($positionId in $roles.Keys) {
+        $want = $roles[$positionId]
+        $position = $sample.Chart.tree.positions | Where-Object { $_.id -eq $positionId } | Select-Object -First 1
+        Assert-True "  its $positionId names the role the toolkit ships, $($want[0]), found in agentic/org/ (the sample hub has no copy)" (
+            $position -and $position.prompt -eq $want[0] -and $position.reportsTo -eq $want[1] -and
+            (Test-Path -LiteralPath (Join-Path $pkgRoot "agentic/org/$($want[0])") -PathType Leaf) -and
+            -not (Test-Path -LiteralPath (Join-Path $pkgRoot "samples/hub/agentic/org/$($want[0])")))
+    }
+    $unroled = @($sample.Chart.tree.positions | Where-Object { $null -eq $_.prompt } | ForEach-Object { $_.id })
+    Assert-Equal '  and only the owner and the builder pool name no role' 'owner,builder' ($unroled -join ',')
     $sampleRow = @(Get-P20OptionalSurfaces -Prefix 'tk' -PackageRoot $pkgRoot -Config ([pscustomobject]@{ PromptsRoot = (Join-Path $pkgRoot 'samples/hub'); ActiveSpace = 'github-demo'; Spaces = @() }) -Features $on) | Where-Object { $_.key -eq 'orgChart' } | Select-Object -First 1
     Assert-Equal '  the Org chart row over the sample: on, with its seats' 'on' $sampleRow.state $sampleRow.note
-    Assert-Equal '  and the note counts them' 'My team, 5 seats; tkOrgChart prints it' $sampleRow.note
+    Assert-Equal '  and the note counts them' 'My team, 7 seats; tkOrgChart prints it' $sampleRow.note
 }
 catch {
     $script:failed++
