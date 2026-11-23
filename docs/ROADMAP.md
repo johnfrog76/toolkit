@@ -64,7 +64,9 @@ M4c 1.5.0  Team Agile says what it is   cut 2026-10-26: the Agenda, the Mileston
         |
 M1b 1.6.0  The bar, held again   cut 2026-11-09: the request gate, names are names, 5.1 reads every script, the Docker refresh, and the Backlog
         |
-M4b 1.7.0  The tour                    Kit's narrated tour, and the ten-minute walk on a machine that has never seen the product
+M2b 1.7.0  The standup seats the team   cut 2026-11-22: team size and the room, the org chart, the Agent line, the refined cast, one list shape, the settings drawer, the sign-in strip
+        |
+M4b 1.8.0  The tour                    Kit's narrated tour, and the ten-minute walk on a machine that has never seen the product
         |
 M5         The rename                 a cards core and an ado module; no version
         :
@@ -157,7 +159,7 @@ the release is not held on a deck.
 ### M4c -- 1.5.0, Team Agile says what it is -- cut 2026-10-26
 
 Team Agile's page says what it is for, and what it shows has a place of its own. **Cut 2026-10-26** with all
-three on main and green, ahead of the tour, which carries to 1.7.0 unchanged.
+three on main and green, ahead of the tour, which carries to 1.8.0 unchanged.
 
 - The standup page opens on an **Agenda**: what moved since the last standup, and what is waiting on you,
   as cards with one action, Work it now; the suggestion's row above them; the text stays on its own tabs (C6VH).
@@ -182,7 +184,28 @@ fix is proved on the host that broke it, Windows-1252 included. **Cut 2026-11-09
 
 Carries to the next quality release: the rest of the review queue.
 
-### M4b -- 1.7.0, the tour
+### M2b -- 1.7.0, the standup seats the team -- cut 2026-11-22
+
+The standup stops reading as a report about a tracker and becomes a team in a room. **Done when:** a Space
+says how many are in its standup and every seat is filled, the org has a chart with a seat for each model or
+person, and a card names the model that works it. **Cut 2026-11-22.**
+
+- **The room:** `spaces.<slug>.features.teamSize` seats 3, 6 or 9 with the chair counted, the work grain goes
+  round the room one frame each, an idle worker gives an honest line about the day, and the played standup is
+  nine windows in the refined cast, the empty desks only the windows past the size.
+- **The org:** `OrgChart`, `GET /api/ritual/org` and the Org tab draw the hub's `org.json` as offices; a card's
+  `**Agent:**` line names the model that works it, written by `Route -Assign`, and the standup seats by it.
+- **One list shape:** every list in the web UI is one height with a plain title, one Open and a `...` menu;
+  the System page has tabs; Team Agile's Milestones tab is Releases.
+- **The settings drawer:** a setting with allowed values is a dropdown that opens on Default, a hub-held unset
+  reaches the hub, the drawer opens loaded, and a signed-out Azure DevOps Space shows the sign-in command to copy.
+- **The desk:** `Daily` in the terminal, `Burn -Reading` and the weekly burndown, `Test -Isolated`, the Python
+  requirements floors, and the Windows PowerShell 5.1 fixes from the review queue.
+
+Carries to 1.8.0: the tour (M4b), unchanged; and two `VERIFY.md` Gate 12 rows wait for the Windows host, the
+requirements floors under a real `py -3` and the sign-in strip against a real signed-out `az`.
+
+### M4b -- 1.8.0, the tour
 
 **Done when:** Kit's guided tour is narrated and in the launcher, and the ten-minute walk has been timed on a
 machine that has never seen the product (the `VERIFY.md` Gate 12 row 4D77 added, with the time on it).
