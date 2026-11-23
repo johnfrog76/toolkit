@@ -1265,7 +1265,7 @@ an issue, by a card and by a card made from an issue, a card made from an issue 
 milestone) beside the same card with its own `**Milestone:**` line (a release), closed
 before the window, closed in it with one still open, nothing in reach, a card and its issue counted once, a
 card and an issue in one milestone whose title is longer than twenty characters, in flight counted but not
-picked, the pick inside the nearest milestone rather than the suggestion's own, and a delegation with the
+picked, the pick inside the nearest destination rather than the suggestion's own, and a delegation with the
 launch off and on beside the two that stay a plain start with it on (a Space worked alone, an item nobody
 has sized); and four chair's readings end to end -- one with the launch on, where the Next line and the
 Corner end in the same `-Launch` -- whose goldens (`corner-<case>.brief.txt`) `Tests/regenerate_joined_goldens.py` writes.
@@ -1285,7 +1285,7 @@ tab's Milestones card, from the same reader (`accounting.github_milestone_rows`)
 (days, `""` when unset) and `reached`. There is no second milestone rule: `reached` is the core's
 `milestone_reached` -- **every issue closed, and at least one issue**, whatever GitHub's own state says. So
 a milestone closed on GitHub with an issue reopened in it is not reached, and one nobody closed on GitHub
-is. The tab reads no card: a card's milestone line feeds the suggestion and the PM Corner above, through
+is. The tab reads no card: a card's release line feeds the suggestion and the PM Corner above, through
 the one card reader, and never these counts, which are the tracker's own. What the route adds is Team Agile's shape around it: the module's gate, `?space=`, the tracker state
 the ceremonies answer with (any repo that fails fails the read, with its reason, never a raise), and the
 kept read -- one `gh` call per repo a minute ([above](#one-tracker-read-kept-a-minute)), read again on
