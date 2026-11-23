@@ -26,6 +26,8 @@
     ["pkg ; extra == 'x'", {"name": "pkg", "extras": [], "specs": [], "marker": "extra == 'x'"}],
     ["x (>=1.2)", {"name": "x", "extras": [], "specs": [[">=", "1.2"]], "marker": ""}],
     ["x (>=1.2, <2)", {"name": "x", "extras": [], "specs": [[">=", "1.2"], ["<", "2"]], "marker": ""}],
+    ["x (>=1.2,<2); extra == 'dev'", {"name": "x", "extras": [], "specs": [[">=", "1.2"], ["<", "2"]], "marker": "extra == 'dev'"}],
+    ["x (>=1.2,<2) ; extra == 'dev'", {"name": "x", "extras": [], "specs": [[">=", "1.2"], ["<", "2"]], "marker": "extra == 'dev'"}],
     ["a-", {"name": "a", "extras": [], "specs": [], "marker": ""}],
     ["a_", {"name": "a", "extras": [], "specs": [], "marker": ""}],
     ["z", {"name": "z", "extras": [], "specs": [], "marker": ""}],
