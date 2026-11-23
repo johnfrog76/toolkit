@@ -188,9 +188,16 @@ def filled_suggest_case(table: dict, case: dict) -> "standup.Standup":
 
 def corner_card_rows(cards: list[dict]) -> list[dict]:
     """corner.json's cards, each given as its file's ``lines``, as the card rows
-    ``read_cards`` makes: the **Sprint:** line WHOLE (card_milestone), the Tags,
-    who takes it and whether it is billable, through the agent's one card reader."""
-    from agent.core.parsers import card_assigned, card_billable, card_milestone, card_tags
+    ``read_cards`` makes: the planning line WHOLE (card_milestone) and whether it is
+    an issue's GitHub milestone (card_milestone_from_github), the Tags, who takes it
+    and whether it is billable, through the agent's one card reader."""
+    from agent.core.parsers import (
+        card_assigned,
+        card_billable,
+        card_milestone,
+        card_milestone_from_github,
+        card_tags,
+    )
 
     rows = []
     for c in cards:
@@ -199,6 +206,7 @@ def corner_card_rows(cards: list[dict]) -> list[dict]:
             {
                 **{k: v for k, v in c.items() if k != "lines"},
                 "sprint": card_milestone(text),
+                "milestoneFromGitHub": card_milestone_from_github(text),
                 "tags": card_tags(text),
                 "assigned": card_assigned(text),
                 "billable": card_billable(text),

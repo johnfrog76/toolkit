@@ -144,10 +144,11 @@ try {
     Assert-True 'it counts the waiting cards and the one in play apart' ($out -match 'Backlog -- 3 cards waiting, 1 in play') $out
     $lines = @($out -split "`n" | Where-Object { $_ -match '^\s+(\d+\s+)?(in play\s+)?(H3RE|K7M2|Q4R9|P7NX)\s' })
     $order = (@($lines | ForEach-Object { [regex]::Match($_, '(H3RE|K7M2|Q4R9|P7NX)').Value })) -join ','
-    Assert-Equal 'the rows: M2 in its order, its card in play in its place, then the card with no milestone' 'H3RE,Q4R9,K7M2,P7NX' $order
+    Assert-Equal 'the rows: M2 in its order, its card in play in its place, then the card with no release' 'H3RE,Q4R9,K7M2,P7NX' $order
     Assert-True 'the ranks read 1, 2, 3, the card in play marked' ($lines[0] -match '^\s+1\s+in play\s+H3RE' -and $lines[1] -match '^\s+2\s+Q4R9' -and $lines[2] -match '^\s+3\s+K7M2') ($lines -join ' / ')
-    Assert-True 'a card with no milestone has no rank' ($lines[3] -match '^\s+P7NX\s') ($lines -join ' / ')
-    Assert-True 'type, milestone, tags and age are columns' ($lines[2] -match 'Task\s+M2\s+docs\s+0d\s+Bench reading') $lines[2]
+    Assert-True 'a card with no release has no rank' ($lines[3] -match '^\s+P7NX\s') ($lines -join ' / ')
+    Assert-True 'type, release, tags and age are columns' ($lines[2] -match 'Task\s+M2\s+docs\s+0d\s+Bench reading') $lines[2]
+    Assert-True 'the column is headed Release' (@($out -split "`n" | Where-Object { $_ -match '^\s+Rank\s+State\s+Id\s+Type\s+Release\s+Tags\s+Age\s+Title' }).Count -eq 1) $out
     Assert-True 'a non-ASCII title reads as UTF-8' ($out.Contains("Caf$([char]0x00E9) menu")) $out
     $after = Get-HubBytes
     $same = ($before.Count -eq $after.Count) -and (@($before.Keys | Where-Object { $after[$_] -cne $before[$_] }).Count -eq 0)
@@ -156,11 +157,11 @@ try {
     $out = Invoke-Verbs ("${prefix}Plan K7M2 -Rank top | Out-Null; ${prefix}Backlog -Milestone m2")
     $lines = @($out -split "`n" | Where-Object { $_ -match '^\s+\d+\s+(in play\s+)?(H3RE|K7M2|Q4R9)\s' })
     Assert-True "after 'Plan K7M2 -Rank top', K7M2 is 1, H3RE 2 and Q4R9 3" ($lines.Count -eq 3 -and $lines[0] -match '^\s+1\s+K7M2' -and $lines[1] -match '^\s+2\s+in play\s+H3RE' -and $lines[2] -match '^\s+3\s+Q4R9') ($lines -join ' / ')
-    Assert-True '-Milestone, ignoring case, keeps the milestone and says the filter' ($out -match "Backlog -- 2 cards waiting, 1 in play -- milestone 'm2'" -and $out -notmatch 'P7NX') $out
+    Assert-True '-Milestone, ignoring case, keeps the release and says the filter' ($out -match "Backlog -- 2 cards waiting, 1 in play -- release 'm2'" -and $out -notmatch 'P7NX') $out
 
     $out = Invoke-Verbs ("${prefix}Backlog -Tag DOCS; ${prefix}Backlog -Type bug -Milestone M2")
     Assert-True '-Tag matches one of the tags, ignoring case' ($out -match "Backlog -- 1 card waiting -- tag 'DOCS'" -and $out -match 'K7M2') $out
-    Assert-True '-Type and -Milestone go together' ($out -match "1 card waiting -- milestone 'M2', type 'bug'") $out
+    Assert-True '-Type and -Milestone go together' ($out -match "1 card waiting -- release 'M2', type 'bug'") $out
     $out = Invoke-Verbs ("${prefix}Backlog -Type 'user story'; 'NONE-EXIT=' + `$LASTEXITCODE")
     Assert-True 'a filter nothing matches says so, exit 0' ($out -match "No card in backlog/ matches -- type 'user story'" -and $out -match 'NONE-EXIT=0') $out
 

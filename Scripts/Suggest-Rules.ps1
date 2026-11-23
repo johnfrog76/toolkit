@@ -160,12 +160,18 @@ function Get-P20SuggestionSentence {
     $milestone = Get-P20SuggestField $Item 'milestone'
     $title = ''
     $open = 0
+    $github = $false
     if ($null -ne $milestone) {
         $title = [string](Get-P20SuggestField $milestone 'title')
         $open = [int](Get-P20SuggestField $milestone 'open')
+        $github = [bool](Get-P20SuggestField $milestone 'github')
     }
-    if ($title -and $open -eq 1) { $why = Format-P20SuggestTemplate ([string]$t.suggestWhyLast) @{ noun = $noun; milestone = $title } }
-    elseif ($title) { $why = Format-P20SuggestTemplate ([string]$t.suggestWhyMilestone) @{ kind = $kind; milestone = $title } }
+    # A title some item has from GitHub is a GitHub milestone; else it is a release.
+    $lastKey = 'suggestWhyLastRelease'
+    $whyKey = 'suggestWhyRelease'
+    if ($github) { $lastKey = 'suggestWhyLast'; $whyKey = 'suggestWhyMilestone' }
+    if ($title -and $open -eq 1) { $why = Format-P20SuggestTemplate ([string]$t.$lastKey) @{ noun = $noun; milestone = $title } }
+    elseif ($title) { $why = Format-P20SuggestTemplate ([string]$t.$whyKey) @{ kind = $kind; milestone = $title } }
     else { $why = Format-P20SuggestTemplate ([string]$t.suggestWhyOldest) @{ kind = $kind } }
     $who = [string](Get-P20SuggestField $Item 'who')
     # Yours to start: you, or the owner's own seat (D-AR10) -- never the crew.
@@ -183,13 +189,18 @@ function Get-P20SuggestionSentence {
             if ($Launch) { $delegateCommand = Format-P20SuggestTemplate ([string]$t.suggestCommandLaunch) @{ arg = $arg } }
             return @{ shape = $shapes[1]; sentence = (Format-P20SuggestTemplate ([string]$t.suggestDelegate) @{ ref = $ref; size = $size }); command = $delegateCommand }
         }
-        # Sized, but no destination: route it to a milestone -- Route's write on an
-        # issue, Plan's **Sprint:** line on a card (Route takes only -Assign there).
+        # Sized, but no destination: an issue has no milestone (Route's write on the
+        # tracker), a card no release (Plan's **Milestone:** line; Route takes only
+        # -Assign there).
         $placeTemplate = [string]$t.suggestCommandPlace
-        if ([string](Get-P20SuggestField $Item 'kind') -ceq 'card') { $placeTemplate = [string]$t.suggestCommandPlaceCard }
+        $placeSentence = [string]$t.suggestPlace
+        if ([string](Get-P20SuggestField $Item 'kind') -ceq 'card') {
+            $placeTemplate = [string]$t.suggestCommandPlaceCard
+            $placeSentence = [string]$t.suggestPlaceCard
+        }
         return @{
             shape    = $shapes[3]
-            sentence = (Format-P20SuggestTemplate ([string]$t.suggestPlace) @{ ref = $ref; size = $size })
+            sentence = (Format-P20SuggestTemplate $placeSentence @{ ref = $ref; size = $size })
             command  = (Format-P20SuggestTemplate $placeTemplate @{ arg = $arg })
         }
     }
@@ -277,10 +288,13 @@ function Get-P20SuggestionItems {
       whose id is its number (Active without one). A card in current/ whose id is
       no issue in the read is its own item -- severity and size from its Tags,
       who from its worker -- its Agent line's family, else its **Assigned:** line
-      (Resolve-P20CardAgent on the card row, else the Assigned line as written) -- else its size, its milestone from its
-      **Sprint:** line, its **Created:** day, its lane. A not-billable card is an
+      (Resolve-P20CardAgent on the card row, else the Assigned line as written) -- else its size, its release from its
+      planning line (the card row's sprint), its **Created:** day, its lane. A not-billable card is an
       item with billable false and adds nothing to an issue. -Waiting is every ref
-      on the queue. A milestone's open counts its billable items, once per id.
+      on the queue. A title's open counts its billable items, once per id, and its
+      github is whether any item has it from GitHub: an issue's milestone, or a
+      card's milestoneFromGitHub (Test-P20CardMilestoneFromGitHub) -- a GitHub
+      milestone, said as one; every other title is a release.
     #>
     param($Labels, $Issues, $Cards, [string[]]$Waiting = @(), [string]$Viewer = '', [string]$PackageRoot)
     $c = Get-P20Consts
@@ -330,7 +344,7 @@ function Get-P20SuggestionItems {
             if ($mTitle) {
                 $dueValue = $null
                 if ($mDue) { $dueValue = $mDue }
-                $milestone = [ordered]@{ title = $mTitle; open = 0; due = $dueValue }
+                $milestone = [ordered]@{ title = $mTitle; open = 0; due = $dueValue; github = $true }
             }
         }
         $created = ConvertTo-P20SuggestDay (Get-P20SuggestField $issue 'createdAt')
@@ -356,7 +370,7 @@ function Get-P20SuggestionItems {
         foreach ($tg in $tags) { if ($sev -ccontains $tg) { $severity = $tg; break } }
         $mTitle = [string](Get-P20SuggestField $card 'sprint')
         $milestone = $null
-        if ($mTitle) { $milestone = [ordered]@{ title = $mTitle; open = 0; due = $null } }
+        if ($mTitle) { $milestone = [ordered]@{ title = $mTitle; open = 0; due = $null; github = [bool](Get-P20SuggestField $card 'milestoneFromGitHub') } }
         $created = ConvertTo-P20SuggestDay (Get-P20SuggestField $card 'created')
         if (-not $created) { $created = $null }
         $who = [string](Get-P20SuggestField $card 'assigned')
@@ -370,14 +384,20 @@ function Get-P20SuggestionItems {
             })
     }
     $opens = @{}
+    $fromGitHub = @{}
     foreach ($item in $items) {
-        if ($item.billable -and $null -ne $item.milestone) {
-            $k = [string]$item.milestone.title
+        if ($null -eq $item.milestone) { continue }
+        $k = [string]$item.milestone.title
+        if ($item.milestone.github) { $fromGitHub[$k] = $true }
+        if ($item.billable) {
             if ($opens.ContainsKey($k)) { $opens[$k] = $opens[$k] + 1 } else { $opens[$k] = 1 }
         }
     }
     foreach ($item in $items) {
-        if ($null -ne $item.milestone) { $item.milestone['open'] = [int]$opens[[string]$item.milestone.title] }
+        if ($null -ne $item.milestone) {
+            $item.milestone['open'] = [int]$opens[[string]$item.milestone.title]
+            $item.milestone['github'] = $fromGitHub.ContainsKey([string]$item.milestone.title)
+        }
     }
     return $items.ToArray()
 }

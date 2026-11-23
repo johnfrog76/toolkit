@@ -1137,7 +1137,7 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `[via python (PATH)]`, or skips with the reason when that python lacks pytest. `tkTestToolkit -TestAll` stubs
   the venv case on POSIX only. Closes the pull request that added the venv search (#116).
 - [ ] **Ten minutes to your own board, on a machine that has never seen the product.** The row the 1.4.0
-  milestone is judged by (`docs/ROADMAP.md`, M4). On a machine with no ToolKit, no hub and no
+  release is judged by (`docs/ROADMAP.md`, M4). On a machine with no ToolKit, no hub and no
   `config.local.json` -- never a clone of the builder's -- with a stopwatch running from the clone: clone the
   repository, and in the clone type the README's first three lines, `Import-Module ./utilities.psm1 -Force`,
   `tkInstallAutoload`, `tkStart`, and nothing else. No account is asked for anywhere. The browser opens on the

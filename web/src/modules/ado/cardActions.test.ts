@@ -36,7 +36,7 @@ function shape(plan: CardActionPlan): { primary: string | null; menu: string[] }
 
 /** What every card offers itself: the billable toggle, then its two planning lines and
  *  its tags (Plan and Tag through the bridge) -- on a card in play or planned. */
-const CARD_ONLY = ["Mark not billable", "Plan milestone", "Plan sprint", "Tag"];
+const CARD_ONLY = ["Mark not billable", "Plan release", "Plan sprint", "Tag"];
 /** A Done card is archived: Plan and Tag do not look there, so it offers neither. */
 const DONE_ONLY = ["Mark not billable"];
 /** On every Code Review card: the verb asks the tracker whether the PR merged. */

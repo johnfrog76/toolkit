@@ -2,8 +2,9 @@
 
 ToolKit 1.0.0 left its private repository on 2026-10-15. The roadmap that got it there was a waterfall
 of eight phases and a public bar, and every line of it is either done or carried below. This file is
-what replaced it: **the road so far**, kept short because the record is the cards; **five milestones**,
-each a release or a refactor with a named "done when"; and the rule for keeping the file honest.
+what replaced it: **the road so far**, kept short because the record is the cards; **the releases**,
+each a version -- or, once, a refactor that ships none -- with a named "done when"; and the rule for
+keeping the file honest.
 
 The owner's three sentences still set the direction. *"This is the core purpose of this software and it
 can't be turned off -- ADO can be turned off."* *"Software is an offering."* And the front door: the
@@ -13,18 +14,21 @@ or with agents, and the cards are the record either way.
 ## How the work is carried
 
 - **Internal work is a card** in the hub's toolkit Space, never a public issue. GitHub issues are for
-  what strangers report and ask for. A card names the milestone it belongs to on its `**Sprint:**`
-  line, so the board's sprint filter shows a milestone's cards without a tracker.
-- **A milestone is a release** (semantic version, [CHANGELOG.md](../CHANGELOG.md), a tag on main) or a
-  refactor that ships no user-visible change and gets no version of its own.
+  what strangers report and ask for. A card names the release it belongs to on its `**Milestone:**`
+  line -- an older card on its `**Sprint:**` line, which still reads the same -- so the board's Release
+  filter shows a release's cards without a tracker.
+- **A release is the tag it aims for**: a semantic version, its section in [CHANGELOG.md](../CHANGELOG.md),
+  a tag on main. Before the tag it is the plan below; after it, the record. The one exception is the
+  rename, a refactor that ships no user-visible change and gets no version of its own.
 - **The Azure DevOps way of working is not legacy.** The owner expects to work that way again -- an
   organisation's board, its sprints, its 1:1s and its accounting against Azure DevOps cards -- so every
-  milestone keeps that path first-class: its verbs stay registered and tested, an Azure DevOps Space
+  release keeps that path first-class: its verbs stay registered and tested, an Azure DevOps Space
   stays in the sample hub and in the owner's, and a release is not cut on the GitHub path alone. Where
   the Azure path can only be proved against a live organisation (VERIFY.md's gates), the release walks
   them or says it did not.
-- **The public milestones on GitHub are the releases only**, named by version, so a visitor sees what
-  shipped and what is next without seeing the crew's cards.
+- **The GitHub milestones group the open issues by theme**, so a visitor sees what is being worked on
+  and what is next. A release is a version and a tag on main, and it names the milestones it reached; a
+  milestone is not a version.
 
 ## The road so far
 
@@ -46,10 +50,10 @@ one tracker of two.
 | 2026-10-15 | **1.0.0, public.** The bar met, one squashed commit, CI on every push, the landing page, Dependabot |
 
 The waterfall's phases 0 to 4 and 7 are in that table. Phase 5 (the first run), phase 6 (ledgers) and
-phase 8 (the rename) are below, under the milestones they now belong to. The four post-flip features F1
+phase 8 (the rename) are below, under the releases they now belong to. The four post-flip features F1
 to F4 are there too, by their cards.
 
-## The milestones
+## The releases
 
 ```text
 M1  1.1.0  The bar, held            done 2026-10-18: the defect queue dry, two refactors in, verify green
@@ -89,7 +93,7 @@ in, and the verify run on the release commit completed green on Ubuntu and on Wi
 - The two quality passes, the Muse pass (2026-10-15, 27 findings) and the Fable pass (2026-10-16): each
   finding a card, worked or closed with a reason. The bugs already in the queue came out of them.
 - The two public issues the flip left open, the landing page's links and the Docker image on Linux, were
-  not in this release; they are the first patch after it, 1.1.1, and need no milestone of their own.
+  not in this release; they are the first patch after it, 1.1.1, and need no entry of their own here.
 - The public bar was the gate the flip was held to, met at 1.0.0; every release after it is held to
   [Contributing](CONTRIBUTING.md), "How a pull request is reviewed", and the release section in
   [AGENTS.md](../AGENTS.md), which is where those rules now live.
@@ -117,7 +121,7 @@ well as the issues, says what moved and how many commits it took, and can answer
 4. One skeleton for the rituals comes first, so the three above are built on it, not copied again.
 
 **Met 2026-10-22**, the day 1.2.0 was cut: all four items on main, and beside them the backlog folder, `Plan`
-and the in-play count, which the milestone did not name and the work demanded.
+and the in-play count, which the release did not name and the work demanded.
 
 ### M3 -- 1.3.0, the Studio opens in a second -- done 2026-10-22
 
@@ -127,7 +131,7 @@ folder, and the standup re-reads the tracker and re-dresses unchanged facts thro
 open. Measured on 2026-10-17 against a hub with thirteen Spaces; each is a card with its numbers.
 **Done when:** the foyer, the Design tab, the Docs tab and the standup each read GitHub in one call
 cold and none warm, through one cache helper on disk keyed by what GitHub already hands back (shas,
-updated-at), with the GUI untouched; the browser's own cache already holds a session. Its own milestone
+updated-at), with the GUI untouched; the browser's own cache already holds a session. Its own release
 because it is new scope since the flip and should not be judged as part of the quality batch; it follows the
 standup release because the cards are small and independent and can be interleaved, while the standup is the
 product's edge.
@@ -164,7 +168,7 @@ three on main and green, ahead of the tour, which carries to 1.8.0 unchanged.
 - The standup page opens on an **Agenda**: what moved since the last standup, and what is waiting on you,
   as cards with one action, Work it now; the suggestion's row above them; the text stays on its own tabs (C6VH).
 - A **Milestones** tab with the tracker's progress bars, and the award dialog as the one place confetti
-  fires, once per milestone per machine; the corner line links to it instead of celebrating (29QA).
+  fires, once per GitHub milestone per machine; the corner line links to it instead of celebrating (29QA).
 - **Every theme keeps its own accent** again; the product's rose and wine are the landing page's and the
   wordmark's default only (U6FU).
 
@@ -229,7 +233,7 @@ session, below, and nothing in M1 to M5 builds toward it or away from it.
 
 ## Not placed
 
-Kept as cards, fitted in when a milestone has room, none of them scheduled: the ritual engine in its
+Kept as cards, fitted in when a release has room, none of them scheduled: the ritual engine in its
 own repository (the old F3; "refine what exists" first, said on 2026-10-16, so it waits for the features
 talk); a backlog of cards (plan one for later); local sprints' write side; flights that protect unfinished work; Daily paging back
 past last week, and a week that is not one engagement; Teams as a connection; a real stress-check verb;
@@ -256,7 +260,8 @@ go into this file:
 
 ## Keeping this file honest
 
-When a milestone's "done when" is met, mark it with the date, here, in the same commit as the release
-or the refactor's merge. When the order changes, change it here and say why. A card names its milestone
-on its `**Sprint:**` line; this file names the milestones. This is the only place the order is written
-down, and the GitHub milestones carry only the release versions.
+When a release's "done when" is met, mark it with the date, here, in the same commit as the tag's
+release pull request or the refactor's merge. When the order changes, change it here and say why. A card
+names its release on its `**Milestone:**` line (an older card on its `**Sprint:**` line); this file names
+the releases. This is the only place their order is written down; the GitHub milestones group the open
+issues by theme and carry no order of their own.

@@ -436,6 +436,22 @@ def card_milestone(content: str) -> str:
     return _card_line(content, stamp_sprint())[1]
 
 
+def card_milestone_from_github(content: str) -> bool:
+    """Whether the title ``card_milestone`` reads is a GitHub issue's milestone
+    rather than the card's own release. True only for a card with NO
+    ``**Milestone:**`` line whose own ``**ADO Link:**`` names a GitHub issue
+    (``tracker()`` reads ``github``) and whose ``**Sprint:**`` line names something:
+    ``NewPrompt`` and ``StartWork`` copy the issue's milestone title onto that line.
+    A ``**Milestone:**`` line is the card's own release, written by ``Plan``, whatever
+    the card is linked to. Mirror: ``Test-P20CardMilestoneFromGitHub``; the
+    ``github`` column of ``Tests/fixtures/parsers/card-milestone.json``."""
+    if _card_line(content, stamp_milestone())[0]:
+        return False
+    if tracker(card_ado_url(content)) != "github":
+        return False
+    return bool(_card_line(content, stamp_sprint())[1])
+
+
 def card_sprint(content: str) -> str:
     """The sprint a card names: its first ``**Sprint:**`` line's value, WHOLE and
     trimmed, "" for none or a placeholder -- whatever the milestone line says.

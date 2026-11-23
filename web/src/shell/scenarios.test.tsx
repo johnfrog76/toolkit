@@ -744,6 +744,18 @@ describe("the scenario grid: what each configuration shows", () => {
     expect([isReached(corner), hasChevron(corner)]).toEqual([true, false]);
     // The brief the page draws below the Corner stops above its line.
     expect(briefSansCorner(data).includes("Corner:")).toBe(false);
+    // A release reached by cards alone: the same shape, so the same link; its line
+    // says release (corner.json's row, as both halves derive it).
+    const table = JSON.parse(fs.readFileSync(path.join(dir, "corner.json"), "utf8")) as {
+      rows: { name: string; expected: Record<string, unknown> }[];
+    };
+    const byCards = table.rows.find((r) => r.name === "reached-by-a-card")!.expected;
+    const release = { ...reachedCorner, ...byCards, brief: `Corner: ${String(byCards.line)}` };
+    expect(release.line).toBe("release B reached");
+    expect([isReached(release as typeof corner), hasChevron(release as typeof corner)]).toEqual([
+      true,
+      false,
+    ]);
     // Several left: the line and its chevron.
     expect(last(brief("many-left"))).toBe(
       "Corner: 3 more issues to get milestone B - start #5 now > (tkStartWork 5)",

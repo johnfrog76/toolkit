@@ -2341,19 +2341,35 @@ class TheCornerTable(unittest.TestCase):
         self.assertNotEqual(_parse_status_metadata(text).get("sprint"), row["expected"]["milestone"])
 
     def test_the_words_are_the_contracts(self):
+        """Each line is one of its shape's sentences: the GitHub milestone's, or its
+        Release twin's -- and every sentence of the seven has a row that says it."""
         t = C.rituals_text()
+        said: set[str] = set()
         for row in CORNER["rows"]:
             exp = row["expected"]
-            key = {
-                "oneLeft": "cornerOneLeft",
-                "manyLeft": "cornerManyLeft",
-                "reached": "cornerReached",
-                "nothingInReach": "cornerNothingInReach",
+            keys = {
+                "oneLeft": ("cornerOneLeft", "cornerOneLeftRelease"),
+                "manyLeft": ("cornerManyLeft", "cornerManyLeftRelease"),
+                "reached": ("cornerReached", "cornerReachedRelease"),
+                "nothingInReach": ("cornerNothingInReach",),
             }[exp["shape"]]
-            head = t[key].split("{")[0]
             with self.subTest(row["name"]):
-                self.assertTrue(exp["line"].startswith(head), (exp["line"], head))
+                hit = [k for k in keys if re.fullmatch(re.sub(r"\\\{\w+\\\}", ".+", re.escape(t[k])), exp["line"])]
+                self.assertEqual(len(hit), 1, (exp["line"], keys))
+                said.update(hit)
                 self.assertEqual(bool(exp["command"]), exp["shape"] in ("oneLeft", "manyLeft"))
+        self.assertEqual(
+            said,
+            {
+                "cornerOneLeft",
+                "cornerOneLeftRelease",
+                "cornerManyLeft",
+                "cornerManyLeftRelease",
+                "cornerReached",
+                "cornerReachedRelease",
+                "cornerNothingInReach",
+            },
+        )
 
     def test_the_briefs_byte_for_byte(self):
         for case in CORNER["briefs"]["cases"]:

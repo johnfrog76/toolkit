@@ -516,6 +516,24 @@ function Get-P20CardMilestone {
     return (Get-P20CardLineValue -Content $Content -Stamp ([string]$c.stamps.sprint)).Value
 }
 
+function Test-P20CardMilestoneFromGitHub {
+    <#
+      Whether the title Get-P20CardMilestone reads is a GitHub issue's milestone
+      rather than the card's own release. True only for a card with NO
+      `**Milestone:**` line whose own ADO Link names a GitHub issue
+      (Resolve-P20Tracker reads 'github') and whose `**Sprint:**` line names
+      something: NewPrompt and StartWork copy the issue's milestone title onto
+      that line. A `**Milestone:**` line is the card's own release, written by
+      Plan, whatever the card is linked to. card_milestone_from_github in the
+      agent; Tests/fixtures/parsers/card-milestone.json's github column.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Content)
+    $c = Get-P20Consts
+    if ((Get-P20CardLineValue -Content $Content -Stamp ([string]$c.stamps.milestone)).Present) { return $false }
+    if ((Resolve-P20Tracker -OrgUrl (Get-P20CardAdoUrl $Content)) -ne 'github') { return $false }
+    return [bool](Get-P20CardLineValue -Content $Content -Stamp ([string]$c.stamps.sprint)).Value
+}
+
 function Get-P20CardSprint {
     <#
       The sprint a card names: its first `**Sprint:**` line's value, WHOLE and

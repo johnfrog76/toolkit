@@ -74,11 +74,14 @@ function Get-P20CornerLine {
         $openTitles[$title][[string](Get-P20SuggestField $item 'kind')] = $true
     }
     $done = @{}
+    $doneGitHub = @{}
     foreach ($cl in @($Closed)) {
         if ($null -eq $cl) { continue }
         $title = [string](Get-P20SuggestField $cl 'milestone')
         $billable = Get-P20SuggestField $cl 'billable'
         if (-not $title -or ($billable -is [bool] -and -not $billable) -or $openTitles.ContainsKey($title)) { continue }
+        # A title some closed item had from GitHub is a GitHub milestone; else a release.
+        if ([bool](Get-P20SuggestField $cl 'github')) { $doneGitHub[$title] = $true }
         $day = ConvertTo-P20SuggestDay (Get-P20SuggestField $cl 'day')
         if (-not $done.ContainsKey($title) -or [string]::CompareOrdinal($day, $done[$title]) -gt 0) { $done[$title] = $day }
     }
@@ -99,7 +102,9 @@ function Get-P20CornerLine {
         $title = $titles[0]
         $out.shape = $shapes[2]
         $out.milestone = $title
-        $out.line = Format-P20SuggestTemplate ([string]$t.cornerReached) @{ milestone = $title }
+        $reachedKey = 'cornerReachedRelease'
+        if ($doneGitHub.ContainsKey($title)) { $reachedKey = 'cornerReached' }
+        $out.line = Format-P20SuggestTemplate ([string]$t.$reachedKey) @{ milestone = $title }
         return $out
     }
     $chosen = Select-P20Suggestion -Items @($Items) -HowIWork $HowIWork -PackageRoot $PackageRoot -Launch $Launch
@@ -111,12 +116,17 @@ function Get-P20CornerLine {
     $title = @(Get-P20NearestMilestones -Milestones @($inReach | ForEach-Object { Get-P20SuggestField $_.item 'milestone' }))[0]
     $pick = @($inReach | Where-Object { [string](Get-P20SuggestField (Get-P20SuggestField $_.item 'milestone') 'title') -ceq $title })[0]
     $remaining = [int](Get-P20SuggestField (Get-P20SuggestField $pick.item 'milestone') 'open')
+    # The title's github is the joined list's (Get-P20SuggestionItems): a GitHub
+    # milestone is said as one, every other title as a release.
+    $oneKey = 'cornerOneLeftRelease'
+    $manyKey = 'cornerManyLeftRelease'
+    if ([bool](Get-P20SuggestField (Get-P20SuggestField $pick.item 'milestone') 'github')) { $oneKey = 'cornerOneLeft'; $manyKey = 'cornerManyLeft' }
     $ref = [string]$pick.ref
     $kind = [string](Get-P20SuggestField $pick.item 'kind')
     if ($remaining -le 1) {
         $noun = [string]$t.suggestNounIssue
         if ($kind -ceq 'card') { $noun = [string]$t.suggestNounCard }
-        $line = Format-P20SuggestTemplate ([string]$t.cornerOneLeft) @{ noun = $noun; ref = $ref; milestone = $title }
+        $line = Format-P20SuggestTemplate ([string]$t.$oneKey) @{ noun = $noun; ref = $ref; milestone = $title }
         $shape = $shapes[0]
     }
     else {
@@ -125,7 +135,7 @@ function Get-P20CornerLine {
         $noun = [string]$t.cornerNounItems
         if ($kinds.Count -eq 1 -and $kinds.ContainsKey('card')) { $noun = [string]$t.cornerNounCards }
         elseif ($kinds.Count -eq 1 -and $kinds.ContainsKey('issue')) { $noun = [string]$t.cornerNounIssues }
-        $line = Format-P20SuggestTemplate ([string]$t.cornerManyLeft) @{ n = [string]$remaining; noun = $noun; ref = $ref; milestone = $title }
+        $line = Format-P20SuggestTemplate ([string]$t.$manyKey) @{ n = [string]$remaining; noun = $noun; ref = $ref; milestone = $title }
         $shape = $shapes[1]
     }
     $out.shape = $shape
@@ -146,8 +156,10 @@ function Get-P20CornerLine {
 
 function Get-P20CornerClosed {
     <#
-      What named a milestone and closed in the window, once per id, each as
-      @{ ref; kind; milestone; day; billable }. corner_closed() in the agent.
+      What named a milestone or a release and closed in the window, once per id, each as
+      @{ ref; kind; milestone; day; billable; github }. corner_closed() in the agent.
+      github is true for an issue, and for a card whose title came from its
+      issue's GitHub milestone (the row's milestoneFromGitHub).
       An issue: CLOSED, a milestone, its closedAt in [-Since, -AsOf] -- the
       standup's own test for yesterday's closes. A card: in archive/, its Closed
       day in [-Since's day, -AsOf's day] (the cards fill's test), its **Sprint:**
@@ -175,7 +187,7 @@ function Get-P20CornerClosed {
         $ref = '#' + [string][int](Get-P20SuggestField $issue 'number')
         if (-not $title -or $null -eq $when -or $when -lt $from -or $when -gt $to -or $seen.ContainsKey($ref)) { continue }
         $seen[$ref] = $true
-        [void]$out.Add([ordered]@{ ref = $ref; kind = 'issue'; milestone = $title; day = (ConvertTo-P20SuggestDay $closedAt); billable = $true })
+        [void]$out.Add([ordered]@{ ref = $ref; kind = 'issue'; milestone = $title; day = (ConvertTo-P20SuggestDay $closedAt); billable = $true; github = $true })
     }
     $sorted = New-Object 'System.Collections.Generic.List[object]'
     foreach ($card in @($Cards)) { if ($null -ne $card) { $sorted.Add($card) } }
@@ -189,7 +201,7 @@ function Get-P20CornerClosed {
         if (-not $day -or [string]::CompareOrdinal($day, $first) -lt 0 -or [string]::CompareOrdinal($day, $last) -gt 0) { continue }
         $seen[$cid] = $true
         $billable = Get-P20SuggestField $card 'billable'
-        [void]$out.Add([ordered]@{ ref = $cid; kind = 'card'; milestone = $title; day = $day; billable = (-not ($billable -is [bool] -and -not $billable)) })
+        [void]$out.Add([ordered]@{ ref = $cid; kind = 'card'; milestone = $title; day = $day; billable = (-not ($billable -is [bool] -and -not $billable)); github = [bool](Get-P20SuggestField $card 'milestoneFromGitHub') })
     }
     return $out.ToArray()
 }

@@ -266,7 +266,7 @@
     },
     "Plan": {
       "category": "prompt",
-      "description": "Plan a card into a milestone, a sprint, or both",
+      "description": "Plan a card into a release, a sprint, or both",
       "usage": "{cliPrefix}Plan <id|file> [-Milestone <title>] [-Sprint <title>] [-Rank top|up|down|<n>] [-Help] | {cliPrefix}Plan <id|file> -Remove [-Only Milestone|Sprint] [-Help]",
       "examples": [
         "{cliPrefix}Plan K7M2 -Milestone \"M2 -- 1.2.0\"",
@@ -276,10 +276,10 @@
         "{cliPrefix}Plan K7M2 -Remove"
       ],
       "notes": [
-        "Writes the card's **Milestone:** and **Sprint:** footer lines, each its own, through Set-P20CardLine -- never a tracker call. The different, tracker-bound -Sprint on NewItem / EditItem sets a milestone on the work item itself, through gh / az; this verb touches nothing but the file. Titles are written WHOLE, never truncated -- a card's own tile shortens them for display.",
-        "A card with no **Milestone:** line reads its milestone from its **Sprint:** line, as every card did before the two were separate. -Sprint on such a card first writes a **Milestone:** line keeping what it read, so setting a sprint never moves a card out of a milestone. -Remove takes the card out of both; -Remove -Only Milestone or -Only Sprint out of one, keeping the other.",
-        "Found in current/ or backlog/, and never pulled into play: a backlog card is planned into a milestone before it is ever pulled into play, which is the point of planning one. Sprints and milestones are opt-in at every grain -- no verb here ever requires a card to carry one.",
-        "A milestone's ORDER is one file, milestones/<slug>.md beside current/ and backlog/ (docs/hub/milestones.md), and this verb is its one writer: -Milestone adds the card's id at the bottom of its milestone's order and takes it out of the one it left, -Remove takes it out, and -Rank top|up|down|<n> moves it -- one line removed, one inserted, no card touched. A position counts the cards the order ranks. -Rank refuses on a card with no milestone. On an Azure DevOps Space the board keeps the order: -Rank refuses, and no order file is written."
+        "Writes the card's release and sprint, its **Milestone:** and **Sprint:** footer lines, each its own, through Set-P20CardLine -- never a tracker call. The release line and the -Milestone switch keep their older name. The different, tracker-bound -Sprint on NewItem / EditItem sets a GitHub milestone (or an Azure DevOps iteration) on the work item itself, through gh / az; this verb touches nothing but the file. Titles are written WHOLE, never truncated -- a card's own tile shortens them for display.",
+        "A card with no **Milestone:** line reads its release from its **Sprint:** line, as every card did before the two were separate. -Sprint on such a card first writes a **Milestone:** line keeping what it read, so setting a sprint never moves a card out of a release. -Remove takes the card out of both; -Remove -Only Milestone (the release) or -Only Sprint out of one, keeping the other.",
+        "Found in current/ or backlog/, and never pulled into play: a backlog card is planned into a release before it is ever pulled into play, which is the point of planning one. Sprints and releases are opt-in at every grain -- no verb here ever requires a card to carry one.",
+        "A release's ORDER is one file, milestones/<slug>.md beside current/ and backlog/ (docs/hub/milestones.md; the folder keeps its name), and this verb is its one writer: -Milestone adds the card's id at the bottom of its release's order and takes it out of the one it left, -Remove takes it out, and -Rank top|up|down|<n> moves it -- one line removed, one inserted, no card touched. A position counts the cards the order ranks. -Rank refuses on a card with no release. On an Azure DevOps Space the board keeps the order: -Rank refuses, and no order file is written."
       ]
     },
     "Tag": {
@@ -305,8 +305,8 @@
         "{cliPrefix}Backlog -Tag docs -Type Bug"
       ],
       "notes": [
-        "Prints the cards in backlog/ -- rank, id, type, milestone, tags, age and title -- milestone by milestone: milestones with an order file (milestones/<slug>.md) first, by the day the file was made, then the rest by title; inside each, its order, then the cards it does not list yet, oldest first; then the cards with no milestone, oldest first. Rank is the card's place in its milestone's order, the count Plan -Rank uses. docs/hub/milestones.md, \"The Backlog: the order as a table\".",
-        "-Milestone, -Tag and -Type go together and match ignoring case (-Type ignoring spaces too, so UserStory is User Story); a filtered row keeps its rank. Read-only and a folder read: it works offline and with no tracker. On an Azure DevOps Space it refuses and names MyWork: the backlog is the board's there."
+        "Prints the cards in backlog/ -- rank, id, type, release, tags, age and title -- release by release: releases with an order file (milestones/<slug>.md) first, by the day the file was made, then the rest by title; inside each, its order, then the cards it does not list yet, oldest first; then the cards with no release, oldest first. Rank is the card's place in its release's order, the count Plan -Rank uses. docs/hub/milestones.md, \"The Backlog: the order as a table\".",
+        "-Milestone (the release), -Tag and -Type go together and match ignoring case (-Type ignoring spaces too, so UserStory is User Story); a filtered row keeps its rank. Read-only and a folder read: it works offline and with no tracker. On an Azure DevOps Space it refuses and names MyWork: the backlog is the board's there."
       ]
     },
     "GetPRComments": {
