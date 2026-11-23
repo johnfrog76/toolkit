@@ -133,13 +133,27 @@ function Invoke-Web {
         # PowerShell run in the child AFTER the script returns, before it exits
         # -- where a case reads back what the script left in the caller's
         # environment (-Fixture must leave nothing behind).
-        [string]$Postamble = ''
+        [string]$Postamble = '',
+        # Gives the sandbox the tracked fixture hub at Tests/fixtures/hub, which
+        # -Fixture copies, and every script the real Config verb runs on. With
+        # -AgentSaves the agent stub then SAVES a Space setting through the real
+        # verb, with the environment it was handed -- what PUT /api/config does
+        # through the bridge -- so a case can show where the write lands.
+        [switch]$WithFixtureHub,
+        [switch]$AgentSaves
     )
 
     $sandbox = Join-Path ([System.IO.Path]::GetTempPath()) "p20-web-test-$([guid]::NewGuid())"
     try {
         $sandboxScripts = Join-Path $sandbox 'Scripts'
         New-Item -ItemType Directory -Path $sandboxScripts -Force | Out-Null
+        if ($WithFixtureHub) {
+            # Every script first, so the copies and stubs below still win.
+            Copy-Item -Path (Join-Path $pkgRoot 'Scripts/*') -Destination $sandboxScripts -Recurse -Force
+            $sandboxFixtures = Join-Path $sandbox 'Tests/fixtures'
+            New-Item -ItemType Directory -Path $sandboxFixtures -Force | Out-Null
+            Copy-Item -LiteralPath (Join-Path $pkgRoot 'Tests/fixtures/hub') -Destination (Join-Path $sandboxFixtures 'hub') -Recurse -Force
+        }
         Copy-Item $targetScript (Join-Path $sandboxScripts 'Start-Web.ps1')
         # Both, because -Status, -Stop and every start path delegate to it.
         Copy-Item $agentScript (Join-Path $sandboxScripts 'Start-Agent.ps1')
@@ -185,6 +199,17 @@ param([switch]$Reuse, [switch]$Stop, [switch]$Status, [switch]$Dev, [int]$Port, 
 Write-Host "  [test] agent stub ($($PSBoundParameters.Keys -join ','))"
 # What the agent's LAUNCHER sees -- and so what its child would inherit.
 if ($Reuse) { Write-Host "  [test] agent sees marker=[$env:P20_TEST_RUN] root=[$env:PROMPTS_ROOT] space=[$env:P20_ACTIVE_SPACE] features=[$env:P20_FEATURES] webhook=[$env:TEAMS_WEBHOOK_MANAGER]" }
+'@
+            if ($AgentSaves) {
+                # The drawer's save of a Space setting, by the one writer.
+                $stub += "`n" + @'
+if ($Reuse) {
+    $saved = & pwsh -NoProfile -NonInteractive -File (Join-Path $PSScriptRoot 'Set-ToolkitConfig.ps1') -Set 'spaces.test.name=Saved in fixture mode' -Hub 2>&1 | Out-String
+    Write-Host "  [test] agent saved exit=[$LASTEXITCODE] $($saved.Trim())"
+}
+'@
+            }
+            $stub += "`n" + @'
 exit 0
 '@
             Set-SandboxStub (Join-Path $sandboxScripts 'Start-Agent.ps1') $stub
@@ -654,23 +679,88 @@ Write-Host "-- -Dev -Fixture: the smoke's servers ----------------" -ForegroundC
 $plantHook = "`$env:TEAMS_WEBHOOK_MANAGER = 'https://example.invalid/hook'; `$env:P20_ACTIVE_SPACE = ''; `$env:P20_FEATURES = ''"
 $readBack = "Write-Host `"  [test] after: marker=[`$env:P20_TEST_RUN] space=[`$env:P20_ACTIVE_SPACE] features=[`$env:P20_FEATURES] webhook=[`$env:TEAMS_WEBHOOK_MANAGER]`""
 
-$r = Invoke-Web -ScriptArgs @('-Dev', '-Fixture', '-Modules', 'on', '-NoBrowser') -WithModules -StubAgent -StubLaunch -WebLogUrl 'http://localhost:5199' -Preamble $plantHook -Postamble $readBack
+# The hub the servers get is a COPY, so a save cannot reach the tracked folder.
+# The agent stub saves a Space setting through the real Config verb, as PUT
+# /api/config does through the bridge; the read-back then digests the sandbox's
+# tracked fixture hub, starts -Fixture a second time (a fresh copy, the first
+# one removed) and runs -Stop, which removes the copy and its record.
+$treeDigest = @'
+function Get-TreeDigest {
+    param([string]$Root)
+    $base = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    $lines = @(Get-ChildItem -LiteralPath $base -Recurse -File -Force | Sort-Object FullName | ForEach-Object {
+            $_.FullName.Substring($base.Length).Replace('\', '/') + ':' + (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+        })
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return [System.BitConverter]::ToString($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($lines -join "`n"))) }
+    finally { $sha.Dispose() }
+}
+'@
+. ([scriptblock]::Create($treeDigest))
+$fixtureReadBack = $treeDigest + "`n" + @'
+$rec = Join-Path $PSScriptRoot '.web.fixture'
+$copy1 = ''
+if (Test-Path -LiteralPath $rec) { $copy1 = (Get-Content -LiteralPath $rec -Raw -Encoding UTF8).Trim() }
+$saved = $false
+if ($copy1 -and (Test-Path -LiteralPath (Join-Path $copy1 'hub.json'))) { $saved = ((Get-Content -LiteralPath (Join-Path $copy1 'hub.json') -Raw -Encoding UTF8) -match 'Saved in fixture mode') }
+Write-Host "  [test] copy1=[$copy1] saved=[$saved]"
+Write-Host "  [test] tracked digest=[$(Get-TreeDigest (Join-Path $PSScriptRoot 'Tests/fixtures/hub'))]"
+& (Join-Path $PSScriptRoot 'Scripts/Start-Web.ps1') -Dev -Fixture -NoBrowser
+$copy2 = (Get-Content -LiteralPath $rec -Raw -Encoding UTF8).Trim()
+Write-Host "  [test] copy2=[$copy2] copy1 gone=[$(-not (Test-Path -LiteralPath $copy1))]"
+& (Join-Path $PSScriptRoot 'Scripts/Start-Web.ps1') -Stop
+Write-Host "  [test] stopped: copy2 gone=[$(-not (Test-Path -LiteralPath $copy2))] record gone=[$(-not (Test-Path -LiteralPath $rec))]"
+'@
+
+$r = Invoke-Web -ScriptArgs @('-Dev', '-Fixture', '-Modules', 'on', '-NoBrowser') -WithModules -WithFixtureHub -AgentSaves -StubAgent -StubLaunch -WebLogUrl 'http://localhost:5199' -Preamble $plantHook -Postamble ($readBack + "`n" + $fixtureReadBack)
 Assert-True '-Fixture exits 0' ($r.ExitCode -eq 0) "exit $($r.ExitCode)`n$($r.Output)"
 Assert-True '-Fixture restarts the agent rather than reusing one' ($r.Output -match 'agent stub \(Stop\)') $r.Output
 $stopAt = $r.Output.IndexOf('agent stub (Stop)')
 $reuseAt = $r.Output.IndexOf('agent stub (Reuse)')
 Assert-True '-Fixture stops the agent BEFORE it starts one' ($stopAt -ge 0 -and $reuseAt -gt $stopAt) $r.Output
 Assert-True 'the agent launcher sees the run marker' ($r.Output -match 'agent sees marker=\[fixture\]') $r.Output
-Assert-True 'the agent launcher sees the fixture hub' ($r.Output -match 'agent sees .*root=\[[^\]]*Tests[\\/]fixtures[\\/]hub\]') $r.Output
+Assert-True 'the agent launcher sees a copy of the fixture hub, in the temp folder' ($r.Output -match 'agent sees .*root=\[[^\]]*p20-fixture-hub-[0-9a-f]{32}\]') $r.Output
+Assert-True 'and never the tracked folder itself' ($r.Output -notmatch 'agent sees .*root=\[[^\]]*Tests[\\/]fixtures[\\/]hub\]') $r.Output
+$copyAt = [regex]::Match($r.Output, 'copy1=\[([^\]]*)\]').Groups[1].Value
+Assert-True 'the copy is the hub the agent was handed, recorded for -Stop' ($copyAt -and $r.Output -match ('root=\[' + [regex]::Escape($copyAt) + '\]')) $r.Output
+Assert-True 'a save through the Config verb succeeds in fixture mode' ($r.Output -match 'agent saved exit=\[0\]') $r.Output
+Assert-True '...and lands in the copy' ($r.Output -match 'copy1=\[[^\]]+\] saved=\[True\]') $r.Output
+$trackedNow = [regex]::Match($r.Output, 'tracked digest=\[([^\]]*)\]').Groups[1].Value
+Assert-True '...and the tracked fixture hub is byte-identical after it' ($trackedNow -and $trackedNow -eq (Get-TreeDigest (Join-Path $pkgRoot 'Tests/fixtures/hub'))) "child [$trackedNow]"
+Assert-True 'a second -Fixture start makes a fresh copy and removes the first' ($r.Output -match 'copy2=\[[^\]]*p20-fixture-hub-[0-9a-f]{32}\] copy1 gone=\[True\]' -and $r.Output -notmatch ('copy2=\[' + [regex]::Escape($copyAt) + '\]')) $r.Output
+Assert-True '-Stop removes the copy and its record' ($r.Output -match 'stopped: copy2 gone=\[True\] record gone=\[True\]') $r.Output
+Assert-True '-Stop says it removed the copy' ($r.Output -match 'Fixture hub copy removed') $r.Output
+
+# -Stop removes only what the record names AND only a fixture copy: a record
+# naming any other folder -- here the sandbox itself, which is in the temp
+# folder under another name, then a folder outside the temp folder -- is
+# reported, and the folder is left where it is.
+$strayRecord = @'
+$keep = Join-Path $PSScriptRoot 'keep-me'
+New-Item -ItemType Directory -Path $keep -Force | Out-Null
+Set-Content -LiteralPath (Join-Path $keep 'card.md') -Value 'kept' -Encoding UTF8
+Set-Content -LiteralPath (Join-Path $PSScriptRoot '.web.fixture') -Value $PSScriptRoot -Encoding UTF8
+'@
+$strayReadBack = @'
+Write-Host "  [test] stray 1: sandbox kept=[$(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'run.ps1'))] record gone=[$(-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.web.fixture')))]"
+Set-Content -LiteralPath (Join-Path $PSScriptRoot '.web.fixture') -Value (Join-Path $PSScriptRoot 'keep-me') -Encoding UTF8
+& (Join-Path $PSScriptRoot 'Scripts/Start-Web.ps1') -Stop
+Write-Host "  [test] stray 2: folder kept=[$(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'keep-me/card.md'))] record gone=[$(-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.web.fixture')))]"
+'@
+$r2 = Invoke-Web -ScriptArgs @('-Stop') -Preamble $strayRecord -Postamble $strayReadBack
+Assert-True '-Stop leaves a temp folder that is not a fixture copy' ($r2.Output -match 'stray 1: sandbox kept=\[True\] record gone=\[True\]') $r2.Output
+Assert-True '-Stop leaves a folder outside the temp folder' ($r2.Output -match 'stray 2: folder kept=\[True\] record gone=\[True\]') $r2.Output
+Assert-True '...and says why it did not remove it' ($r2.Output -match 'not a fixture copy in the temp folder; not removing it') $r2.Output
+Assert-True '-Stop with a stray record still exits 0' ($r2.ExitCode -eq 0) "exit $($r2.ExitCode)"
 Assert-True 'the agent launcher sees the fixture Space' ($r.Output -match 'agent sees .*space=\[test\]') $r.Output
 Assert-True '-Modules on hands the agent growth and communication' ($r.Output -match 'agent sees .*features=\[\{"growth":true,"communication":true\}\]') $r.Output
 Assert-True 'the agent launcher sees NO webhook, though the shell holds one' ($r.Output -match 'agent sees .*webhook=\[\]') $r.Output
 Assert-True 'the Vite launch sees the same environment' ($r.Output -match 'launch sees marker=\[fixture\] space=\[test\] webhook=\[\]') $r.Output
-Assert-True '-Fixture says what it started, and that config.local.json is untouched' ($r.Output -match 'Fixture mode: .*config\.local\.json is not touched') $r.Output
+Assert-True '-Fixture says what it started, and that neither config.local.json nor the tracked hub is touched' ($r.Output -match 'Fixture mode: a copy of .*config\.local\.json and the tracked fixture hub are not touched') $r.Output
 Assert-True 'the shell gets its webhook back afterwards' ($r.Output -match 'after: .*webhook=\[https://example\.invalid/hook\]') $r.Output
 Assert-True 'and none of the fixture environment stays behind' ($r.Output -match 'after: marker=\[(?!fixture)[^\]]*\] space=\[\] features=\[\]') $r.Output
 
-$r = Invoke-Web -ScriptArgs @('-Dev', '-Fixture', '-NoBrowser') -WithModules -StubAgent -StubLaunch -WebLogUrl 'http://localhost:5199'
+$r = Invoke-Web -ScriptArgs @('-Dev', '-Fixture', '-NoBrowser') -WithModules -WithFixtureHub -StubAgent -StubLaunch -WebLogUrl 'http://localhost:5199' -Postamble "& (Join-Path `$PSScriptRoot 'Scripts/Start-Web.ps1') -Stop | Out-Null"
 Assert-True '-Fixture without -Modules sets no flag at all' ($r.Output -match 'agent sees .*features=\[\{\}\]') $r.Output
 Assert-True '-Fixture without -Modules exits 0' ($r.ExitCode -eq 0) "exit $($r.ExitCode)"
 

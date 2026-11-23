@@ -30,8 +30,9 @@
 //                       (env.agentPort, which vite.config.ts reads).
 //
 // Both are stopped, and the scratch removed, when the run ends. The fixture hub
-// is read where it is committed, as -Fixture reads Tests/fixtures/hub; the flag
-// writes go to the package's config, never to the hub.
+// is read where it is committed (-Fixture serves a copy of it instead), so every
+// write a mode makes goes to the scratch package's config.local.json -- flags,
+// and Space fields with `local: true` -- and never to the hub.
 import { spawn, spawnSync } from "node:child_process";
 import { closeSync, copyFileSync, cpSync, existsSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";

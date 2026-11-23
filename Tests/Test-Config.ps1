@@ -260,6 +260,49 @@ catch {
 }
 finally { Remove-Item $box.Root -Recurse -Force -ErrorAction SilentlyContinue }
 
+# -- The active Space, as every other verb reads it -----------------------------
+# The environment's stand-in for config.local.json's activeSpace (consts.json
+# env.activeSpace) decides the Space for the process it is set in -- the module
+# and the agent read it first, and `Web -Dev -Fixture` names the fixture's Space
+# through it. -List once read the two files alone, so a machine whose
+# config.local.json named another Space listed THAT Space's rows in fixture mode.
+# The runners remove the variable for a run, so this case sets it for its own
+# children and takes it away again.
+
+Write-Host ''
+Write-Host '-- The environment names the active Space ----------------' -ForegroundColor Cyan
+
+$box = New-ConfigSandbox
+$overrideName = [string]((Get-Content (Join-Path $pkgRoot 'consts.json') -Raw -Encoding UTF8 | ConvertFrom-Json).env.activeSpace)
+try {
+    Set-HubRoot $box
+    [void](Invoke-Config $box @('-Set', 'spaces.fx.name=Fixture Space', '-Hub'))
+    [void](Invoke-Config $box @('-Set', 'activeSpace=azure-demo'))
+    $plain = (Invoke-Config $box @('-List', '-AsJson')).Output | ConvertFrom-Json
+    Assert-Equal 'without the override, -List is in the file''s Space' 'azure-demo' $plain.activeSpace
+
+    [System.Environment]::SetEnvironmentVariable($overrideName, 'fx')
+    try { $over = Invoke-Config $box @('-List', '-AsJson') }
+    finally { [System.Environment]::SetEnvironmentVariable($overrideName, $null) }
+    Assert-Equal '-List -AsJson with the override exits 0' 0 $over.ExitCode
+    $overParsed = $over.Output | ConvertFrom-Json
+    Assert-Equal 'with the override set, -List is in the override''s Space' 'fx' $overParsed.activeSpace
+    $keys = @($overParsed.settings | ForEach-Object { [string]$_.key })
+    Assert-True "the Space rows are the override's" ($keys -contains 'spaces.fx.name') ($keys -join ', ')
+    Assert-True "and not config.local.json's Space" (@($keys | Where-Object { $_ -like 'spaces.azure-demo.*' }).Count -eq 0) ($keys -join ', ')
+    Assert-True "the checkout row is the override's Space too" ($keys -contains 'spaceCheckouts.fx.path') ($keys -join ', ')
+    $activeRow = @($overParsed.settings | Where-Object { $_.key -eq 'activeSpace' })
+    Assert-True 'activeSpace is reported from the environment, as PROMPTS_ROOT is' ($activeRow.Count -eq 1 -and $activeRow[0].source -eq 'env' -and $activeRow[0].value -eq 'fx') ($activeRow | ConvertTo-Json -Compress)
+    Assert-Equal 'and config.local.json still says what it said' 'azure-demo' (Get-LocalConfigText $box | ConvertFrom-Json).activeSpace
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    [System.Environment]::SetEnvironmentVariable($overrideName, $null)
+    Remove-Item $box.Root -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # -- Machine keys --------------------------------------------------------------
 
 Write-Host ''
