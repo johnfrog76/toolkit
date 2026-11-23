@@ -1,5 +1,5 @@
 {
-  "_comment": "The sample org chart (docs/hub/org.md): who the positions are and which model or person sits in each seat. It rides Team Agile, so OrgChart prints it where Team Agile is on. One tree here; add another under trees and name the one in use with activeTree. A position names its job description with \"prompt\", a file name looked up in the hub's agentic/org/, then the hub's agentic/, then the toolkit's agentic/org/: the intern names the role the toolkit ships, and a copy of yours under the same name in agentic/org/ would win.",
+  "_comment": "The sample org chart (docs/hub/org.md): who the positions are and which model or person sits in each seat. It rides Team Agile, so OrgChart prints it where Team Agile is on. One tree here; add another under trees and name the one in use with activeTree. A position names its job description with \"prompt\", a file name looked up in the hub's agentic/org/, then the hub's agentic/, then the toolkit's agentic/org/: every office here names a role the toolkit ships, and a copy of yours under the same name in agentic/org/ would win. The builder is a pool, not an office, so it names no role.",
   "activeTree": "mine",
   "trees": [
     {
@@ -15,9 +15,40 @@
           ]
         },
         {
-          "id": "lead",
-          "title": "Team lead",
+          "id": "vp-product",
+          "title": "VP of product",
+          "prompt": "vp-of-product.prompt.md",
           "reportsTo": "owner",
+          "defaultModel": "opus",
+          "seats": [
+            { "id": "vp-product", "model": "opus", "machine": "this-machine" }
+          ]
+        },
+        {
+          "id": "vp-engineering",
+          "title": "VP of engineering",
+          "prompt": "vp-of-engineering.prompt.md",
+          "reportsTo": "owner",
+          "defaultModel": "opus",
+          "seats": [
+            { "id": "vp-engineering", "model": "opus", "machine": "this-machine" }
+          ]
+        },
+        {
+          "id": "pm",
+          "title": "PM",
+          "prompt": "pm.prompt.md",
+          "reportsTo": "owner",
+          "defaultModel": "opus",
+          "seats": [
+            { "id": "pm", "model": "opus", "machine": "this-machine" }
+          ]
+        },
+        {
+          "id": "team-lead",
+          "title": "Team lead",
+          "prompt": "team-lead.prompt.md",
+          "reportsTo": "pm",
           "defaultModel": "opus",
           "seats": [
             { "id": "demo", "model": "opus", "machine": "this-machine", "space": "demo" },
@@ -27,18 +58,9 @@
         {
           "id": "builder",
           "title": "Builder",
-          "reportsTo": "lead",
+          "reportsTo": "team-lead",
           "defaultModel": "sonnet for the cards a lead hands out",
           "seats": []
-        },
-        {
-          "id": "pm",
-          "title": "PM",
-          "reportsTo": "owner",
-          "defaultModel": "opus",
-          "seats": [
-            { "id": "pm", "model": "opus", "machine": "this-machine" }
-          ]
         },
         {
           "id": "intern",

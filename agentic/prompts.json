@@ -149,6 +149,42 @@
       "module": "solitaireAgile",
       "drives": "Proposals only, to the seat it assists: milestones (placed by that seat with Route -Milestone), breakdowns, close-outs, bug severities (Route -Severity) and shipped designs to archive (MoveDesign)",
       "category": "org"
+    },
+    "pm": {
+      "workflows": [
+        "agents"
+      ],
+      "sender": "by hand",
+      "module": "solitaireAgile",
+      "drives": "Plans the work and keeps the record: a queue of defined cards to the leads (NewItem, NewPrompt, Route -Milestone), each ready to the seat that merges, what merged and closed recorded on the card and the tracker (Land), and its decision on each draft from a seat that assists it",
+      "category": "org"
+    },
+    "team-lead": {
+      "workflows": [
+        "agents"
+      ],
+      "sender": "by hand",
+      "module": "solitaireAgile",
+      "drives": "Leads one lane: briefs a builder per card (StartWork, Route -Assign), reads every diff, proves the work and catches it up with its base, and hands on one ready pull request at a time; never merges its own",
+      "category": "org"
+    },
+    "vp-of-engineering": {
+      "workflows": [
+        "agents"
+      ],
+      "sender": "by hand",
+      "module": "solitaireAgile",
+      "drives": "Holds the engineering standards and the merge: checks a ready pull request for itself (the head, the base, every check, the whole diff), then merges it and reports the hash, or sends it back with a finding",
+      "category": "org"
+    },
+    "vp-of-product": {
+      "workflows": [
+        "agents"
+      ],
+      "sender": "by hand",
+      "module": "solitaireAgile",
+      "drives": "Owns scope, voice and what a user will see: decisions written where they belong, a design made a spec ready to build (NewDesign, MoveDesign -To Spec), reviews before a user-facing change merges, and the release notes for the owner's word",
+      "category": "org"
     }
   }
 }

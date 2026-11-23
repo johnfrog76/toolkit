@@ -63,6 +63,10 @@ between them. They ride Team Agile, so like the add-ons' prompts they are listed
 
 | Prompt | Add-on | What it drives |
 |---|---|---|
+| `pm` | solitaireAgile | Plans the work and keeps the record straight: turns the owner's direction into a queue of cards whose specs are ready, carries each ready pull request to the seat that merges, records what merged and closed with `tkLand`, and decides on the drafts of a seat that assists it, making the writes itself. Suggested model: Opus |
+| `team-lead` | solitaireAgile | Leads one lane or Space: briefs a builder per card from `tkStartWork` with the stop rule, reads every diff, proves the work and catches it up with its base by merge, and hands on one ready pull request at a time. Never merges its own work. Suggested model: Opus |
+| `vp-of-engineering` | solitaireAgile | Owns how the work is built across lanes, and holds the merge duty unless the how-we-work note gives it to another seat: checks a ready pull request for itself, then merges and reports the hash, or sends it back with a finding |
+| `vp-of-product` | solitaireAgile | Owns what the product is for and how it reads: decisions written where they belong, a design made a spec ready to build with `tkNewDesign` and `tkMoveDesign`, a read of anything a user will see before it merges, and the release notes for the owner's word |
 | `intern` | solitaireAgile | Assists the seat that plans the work, with proposals only: milestones for a Space that has none, breakdowns of an issue or user story too big for one card, close-outs with their evidence, a severity for each bug, and designs whose work has shipped to archive. That seat decides and writes, with `tkRoute`, `tkMoveDesign` and on the tracker. Suggested model: Haiku |
 
 ## The shape of a prompt
@@ -107,7 +111,8 @@ ones it belongs with:
 The shipped ones carry theirs in the index, not in their frontmatter: `build`, `pr-ship` and `pr-publish`
 are `ship`; `ado-comments`, `pr-review` and `pr-suggest` are `review`; `new-bug`, `new-user-story`
 and `new-issue` are `tracker`; `generate-review`, `growth-create-training` and
-`growth-create-presentation` are `growth`; `manager1on1` is `meetings`; `intern` is `org`.
+`growth-create-presentation` are `growth`; `manager1on1` is `meetings`; the roles -- `pm`, `team-lead`,
+`vp-of-engineering`, `vp-of-product` and `intern` -- are `org`.
 
 Below the title, a prompt you open by hand speaks to the assistant as "you" and to you as "the
 user". The two the tools send speak about the tool in the third person above the line, and the
