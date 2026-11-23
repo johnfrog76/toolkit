@@ -56,6 +56,15 @@ listed only while it is on:
 | `growth-create-presentation` | growth | The same for a talk, demo, brown bag or workshop |
 | `manager1on1` | communication | Work a 1:1 session file end to end. `tkMeetingAgenda -Plan` and `-Retro` point at it |
 
+**The org's roles** -- `agentic/org/`, one `<role>.prompt.md` each, written as a job description for
+a seat a team staffs when it works a Space with agents. The hub's `org.json` names a role for a
+position; [`org/README.md`](org/README.md) is the one-page view of the roles and how work moves
+between them. They ride Team Agile, so like the add-ons' prompts they are listed only while it is on:
+
+| Prompt | Add-on | What it drives |
+|---|---|---|
+| `intern` | solitaireAgile | Assists the seat that plans the work, with proposals only: milestones for a Space that has none, breakdowns of an issue or user story too big for one card, close-outs with their evidence, a severity for each bug, and designs whose work has shipped to archive. That seat decides and writes, with `tkRoute`, `tkMoveDesign` and on the tracker. Suggested model: Haiku |
+
 ## The shape of a prompt
 
 Every prompt here opens the same way, and `Tests/test_agentic_index.py` holds all of them to it:
@@ -93,11 +102,12 @@ ones it belongs with:
 | `meetings` | prepares or closes a meeting |
 | `rituals` | runs a team's ritual -- a standup, a triage |
 | `design` | works a design note or a spec |
+| `org` | is a role in the org -- a job description a seat or a card's job is worked from |
 
 The shipped ones carry theirs in the index, not in their frontmatter: `build`, `pr-ship` and `pr-publish`
 are `ship`; `ado-comments`, `pr-review` and `pr-suggest` are `review`; `new-bug`, `new-user-story`
 and `new-issue` are `tracker`; `generate-review`, `growth-create-training` and
-`growth-create-presentation` are `growth`; `manager1on1` is `meetings`.
+`growth-create-presentation` are `growth`; `manager1on1` is `meetings`; `intern` is `org`.
 
 Below the title, a prompt you open by hand speaks to the assistant as "you" and to you as "the
 user". The two the tools send speak about the tool in the third person above the line, and the
@@ -113,9 +123,12 @@ else the verb or route that sends it to a model), its **module**, what it **driv
 **category** (above). The
 Studio's Prompts card reads it to show a Space the prompts for the way you work there, and
 `Tests/test_agentic_index.py` holds it to the folder: every prompt has an entry, every entry a
-prompt, every workflow one of the three, every category one of the vocabulary's.
+prompt, every workflow one of the three, every category one of the vocabulary's. The roles in `org/`
+are in the same index and the same name space -- a role and a flat prompt never share a name -- and
+open at the same address, `/studio/prompts/<name>`.
 
-A prompt in your own folder (`agenticExtensionPath`, below), or in your hub's `agentic/`, is yours and
+A prompt in your own folder (`agenticExtensionPath`, below), or in your hub's `agentic/` or its
+`agentic/org/`, is yours and
 needs no entry -- the card lists it under **Your hub** for every way of working, and a `category: <name>`
 line in its frontmatter is its category; the index describes the shipped set. Each prompt opens in a reading room at `/studio/prompts/<name>`. The card's **Copy
 reference** puts an `@` reference to the file on the clipboard for an assistant that can read your files;

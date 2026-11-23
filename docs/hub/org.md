@@ -68,7 +68,7 @@ is the tree you draw, never a Space.
 | tree | `positions` | yes | the tree's positions, in the order you want siblings drawn |
 | position | `id` | yes | unique within its tree. The same id in two trees is fine |
 | position | `title` | no | the office's name; the id when absent |
-| position | `prompt` | no | the **file name** of the position's prompt in the hub's agentic folder (`folders.agentic`, `agentic` by default). A name, not a path |
+| position | `prompt` | no | the **file name** of the position's role -- its job description -- looked up in three folders, in order ([Where a position's prompt is found](#where-a-positions-prompt-is-found)). A name, not a path |
 | position | `reportsTo` | on every position but the root | the id of the position it reports up to |
 | position | `defaultModel` | no | free text: the model this office is meant to have, or a line about how it is staffed |
 | position | `seats` | no | an array of seats; absent or `[]` means a pool |
@@ -83,6 +83,27 @@ A key the tool does not read is **ignored with a warning** naming where it is, a
 (`org.json: 'x' is not a key this tool reads in position 'p' of tree 't' -- ignored.`). A key that starts
 with an underscore is a note and is not said. Key names are matched exactly, case included, and an id is
 compared character for character (`A` is not `a`); a number given as an id is read as its text.
+
+## Where a position's prompt is found
+
+A position's `prompt` names a **role**: a job description, one `<role>.prompt.md`. The toolkit ships
+its roles in its own `agentic/org/` ([the roles](../../agentic/org/README.md)), and a hub may write its
+own. The name is looked up in three folders, in this order, and the first that has the file is the one
+used:
+
+1. the hub's `agentic/org/` -- the hub's own roles;
+2. the hub's `agentic/` -- where a position's prompt was always looked for, so an `org.json` written
+   before the roles folder keeps validating;
+3. the toolkit's `agentic/org/` -- the shipped roles.
+
+So **a hub's own role wins**: a file in the hub's `agentic/org/` (or its `agentic/`) under a shipped
+role's name is the one used, and the shipped one is not read. A hub can name a shipped role, such as
+`intern.prompt.md`, without copying it. The toolkit's flat `agentic/` is not in the list: a task prompt
+there is not a role. `agentic` in the first two is the hub's agentic folder as `hub.json` names it
+(`folders.agentic`); `org` is `consts.json` `org.rolesFolder`. Both halves hold the same list -- the
+CLI's `Get-P20OrgPromptDirs` in `Scripts/Read-OrgChart.ps1` and the agent's `prompt_dirs` in
+`agent/solitaire/org.py` -- and the shared table has a row for each folder and one for a hub's role
+shadowing a shipped one.
 
 ## Positions, seats, and the three shapes
 
@@ -125,13 +146,14 @@ on) and one sentence.
 | `cycle` | positions report to each other in a loop | `Positions in tree 'a' report to each other in a loop: p -> r -> q -> p.` |
 | `no-root` | no position reports to nobody (a tree with no positions) | `Tree 'a' has no root: exactly one position reports to nobody.` |
 | `several-roots` | more than one does | `Tree 'a' has 2 roots (x, y): exactly one position reports to nobody.` |
-| `unknown-prompt` | a `prompt` that is not a file in the agentic folder | `Position 'y' in tree 'a' names the prompt 'missing.prompt.md', which is not a file in the hub's agentic/ folder.` |
+| `unknown-prompt` | a `prompt` that is a file in none of the three folders | `Position 'y' in tree 'a' names the prompt 'missing.prompt.md', which is not a file in the hub's agentic/org/ or agentic/ folder or the toolkit's agentic/org/.` |
 
 The loop is named from the position where the walk up from the first affected position closes it, so a
 position hanging off a loop is not in the sentence. A loop is said before a missing root (a tree whose every
 position reports to another has both). A `prompt` that holds a path separator, `.` or `..`, or names a
-folder, is an `unknown-prompt`: it is a file **name** in the agentic folder and cannot point out of it. The
-agentic folder is resolved as `hub.json` says (`folders.agentic`).
+folder, is an `unknown-prompt`: it is a file **name** in one of the three folders and cannot point out of
+them. The hub's agentic folder is resolved as `hub.json` says (`folders.agentic`), and the sentence names
+it as it is called there.
 
 Two kinds belong to the reader's callers rather than to the file: `missing` (no `org.json` at the hub
 root) and `unknown-tree` (`-Tree` names a tree the file does not have).
@@ -182,10 +204,11 @@ agent's:
 | Key | Is | From |
 | --- | --- | --- |
 | `promptTitle` | the prompt's title: its front matter's `title`, else its one `#` heading, else the file's name without `.prompt.md` | `agent/studio/prompts.py`'s `record`, the one reader every prompt goes through -- not a second parser |
-| `promptRef` | the address after `/studio/prompts/` that opens the prompt in the Studio's reading room: `yours/<name>`, the `ref` a Studio prompt row carries (the web builds the link with `promptPath(ref)`) | the same rule the Studio lists by; `null` for a file the room does not list (not `<name>.prompt.md`, or a name that is not a plain word), which still has its title |
+| `promptRef` | the address after `/studio/prompts/` that opens the prompt in the Studio's reading room: `yours/<name>` for the hub's copy, `<name>` for a role the toolkit ships -- the `ref` a Studio prompt row carries (the web builds the link with `promptPath(ref)`) | the same rule the Studio lists by; `null` for a file the room does not list (not `<name>.prompt.md`, or a name that is not a plain word), which still has its title |
 
 Both are `null` on a position with no `prompt`. The file read is the one the reading room opens -- the
-machine's `agenticExtensionPath` copy where there is one, else the hub's. Everything else in the response
+machine's `agenticExtensionPath` copy where there is one, else the first of the
+[three folders](#where-a-positions-prompt-is-found) that has it. Everything else in the response
 is byte for byte the CLI's (`Tests/test_org.py` strips the two keys and compares the rest to the table's
 responses).
 
@@ -240,4 +263,6 @@ in flight, and no join with the standup's workers. The web's Org tab draws the t
 ## An example to copy
 
 [`samples/hub/org.json`](../../samples/hub/org.json) is a small tree -- an owner, a lead with one staffed
-and one vacant seat, a builder pool -- copied out with the rest of the sample hub.
+and one vacant seat, a builder pool under the lead, and a PM with an intern under it -- copied out with the
+rest of the sample hub. The PM names no prompt; the intern names `intern.prompt.md`, the role the toolkit
+ships, which the sample hub does not copy, so it is found in the toolkit's `agentic/org/`. Five seats in all.

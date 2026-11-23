@@ -8,12 +8,15 @@ The ``kind`` of a failure is the contract; the sentence is the CLI's wording.
 
 Three layers, so the rule is testable without a hub:
 
-- ``read_org_chart`` -- PURE over the file's text and the names the agentic
-  folder holds. The same checks in the same order, the same tolerance of an
-  unknown key (said, never refused), the same derived seat ``state``, the
+- ``read_org_chart`` -- PURE over the file's text and a test of whether a
+  prompt name is in any of the folders a role is looked up in. The same checks
+  in the same order, the same tolerance of an unknown key (said, never
+  refused), the same derived seat ``state``, the
   positions in tree order with their ``level``. It never raises.
 - ``find_org_chart`` -- the hub layer: where the file is, whether a hub was
-  named at all, which folder the prompts are in.
+  named at all, and the folders a position's prompt is looked up in
+  (``prompt_dirs``: the hub's agentic/org/, the hub's agentic/, the toolkit's
+  agentic/org/).
 - the route -- the thin layer: ``find_org_chart`` plus each position's prompt
   as the Studio's reading room knows it (``promptTitle``, ``promptRef``), taken
   through ``agent/studio/prompts.py``'s one record, never a second parser.
@@ -29,13 +32,14 @@ import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
 
 from ..core import log_writer
 from ..core.config import API_PREFIX, hub_configured, hub_folder, hub_root
-from ..core.consts import org_file, rituals_org_route
+from ..core.consts import org_file, org_roles_folder, rituals_org_route
 from ..studio import prompts
 from .standup import api
 
@@ -194,10 +198,21 @@ def _first_duplicate(ids: list[str]) -> str:
     return ""
 
 
+def prompt_places(agentic_folder: str) -> str:
+    """The three folders a position's prompt is looked up in, as the
+    unknown-prompt sentence names them -- the CLI's words exactly."""
+    roles = org_roles_folder()
+    return (
+        f"the hub's {agentic_folder}/{roles}/ or {agentic_folder}/ folder "
+        f"or the toolkit's {prompts.AGENTIC_DIR.name}/{roles}/"
+    )
+
+
 def _check_tree(tree: dict, prompt_exists: Callable[[str], bool], agentic_folder: str) -> tuple[str, str] | None:
     """One tree's rules, in a fixed order, the first broken one a failure: a
     position or seat id used twice, a reportsTo that names nothing, a loop, not
-    exactly one root, a prompt that is not a file in the agentic folder."""
+    exactly one root, a prompt that is in none of the folders a role is looked
+    up in."""
     tree_id = tree["id"]
     positions = tree["positions"]
     dup = _first_duplicate([p["id"] for p in positions])
@@ -249,7 +264,7 @@ def _check_tree(tree: dict, prompt_exists: Callable[[str], bool], agentic_folder
                 "unknown-prompt",
                 (
                     f"Position '{position['id']}' in tree '{tree_id}' names the prompt '{name}', "
-                    f"which is not a file in the hub's {agentic_folder}/ folder."
+                    f"which is not a file in {prompt_places(agentic_folder)}."
                 ),
             )
     return None
@@ -313,8 +328,9 @@ def read_org_chart(
     file_name: str = "",
 ) -> OrgResult:
     """The org chart in ``text`` (the file's contents), for the tree in use or
-    ``tree_id``. ``prompt_exists`` says whether a name is a file in the agentic
-    folder; ``agentic_folder`` is that folder's name, for the sentence. Never raises."""
+    ``tree_id``. ``prompt_exists`` says whether a name is a file in any of the
+    folders a role is looked up in (``prompt_dirs``); ``agentic_folder`` is the
+    hub's agentic folder's name, for the sentence. Never raises."""
     file_name = file_name or org_file()
     try:
         data = json.loads(text.lstrip("﻿"), parse_constant=_no_constant)
@@ -377,6 +393,25 @@ def read_org_chart(
 # -- The hub -------------------------------------------------------------------
 
 
+def prompt_dirs() -> list[Path]:
+    """Where a position's prompt is looked for, in order (docs/hub/org.md,
+    "Where a position's prompt is found"): the hub's agentic/org/, the hub's
+    agentic/ as it has always been read, then the toolkit's own agentic/org/.
+    The first that has the file wins, so a hub's own role under a shipped name
+    is the one used. The CLI's ``Get-P20OrgPromptDirs`` is the same list."""
+    agentic = hub_folder("agentic")
+    return [agentic / org_roles_folder(), agentic, prompts.shipped_roles_dir()]
+
+
+def find_prompt(file_name: str) -> Path | None:
+    """The first folder's copy of a prompt file NAME, or None."""
+    for folder in prompt_dirs():
+        path = folder / file_name
+        if path.is_file():
+            return path
+    return None
+
+
 def find_org_chart(tree_id: str = "") -> OrgResult:
     """Read the chart from the hub the agent resolved. ``no-hub`` when nobody
     said where the hub is ("the hub resolved" is not "a hub was configured"),
@@ -392,12 +427,11 @@ def find_org_chart(tree_id: str = "") -> OrgResult:
         text = path.read_bytes().decode("utf-8", errors="replace")
     except OSError as e:
         return OrgResult("invalid", "unreadable", f"{org_file()} is not readable ({e}).", path=str(path))
-    agentic = hub_folder("agentic")
 
     def prompt_exists(name: str) -> bool:
-        return (agentic / name).is_file()
+        return find_prompt(name) is not None
 
-    result = read_org_chart(text, prompt_exists, agentic.name, tree_id.strip())
+    result = read_org_chart(text, prompt_exists, hub_folder("agentic").name, tree_id.strip())
     result.path = str(path)
     return result
 
@@ -409,15 +443,19 @@ def prompt_fields(file_name: str) -> tuple[str | None, str | None]:
     """(title, ref) of a position's prompt: ``prompts.record``'s title -- the
     front matter's ``title``, else the one ``#`` heading, else the file's name --
     and the reading-room reference the Studio's own rows carry
-    (``yours/<name>``). The file read is the one the room opens: the machine's
-    extension folder's copy first, then the hub's. A file the room does not list
-    (not ``<name>.prompt.md``) has a title and no ref."""
+    (``yours/<name>`` for one of yours, ``<name>`` for the toolkit's). The file
+    read is the one the room opens: the machine's extension folder's copy first,
+    then the lookup's order (``prompt_dirs``) -- the hub's roles, the hub's
+    agentic folder, the toolkit's roles. A file the room does not list (not
+    ``<name>.prompt.md``) has a title and no ref."""
     if not file_name:
         return None, None
     name = prompts.stem(file_name)
+    shipped = prompts.shipped_roles_dir()
     folders = [folder for folder, _ in prompts.yours_folders()]
-    folders.append(hub_folder("agentic"))
+    folders += prompt_dirs()
     text = ""
+    found: Path | None = None
     for folder in folders:
         path = folder / file_name
         if path.is_file():
@@ -425,9 +463,12 @@ def prompt_fields(file_name: str) -> tuple[str | None, str | None]:
                 text = path.read_text(encoding="utf-8-sig")
             except OSError:
                 continue
+            found = folder
             break
     title = prompts.record(text, name)[0] if text else name
-    ref = f"{prompts.YOURS}/{name}" if prompts.listed(file_name) else None
+    ref = None
+    if prompts.listed(file_name):
+        ref = name if found == shipped else f"{prompts.YOURS}/{name}"
     return title or name, ref
 
 

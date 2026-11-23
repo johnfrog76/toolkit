@@ -187,11 +187,45 @@ function Test-P20OrgDuplicates {
     return ''
 }
 
+function Get-P20OrgPromptDirs {
+    <#
+      Where a position's prompt is looked for, in order (docs/hub/org.md, "Where
+      a position's prompt is found"): the hub's agentic/org/, the hub's agentic/
+      as it has always been read, then the toolkit's own agentic/org/. The first
+      folder that has the file wins, so a hub's own role under a shipped name is
+      the one used. Returns @{ Dirs; Places } -- Places is how the unknown-prompt
+      sentence names the three.
+    #>
+    param([string]$PromptsRoot, [string]$AgenticFolder, [string]$PackageRoot)
+    $roles = [string](Get-P20Consts).org.rolesFolder
+    $hubAgentic = Join-Path $PromptsRoot $AgenticFolder
+    $dirs = @(
+        (Join-Path $hubAgentic $roles),
+        $hubAgentic,
+        (Join-Path (Join-Path $PackageRoot 'agentic') $roles)
+    )
+    $places = "the hub's $AgenticFolder/$roles/ or $AgenticFolder/ folder or the toolkit's agentic/$roles/"
+    return @{ Dirs = $dirs; Places = $places }
+}
+
+function Find-P20OrgPrompt {
+    # The path of the first folder's copy of a prompt file NAME, or '' when none has it.
+    param([string]$Name, [string[]]$PromptDirs = @())
+    foreach ($dir in @($PromptDirs)) {
+        if (-not $dir) { continue }
+        $candidate = Join-Path $dir $Name
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    }
+    return ''
+}
+
 function Test-P20OrgTree {
     # One tree's rules, in a fixed order, the first broken one a failure: a
     # position or seat id used twice, a reportsTo that names nothing, a loop, not
-    # exactly one root, a prompt that is not a file in the agentic folder.
-    param($Tree, [string]$AgenticDir)
+    # exactly one root, a prompt that is in none of the folders a role is
+    # looked up in. -PromptDirs is that list, in order (Get-P20OrgPromptDirs);
+    # -PromptPlaces is how the sentence names them.
+    param($Tree, [string[]]$PromptDirs = @(), [string]$PromptPlaces = '')
     $treeId = $Tree.Id
     $dup = Test-P20OrgDuplicates -Ids @($Tree.Positions | ForEach-Object { $_.Id })
     if ($dup) { return @{ Kind = 'duplicate-position'; Message = "Two positions in tree '$treeId' share the id '$dup'." } }
@@ -233,10 +267,9 @@ function Test-P20OrgTree {
         $name = $position.Prompt
         $isName = ($name -notmatch '[\\/]') -and ($name -ne '.') -and ($name -ne '..')
         $there = $false
-        if ($isName -and $AgenticDir) { $there = Test-Path -LiteralPath (Join-Path $AgenticDir $name) -PathType Leaf }
+        if ($isName) { $there = [bool](Find-P20OrgPrompt -Name $name -PromptDirs $PromptDirs) }
         if (-not $there) {
-            $folderName = Split-Path -Leaf $AgenticDir
-            return @{ Kind = 'unknown-prompt'; Message = "Position '$($position.Id)' in tree '$treeId' names the prompt '$name', which is not a file in the hub's $folderName/ folder." }
+            return @{ Kind = 'unknown-prompt'; Message = "Position '$($position.Id)' in tree '$treeId' names the prompt '$name', which is not a file in $PromptPlaces." }
         }
     }
     return $null
@@ -358,12 +391,12 @@ function Read-P20OrgChart {
         return (& $fail 'unknown-active-tree' "'activeTree' names '$active', which is not a tree. Trees: $($treeIds -join ', ').")
     }
 
-    $agenticDir = ''
+    if (-not $PackageRoot) { $PackageRoot = Split-Path $PSScriptRoot -Parent }
     $manifest = Read-P20HubManifest -Root $PromptsRoot -WarningAction SilentlyContinue
     $names = Get-P20HubFolderNames -PromptsRoot $PromptsRoot -PackageRoot $PackageRoot -Manifest $manifest
-    $agenticDir = Join-Path $PromptsRoot ([string]$names['agentic'])
+    $lookup = Get-P20OrgPromptDirs -PromptsRoot $PromptsRoot -AgenticFolder ([string]$names['agentic']) -PackageRoot $PackageRoot
     foreach ($tree in $trees) {
-        $broken = Test-P20OrgTree -Tree $tree -AgenticDir $agenticDir
+        $broken = Test-P20OrgTree -Tree $tree -PromptDirs $lookup.Dirs -PromptPlaces $lookup.Places
         if ($broken) { return (& $fail $broken.Kind $broken.Message) }
     }
 

@@ -472,7 +472,16 @@ describe("the Prompts card's filters", () => {
 // The category row: All, then each category with a prompt in the active
 // source -- the vocabulary's order, any outside it after -- each with its count.
 describe("the Prompts card's category row", () => {
-  const VOCABULARY = ["ship", "review", "tracker", "growth", "meetings", "rituals", "design"];
+  const VOCABULARY = [
+    "ship",
+    "review",
+    "tracker",
+    "growth",
+    "meetings",
+    "rituals",
+    "design",
+    "org",
+  ];
   const tk = (name: string, cat: string) => row({ name, category: cat, workflows: ["team"] });
   const mine = (name: string, cat: string) =>
     row({ name, ref: `yours/${name}`, group: "yours", workflows: [], sender: "", category: cat });

@@ -494,9 +494,12 @@ export const USAGE = consts.usage as {
  * The org chart's hub file (docs/hub/org.md): the name of the file at the hub
  * root, beside hub.json, that holds the org's trees, positions and seats. The CLI
  * reads it; the agent serves it and the web will draw what the agent serves.
+ * `rolesFolder` is the folder inside an agentic folder that holds the org's role
+ * prompts; the CLI and the agent look a position's prompt up through it.
  */
 export const ORG = consts.org as {
   file: string;
+  rolesFolder: string;
 };
 
 /**

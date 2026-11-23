@@ -72,6 +72,25 @@ def build_hub(hub: Path, case: dict) -> None:
         (folder / name).write_text("", encoding="utf-8")
     for name in case.get("promptFolders", []):
         (folder / name).mkdir(parents=True, exist_ok=True)
+    if "hubOrgPrompts" in case:
+        roles = folder / C.org_roles_folder()
+        roles.mkdir(parents=True, exist_ok=True)
+        for name in case["hubOrgPrompts"]:
+            (roles / name).write_text("", encoding="utf-8")
+
+
+def build_package(pkg: Path, case: dict) -> Path:
+    """The scratch package a table row reads against: exactly its ``shippedPrompts``
+    in agentic/<roles>/ and its ``shippedFlatPrompts`` in agentic/, so the real
+    shipped roles never decide a row. Returns its agentic folder."""
+    agentic = pkg / "agentic"
+    roles = agentic / C.org_roles_folder()
+    roles.mkdir(parents=True, exist_ok=True)
+    for name in case.get("shippedPrompts", []):
+        (roles / name).write_text("", encoding="utf-8")
+    for name in case.get("shippedFlatPrompts", []):
+        (agentic / name).write_text("", encoding="utf-8")
+    return agentic
 
 
 class OrgBase(unittest.TestCase):
@@ -155,9 +174,10 @@ class TheSharedTable(OrgBase):
     def test_the_table_has_the_cases_this_suite_knows_how_to_build(self):
         self.assertGreaterEqual(len(CASES), 33)
         for case in CASES:
+            optional = {"promptFolders", "hubOrgPrompts", "shippedPrompts", "shippedFlatPrompts"}
             self.assertEqual(
                 set(case) - {"name", "why", "org", "orgText", "orgFile", "hubJson", "tree", "prompts", "promptsFolder"},
-                {"expect"} | ({"promptFolders"} if "promptFolders" in case else set()),
+                {"expect"} | (optional & set(case)),
                 case["name"],
             )
 
@@ -166,7 +186,11 @@ class TheSharedTable(OrgBase):
             with self.subTest(case=case["name"]):
                 hub = self.base / "reader" / case["name"]
                 build_hub(hub, case)
-                with mock.patch.dict(os.environ, {"PROMPTS_ROOT": str(hub)}):
+                agentic = build_package(self.base / "reader-pkg" / case["name"], case)
+                with (
+                    mock.patch.dict(os.environ, {"PROMPTS_ROOT": str(hub)}),
+                    mock.patch.object(prompts, "AGENTIC_DIR", agentic),
+                ):
                     got = org.find_org_chart(case.get("tree", ""))
                 want = case["expect"]
                 self.assertEqual(got.status, want["status"])
@@ -188,13 +212,21 @@ class TheSharedTable(OrgBase):
             with self.subTest(case=case["name"]):
                 hub = self.base / "route" / case["name"]
                 build_hub(hub, case)
+                agentic = build_package(self.base / "route-pkg" / case["name"], case)
                 query = f"?tree={case['tree']}" if "tree" in case else ""
-                with mock.patch.dict(os.environ, {"PROMPTS_ROOT": str(hub)}):
+                with (
+                    mock.patch.dict(os.environ, {"PROMPTS_ROOT": str(hub)}),
+                    mock.patch.object(prompts, "AGENTIC_DIR", agentic),
+                ):
                     res = self.client.get(ROUTE + query)
                 want = case["expect"]
                 if want["status"] == "ok":
                     self.assertEqual(res.status_code, 200, res.text)
                     body = res.json()
+                    # Which copy the lookup chose: the hub's reads yours/<name>, the toolkit's <name>.
+                    refs = {p["id"]: p["promptRef"] for p in body["tree"]["positions"]}
+                    for pid, ref in want.get("promptRefs", {}).items():
+                        self.assertEqual(refs.get(pid), ref, pid)
                     for position in body["tree"]["positions"]:
                         # the two fields the web needs; the table's response is the shared part
                         self.assertEqual(
@@ -408,9 +440,29 @@ class TheRoute(OrgBase):
         self.assertEqual(res.status_code, 200, res.text)
         body = res.json()
         self.assertEqual((body["activeTree"], body["tree"]["name"]), ("mine", "My team"))
-        self.assertEqual([p["level"] for p in body["tree"]["positions"]], [0, 1, 2])
-        self.assertEqual([s["state"] for s in body["tree"]["positions"][1]["seats"]], ["staffed", "vacant"])
-        self.assertTrue(all(p["promptTitle"] is None and p["promptRef"] is None for p in body["tree"]["positions"]))
+        positions = body["tree"]["positions"]
+        self.assertEqual(
+            [(p["id"], p["level"]) for p in positions],
+            [
+                ("owner", 0),
+                ("lead", 1),
+                ("builder", 2),
+                ("pm", 1),
+                ("intern", 2),
+            ],
+        )
+        self.assertEqual([s["state"] for s in positions[1]["seats"]], ["staffed", "vacant"])
+        by_id = {p["id"]: p for p in positions}
+        # The intern names the role the toolkit ships: the sample hub has no copy,
+        # so the lookup finds the toolkit's agentic/org/ and the ref is a shipped one.
+        intern = by_id["intern"]
+        self.assertEqual(
+            (intern["prompt"], intern["reportsTo"], intern["promptRef"]), ("intern.prompt.md", "pm", "intern")
+        )
+        self.assertEqual(intern["promptTitle"], "Intern")
+        self.assertFalse((sample / "agentic" / "org" / "intern.prompt.md").exists())
+        for pid in ("owner", "lead", "builder", "pm"):
+            self.assertEqual((by_id[pid]["promptTitle"], by_id[pid]["promptRef"]), (None, None), pid)
 
 
 class TheFlagOff(OrgBase):

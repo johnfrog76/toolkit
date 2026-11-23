@@ -110,7 +110,7 @@ export function groupLabel(group: PromptListRow["group"]): string {
  * The category row's threshold: up to this many categories are filter tabs (the
  * house's FilterBadge row); past it the row is meant to become a dropdown, the
  * pattern a long single choice takes. The dropdown is not built -- the
- * vocabulary is seven -- and PromptsCard.test.tsx fails when agentic/prompts.json
+ * vocabulary is eight -- and PromptsCard.test.tsx fails when agentic/prompts.json
  * grows past this, which is the moment to build it.
  */
 export const CATEGORY_TABS_MAX = 8;
