@@ -383,7 +383,11 @@ export async function launchChromium() {
 // key), and a smoke context starts with it set -- the running version is
 // consts.json's. `browser.newContextUnmarked` is the one that does not, for the
 // case that asserts the dialog opens (smokeMatrix.mjs).
-const WHATS_NEW_SEEN_KEY = "p20.whatsNew.seen";
+// The key is read out of that file's own constant, so the two cannot drift.
+const WHATS_NEW_SEEN_KEY = /export const WHATS_NEW_SEEN_KEY = "([^"]+)"/.exec(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "shell", "releaseNotes.ts"), "utf8"),
+)?.[1];
+if (!WHATS_NEW_SEEN_KEY) throw new Error("smoke: could not read WHATS_NEW_SEEN_KEY from shell/releaseNotes.ts");
 const RUNNING_VERSION = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "consts.json"), "utf8"),
 ).version;
