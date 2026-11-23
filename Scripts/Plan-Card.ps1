@@ -103,9 +103,9 @@ if ($Help) {
     Write-Host "  ${p}Plan <id|file> -Remove -Only Sprint    Take it out of one (-Only Milestone for the release), keep the other" -ForegroundColor Cyan
     Write-Host "  ${p}Plan -Help                             Show this help" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  Writes the card's release and sprint footer lines, **Milestone:** and **Sprint:**," -ForegroundColor Gray
-    Write-Host "  each its own, through Set-P20CardLine. A card with no **Milestone:** line reads its" -ForegroundColor Gray
-    Write-Host "  release from its Sprint line, as it always did; -Sprint keeps that release on its own line." -ForegroundColor Gray
+    Write-Host "  Writes the card's release and sprint, its Milestone and Sprint footer lines, each" -ForegroundColor Gray
+    Write-Host "  its own, through Set-P20CardLine. A card with no Milestone line reads its release" -ForegroundColor Gray
+    Write-Host "  from its Sprint line, as it always did; -Sprint keeps that release on its own line." -ForegroundColor Gray
     Write-Host "  Titles are written whole, never truncated. This never touches the tracker --" -ForegroundColor Gray
     Write-Host "  NewItem / EditItem have their own -Sprint, which sets a milestone through gh / az." -ForegroundColor Gray
     Write-Host "  Found in current/ or backlog/, and never pulled into play: a backlog card is" -ForegroundColor Gray

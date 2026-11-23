@@ -86,7 +86,7 @@ $created = $consts.stamps.created
 . (Join-Path $pkgRoot 'Scripts/Get-MilestoneOrder.ps1')
 
 # -- The one reader, over the shared table ---------------------------------------
-Write-Host "-- A milestone's order: the shared table ---------------" -ForegroundColor Cyan
+Write-Host "-- A release's order: the shared table -----------------" -ForegroundColor Cyan
 $orderTable = [System.IO.File]::ReadAllText((Join-Path $scriptDir 'fixtures/parsers/milestone-order.json')) | ConvertFrom-Json
 foreach ($row in $orderTable.slugs) {
     Assert-Equal "slug: '$($row.title)'" ([string]$row.slug) (ConvertTo-P20MilestoneSlug ([string]$row.title))
@@ -299,7 +299,7 @@ try {
     Assert-True 'the archived card keeps its planned Milestone line untouched' ($closedText -match [regex]::Escape("$milestone M2"))
 
     Write-Host ""
-    Write-Host "-- A milestone's order: one file, one writer ----------" -ForegroundColor Cyan
+    Write-Host "-- A release's order: one file, one writer ------------" -ForegroundColor Cyan
 
     $space = Split-Path $spike[0].DirectoryName -Parent
     $msDir = Join-Path $space ([string]$consts.folders.milestones)
