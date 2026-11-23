@@ -2146,7 +2146,7 @@ function global:Set-P20CardCover {
 }
 
 function global:Set-P20CardSprint {
-    <# Plan -- the write side of a card's two planning lines and its milestone's order: -Milestone and -Sprint, each its own line; -Rank moves the card in milestones/<slug>.md; -Remove [-Only Milestone|Sprint] clears them. Never touches the tracker. #>
+    <# Plan -- the write side of a card's two planning lines and its release's order: -Milestone (the release) and -Sprint, each its own line; -Rank moves the card in milestones/<slug>.md; -Remove [-Only Milestone|Sprint] clears them. Never touches the tracker. #>
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)][string]$Card,
@@ -2177,7 +2177,7 @@ function global:Set-P20CardTags {
 }
 
 function global:Get-P20Backlog {
-    <# Backlog -- the Space's waiting cards as one ranked table: backlog/, milestone by milestone, in each milestone's order. -Milestone, -Tag and -Type filter. Read-only; refuses on an Azure DevOps Space. #>
+    <# Backlog -- the Space's waiting cards as one ranked table: backlog/, release by release, in each release's order. -Milestone (the release), -Tag and -Type filter. Read-only; refuses on an Azure DevOps Space. #>
     [CmdletBinding()]
     param(
         [string]$Milestone,

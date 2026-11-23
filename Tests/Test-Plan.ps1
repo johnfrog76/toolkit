@@ -147,7 +147,7 @@ try {
     Assert-True '-Help names -Sprint beside it' ($help -match [regex]::Escape("${prefix}Plan <id|file> -Sprint")) $help
     Assert-True '-Help names -Remove and -Remove -Only too' ($help -match [regex]::Escape("${prefix}Plan <id|file> -Remove ") -and $help -match [regex]::Escape("${prefix}Plan <id|file> -Remove -Only")) $help
     Assert-True 'a bare call states the reason, exit 2' ($out -match 'no card given\.' -and $out -match 'BARE-EXIT=2') $out
-    Assert-True 'a card with no switch is refused, exit 2' ($out -match 'no milestone or sprint given\.' -and $out -match 'NEITHER-EXIT=2') $out
+    Assert-True 'a card with no switch is refused, exit 2' ($out -match 'no release or sprint given\.' -and $out -match 'NEITHER-EXIT=2') $out
     Assert-True '-Milestone and -Remove together are refused, exit 2' ($out -match "do not go together" -and $out -match 'BOTH-EXIT=2') $out
     Assert-True '-Sprint and -Remove together are refused, exit 2' ($out -match 'SPRINTREMOVE-EXIT=2') $out
     Assert-True '-Only without -Remove is refused, exit 2' ($out -match "'-Only' goes with '-Remove'" -and $out -match 'ONLYALONE-EXIT=2') $out
@@ -223,7 +223,7 @@ try {
     Assert-True 'again: no sprint, nothing written' ($out -match 'ONLYSAGAIN-EXIT=0' -and $out -match 'carries no sprint -- nothing written') $out
     $out = Invoke-Verbs ("${prefix}Plan K7M2 -Remove -Only Milestone; 'ONLYM-EXIT=' + `$LASTEXITCODE")
     $noMilestone = [System.IO.File]::ReadAllText($spike[0].FullName)
-    Assert-True "'-Remove -Only Milestone' with no sprint left deletes the line" ($out -match 'ONLYM-EXIT=0' -and $out -match 'K7M2 is out of its milestone' -and @(Get-Lines $noMilestone $milestone).Count -eq 0 -and -not (Get-P20CardMilestone $noMilestone)) $noMilestone
+    Assert-True "'-Remove -Only Milestone' with no sprint left deletes the line" ($out -match 'ONLYM-EXIT=0' -and $out -match 'K7M2 is out of its release' -and @(Get-Lines $noMilestone $milestone).Count -eq 0 -and -not (Get-P20CardMilestone $noMilestone)) $noMilestone
 
     Write-Host ""
     Write-Host "-- A sprint on a card with no milestone is not one ----" -ForegroundColor Cyan
@@ -266,7 +266,7 @@ try {
     # card goes back to the card it was before its Sprint line was written.
     [System.IO.File]::WriteAllText($spike[0].FullName, $oldText)
     $out = Invoke-Verbs ("${prefix}Plan K7M2 -Remove; 'REMOVE-EXIT=' + `$LASTEXITCODE")
-    Assert-True "'Plan K7M2 -Remove' exits 0" ($out -match 'REMOVE-EXIT=0' -and $out -match 'K7M2 is out of its milestone and sprint') $out
+    Assert-True "'Plan K7M2 -Remove' exits 0" ($out -match 'REMOVE-EXIT=0' -and $out -match 'K7M2 is out of its release and sprint') $out
     $afterRemove = [System.IO.File]::ReadAllText($spike[0].FullName)
     Assert-Equal 'the line is gone and nothing else moved' $clean $afterRemove
     [System.IO.File]::WriteAllText($spike[0].FullName, $pair)
@@ -275,7 +275,7 @@ try {
     Assert-True 'on a card with both, both lines go' (@(Get-Lines $afterRemoveBoth $milestone).Count -eq 0 -and @(Get-Lines $afterRemoveBoth $sprint).Count -eq 0) $afterRemoveBoth
 
     $out = Invoke-Verbs ("${prefix}Plan K7M2 -Remove; 'REMOVEAGAIN-EXIT=' + `$LASTEXITCODE")
-    Assert-True 'removing again exits 0 and writes nothing' ($out -match 'REMOVEAGAIN-EXIT=0' -and $out -match 'carries no milestone or sprint') $out
+    Assert-True 'removing again exits 0 and writes nothing' ($out -match 'REMOVEAGAIN-EXIT=0' -and $out -match 'carries no release or sprint') $out
     Assert-Equal 'still exactly as it was' $afterRemoveBoth ([System.IO.File]::ReadAllText($spike[0].FullName))
 
     Write-Host ""
@@ -311,7 +311,7 @@ try {
         "${prefix}NewPrompt -Now -Title 'Order two' -Type Task -Id W4CY | Out-Null; " +
         "${prefix}NewPrompt -Title 'Order three' -Type Task -Id H6PN | Out-Null; " +
         "${prefix}Plan T3MX -Rank top; 'NOMS-EXIT=' + `$LASTEXITCODE")
-    Assert-True "'Plan T3MX -Rank top' on a card with no milestone refuses, exit 2, naming the fix" ($out -match 'NOMS-EXIT=2' -and $out -match 'carries no milestone' -and $out -match [regex]::Escape("${prefix}Plan T3MX -Milestone")) $out
+    Assert-True "'Plan T3MX -Rank top' on a card with no release refuses, exit 2, naming the fix" ($out -match 'NOMS-EXIT=2' -and $out -match 'carries no release' -and $out -match [regex]::Escape("${prefix}Plan T3MX -Milestone")) $out
     Assert-True 'and no order file was written' (-not (Test-Path -LiteralPath $m2Path))
 
     $out = Invoke-Verbs ("${prefix}Plan T3MX -Milestone 'M2 -- 1.2.0'; 'ADD1-EXIT=' + `$LASTEXITCODE; " +
@@ -370,9 +370,9 @@ try {
     $t3Before = [System.IO.File]::ReadAllText($t3mx)
     $m2Before = [System.IO.File]::ReadAllText($m2Path)
     $out = Invoke-Verbs ("${prefix}Plan T3MX -Milestone '-- !'; 'NOSLUG-EXIT=' + `$LASTEXITCODE")
-    Assert-True "a title with no letter or digit refuses, exit 2: it cannot name an order file" ($out -match 'NOSLUG-EXIT=2' -and $out -match [regex]::Escape("'-- !' has no letter or digit to name its order file with.") -and $out -match [regex]::Escape('Give the milestone a title with a word in it.')) $out
+    Assert-True "a title with no letter or digit refuses, exit 2: it cannot name an order file" ($out -match 'NOSLUG-EXIT=2' -and $out -match [regex]::Escape("'-- !' has no letter or digit to name its order file with.") -and $out -match [regex]::Escape('Give the release a title with a word in it.')) $out
     $out = Invoke-Verbs ("${prefix}Plan T3MX -Milestone 'M2 1.2.0'; 'SLUGTAKEN-EXIT=' + `$LASTEXITCODE")
-    Assert-True "a title that slugs to another title's file refuses, exit 2, naming both" ($out -match 'SLUGTAKEN-EXIT=2' -and $out -match [regex]::Escape("$([string]$consts.folders.milestones)/m2-1-2-0.md is the order of 'M2 -- 1.2.0', not 'M2 1.2.0'.") -and $out -match [regex]::Escape('Two milestone titles slug to the same file. Rename one milestone, on its cards and in that file''s heading.')) $out
+    Assert-True "a title that slugs to another title's file refuses, exit 2, naming both" ($out -match 'SLUGTAKEN-EXIT=2' -and $out -match [regex]::Escape("$([string]$consts.folders.milestones)/m2-1-2-0.md is the order of 'M2 -- 1.2.0', not 'M2 1.2.0'.") -and $out -match [regex]::Escape('Two release titles slug to the same file. Rename one release, on its cards and in that file''s heading.')) $out
     Assert-True 'and neither refusal changed the card or the order' (([System.IO.File]::ReadAllText($t3mx)) -ceq $t3Before -and ([System.IO.File]::ReadAllText($m2Path)) -ceq $m2Before)
 
     $read = Get-P20SpaceMilestoneOrders -SpaceDir $space
