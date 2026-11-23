@@ -2040,6 +2040,9 @@ each count and the chip's total, each filter's rows, the tags and the header hol
 the filter changes, the choice kept after a reload, a fresh browser context opening on All.
 `docs/TESTING.md` has the why at length, and the ports and interpreter switches.
 
+CI runs this mode in the web job on Ubuntu, so every change that reaches the web half runs it; the
+`--matrix` and `--a11y` modes run in the Windows job (`docs/TESTING.md`, "In CI").
+
 **`--matrix`** (`npm run smoke:matrix`) runs on the same kind of servers, over `Tests/fixtures/hub`:
 each module flag alone on -- its nav entry, page, data and source there, every other module's absent and
 never requested, one new browser context per pass, the cases being `docs/SCENARIOS.md`'s "The nav, by

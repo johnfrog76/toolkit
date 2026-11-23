@@ -10,7 +10,7 @@
         pwsh -NoProfile -File Scripts/Test-CiHalf.ps1 -Half agent -Path agent.log -ExitCode <code>
 
     -Half smoke reads a browser smoke's transcript (npm run smoke -- --matrix,
-    --a11y) by its closing `smoke:` line, the same way.
+    --a11y, --studio) by its closing `smoke:` line, the same way.
 
     The verdict is Get-P20CiHalfVerdict (Scripts/TestAll-Rules.ps1): the parser
     and the rule {cliPrefix}Test reads each half with, and one rule tighter -- a
