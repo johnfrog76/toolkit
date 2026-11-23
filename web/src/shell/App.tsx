@@ -47,6 +47,7 @@ import {
 import type { CardContext } from "./registry";
 import { ShellProvider } from "./cards";
 import { SettingsDrawer } from "./SettingsDrawer";
+import { WhatsNewDialog, useWhatsNew } from "./WhatsNew";
 import { usePrefetchModules } from "./prefetchModules";
 import { useUnsavedTotal } from "./settings";
 import { ToolKitLogo } from "../shared/ToolKitLogo";
@@ -302,6 +303,7 @@ export function App() {
     document.title = pageName ? `${pageName} · ToolKit` : "ToolKit";
   }, [pageName]);
 
+  const whatsNew = useWhatsNew();
   const [settingsOpen, setSettingsOpen] = useState(false);
   // A door in the drawer may be a PAGE (the connect wizard): the drawer closes
   // when the address changes, so the page is what you see. Noticed while
@@ -532,6 +534,7 @@ export function App() {
                 onSwitchSpace={(slug) => void switchMode({ mode: slug })}
                 links={settingsLinks}
                 onOpenSettings={openSettings}
+                onOpenWhatsNew={whatsNew.open}
                 restoreFocusTarget={restoreFocusTarget}
               />
             </div>
@@ -576,6 +579,9 @@ export function App() {
       {/* Every section is contributed by a module through the registry, gated
           by that module's flag like its cards are -- the shell does not know
           what they are. Today that is one: the ADO core's Configuration. */}
+      {whatsNew.releases ? (
+        <WhatsNewDialog releases={whatsNew.releases} onClose={whatsNew.close} />
+      ) : null}
       <SettingsDrawer
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

@@ -88,6 +88,8 @@ interface Props {
   onSwitchSpace: (slug: string) => void;
   links: SettingsLink[];
   onOpenSettings: (anchor?: string) => void;
+  /** Opens the release notes (What's new): core, so the item is always drawn. */
+  onOpenWhatsNew: () => void;
   /** Spread on the trigger so a closing drawer hands focus back to it. */
   restoreFocusTarget: object;
 }
@@ -101,6 +103,7 @@ export function AvatarMenu({
   onSwitchSpace,
   links,
   onOpenSettings,
+  onOpenWhatsNew,
   restoreFocusTarget,
 }: Props) {
   const styles = useStyles();
@@ -246,6 +249,7 @@ export function AvatarMenu({
             >
               All settings
             </MenuItem>
+            <MenuItem onClick={onOpenWhatsNew}>What&apos;s new</MenuItem>
           </MenuGroup>
         </MenuList>
       </MenuPopover>

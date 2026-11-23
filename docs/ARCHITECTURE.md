@@ -247,7 +247,10 @@ registry's settings links. Its Space entry lists the slugs in `config.switcherSp
 submenu; past it the same entry opens a searchable quick menu with **View all**
 (`src/shell/SpaceQuickMenu.tsx`) -- same call, same order, nothing new stored. [`web/README.md`, "The
 avatar menu, and arriving at a setting"](../web/README.md#the-avatar-menu-and-arriving-at-a-setting)
-has the detail; [`SCENARIOS.md`](SCENARIOS.md) tables the two counts.
+has the detail; [`SCENARIOS.md`](SCENARIOS.md) tables the two counts. The menu's last Settings item,
+**What's new**, is core: a dialog of the running version's `CHANGELOG.md` section, which the bundle reads
+at build time through the `@changelog` alias, as it does `consts.json` (the image build copies both);
+it opens on its own once per version per browser and needs no agent route.
 
 ## Trust model
 

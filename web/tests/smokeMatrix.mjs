@@ -32,6 +32,7 @@ import { fileURLToPath } from "node:url";
 import {
   answerWithAgents,
   boardLanesCheck,
+  dismissWhatsNew,
   flipCase,
   launchChromium,
   mainNavEntries,
@@ -340,7 +341,32 @@ const SURFACES = [
   },
 ];
 
+// A browser profile that has not shown this version: What's new opens on its own,
+// titled with the running version, and a reload does not open it again.
+async function whatsNewCase(browser, stack, check) {
+  const version = JSON.parse(readFileSync(join(stack.pkg, "consts.json"), "utf8")).version;
+  const ctx = await browser.newContextUnmarked({ viewport: VIEWPORT });
+  const page = await ctx.newPage();
+  try {
+    await openRoute(page, stack.base, "/");
+    const dialog = page.locator('[data-testid="whats-new-dialog"]');
+    await dialog.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
+    check(
+      "whatsnew: a fresh profile opens the dialog, titled with the running version",
+      (await dialog.count()) === 1 && (await dialog.innerText()).includes(`What's new in ${version}`),
+      `looking for ${version}`,
+    );
+    await dismissWhatsNew(page);
+    await openRoute(page, stack.base, "/");
+    await page.waitForTimeout(2000);
+    check("whatsnew: the second load of the same version does not open it", (await dialog.count()) === 0);
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function storageCases(browser, stack, check) {
+  await whatsNewCase(browser, stack, check);
   for (const s of SURFACES) {
     // (a) a new context: empty storage
     {
@@ -367,6 +393,9 @@ async function storageCases(browser, stack, check) {
       const { ctx, page, errors } = await newRecordedPage(browser, { hostile: true });
       try {
         await openRoute(page, stack.base, s.route);
+        // Storage that throws cannot hold the what's-new mark, so this page's
+        // memory shows the dialog once; close it so it is not over the page.
+        await dismissWhatsNew(page);
         const ready = await s.ready(page);
         check(`hostile: ${s.name} is drawn with storage refused`, ready, (await page.evaluate(() => document.body.innerText)).slice(0, 300));
         check(`hostile: ${s.route} shows no crash`, await noCrash(page));
