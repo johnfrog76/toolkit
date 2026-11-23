@@ -363,8 +363,10 @@ class StatusMetadataTests(unittest.TestCase):
         Tests/fixtures/parsers/card-milestone.json."""
         import json
 
+        from agent.core.config import tracker
         from agent.core.parsers import (
             _parse_status_metadata,
+            card_ado_url,
             card_milestone,
             card_milestone_from_github,
             card_sprint,
@@ -394,7 +396,7 @@ class StatusMetadataTests(unittest.TestCase):
         # Both sources: an issue's GitHub milestone on a GitHub card's Sprint line, and
         # a GitHub card's own Milestone line, which is a release.
         self.assertTrue(any(r["github"] for r in table["rows"]))
-        on_github = [r for r in table["rows"] if any("github.com" in ln for ln in r["lines"])]
+        on_github = [r for r in table["rows"] if tracker(card_ado_url("\n".join(r["lines"]))) == "github"]
         self.assertTrue(any(not r["github"] and r["milestone"] for r in on_github))
 
     def test_a_milestones_order_by_the_shared_table(self):
