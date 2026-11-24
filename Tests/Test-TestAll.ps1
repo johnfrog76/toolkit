@@ -321,8 +321,8 @@ Assert-True 'the ps51 job says which ANSI code page 5.1 reads a script without a
 Assert-True 'no step runs a hand-picked list of suites on 5.1: the ps51 job runs them all' `
     (($workflow -notmatch 'on Windows PowerShell 5\.1 itself') -and ($ps51Job -notmatch "Test-Toolkit\.ps1 -[A-Z]") -and ($workflow -notmatch "powershell\.exe [^\r\n]*Test-Toolkit\.ps1 -[A-Z]"))
 $jobCount = [regex]::Matches($workflow, '(?m)^\s+runs-on:').Count
-Assert-True 'verify.yml runs on pull requests (default types: labeled is NOT a trigger), pushes to main, the button, and a weekday schedule' `
-    (($workflow -match '(?m)^\s+workflow_dispatch:') -and ($workflow -notmatch '(?m)^\s+types:') -and ($workflow -notmatch '(?m)^\s+if: .*labeled') -and ($workflow -match '(?ms)^\s+push:\s*\r?\n\s+branches: \[main\]') -and ($workflow -match '(?m)^\s+- cron: "[^"]+"'))
+Assert-True 'verify.yml runs on pull requests (opened, synchronize, reopened and labeled, so the ci label starts a run on an open one), pushes to main, the button, and a weekday schedule' `
+    (($workflow -match '(?m)^\s+workflow_dispatch:') -and ($workflow -match '(?ms)^  pull_request:\s*\r?\n(?:\s+#[^\r\n]*\r?\n)*\s+types: \[opened, synchronize, reopened, labeled\]\s*\r?\n') -and ([regex]::Matches($workflow, '(?m)^\s+types:').Count -eq 1) -and ($workflow -match '(?ms)^\s+push:\s*\r?\n\s+branches: \[main\]') -and ($workflow -match '(?m)^\s+- cron: "[^"]+"'))
 $windowsJob = Get-WfJob 'windows'
 Assert-True 'the Windows job runs on the schedule, the button and the ci label, and not on a push to main' `
     (($windowsJob -match "(?m)^\s+if: .*github\.event_name == 'schedule'") -and ($windowsJob -match "(?m)^\s+if: .*github\.event_name == 'workflow_dispatch'") -and ($windowsJob -match "(?m)^\s+if: .*labels\.\*\.name, 'ci'") -and ($windowsJob -notmatch "(?m)^\s+if: .*'push'"))

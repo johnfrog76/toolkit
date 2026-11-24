@@ -34,12 +34,14 @@
 # Windows runs against main once each weekday evening, so a change that only 5.1 or
 # the browser would show is caught the same day. A pull request that is heavy on
 # PowerShell and wants the proof before it merges asks for it with the `ci` label.
-# The label takes effect on the pull request's next push (or reopen); to run Windows
-# on a branch right away, use the Actions tab's button on that branch
-# (`gh workflow run verify.yml --ref <branch>`). A label added to an open pull
-# request starts nothing by itself, on purpose: `labeled` is not a trigger, because
-# any label would then open a run in the pull request's concurrency group and
-# cancel the checks already running there.
+# The label works on an open pull request: `labeled` is a trigger, so adding it
+# starts a run on the head as it stands, with both Windows jobs in it, and no push
+# is needed. The cost is that ANY label added to a pull request starts a run, and
+# that run takes the place of one still in progress in the pull request's
+# concurrency group. Nothing is lost but time: the new run is the whole workflow
+# on the same head, never a part of it, so Verify always sums up a full run. The
+# Actions tab's button still runs Windows on any branch
+# (`gh workflow run verify.yml --ref <branch>`).
 # A local run on each host remains the proof for a change.
 #
 # A scheduled failure is not re-run, and nothing here files it: the job's token has no
@@ -62,6 +64,9 @@ name: verify
 on:
   workflow_dispatch:
   pull_request:
+    # The default three, and `labeled`, so the `ci` label starts the Windows jobs
+    # on an open pull request (the header has the cost).
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [main]
   schedule:
@@ -460,7 +465,8 @@ jobs:
 
   windows:
     name: The browser smoke and the CLI in PowerShell 7 on Windows
-    # The schedule, the button, or a pull request that carries the `ci` label. A push
+    # The schedule, the button, or a pull request that carries the `ci` label --
+    # from the moment the label is added, which starts a run of its own. A push
     # to main and an ordinary pull request skip it.
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci')) }}
     runs-on: windows-latest
