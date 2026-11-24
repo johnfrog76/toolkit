@@ -177,7 +177,7 @@ pwsh -NoProfile -File Scripts/Write-TestCounts.ps1 -Path run.log
 run:` -- four lines, the CLI's per-suite line and its `N suites, M assertions` total, then `pytest: ...` and
 `web: ...`. The writer takes a file holding the block or the whole transcript (`-Path -` reads standard input,
 and lines can be piped in), reads the four lines after the last heading, drops a `pytest:` line's
-`(via <python>)`, and checks everything before it writes: four lines in their shapes, a total that is the sum
+`(via <python>)` (whatever parentheses the interpreter's name holds, as in `(via python3 (PATH))`), and checks everything before it writes: four lines in their shapes, a total that is the sum
 of its suites, the suites exactly the registry's in the runner's order (so a block from another tree is
 refused), and the version `consts.json`'s. A half that was skipped or failed prints a sentence in its line's
 place (`pytest: NOT AVAILABLE -- ...`, `web: not run -- ...`), never a number, so its block is refused too.

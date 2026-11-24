@@ -232,13 +232,14 @@ $pasteTable = @(
     @('all three ran', [ordered]@{ agent = $recAgent; web = $recWeb }, $cliTwo, 'Consts 10, Compat 20, Menu 30|3 suites, 60 assertions|pytest: 12 passed, 1 skipped, 40 subtests|web: 7 suites, 55 tests'),
     @('agent skipped', [ordered]@{ agent = [ordered]@{ result = 'skip'; reason = 'no Python 3 on the PATH' }; web = $recWeb }, $cliTwo, 'Consts 10, Compat 20, Menu 30|3 suites, 60 assertions|pytest: NOT AVAILABLE -- no python with pytest was found: no Python 3 on the PATH|web: 7 suites, 55 tests'),
     @('agent ran through a venv', [ordered]@{ agent = [ordered]@{ result = 'pass'; line = $recAgent.line; python = '~/.venv-toolkit/bin/python' }; web = $recWeb }, $cliTwo, 'Consts 10, Compat 20, Menu 30|3 suites, 60 assertions|pytest: 12 passed, 1 skipped, 40 subtests (via ~/.venv-toolkit/bin/python)|web: 7 suites, 55 tests'),
+    @('agent ran through the PATH python', [ordered]@{ agent = [ordered]@{ result = 'pass'; line = $recAgent.line; python = 'python3 (PATH)' }; web = $recWeb }, $cliTwo, 'Consts 10, Compat 20, Menu 30|3 suites, 60 assertions|pytest: 12 passed, 1 skipped, 40 subtests (via python3 (PATH))|web: 7 suites, 55 tests'),
     @('web failed, CLI partial', [ordered]@{ agent = $recAgent; web = [ordered]@{ result = 'fail' } }, @(), 'CLI: not printed -- the CLI half did not run every suite and pass|pytest: 12 passed, 1 skipped, 40 subtests|web: not printed -- the web half did not pass')
 )
 foreach ($pc in $pasteTable) {
     $pasted = @(Get-P20PasteLines -Records $pc[1] -CliLines $pc[2])
     Assert-Equal "tkTest's counts block, $($pc[0])" $pc[3] ($pasted -join '|')
     $blockTaken = (@((ConvertFrom-P20CountsBlock -Text ($pasted -join "`n")).Findings).Count -eq 0)
-    $shouldTake = ($pc[0] -eq 'all three ran' -or $pc[0] -eq 'agent ran through a venv')
+    $shouldTake = ($pc[0] -eq 'all three ran' -or $pc[0] -eq 'agent ran through a venv' -or $pc[0] -eq 'agent ran through the PATH python')
     Assert-True "and the writer's block rule $(if ($shouldTake) { 'takes' } else { 'refuses' }) it" ($blockTaken -eq $shouldTake)
 }
 
