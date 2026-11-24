@@ -418,7 +418,7 @@ function ConvertFrom-P20CountsBlock {
             if ($fromHeading -and $lines.Count -gt 0) { break }
             continue
         }
-        $lines += ($t -replace '^(pytest: .*?)\s+\(via [^)]*\)$', '$1')
+        $lines += ($t -replace '^(pytest: .*?)\s+\(via .*\)$', '$1')
     }
     $out.Lines = $lines
     $shape = 'a full run prints four: the per-suite line, "N suites, M assertions", "pytest: ..." and "web: ..."'
