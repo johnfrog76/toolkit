@@ -322,7 +322,7 @@ summed up by one check, `Verify`) runs these three
 runners on Ubuntu, reads each one's summary line and fails a step on a failure, a skipped half or a run
 that counted nothing ([docs/TESTING.md](docs/TESTING.md), "In CI"). A pull request runs only the halves
 its files can reach, and the cross-half contract suites for the rest; a push to `main` runs all three. That is this gate on Linux under
-`pwsh` 7. Its Windows job, which runs on a weekday-evening schedule against `main`, from the Actions tab's button and on a pull request labelled `ci` (the label takes effect on the next push or reopen, and a label alone starts nothing, so it never cancels running checks; for a branch right away, `gh workflow run verify.yml --ref <branch>`), not on an ordinary pull request or a push to `main`, adds the CLI half on Windows twice, in two jobs side by side: `tkTest -Half cli` typed in Windows PowerShell 5.1
+`pwsh` 7. Its Windows job, which runs on a weekday-evening schedule against `main`, from the Actions tab's button and on a pull request labelled `ci` (adding the label to an open pull request starts a run on its head, with no push needed; for any branch, `gh workflow run verify.yml --ref <branch>`), not on an ordinary pull request or a push to `main`, adds the CLI half on Windows twice, in two jobs side by side: `tkTest -Half cli` typed in Windows PowerShell 5.1
 after the one-manifest import, with the runner starting each suite in `pwsh` 7; and `Tests/Test-Toolkit.ps1`
 with no suite switch started by `powershell.exe` (the `ps51` job), so every suite runs in 5.1. Both are read the same way.
 The agent's and the web UI's runners on Windows are still walked here and in Gate 12.
