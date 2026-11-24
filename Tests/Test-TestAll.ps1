@@ -244,7 +244,10 @@ Assert-True 'the web job runs npm test, read through the gate' `
     ($jWeb -match 'npm test 2>&1 \| tee [^\r\n]+\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half web\b')
 Assert-True 'the cli job installs neither Node nor Python' (($jCli -ne '') -and ($jCli -notmatch 'setup-node|setup-python|npm ci|pip install'))
 Assert-True 'the agent job installs Python and not Node' (($jAgent -match 'actions/setup-python@') -and ($jAgent -match 'pip install -r agent/requirements-dev\.txt') -and ($jAgent -notmatch 'setup-node|npm ci'))
-Assert-True 'the web job installs Node and not Python' (($jWeb -match 'actions/setup-node@') -and ($jWeb -match 'npm ci') -and ($jWeb -notmatch 'setup-python|pip install'))
+Assert-True 'the web job installs Node, Playwright''s chromium, and Python with the agent''s requirements only for the Studio smoke' `
+    (($jWeb -match 'actions/setup-node@') -and ($jWeb -match 'npm ci') -and ($jWeb -match 'actions/setup-python@') -and ($jWeb -match 'pip install -r agent/requirements\.txt') -and ($jWeb -match 'npx playwright install --with-deps chromium'))
+Assert-True 'the web job runs the Studio smoke, read through the gate' `
+    ($jWeb -match 'npm run smoke:studio 2>&1 \| tee [^\r\n]+\r?\n[^\r\n]*\r?\n[^\r\n]*Test-CiHalf\.ps1 -Half smoke\b')
 Assert-True 'the agent job carries its lints and its audit: ruff check, ruff format --check, pip-audit' `
     (($jAgent -match '(?m)^\s+ruff check\s*$') -and ($jAgent -match '(?m)^\s+ruff format --check\s*$') -and ($jAgent -match 'pip_audit -r agent/requirements-dev\.txt'))
 Assert-True 'the web job carries its lints and its audit: npm run lint, npm run lint:md, npm audit --omit=dev at high' `

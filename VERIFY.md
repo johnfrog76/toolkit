@@ -551,8 +551,9 @@ tkWeb -Status
 - [ ] `-Stop` ends the dev server **and** the agent
 - [ ] `-Status` afterwards reports both as not running, and still exits 0
 
-**What CI covers of this gate.** The check's Windows job runs the two smoke modes that start their own
-servers, `npm run smoke:matrix` and `npm run smoke:a11y`, and fails a step on a failure, a serious or
+**What CI covers of this gate.** The check's web job on Ubuntu runs the Studio's smoke mode, `npm run smoke:studio`,
+for every change that reaches the web half. Its Windows job runs the two smoke modes that start their own
+servers, `npm run smoke:matrix` and `npm run smoke:a11y`. Each step fails a step on a failure, a serious or
 critical axe finding, or a run that never reached its closing `smoke:` line ([docs/TESTING.md](docs/TESTING.md),
 "In CI"). The modes above, against servers `tkWeb -Dev` started, the phone viewport, the pictures and the
 real hub are still walked here. The landing page is in no smoke mode: `npm test` holds its words, and

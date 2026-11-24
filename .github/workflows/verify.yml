@@ -9,12 +9,14 @@
 #             consts.json's version (Scripts/Test-TestCountsChange.ps1).
 #   cli       the CLI half,      )
 #   agent     the agent half,    ) side by side, each with its own installs and lints,
-#   web       the web UI half,   ) each when `changes` says the change can reach it.
+#   web       the web UI half,   ) each when `changes` says the change can reach it;
+#                                the web job also runs the Studio's browser smoke.
 #   contract  a pull request that leaves a half out: the cross-half suites of the
 #             halves that did not run, and the markdown lint when the web job did not.
 #   verify    the one check that sums the run up: green when every job the
 #             change needed passed, whatever the filter skipped.
-#   windows   the browser smoke and the CLI in PowerShell 7 on Windows.
+#   windows   the matrix and accessibility browser smokes and the CLI in PowerShell 7
+#             on Windows.
 #   ps51      every CLI suite in Windows PowerShell 5.1, the floor.
 #             The two Windows jobs run side by side, on a schedule, the button, and
 #             a pull request that carries the `ci` label -- ps51 on such a pull
@@ -248,6 +250,29 @@ jobs:
         working-directory: web
         run: npm ci
 
+      # The Studio smoke starts its own agent, with this interpreter, so the web job
+      # carries Python and the agent's requirements as well as Node. pytest is not
+      # needed here.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            agent/requirements.txt
+            agent/requirements-dev.txt
+
+      - name: pip install (agent)
+        id: pip
+        run: python -m pip install -r agent/requirements.txt
+
+      # npm ci installs Playwright the library; the browser is a download of its own,
+      # and on Ubuntu it brings the system libraries it needs with it.
+      - name: Playwright's chromium
+        id: chromium
+        if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
       # Each step below runs whatever the one before it did, so one red step cannot
       # hide the others' answers; each waits on the install.
       - name: Versions
@@ -255,6 +280,7 @@ jobs:
         run: |
           pwsh -NoProfile -Command '"pwsh " + $PSVersionTable.PSVersion.ToString()'
           node --version
+          python --version
           git --version
 
       # The web UI: jest's Tests: line. It holds both web-side contracts too, the
@@ -291,6 +317,19 @@ jobs:
         if: ${{ !cancelled() && steps.npm.outcome == 'success' }}
         working-directory: web
         run: npm audit --omit=dev --audit-level=high
+
+      # The Studio's browser smoke, on servers it starts and stops itself over a
+      # scratch copy of the package. It runs here, not on Windows, because this job
+      # runs for every change that reaches the web half, a web-only change included,
+      # which the Windows job skips. The closing smoke: line.
+      - name: The smoke -- npm run smoke:studio
+        if: ${{ !cancelled() && steps.npm.outcome == 'success' && steps.chromium.outcome == 'success' && steps.pip.outcome == 'success' }}
+        working-directory: web
+        run: |
+          set +e
+          npm run smoke:studio 2>&1 | tee "$RUNNER_TEMP/smoke-studio.log"
+          code=${PIPESTATUS[0]}
+          pwsh -NoProfile -File ../Scripts/Test-CiHalf.ps1 -Half smoke -Path "$RUNNER_TEMP/smoke-studio.log" -ExitCode "$code"
 
   contract:
     name: The contracts between the halves
