@@ -122,19 +122,6 @@ so the container cannot reach the agent -- by Docker's own networking model. On 
 
 **Issue:** [#300](https://github.com/johnfrog76/toolkit/issues/300), with [#11](https://github.com/johnfrog76/toolkit/issues/11) as its history
 
-### On Linux the dev-port sweep does not recognise a dev server
-
-**What you see:** On Linux, `tkWeb -Stop`, `-Restart` and `-Status` call every listener on the dev port
-"not a dev server" and leave it running, an orphaned dev server of this checkout included:
-`Port 5174 is held by MainThread (PID <n>) -- not a dev server; not stopping it`. The process name is read
-from `ps -o comm=`, which on Linux is the main thread's name, and Node calls its main thread `MainThread`;
-the sweep recognises only `node`. On macOS and Windows the same read answers `node`. Until it is fixed, stop
-a leftover dev server on Linux by its PID.
-
-**Where you meet it:** [The CLI](CLI.md#the-other-two-halves), "The other two halves"
-
-**Issue:** [#521](https://github.com/johnfrog76/toolkit/issues/521)
-
 ### A release's order is not drawn
 
 **What you see:** `Plan <id> -Rank` keeps a release's order in `milestones/<slug>.md`, the CLI and the agent read
