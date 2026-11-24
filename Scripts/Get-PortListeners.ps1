@@ -14,7 +14,9 @@
     beside. Neither policy lives here.
 
     Windows answers through Get-NetTCPConnection and Win32_Process, falling back
-    to netstat and Get-Process; everything else through lsof and ps. A machine with neither answers "nothing", which
+    to netstat and Get-Process; everything else through lsof and ps, and on Linux
+    the /proc/<pid>/exe link, because there ps names a thread rather than the
+    executable. A machine with neither answers "nothing", which
     is the honest reading -- a probe that cannot see is not evidence of an
     empty port, and both callers treat it that way.
 
@@ -79,6 +81,29 @@ function Get-P20PortListenerIds {
     return @($ids | Where-Object { $_ } | ForEach-Object { [int]$_ } | Select-Object -Unique)
 }
 
+function Resolve-P20UnixProcessName {
+    <#
+        The name of a process off Windows, from what `ps -o comm=` said and
+        where /proc/<pid>/exe points. Pure, so the suite can feed it a Linux
+        answer on any host.
+
+        The executable wins when there is one. On Linux `comm` is the main
+        thread's name, which a program may rename -- Node calls its main thread
+        MainThread -- and is cut to 15 characters; the exe link is the image
+        itself. A link to a file replaced on disk reads `<path> (deleted)`, and
+        the suffix is not part of the name. No link (macOS has no /proc, and
+        another user's link cannot be read) falls back to comm.
+    #>
+    param([string]$Comm, [string]$ExeTarget)
+
+    $exe = ([string]$ExeTarget).Trim()
+    if ($exe.EndsWith(' (deleted)')) { $exe = $exe.Substring(0, $exe.Length - ' (deleted)'.Length).TrimEnd() }
+    if ($exe) { return [string](Split-Path $exe -Leaf) }
+    $c = ([string]$Comm).Trim()
+    if ($c) { return [string](Split-Path $c -Leaf) }
+    return ''
+}
+
 function Get-P20ProcessNameById {
     <#
         The image name of a process, or '' when it cannot be read. '' is a
@@ -102,8 +127,16 @@ function Get-P20ProcessNameById {
             return ''
         }
         $name = & ps -o comm= -p $ProcessId 2>$null
-        if ($name) { return [string](Split-Path ([string]$name).Trim() -Leaf) }
-        return ''
+        # Only Linux has the link; anywhere else the path does not exist and
+        # comm, which is the executable there, is the answer. Reading it may
+        # fail (another user's process): the catch keeps comm, never a throw.
+        $exe = ''
+        $link = "/proc/$ProcessId/exe"
+        if (Test-Path -LiteralPath $link) {
+            try { $exe = [string](Get-Item -LiteralPath $link -Force -ErrorAction Stop).Target }
+            catch { $exe = '' }
+        }
+        return (Resolve-P20UnixProcessName -Comm ([string]($name | Select-Object -First 1)) -ExeTarget $exe)
     }
     catch { return '' }
 }

@@ -938,10 +938,10 @@ test run. So `-Stop` walks the descendants (`pgrep -P` on macOS and Linux,
 start is named with its PID either way, but it is only *stopped* if its image is `node`, which is
 what Vite runs in, **and** it belongs to this checkout: its command line or working directory is
 under this package's `web/` (on Windows the command line alone, since the working directory is not
-readable there; a listener whose owner cannot be read counts as not this checkout's). Recognising
-`node` holds on macOS and Windows. On Linux the name read is the process's main thread, which Node calls
-`MainThread`, so no dev server is recognised there and every listener is left running --
-[a known gap](KNOWN-GAPS.md#on-linux-the-dev-port-sweep-does-not-recognise-a-dev-server). A `node`
+readable there; a listener whose owner cannot be read counts as not this checkout's). The image is
+the executable on every platform: on Linux it is read from `/proc/<pid>/exe`, because `ps -o comm=`
+there names the main thread, which Node calls `MainThread`; where that link cannot be read (another
+user's process) the `ps` name stands, and such a listener is not stopped. A `node`
 serving that port from another checkout is named -- `Port 5174 is held by a node (PID <n>) that
 belongs to another checkout; not stopping it` -- and left running, from `-Status`, `-Stop` and
 `-Restart` alike. Anything that is not `node` gets `Port 5174 is held by <name> (PID <n>) -- not a dev server; not stopping it`
