@@ -397,6 +397,29 @@ Write-Host ""
 # checkout's dev server: the real helpers answer for it, and only the final
 # kill is stubbed, so a regression here is a failed assertion, not a dead server.
 
+Write-Host "-- A process is named by its executable ----------------" -ForegroundColor Cyan
+
+# The rule the name helper applies off Windows, fed each answer a host can give,
+# so a Linux reading is asserted on every platform: comm is what `ps -o comm=`
+# said, the exe target is where /proc/<pid>/exe points ('' where there is no
+# /proc, or the link cannot be read).
+. (Join-Path $pkgRoot 'Scripts/Get-PortListeners.ps1')
+$nameRows = @(
+    @{ Case = 'Linux node: comm is the main thread';      Comm = 'MainThread';            Exe = '/usr/bin/node';                Want = 'node' }
+    @{ Case = 'Linux: an executable replaced on disk';    Comm = 'MainThread';            Exe = '/usr/local/bin/node (deleted)'; Want = 'node' }
+    @{ Case = 'Linux: comm cut to 15 characters';         Comm = 'a-very-long-pro';       Exe = '/opt/x/a-very-long-program';   Want = 'a-very-long-program' }
+    @{ Case = 'Linux: a link that cannot be read';        Comm = 'MainThread';            Exe = '';                             Want = 'MainThread' }
+    @{ Case = 'macOS: comm is the full path, no /proc';   Comm = '/opt/homebrew/bin/node'; Exe = '';                            Want = 'node' }
+    @{ Case = 'comm padded, no link';                     Comm = "  node `n";             Exe = '';                             Want = 'node' }
+    @{ Case = 'a process already gone';                   Comm = '';                      Exe = '';                             Want = '' }
+)
+foreach ($row in $nameRows) {
+    $got = Resolve-P20UnixProcessName -Comm $row.Comm -ExeTarget $row.Exe
+    Assert-True "name rule: $($row.Case) -> '$($row.Want)'" ($got -ceq $row.Want) "got '$got'"
+}
+
+Write-Host ""
+
 Write-Host "-- Another checkout's node listener is reported, kept -" -ForegroundColor Cyan
 
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
@@ -424,35 +447,31 @@ function global:Invoke-WebComposeDown { Write-Host "  [test] compose down" }
         Assert-True 'the throwaway listener is up before the run' (Test-NetPortOpen -Port $foreignPort) "port $foreignPort"
 
         # What the launcher will call the listener, read by the same shared
-        # helper. macOS and Windows name it node, so the ownership check runs
-        # and must name it another checkout's. Linux reads a process's main
-        # thread name, which Node sets to MainThread, so the sweep calls it
-        # "not a dev server" before ownership is ever asked -- a known gap in
-        # how Linux names processes, recorded as an open issue. Either way the
-        # listener stays up and nothing is stopped.
+        # helper: node on every platform, so the ownership check runs and must
+        # name it another checkout's. On Linux that answer comes from the
+        # /proc/<pid>/exe link, because ps there names the main thread, which
+        # Node calls MainThread; elsewhere it is ps or Win32_Process.
         . (Join-Path $pkgRoot 'Scripts/Get-PortListeners.ps1')
         $seenAs = Get-P20ProcessNameById -ProcessId $foreign.Id
-        $namedRight = if (($seenAs -eq 'node') -or ($seenAs -eq 'node.exe')) {
-            "PID $($foreign.Id)\) that belongs to another checkout; not stopping it"
-        }
-        else {
-            "PID $($foreign.Id)\) -- not a dev server; not stopping it"
-        }
+        $viaLink = Test-Path -LiteralPath "/proc/$($foreign.Id)/exe"
+        $source = if ($viaLink) { 'the /proc exe link' } else { 'ps or Win32_Process, no /proc here' }
+        Assert-True "the name helper calls a real node process node ($source; answered '$seenAs')" (($seenAs -eq 'node') -or ($seenAs -eq 'node.exe')) "answered '$seenAs'"
+        $namedRight = "PID $($foreign.Id)\) that belongs to another checkout; not stopping it"
 
         $r = Invoke-Web -ScriptArgs @('-Stop') -Preamble $realHelpers -VitePort $foreignPort
         Assert-True '-Stop does not stop another checkout''s node' ($r.Output -notmatch "would stop $($foreign.Id)") $r.Output
         Assert-True '-Stop says it did not stop it' ($r.Output -notmatch 'Also stopped PID') $r.Output
-        Assert-True "-Stop names it as the platform sees it ($seenAs)" ($r.Output -match $namedRight) $r.Output
+        Assert-True '-Stop names it another checkout''s node' ($r.Output -match $namedRight) $r.Output
         Assert-True '-Stop leaves the listener running' (-not $foreign.HasExited -and (Test-NetPortOpen -Port $foreignPort)) "port $foreignPort"
         Assert-True '-Stop beside another checkout''s node exits 0' ($r.ExitCode -eq 0) "exit $($r.ExitCode)"
 
         $r = Invoke-Web -ScriptArgs @('-Restart', '-Dev', '-NoBrowser') -WithModules -StubAgent -StubLaunch -Preamble $realHelpers -VitePort $foreignPort
         Assert-True '-Restart does not stop another checkout''s node' ($r.Output -notmatch "would stop $($foreign.Id)") $r.Output
-        Assert-True "-Restart names it as the platform sees it ($seenAs)" ($r.Output -match $namedRight) $r.Output
+        Assert-True '-Restart names it another checkout''s node' ($r.Output -match $namedRight) $r.Output
         Assert-True '-Restart leaves the listener running' (-not $foreign.HasExited -and (Test-NetPortOpen -Port $foreignPort)) "port $foreignPort"
 
         $r = Invoke-Web -ScriptArgs @('-Status') -Preamble $realHelpers -VitePort $foreignPort
-        Assert-True "-Status names it as the platform sees it ($seenAs)" ($r.Output -match $namedRight) $r.Output
+        Assert-True '-Status names it another checkout''s node' ($r.Output -match $namedRight) $r.Output
         Assert-True '-Status does not promise -Stop will end it' ($r.Output -notmatch 'Web -Stop will end it') $r.Output
     }
     finally {
