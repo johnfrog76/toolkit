@@ -20,6 +20,7 @@ Under pytest:  python3 -m pytest Tests/
 
 import json
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -186,6 +187,66 @@ class GrowthDetailTests(_RoutesCase):
                 with self.assertRaises(HTTPException) as caught:
                     asyncio.run(get_growth_detail(name))
                 self.assertIn(caught.exception.status_code, (400, 404), name)
+
+
+class GrowthDetailByListing(_RoutesCase):
+    """An item is taken from growth/current/'s own listing, by exact name. Runs on
+    a copy of the fixture hub, because it adds a directory and a link."""
+
+    FILENAME = GrowthDetailTests.FILENAME
+
+    def setUp(self):
+        self._hub_tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self._hub_tmp.name)
+        self.hub = self.base / "hub"
+        shutil.copytree(FIXTURE_HUB, self.hub)
+        (self.base / "training-2026-04-01-outside.prompt.md").write_text("## Title\noutside\n", encoding="utf-8")
+        (self.hub / "growth" / "current" / "training-2026-04-02-a-dir.prompt.md").mkdir()
+        super().setUp()
+
+    def tearDown(self):
+        super().tearDown()
+        self._hub_tmp.cleanup()
+
+    def test_the_named_item_reads_as_before(self):
+        self.assertEqual(self.client.get(f"/api/growth/{self.FILENAME}").status_code, 200)
+
+    def test_every_other_shape_is_not_found(self):
+        rows = {
+            "a name that climbs": ("%2E%2E", 400),
+            "a backslash in the name": (f"..%5C{self.FILENAME}", 400),
+            "an encoded forward slash": (f"..%2F{self.FILENAME}", 404),
+            "a colon in the name": (f"D:{self.FILENAME}", 404),
+            "the name in other letter case": (self.FILENAME.upper(), 404),
+            "a directory's name": ("training-2026-04-02-a-dir.prompt.md", 404),
+        }
+        for shape, (name, status) in rows.items():
+            with self.subTest(shape=shape):
+                self.assertEqual(self.client.get(f"/api/growth/{name}").status_code, status)
+
+    def _link(self, name: str, target: Path) -> None:
+        try:
+            os.symlink(target, self.hub / "growth" / "current" / name)
+        except (OSError, NotImplementedError) as e:
+            self.skipTest(f"this host cannot create a symbolic link ({type(e).__name__})")
+
+    def listed(self) -> list[str]:
+        return [i["filename"] for i in self.client.get("/api/growth").json()["items"]]
+
+    def test_a_link_to_a_file_inside_the_hub_is_listed_and_opened(self):
+        target = self.hub / "notes" / "training-kept-elsewhere.prompt.md"
+        target.parent.mkdir()
+        target.write_text("## Title\ninside\n", encoding="utf-8")
+        self._link("training-2026-04-03-link.prompt.md", target)
+        self.assertIn("training-2026-04-03-link.prompt.md", self.listed())
+        r = self.client.get("/api/growth/training-2026-04-03-link.prompt.md")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIn("inside", r.json()["content"])
+
+    def test_a_link_to_a_file_outside_the_hub_is_neither_listed_nor_opened(self):
+        self._link("training-2026-04-04-out.prompt.md", self.base / "training-2026-04-01-outside.prompt.md")
+        self.assertNotIn("training-2026-04-04-out.prompt.md", self.listed())
+        self.assertEqual(self.client.get("/api/growth/training-2026-04-04-out.prompt.md").status_code, 404)
 
 
 class ResumeTests(_RoutesCase):

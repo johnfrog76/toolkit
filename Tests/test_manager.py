@@ -204,6 +204,95 @@ class ListAndRead(ManagerRouteTestCase):
                 manager._safe_name(bad)
 
 
+def _tree(root: Path) -> dict:
+    """Every file under ``root`` and its bytes, links as their targets: what a
+    refused write must leave exactly as it found."""
+    out = {}
+    for path in sorted(root.rglob("*")):
+        rel = str(path.relative_to(root))
+        if path.is_symlink():
+            out[rel] = ("link", os.readlink(path))
+        elif path.is_file():
+            out[rel] = path.read_bytes()
+        else:
+            out[rel] = "dir"
+    return out
+
+
+class ByTheFolderListing(ManagerRouteTestCase):
+    """A session is taken from current/'s or archive/'s own listing, by exact name.
+
+    A name in the listing reads and saves as it always has; every other shape is
+    not found (or 400 where it looks like a path, as before), and a refused save
+    writes nothing anywhere."""
+
+    NAME = "2026-01-08.md"
+
+    def setUp(self):
+        super().setUp()
+        self.base = Path(self.tmp.name)
+        (self.base / "2026-03-01.md").write_text("# 2026-03-01\n\n## Stage\ndraft\n", encoding="utf-8")
+        (self.hub / "manager" / "current" / "2026-03-02.md").mkdir()
+
+    def rows(self) -> dict:
+        return {
+            "a name that climbs": ("%2E%2E", 400),
+            "a backslash in the name": (f"..%5C{self.NAME}", 400),
+            "an encoded forward slash": (f"..%2F{self.NAME}", 404),
+            "a colon in the name": (f"D:{self.NAME}", 404),
+            "the name in other letter case": (self.NAME.upper(), 404),
+            "a directory's name": ("2026-03-02.md", 404),
+        }
+
+    def test_the_named_session_reads_and_saves_as_before(self):
+        self.assertEqual(self.client.get(f"/api/manager/{self.NAME}").status_code, 200)
+        r = self.client.put(f"/api/manager/{self.NAME}", json={"since": "kept"})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIn("kept", self.session(self.NAME).read_text(encoding="utf-8"))
+
+    def test_every_other_shape_is_not_found_and_nothing_is_written(self):
+        for shape, (name, status) in self.rows().items():
+            with self.subTest(shape=shape):
+                self.assertEqual(self.client.get(f"/api/manager/{name}").status_code, status)
+                before = _tree(self.base)
+                r = self.client.put(f"/api/manager/{name}", json={"since": "should not land"})
+                self.assertEqual(r.status_code, status, r.text)
+                self.assertEqual(_tree(self.base), before)
+
+    def _link(self, name: str, target: Path) -> None:
+        try:
+            os.symlink(target, self.session(name))
+        except (OSError, NotImplementedError) as e:
+            self.skipTest(f"this host cannot create a symbolic link ({type(e).__name__})")
+
+    def listed(self) -> list[str]:
+        return [i["filename"] for i in self.client.get("/api/manager").json()["items"]]
+
+    def test_a_link_to_a_file_inside_the_hub_is_listed_opened_and_saved_through(self):
+        target = self.hub / "notes" / "kept-elsewhere.md"
+        target.parent.mkdir()
+        target.write_text("# 2026-03-03\n\n## Stage\ndraft\n\n## Since Last Session\nold\n", encoding="utf-8")
+        self._link("2026-03-03.md", target)
+        self.assertIn("2026-03-03.md", self.listed())
+        self.assertEqual(self.client.get("/api/manager/2026-03-03.md").status_code, 200)
+        before = _tree(self.base)
+        r = self.client.put("/api/manager/2026-03-03.md", json={"since": "through the link"})
+        self.assertEqual(r.status_code, 200, r.text)
+        after = _tree(self.base)
+        changed = {k for k in set(before) | set(after) if before.get(k) != after.get(k)}
+        self.assertEqual(changed, {str(target.relative_to(self.base))})
+        self.assertIn("through the link", target.read_text(encoding="utf-8"))
+        self.assertTrue(self.session("2026-03-03.md").is_symlink())
+
+    def test_a_link_to_a_file_outside_the_hub_is_neither_listed_nor_opened(self):
+        self._link("2026-03-04.md", self.base / "2026-03-01.md")
+        self.assertNotIn("2026-03-04.md", self.listed())
+        self.assertEqual(self.client.get("/api/manager/2026-03-04.md").status_code, 404)
+        before = _tree(self.base)
+        self.assertEqual(self.client.put("/api/manager/2026-03-04.md", json={"since": "x"}).status_code, 404)
+        self.assertEqual(_tree(self.base), before)
+
+
 CARRIED_FROM_TABLE = REPO_ROOT / "Tests" / "fixtures" / "carried-from" / "table.json"
 
 
