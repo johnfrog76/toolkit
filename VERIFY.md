@@ -1368,6 +1368,15 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `Fixture hub copy removed (<path>)`, the folder and `.web.fixture` are gone, and no `Could not remove` line -- the
   removal waits for the stopped agent's handles. The macOS host proved the copy, the record, the removal and the
   `Config` read with the agent stubbed; a Windows temp path, a real agent holding the folder, and 5.1 are this row's.
+- [ ] **A hub file is opened from its folder's listing, on Windows (Refs #593).** On the Windows PC, with the hub on
+  one drive, `communication` and `growth` on and the agent up: request a 1:1 session, a growth item and a card's review
+  comments by a name that is not in the folder but holds a colon in second position --
+  `curl -s http://127.0.0.1:<agentPort>/api/manager/D:2026-01-08.md`, `.../api/growth/D:goal-2026-x.prompt.md` and
+  `.../api/pr-comments/D:62-x.prompt.md` -- and see a 404 naming the file each time. A `PUT` of the first, with
+  `{"since": "x"}`, is a 404 too and changes no file. The same three opened from the web UI by their listed names
+  still read, and a session still saves. `python -m pytest Tests/test_file_in_folder.py Tests/test_manager.py
+  Tests/test_growth.py Tests/test_pr_comments.py` passes, its link rows run or skipped by name. The macOS host proved
+  the rule and the routes; a Windows path is this row's.
 
 ## Recording a run
 

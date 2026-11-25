@@ -159,6 +159,52 @@ class TheRead(_Hub):
                 self.assertEqual(self.client.get(f"/api/reference/{name}").status_code, 404)
 
 
+class ByTheFolderListing(_Hub):
+    """A document is an entry of reference/current/'s own listing, by exact name."""
+
+    NAME = "days-off-2027.md"
+
+    def test_every_other_shape_is_404(self):
+        folder = self.hub / "reference" / "current"
+        (folder / "a-dir.md").mkdir()
+        rows = {
+            "a name that climbs": "%2E%2E",
+            "a backslash in the name": f"..%5C{self.NAME}",
+            "an encoded forward slash": f"..%2F{self.NAME}",
+            "a colon in the name": f"D:{self.NAME}",
+            "the name in other letter case": self.NAME.upper(),
+            "a directory's name": "a-dir.md",
+        }
+        for shape, name in rows.items():
+            with self.subTest(shape=shape):
+                self.assertEqual(self.client.get(f"/api/reference/{name}").status_code, 404)
+        self.assertEqual(self.client.get(f"/api/reference/{self.NAME}").status_code, 200)
+
+    def _link(self, name: str, target: Path) -> None:
+        try:
+            os.symlink(target, self.hub / "reference" / "current" / name)
+        except (OSError, NotImplementedError) as e:
+            self.skipTest(f"this host cannot create a symbolic link ({type(e).__name__})")
+
+    def listed(self) -> list[str]:
+        return [d["name"] for d in self.client.get("/api/reference").json()["items"]]
+
+    def test_a_link_to_a_document_inside_the_hub_is_listed_and_opened(self):
+        target = self.hub / "kept" / "elsewhere.md"
+        target.parent.mkdir()
+        target.write_text("# Kept elsewhere\n", encoding="utf-8")
+        self._link("link.md", target)
+        self.assertIn("link.md", self.listed())
+        self.assertEqual(self.client.get("/api/reference/link.md").status_code, 200)
+
+    def test_a_link_to_a_document_outside_the_hub_is_neither_listed_nor_opened(self):
+        outside = Path(self.tmp.name) / "outside.md"
+        outside.write_text("# Outside\n", encoding="utf-8")
+        self._link("out.md", outside)
+        self.assertNotIn("out.md", self.listed())
+        self.assertEqual(self.client.get("/api/reference/out.md").status_code, 404)
+
+
 class TheGate(_Hub):
     def test_a_hub_with_no_reference_folder_answers_empty_not_an_error(self):
         shutil.rmtree(self.hub / "reference")
