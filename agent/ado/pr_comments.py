@@ -22,13 +22,15 @@ writer it was.
 
 import json
 import re
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..core import log_writer, model
-from ..core.config import AGENTIC_DIR, PROMPT_SUFFIX, resolve_dirs
+from ..core.config import AGENTIC_DIR, PROMPT_SUFFIX, hub_root, resolve_dirs
 from ..core.consts import token_pr_review_heading
+from .design import _inside
 
 api = APIRouter()
 
@@ -66,6 +68,10 @@ class PRCommentsListResponse(BaseModel):
 
 class PRCommentsDetailResponse(BaseModel):
     file: str
+    # The card's absolute path on this machine -- current/'s, or archive/'s when
+    # it fell back -- for the File line. Not a comment's ``file_path``, which is
+    # the reviewed file in the PR.
+    file_path: str = ""
     title: str
     pr_id: int
     round_num: int
@@ -313,6 +319,18 @@ async def list_pr_comments():
     return PRCommentsListResponse(count=len(items), items=items)
 
 
+def _card_named(folder: Path, name: str) -> Path | None:
+    """The file in ``folder`` whose name is exactly ``name``, from the folder's
+    own listing; None when there is none, or the folder cannot be listed."""
+    try:
+        for entry in folder.iterdir():
+            if entry.name == name and entry.is_file():
+                return entry
+    except OSError:
+        return None
+    return None
+
+
 # ---------------------------------------------------------------------------
 # GET /api/pr-comments/{filename} — full parsed comments for one file
 # ---------------------------------------------------------------------------
@@ -322,11 +340,11 @@ async def get_pr_comments(filename: str):
     if ".." in filename or "/" in filename or "\\" in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
     current_dir, archive_dir = resolve_dirs()
-    f = current_dir / filename
-    if not f.exists():
-        # Fall back to archive/ — a triaged review still has viewable comments.
-        f = archive_dir / filename
-    if not f.exists():
+    # The card is taken from the folder's own listing, by name, so the path that
+    # is read and answered comes from the disk and never from the request.
+    # archive/ is the fallback: a triaged review still has viewable comments.
+    f = _card_named(current_dir, filename) or _card_named(archive_dir, filename)
+    if f is None:
         log_writer.write_log("WARN", "agent/pr-comments/detail", f"not found: {filename}")
         raise HTTPException(status_code=404, detail=f"{filename} not found")
     content = f.read_text(encoding="utf-8-sig", errors="replace")
@@ -338,6 +356,7 @@ async def get_pr_comments(filename: str):
     log_writer.write_log("CMD", "agent/pr-comments/detail", f"{filename} — {len(comments)} comments, {open_count} open")
     return PRCommentsDetailResponse(
         file=filename,
+        file_path=str(f.resolve()) if _inside(hub_root(), f) else "",
         title=_get_prompt_title(content),
         pr_id=pr_id,
         round_num=round_num,

@@ -523,6 +523,21 @@ class TheSeedDrawer(HubCase):
         # "search" is the route, not a note's name: the document read still answers for real names.
         self.assertEqual(self.client.get("/api/studio/design/board-ideas.md").status_code, 200)
 
+    def test_one_note_answers_with_its_path_on_this_machine(self):
+        self._write("design/archive/old.md", f"---\nid: {self.ID}2\n---\n\n# Old\n")
+        bare = self.client.get("/api/studio/design/board-ideas.md").json()
+        self.assertEqual(bare["file_path"], str((self.hub / "design" / "board-ideas.md").resolve()))
+        old = self.client.get("/api/studio/design/design/archive/old.md").json()
+        self.assertEqual(old["file_path"], str((self.hub / "design" / "archive" / "old.md").resolve()))
+
+    def test_a_note_that_leads_out_of_the_hub_names_no_path(self):
+        outside = Path(self._tmp.name) / "outside.md"
+        outside.write_text("# Outside\n", encoding="utf-8")
+        (self.hub / "design" / "linked.md").symlink_to(outside)
+        res = self.client.get("/api/studio/design/linked.md")
+        self.assertEqual((res.status_code, res.json()["title"], res.json()["file_path"]), (200, "Outside", ""))
+        self.assertEqual(self.client.get("/api/studio/design/design/%2E%2E/hub.json").status_code, 404)
+
     def test_the_thread_space_rule(self):
         spaces = [
             {"slug": "acme", "org": "https://dev.azure.com/acme", "projects": [{"repo": "toolkit"}]},

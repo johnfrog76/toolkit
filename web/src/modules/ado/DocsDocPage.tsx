@@ -123,6 +123,7 @@ export function DocsDocPage() {
                 </>
               ) : undefined
             }
+            path={readable && data.file_path ? data.file_path : undefined}
             url={readable ? data.url : undefined}
             refresh={readable ? { onClick: refetch, isFetching } : undefined}
             external={readable ? <DocOpenButton doc={data} /> : undefined}

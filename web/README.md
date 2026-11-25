@@ -1139,7 +1139,7 @@ wordmark's default blob, and by no theme.
   `MarkdownViewer` holding `README.md` -- with everything under `docs/` folded above the text
   (`DocsTree`, a `<details>`, closed, so nothing moves until it is asked for). `/docs/*` is
   `DocsDocPage.tsx`, one document's room, its repo path after the prefix (`/docs/docs/CLI.md`); the
-  same frame with `DetailHeader`, so the document's link is its File line. Between documents the room keeps the one it has until the next
+  same frame with `DetailHeader`, so the File line holds the document's path on this machine where the Space's checkout is ready here and holds it (the agent's `file_path`), else its link. Between documents the room keeps the one it has until the next
   arrives, then swaps the text in place -- no spinner, no jump -- and starts at the top unless the
   address carries an anchor. Known gap: [The Docs tab reads one repository, and only reads](../docs/KNOWN-GAPS.md#the-docs-tab-reads-one-repository-and-only-reads).
 - **Where a link in a repo's document goes is decided ONCE**, in `shared/docLinks.ts`, used by
@@ -1459,9 +1459,9 @@ card by its exact id. A card with no work item looks exactly like one with: you 
 
 **Every record page draws its header with `shared/DetailHeader.tsx`** -- back, the title as the page's one `h1`, a meta slot and an extra slot,
 the File line, and the controls on the right in the house order (the page's own, then refresh, then the link out last) -- and
-`shell/detailHeader.test.ts` fails on a module page that builds its own. The File line is `shared/FilePath.tsx`, compact: the label **Copy the file path** (a local file) or **Copy the file link** (a URL) and a copy icon, the address itself in the tooltip on hover and on keyboard focus -- the exact value a click copies -- so the line is the same width however long the address is. It is on the card page, the growth item page, the 1:1 session page, the review page and the Resume page with the file's absolute path, and on an issue and on a document read from the tracker with its link. The design note page and the PR comments page show no line yet: their routes do not send the absolute path ([Known gaps](../docs/KNOWN-GAPS.md#three-record-pages-do-not-show-a-local-files-absolute-path)). The owner: "the most useful is
+`shell/detailHeader.test.ts` fails on a module page that builds its own. The File line is `shared/FilePath.tsx`, compact: the label **Copy the file path** (a local file) or **Copy the file link** (a URL) and a copy icon, the address itself in the tooltip on hover and on keyboard focus -- the exact value a click copies -- so the line is the same width however long the address is. It is on the card page, the growth item page, the 1:1 session page, the review page, the Resume page, the design note page and the PR comments page with the file's absolute path, and on an issue with its link. The docs viewer and a repo's design document carry the path on this machine where the Space's checkout is ready here and holds the file, else the link; those four routes send it as `file_path`, because their `path` already names the file relative to the repo or the hub (the PR comments route sends the card's name as `file`). The owner: "the most useful is
 every detail view has the file where it lives, so I can share the path with an agent easily." The path
-is what the agent resolved to read the file (`path` on each detail response), so it is the agent's
+is what the agent resolved to read the file (`path` on each detail response, `file_path` on those four), so it is the agent's
 machine's path -- normally this one; an older agent sends none and the line is absent. The copy itself is
 `shared/copyText.ts`, lifted out of Daily's Copy Day so every copy in the app is the same copy.
 On Daily Activity the outcome is also **announced**: the button's label flips to

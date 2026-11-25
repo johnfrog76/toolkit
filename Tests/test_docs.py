@@ -15,6 +15,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -430,6 +431,82 @@ class TheRoutes(unittest.TestCase):
             self.assertEqual(res.status_code, 404, url)
             self.assertIn("never a '..'", res.json()["detail"], url)
         self.assertEqual(fake.calls, [])
+
+
+_REAL_RUN = subprocess.run
+
+
+def _git(cwd: Path, *args: str) -> None:
+    _REAL_RUN(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "-C", str(cwd), *args],
+        check=True,
+        capture_output=True,
+    )
+
+
+class TheLocalPath(unittest.TestCase):
+    """Where the Space's checkout is ready on this machine -- the Design tab's
+    resolution -- a document it holds answers with its absolute path, for the
+    File line. The text is still the tracker's; elsewhere the path is ""."""
+
+    def setUp(self):
+        docs.clear_cache()
+        self.client = TestClient(app)
+        self._tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self._tmp.name).resolve()
+        self.clone = self.base / "clone"
+        (self.clone / "docs").mkdir(parents=True)
+        _git(self.clone, "init", "-q", "-b", "main")
+        _git(self.clone, "remote", "add", "origin", f"https://github.com/{REPO}.git")
+        (self.clone / "README.md").write_text("# The clone's README\n", encoding="utf-8")
+        (self.clone / "docs" / "CLI.md").write_text("# The clone's CLI, not the tracker's\n", encoding="utf-8")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _get(self, url: str, checkout: str | None = None, fake: FakeRepo | None = None):
+        fake = fake if fake is not None else FakeRepo()
+        cfg: dict = {"org": ORG, "status": "active", "activeSpace": "prod"}
+        cfg["spaceCheckouts"] = {"prod": {"path": str(self.clone if checkout is None else checkout)}}
+
+        def run(argv, **kw):
+            return _REAL_RUN(argv, **kw) if argv[0] == "git" else fake(argv, **kw)
+
+        with (
+            mock.patch.object(design, "load_config", return_value=cfg),
+            mock.patch.object(design, "_resolve_tier", return_value=(1, "")),
+            mock.patch.object(design.subprocess, "run", side_effect=run),
+        ):
+            return self.client.get(url)
+
+    def test_a_document_in_the_ready_clone_answers_with_its_path(self):
+        body = self._get("/api/docs/docs/CLI.md").json()
+        self.assertEqual(body["file_path"], str(self.clone / "docs" / "CLI.md"))
+        self.assertEqual(body["body"], CLI)  # still read from the tracker
+        self.assertEqual(self._get("/api/docs/README.md").json()["file_path"], str(self.clone / "README.md"))
+
+    def test_a_document_the_clone_does_not_hold_names_no_path(self):
+        body = self._get("/api/docs/docs/modules/ado.md").json()
+        self.assertEqual((body["title"], body["file_path"]), ("Azure DevOps", ""))
+
+    def test_no_checkout_or_another_repos_names_no_path(self):
+        self.assertEqual(self._get("/api/docs/docs/CLI.md", checkout="").json()["file_path"], "")
+        _git(self.clone, "remote", "set-url", "origin", "https://github.com/o/other.git")
+        self.assertEqual(self._get("/api/docs/docs/CLI.md").json()["file_path"], "")
+
+    def test_a_link_out_of_the_clone_names_no_path(self):
+        outside = self.base / "secret.md"
+        outside.write_text("# Not the clone's\n", encoding="utf-8")
+        (self.clone / "docs" / "CLI.md").unlink()
+        (self.clone / "docs" / "CLI.md").symlink_to(outside)
+        self.assertEqual(self._get("/api/docs/docs/CLI.md").json()["file_path"], "")
+        for url in ("/api/docs/docs/%2E%2E/%2E%2E/secret.md", "/api/docs/docs/..%2F..%2Fsecret.md"):
+            self.assertEqual(self._get(url).status_code, 404, url)
+
+    def test_a_document_without_a_checkout_answers_as_before(self):
+        res = self._get("/api/docs/docs/CLI.md", checkout="")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual((res.json()["body"], res.json()["file_path"]), (CLI, ""))
 
 
 class TheIssuesLink(unittest.TestCase):

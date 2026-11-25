@@ -11,9 +11,13 @@ jest.mock("../../shared/MarkdownViewer", () => ({
 }));
 const copyText = jest.fn().mockResolvedValue(undefined);
 jest.mock("../../shared/copyText", () => ({ copyText: (t: string) => copyText(t) }));
+// The agent answers `file_path` only where the Space's checkout is ready here
+// and holds the document; a test sets it to see the File line take it.
+const local: { file_path?: string } = {};
 jest.mock("./api.ado", () => ({
   useGetDocQuery: () => ({
     data: {
+      ...local,
       supported: true,
       repo: "owner/repo",
       path: "docs/CONFIGURATION.md",
@@ -39,6 +43,11 @@ const open = () =>
     </MemoryRouter>,
   );
 
+beforeEach(() => {
+  delete local.file_path;
+  copyText.mockClear();
+});
+
 describe("the docs page header", () => {
   it("shows the title, the repository and path, and the File line you can copy", async () => {
     open();
@@ -51,6 +60,14 @@ describe("the docs page header", () => {
     expect(copyText).toHaveBeenCalledWith(
       "https://github.com/owner/repo/blob/main/docs/CONFIGURATION.md",
     );
+  });
+
+  it("holds the file's path on this machine when the checkout is ready here", async () => {
+    local.file_path = "/clones/repo/docs/CONFIGURATION.md";
+    open();
+    expect(await fileLineValue()).toBe("/clones/repo/docs/CONFIGURATION.md");
+    fireEvent.click(screen.getByRole("button", { name: "Copy the file path" }));
+    expect(copyText).toHaveBeenCalledWith("/clones/repo/docs/CONFIGURATION.md");
   });
 
   it("puts refresh before the github.com link, which is last", () => {

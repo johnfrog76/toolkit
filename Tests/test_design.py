@@ -1058,6 +1058,8 @@ class TheCheckoutSource(unittest.TestCase):
         body = moved.json()
         self.assertEqual((body["path"], body["archived"], body["id"]), ("design/archive/x.md", True, ID_A))
         self.assertEqual(body["body"], self.NOTE_X)
+        # Read from the clone, so the File line has its path on this machine.
+        self.assertEqual(body["file_path"], str((self.clone / "design" / "archive" / "x.md").resolve()))
         self.assertEqual(self._get("/api/design/design/x.md").status_code, 404)
         self.assertEqual(self.gh_calls, [])
 
@@ -1089,7 +1091,8 @@ class TheCheckoutSource(unittest.TestCase):
         found = self._get("/api/design/search?q=default%20branch", fake=fake).json()
         self.assertEqual((found["source"], found["note"]), ("github", design.CODE_SEARCH_NOTE))
         self.assertEqual([h["path"] for h in found["hits"]], ["design/x.md"])
-        self.assertEqual(self._get("/api/design/design/x.md", fake=fake).json()["title"], "On GitHub")
+        doc = self._get("/api/design/design/x.md", fake=fake).json()
+        self.assertEqual((doc["title"], doc["file_path"]), ("On GitHub", ""))
         self.assertNotEqual(self.gh_calls, [])
 
     def test_no_checkout_is_todays_read(self):

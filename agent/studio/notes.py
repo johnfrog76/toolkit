@@ -41,6 +41,7 @@ from ..ado.design import (
     DesignSearchResponse,
     NotShown,
     Structure,
+    _inside,
     attach_cards,
     group_designs,
     hits_from_matches,
@@ -51,7 +52,7 @@ from ..ado.design import (
     space_card_folders,
 )
 from ..core import log_writer
-from ..core.config import hub_folder, load_config, tracker, tracker_repos
+from ..core.config import hub_folder, hub_root, load_config, tracker, tracker_repos
 from ..core.consts import folder_archive, re_studio_note_name
 
 # The Studio is core, from day one (D-S13):
@@ -86,6 +87,7 @@ class DesignNotesResponse(BaseModel):
 
 class DesignNoteDetail(DesignNote):
     path: str = ""  # the file's hub-relative path, e.g. design/archive/old.md
+    file_path: str = ""  # its absolute path on this machine, for the File line; "" when it leads out of the hub
     kind: str = ""  # note | spec
     archived: bool = False
     body: str = ""
@@ -279,5 +281,10 @@ async def get_note(path: str):
     text = file.read_text(encoding="utf-8-sig")
     note = read_note(text, file.name, load_config().get("spaces", []) or [])
     return DesignNoteDetail(
-        **note.model_dump(), path=f"{label}/{file.name}", kind=kind, archived=(where == ARCHIVE), body=text
+        **note.model_dump(),
+        path=f"{label}/{file.name}",
+        file_path=str(file.resolve()) if _inside(hub_root(), file) else "",
+        kind=kind,
+        archived=(where == ARCHIVE),
+        body=text,
     )
