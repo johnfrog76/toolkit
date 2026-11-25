@@ -11,9 +11,10 @@ report "no log yet" until one exists; nothing raises either way.
 """
 
 import json
+import math
 import os
 import re
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -27,6 +28,72 @@ from ..core.config import (
 )
 
 api = APIRouter()
+
+
+def _today() -> date:
+    """The reader's day. One seam for the tests."""
+    return date.today()
+
+
+def _number(value: object) -> int | float | None:
+    """A JSON number, or None: null, a string, a boolean, a list, an object and a NaN or an
+    infinity are no number. Every number read from the stress log goes through here, so no
+    shape of the log can fail a route."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def _int(value: object, default: int) -> int:
+    """A number read as a whole one, or ``default``."""
+    number = _number(value)
+    return default if number is None else int(number)
+
+
+def _float(value: object, default: float) -> float:
+    """A number, or ``default``."""
+    number = _number(value)
+    return default if number is None else float(number)
+
+
+def _object(value: object) -> dict:
+    """A block of the log, or an empty one when the log holds anything else there."""
+    return value if isinstance(value, dict) else {}
+
+
+def _strings(value: object) -> list[str]:
+    """A list's strings; nothing when the log holds anything but a list there."""
+    return [v for v in value if isinstance(v, str)] if isinstance(value, list) else []
+
+
+def _count(value: object) -> int:
+    """How many entries a list holds; 0 when the log holds anything but a list there."""
+    return len(value) if isinstance(value, list) else 0
+
+
+def _text(value: object) -> str | None:
+    """A string, or None."""
+    return value if isinstance(value, str) else None
+
+
+def _day(value: object) -> date | None:
+    """A yyyy-mm-dd day, or None."""
+    try:
+        return date.fromisoformat(value) if isinstance(value, str) else None
+    except ValueError:
+        return None
+
+
+def _days_left(log: dict, org: dict) -> int | None:
+    """Days left in the sprint, worked out at read time: from the log's own end date, else the
+    Space's configured ``sprint.endDate``; the log's stored ``daysRemaining`` only when no day is
+    known. None -- no countdown -- when there is neither. Never below 0."""
+    sprint = _object(log.get("sprint"))
+    end = _day(sprint.get("endDate")) or _day(_object(org.get("sprint")).get("endDate"))
+    if end is not None:
+        return max((end - _today()).days, 0)
+    stored = _number(sprint.get("daysRemaining"))
+    return None if stored is None else max(int(stored), 0)
 
 
 def _stress_log_default() -> Path:
@@ -49,41 +116,42 @@ def _held(pairs: list[tuple[str, bool]]) -> list[str]:
     return [text for text, when in pairs if when]
 
 
-def _classify_stress(log: dict) -> dict:
+def _classify_stress(log: dict, days: int | None) -> dict:
     """Classify a stress-log dict into the four risk dimensions.
 
     This is the only implementation in this package: the PowerShell twin it
     was parity-tested against did not come across, because sprint awareness is
     off by default here and no command writes the log. The rules are carried
     unchanged so that a hub which already has a stress-log.json reads the same
-    way it did.
+    way it did -- with one exception: ``days`` is the caller's (``_days_left``), and
+    when there is none no reason is scored from it, where a missing value once read as 99.
     """
-    sprint = log.get("sprint") or {}
-    origin = log.get("origin") or {}
-    comm = log.get("communication") or {}
-    team = log.get("teamDynamics") or {}
+    sprint = _object(log.get("sprint"))
+    origin = _object(log.get("origin"))
+    comm = _object(log.get("communication"))
+    team = _object(log.get("teamDynamics"))
 
-    days = int(sprint.get("daysRemaining", 99))
-    velocity = int(sprint.get("mergeVelocity", 0))
+    velocity = _int(sprint.get("mergeVelocity"), 0)
     refactor = bool(sprint.get("refactorWaveActive", False))
     int_window = bool(sprint.get("integrationWindowClosing", False))
 
-    upstream = int(origin.get("upstreamMerges", 0))
-    surface = int(origin.get("surfaceAreaChange", 0))
-    conflicts = len(origin.get("conflictZones") or [])
-    rebase = origin.get("rebasePressure") or _rebase_pressure(upstream, surface)
+    upstream = _int(origin.get("upstreamMerges"), 0)
+    surface = _int(origin.get("surfaceAreaChange"), 0)
+    conflicts = _count(origin.get("conflictZones"))
+    rebase = _text(origin.get("rebasePressure")) or _rebase_pressure(upstream, surface)
 
     broadcasted = bool(comm.get("prBroadcasted", False))
-    visibility = float(comm.get("visibilityScore", 0.5))
+    visibility = _float(comm.get("visibilityScore"), 0.5)
     cadence = comm.get("updateCadence", "Normal")
 
-    xxl = len(team.get("xxlPrAuthors") or [])
-    silent = len(team.get("silentRefactorers") or [])
+    xxl = _count(team.get("xxlPrAuthors"))
+    silent = _count(team.get("silentRefactorers"))
+    dated = days is not None
 
     # sprintStress
     sprint_high = _held(
         [
-            ("daysRemaining <= 3", days <= 3),
+            ("daysRemaining <= 3", dated and days <= 3),
             ('rebasePressure == "High"', rebase == "High"),
             ("mergeVelocity >= 10", velocity >= 10),
             ("refactorWaveActive == true", refactor),
@@ -92,13 +160,13 @@ def _classify_stress(log: dict) -> dict:
     )
     sprint_medium = _held(
         [
-            ("daysRemaining <= 5", days <= 5),
+            ("daysRemaining <= 5", dated and days <= 5),
             ('rebasePressure == "Medium"', rebase == "Medium"),
         ]
     )
     sprint_low = _held(
         [
-            ("daysRemaining > 5", days > 5),
+            ("daysRemaining > 5", dated and days > 5),
             ('rebasePressure == "Low"', rebase == "Low"),
             ("mergeVelocity < 10", velocity < 10),
         ]
@@ -232,21 +300,23 @@ class StressStatusResponse(BaseModel):
     teamDynamicsStress: StressDimension | None = None
 
 
-def _stress_context(log: dict) -> StressContext:
-    sprint = log.get("sprint") or {}
-    origin = log.get("origin") or {}
-    comm = log.get("communication") or {}
+def _stress_context(log: dict, days: int | None) -> StressContext:
+    """What the card shows beside the dials. ``days`` is the one reading ``_classify_stress``
+    scored, so a log with no countdown shows none rather than 0."""
+    sprint = _object(log.get("sprint"))
+    origin = _object(log.get("origin"))
+    comm = _object(log.get("communication"))
     return StressContext(
         sprintName=str(sprint.get("name", "Sprint")),
         sprintFullName=str(sprint.get("fullName", sprint.get("name", "Sprint"))),
-        daysRemaining=int(sprint.get("daysRemaining", 0)),
-        mergeVelocity=int(sprint.get("mergeVelocity", 0)),
-        upstreamMerges=int(origin.get("upstreamMerges", 0)),
-        surfaceAreaChange=int(origin.get("surfaceAreaChange", 0)),
+        daysRemaining=days,
+        mergeVelocity=_int(sprint.get("mergeVelocity"), 0),
+        upstreamMerges=_int(origin.get("upstreamMerges"), 0),
+        surfaceAreaChange=_int(origin.get("surfaceAreaChange"), 0),
         rebasePressure=str(origin.get("rebasePressure", "Low")),
-        conflictZones=list(origin.get("conflictZones") or []),
+        conflictZones=_strings(origin.get("conflictZones")),
         prBroadcasted=bool(comm.get("prBroadcasted", False)),
-        visibilityScore=float(comm.get("visibilityScore", 0.5)),
+        visibilityScore=_float(comm.get("visibilityScore"), 0.5),
         updateCadence=str(comm.get("updateCadence", "Normal")),
     )
 
@@ -297,22 +367,13 @@ def _config_sprint_context(org: dict, repo: str | None = None) -> StressContext:
         org_dir = (hub_root() / folder) if folder else hub_root()
         raw = _read_history(org_dir, repo)
         if raw:
-            latest = max(raw, key=lambda e: e.get("date", ""))
-            name = latest.get("sprint")
+            name = _text(max(raw, key=_row_date).get("sprint"))
     name = str(name or "Sprint")
-    end_date_str = sprint.get("endDate")
-    days_remaining: int | None
-    if end_date_str:
-        try:
-            end_dt = date.fromisoformat(end_date_str)
-            days_remaining = max((end_dt - date.today()).days, 0)
-        except ValueError:
-            days_remaining = None
-    else:
-        # No end date configured -- don't fabricate a countdown. A hardcoded
-        # +7 was wrong for any org whose sprint is not a fortnight starting
-        # where the one it was written against started.
-        days_remaining = None
+    # No end date configured -- don't fabricate a countdown. A hardcoded
+    # +7 was wrong for any org whose sprint is not a fortnight starting
+    # where the one it was written against started.
+    end_dt = _day(sprint.get("endDate"))
+    days_remaining = None if end_dt is None else max((end_dt - _today()).days, 0)
     return StressContext(sprintName=name, sprintFullName=name, daysRemaining=days_remaining)
 
 
@@ -323,7 +384,7 @@ _REPO_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 def _repo_key(repo: str | None) -> str | None:
     """A repo key if it is one, else None. Every route takes its ``repo`` through
     this, and a key read from a log does too, before either names a file."""
-    return repo if repo and _REPO_KEY.fullmatch(repo) else None
+    return repo if isinstance(repo, str) and _REPO_KEY.fullmatch(repo) else None
 
 
 def _stress_log_path(repo: str | None) -> Path:
@@ -334,6 +395,58 @@ def _stress_log_path(repo: str | None) -> Path:
         if namespaced is not None and namespaced.exists():
             return namespaced
     return _stress_log_default()
+
+
+_NO_LOG = "view-only -- no live signal on this machine; the stress log is written where the repo is checked out"
+
+
+def _log_repo(log: dict) -> str | None:
+    """The repository a log names: its ``repoKey``, else the last segment of its ``sourceRepo``."""
+    source = _text(log.get("sourceRepo"))
+    return _repo_key(_text(log.get("repoKey")) or (_repo_name_from_url(source) if source else None))
+
+
+def _log_refusal(log: dict, active: str, repo: str | None) -> str | None:
+    """Why this log is not the active Space's and the asked repository's, or None when it is.
+
+    Both sprint routes ask it, so one log is refused by both in one sentence. The log is a single
+    file a machine writes for one Space and one repository: one that names another Space, or none,
+    is not this Space's; one that names another repository than the one asked for is not that
+    repository's, which is what ``_stress_log_path`` falling back to the unnamespaced file would
+    otherwise serve under the asked name."""
+    log_org = _text(log.get("org"))
+    if not log_org:
+        return "view-only — the live log on this machine names no Space"
+    if log_org != active:
+        return f"view-only — live log on this machine is for '{log_org}'"
+    log_repo = _log_repo(log)
+    if repo and log_repo and log_repo != repo:
+        return f"view-only — live log on this machine is for '{log_repo}', not '{repo}'"
+    return None
+
+
+def _read_log(repo: str | None, active: str) -> tuple[dict | None, str]:
+    """The stress log both sprint routes read, and the one reason it is not used.
+
+    ``(log, "ok")`` when the file is there, is an object, and is this Space's and this repository's
+    (``_log_refusal``); otherwise ``(None, reason)`` -- missing, unreadable, not an object, or
+    another Space's or repository's. No shape of the file raises."""
+    path = _stress_log_path(repo)
+    if not path.exists():
+        return None, _NO_LOG
+    try:
+        log = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (ValueError, OSError) as exc:
+        return None, f"could not read stress-log.json: {exc.__class__.__name__}"
+    if not isinstance(log, dict):
+        return None, "could not read stress-log.json: it is not an object"
+    refusal = _log_refusal(log, active, repo)
+    return (None, refusal) if refusal else (log, "ok")
+
+
+def _active_org(cfg: dict) -> dict:
+    active = cfg.get("activeSpace", "")
+    return next((o for o in (cfg.get("spaces") or []) if o.get("slug") == active), {})
 
 
 @api.get("/stress-status", response_model=StressStatusResponse)
@@ -350,70 +463,26 @@ async def get_stress_status(repo: str | None = None):
             detail="sprint awareness is off for this org",
         )
 
-    org = next((o for o in (cfg.get("spaces") or []) if o.get("slug") == active), {})
-
-    log_path = _stress_log_path(repo)
-    if not log_path.exists():
+    org = _active_org(cfg)
+    log, detail = _read_log(repo, active)
+    if log is None:
         return StressStatusResponse(
             enabled=True,
             org=active,
-            detail="view-only -- no live signal on this machine; "
-            "the stress log is written where the repo is checked out",
+            detail=detail,
             context=_config_sprint_context(org, repo),
         )
 
-    try:
-        log = json.loads(log_path.read_text(encoding="utf-8-sig"))
-    except (json.JSONDecodeError, OSError) as exc:
-        return StressStatusResponse(
-            enabled=True,
-            org=active,
-            detail=f"could not read stress-log.json: {exc.__class__.__name__}",
-            context=_config_sprint_context(org, repo),
-        )
-    if not isinstance(log, dict):
-        return StressStatusResponse(
-            enabled=True,
-            org=active,
-            detail="could not read stress-log.json: it is not an object",
-            context=_config_sprint_context(org, repo),
-        )
-
-    # Stale-guard: the log is a single, non-namespaced file. If it was generated
-    # for a different org (you switched orgs without rebuilding), refuse to serve
-    # cross-org data — report stale instead of silently showing the wrong org.
-    log_org = log.get("org")
-    if log_org and log_org != active:
-        return StressStatusResponse(
-            enabled=True,
-            org=active,
-            detail=f"view-only — live log on this machine is for '{log_org}'",
-            context=_config_sprint_context(org, repo),
-        )
-
-    # Same guard, per-repo: _stress_log_path falls back to the unnamespaced
-    # stress-log.json when no stress-log.<repo>.json exists. Without this
-    # check, a multi-repo org would silently show one repo's live numbers
-    # under a different repo's name whenever a namespaced log is missing —
-    # same org passes the check above, but it's still the wrong repo's data.
-    log_repo_key = log.get("repoKey")
-    if repo and log_repo_key and log_repo_key != repo:
-        return StressStatusResponse(
-            enabled=True,
-            org=active,
-            detail=f"view-only — live log on this machine is for '{log_repo_key}', not '{repo}'",
-            context=_config_sprint_context(org, repo),
-        )
-
-    dims = _classify_stress(log)
+    days = _days_left(log, org)
+    dims = _classify_stress(log, days)
     return StressStatusResponse(
         enabled=True,
-        org=log.get("org", active),
+        org=active,
         detail="ok",
-        generatedAt=log.get("generatedAt"),
-        sourceRepo=log.get("sourceRepo"),
-        sprintSource=log.get("sprintSource"),
-        context=_stress_context(log),
+        generatedAt=_text(log.get("generatedAt")),
+        sourceRepo=_text(log.get("sourceRepo")),
+        sprintSource=_text(log.get("sprintSource")),
+        context=_stress_context(log, days),
         sprintStress=StressDimension(**dims["sprintStress"]),
         originStress=StressDimension(**dims["originStress"]),
         communicationStress=StressDimension(**dims["communicationStress"]),
@@ -425,8 +494,9 @@ async def get_stress_status(repo: str | None = None):
 #
 # Reads {slug}/stress-history.{repoName}.json from the hub -- a
 # per-slug, per-repo full sprint-window cache derived from git. Repo name is
-# extracted from stress-log.json's sourceRepo field (last path segment, no .git).
-# Parallel to /api/stress-status — separate call, separate cache. Gated on
+# the asked repo, else the log's (repoKey, else sourceRepo's last segment).
+# Parallel to /api/stress-status -- separate call, the same log reader, so a log
+# the status route refuses frames no window here either. Gated on
 # features.sprintAwareness; returns an empty window when the feature is off.
 # ---------------------------------------------------------------------------
 def _repo_name_from_url(url: str) -> str:
@@ -448,101 +518,89 @@ class SprintActivityResponse(BaseModel):
     endDate: str
     mine: list[SprintActivityEntry]
     team: list[SprintActivityEntry]
+    # Why the stress log framed this window or did not, in the status route's words: "ok", or
+    # the reason it was not used. Absent where sprint awareness is off.
+    detail: str | None = None
 
 
-@api.get("/stress-sprint-activity", response_model=SprintActivityResponse)
+def _row_date(row: dict) -> str:
+    return _text(row.get("date")) or ""
+
+
+def _window_start(end_date: str) -> str:
+    """With no history to say where the sprint started, an estimate back from its end."""
+    end_dt = _day(end_date) or _today()
+    return (end_dt - timedelta(days=20)).isoformat()
+
+
+@api.get("/stress-sprint-activity", response_model=SprintActivityResponse, response_model_exclude_none=True)
 async def get_sprint_activity(repo: str | None = None):
     repo = _repo_key(repo)
-    from datetime import timedelta
-
     cfg = load_config()
     active = cfg.get("activeSpace", "")
-    today = date.today().isoformat()
+    today = _today().isoformat()
 
     if not _active_space_feature("sprintAwareness"):
         return SprintActivityResponse(startDate=today, endDate=today, mine=[], team=[])
 
-    # Sprint frame + sourceRepo from stress-log.json (live, this-machine signal)
+    # Sprint frame + repo from stress-log.json (live, this-machine signal), only when
+    # the log is this Space's and this repository's -- the status route's own check.
     end_date = today
     sprint_name: str | None = None
-    source_repo = ""
-    repo_key = ""
-    log_path = _stress_log_path(repo)
-    if log_path.exists():
-        try:
-            log = json.loads(log_path.read_text(encoding="utf-8-sig"))
-            if isinstance(log, dict) and log.get("org") == active:
-                sprint = log.get("sprint") or {}
-                end_date = sprint.get("endDate") or today
-                sprint_name = sprint.get("name")
-                source_repo = log.get("sourceRepo") or ""
-                repo_key = log.get("repoKey") or ""
-        except (json.JSONDecodeError, OSError):
-            pass
+    log_repo: str | None = None
+    log, detail = _read_log(repo, active)
+    if log is not None:
+        sprint = _object(log.get("sprint"))
+        end_date = _text(sprint.get("endDate")) or today
+        sprint_name = _text(sprint.get("name"))
+        log_repo = _log_repo(log)
 
     # Resolve per-slug, per-repo history path. Prefer the explicit `repo` query
     # param (view path — works with no live stress-log at all, e.g. a machine
-    # with no local stress log) over
-    # repoKey/sourceRepo from the ephemeral log, since the log may be stale,
-    # missing, or belong to a different repo than the one the UI has selected.
-    org_config = next((o for o in (load_config().get("spaces") or []) if o.get("slug") == active), {})
-    folder = org_config.get("promptsFolder", "")
+    # with no local stress log) over the log's own repository.
+    folder = _active_org(cfg).get("promptsFolder", "")
     org_dir = (hub_root() / folder) if folder else hub_root()
-    repo_name = _repo_key(repo or repo_key or (_repo_name_from_url(source_repo) if source_repo else "")) or "default"
+    repo_name = repo or log_repo or "default"
     raw = _read_history(org_dir, repo_name)
 
     # If the live log didn't give us a sprint name (missing/stale/wrong repo),
     # fall back to the committed history file's own latest sprint label so
     # view-only machines still see data — no ephemeral log required.
     if not sprint_name and raw:
-        latest = max(raw, key=lambda e: e.get("date", ""))
-        sprint_name = latest.get("sprint")
-        end_date = max((e.get("date", "") for e in raw), default=end_date) or end_date
+        latest = max(raw, key=_row_date)
+        sprint_name = _text(latest.get("sprint"))
+        end_date = max((_row_date(e) for e in raw), default=end_date) or end_date
 
     # No sprint name means we can't scope history — return empty shell
     if not sprint_name:
-        try:
-            end_dt = date.fromisoformat(end_date)
-        except ValueError:
-            end_dt = date.today()
-        start_date = (end_dt - timedelta(days=20)).isoformat()
-        return SprintActivityResponse(startDate=start_date, endDate=end_date, mine=[], team=[])
+        return SprintActivityResponse(
+            startDate=_window_start(end_date), endDate=end_date, mine=[], team=[], detail=detail
+        )
 
-    # Read history — file is already scoped to org+repo; filter to current sprint only
-    history = [e for e in raw if e.get("sprint") == sprint_name]
-
-    # Deduplicate by date (safety net; full rewrite should already be clean)
+    # Read history — file is already scoped to org+repo; filter to current sprint only.
+    # Deduplicate by date (safety net; full rewrite should already be clean).
     by_date: dict[str, dict] = {}
-    for entry in history:
-        d = entry.get("date", "")
-        if d:
+    for entry in raw:
+        d = _row_date(entry)
+        if d and entry.get("sprint") == sprint_name:
             by_date[d] = entry
 
     # startDate: earliest history date for this sprint (git is source of truth when
     # history exists); fallback estimates from endDate without assuming sprint length.
-    if by_date:
-        start_date = min(by_date.keys())
-    else:
-        try:
-            end_dt = date.fromisoformat(end_date)
-        except ValueError:
-            end_dt = date.today()
-        start_date = (end_dt - timedelta(days=20)).isoformat()
+    start_date = min(by_date.keys()) if by_date else _window_start(end_date)
 
-    mine_entries = [
-        SprintActivityEntry(date=d, count=int(e.get("mine") or 0), churn=int(e.get("mineChurn") or 0))
-        for d, e in sorted(by_date.items())
-    ]
-    team_entries = [
-        SprintActivityEntry(date=d, count=int(e.get("team") or 0), churn=int(e.get("teamChurn") or 0))
-        for d, e in sorted(by_date.items())
-    ]
+    def entries(count: str, churn: str) -> list[SprintActivityEntry]:
+        return [
+            SprintActivityEntry(date=d, count=_int(e.get(count), 0), churn=_int(e.get(churn), 0))
+            for d, e in sorted(by_date.items())
+        ]
 
     return SprintActivityResponse(
         startDate=start_date,
         endDate=end_date,
-        mine=mine_entries,
-        team=team_entries,
+        mine=entries("mine", "mineChurn"),
+        team=entries("team", "teamChurn"),
+        detail=detail,
     )
 
 

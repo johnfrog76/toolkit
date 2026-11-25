@@ -9,6 +9,7 @@ import tempfile
 import textwrap
 import time
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest import mock
 
@@ -191,6 +192,263 @@ class ARepoKeyIsAName(unittest.TestCase):
             reply = client.get("/api/stress-status")
         self.assertEqual(reply.status_code, 200)
         self.assertIn("not an object", reply.json()["detail"])
+
+
+TODAY = date(2026, 11, 25)
+SPACE = "acme"
+STATUS_OFF = {
+    "enabled": False,
+    "org": SPACE,
+    "detail": "sprint awareness is off for this org",
+    "generatedAt": None,
+    "sourceRepo": None,
+    "sprintSource": None,
+    "context": None,
+    "sprintStress": None,
+    "originStress": None,
+    "communicationStress": None,
+    "teamDynamicsStress": None,
+}
+
+
+class ASprintLogReadsOneWay(unittest.TestCase):
+    """The stress log, read by both sprint routes: one reading of every field, no shape a 500,
+    and a log that is another Space's or another repository's refused by both in one sentence."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.hub = Path(self.tmp.name) / "hub"
+        (self.hub / SPACE).mkdir(parents=True)
+        self.space: dict = {"slug": SPACE, "promptsFolder": SPACE}
+        self.on = True
+        for target, value in (("hub_root", lambda: self.hub), ("_today", lambda: TODAY)):
+            patcher = mock.patch.object(sprint, target, side_effect=value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        patcher = mock.patch.object(sprint, "load_config", side_effect=self.config)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.client = TestClient(create_app(client_dir=None), raise_server_exceptions=False)
+
+    def config(self):
+        return {"activeSpace": SPACE, "spaces": [self.space], "features": {"sprintAwareness": self.on}}
+
+    def log(self, sprint_block=None, **fields):
+        body = {"org": SPACE, "repoKey": "widget", "sprint": {"name": "S1", "daysRemaining": 10}}
+        if sprint_block is not None:
+            body["sprint"] = sprint_block
+        body.update(fields)
+        self.write_log(json.dumps(body))
+
+    def write_log(self, text, name="stress-log.json"):
+        (self.hub / name).write_bytes(text.encode("utf-8") if isinstance(text, str) else text)
+
+    def history(self, rows, repo="widget"):
+        (self.hub / SPACE / f"stress-history.{repo}.json").write_text(json.dumps(rows), encoding="utf-8")
+
+    def status(self, repo="widget"):
+        reply = self.client.get("/api/stress-status" + (f"?repo={repo}" if repo else ""))
+        self.assertEqual(reply.status_code, 200, reply.text)
+        return reply.json()
+
+    def activity(self, repo="widget"):
+        reply = self.client.get("/api/stress-sprint-activity" + (f"?repo={repo}" if repo else ""))
+        self.assertEqual(reply.status_code, 200, reply.text)
+        return reply.json()
+
+    def day_reasons(self, body):
+        return [r for dim in ("sprintStress",) for r in body[dim]["reasons"] if "daysRemaining" in r]
+
+    def test_a_number_or_nothing(self):
+        for raw, want in (
+            (3, 3),
+            (2.5, 2.5),
+            (-1, -1),
+            (0, 0),
+            (None, None),
+            ("4", None),
+            ("soon", None),
+            (True, None),
+            (False, None),
+            (float("nan"), None),
+            (float("inf"), None),
+            ([1], None),
+            ({"a": 1}, None),
+        ):
+            with self.subTest(raw=raw):
+                self.assertEqual(sprint._number(raw), want)
+
+    def test_days_remaining_with_no_date_is_the_stored_number_or_no_countdown(self):
+        # (stored daysRemaining, the countdown served, the day reason the score carries)
+        for stored, days, reason in (
+            ("absent", None, None),
+            (None, None, None),
+            ("soon", None, None),
+            ("4", None, None),
+            (True, None, None),
+            (-2, 0, "daysRemaining <= 3"),
+            (2.5, 2, "daysRemaining <= 3"),
+            (4, 4, "daysRemaining <= 5"),
+            (10, 10, "daysRemaining > 5"),
+        ):
+            with self.subTest(stored=stored):
+                block = {"name": "S1"}
+                if stored != "absent":
+                    block["daysRemaining"] = stored
+                self.log(block)
+                body = self.status()
+                self.assertEqual(body["detail"], "ok")
+                self.assertEqual(body["context"]["daysRemaining"], days)
+                self.assertEqual(self.day_reasons(body), [reason] if reason else [])
+
+    def test_a_nan_in_the_log_is_no_number(self):
+        self.write_log('{"org": "acme", "sprint": {"daysRemaining": NaN, "mergeVelocity": Infinity}}')
+        body = self.status(repo=None)
+        self.assertIsNone(body["context"]["daysRemaining"])
+        self.assertEqual(body["context"]["mergeVelocity"], 0)
+
+    def test_days_remaining_is_worked_out_from_an_end_date_at_read_time(self):
+        # (the log's endDate, the Space's configured endDate, stored, the countdown served)
+        for log_end, space_end, stored, days in (
+            ("2026-12-01", None, 10, 6),
+            ("2026-11-27", None, 10, 2),
+            ("2026-11-25", None, 10, 0),
+            ("2026-11-01", None, 10, 0),
+            (None, "2026-12-05", 1, 10),
+            ("2026-12-01", "2026-12-05", 1, 6),
+            ("not a day", "2026-12-05", 1, 10),
+            (7, None, 1, 1),
+            ("not a day", None, None, None),
+        ):
+            with self.subTest(log_end=log_end, space_end=space_end):
+                block = {"name": "S1", "daysRemaining": stored}
+                if log_end is not None:
+                    block["endDate"] = log_end
+                self.space["sprint"] = {"endDate": space_end} if space_end else {}
+                self.log(block)
+                body = self.status()
+                self.assertEqual(body["context"]["daysRemaining"], days)
+                if days is not None and days <= 3:
+                    self.assertEqual(body["sprintStress"]["level"], "High")
+                    self.assertIn("daysRemaining <= 3", body["sprintStress"]["reasons"])
+
+    def test_every_number_the_score_compares_is_a_number_or_its_default(self):
+        defaults = {"mergeVelocity": 0, "upstreamMerges": 0, "surfaceAreaChange": 0, "visibilityScore": 0.5}
+        where = {
+            "mergeVelocity": "sprint",
+            "upstreamMerges": "origin",
+            "surfaceAreaChange": "origin",
+            "visibilityScore": "communication",
+        }
+        for field, default in defaults.items():
+            for raw, want in ((None, default), ("x", default), (-3, -3), (1.5, 1.5), (True, default)):
+                with self.subTest(field=field, raw=raw):
+                    block = {"name": "S1", "daysRemaining": 10}
+                    parts = {"sprint": block, "origin": {}, "communication": {}}
+                    parts[where[field]][field] = raw
+                    self.log(parts["sprint"], origin=parts["origin"], communication=parts["communication"])
+                    served = self.status()["context"][field]
+                    self.assertEqual(served, int(want) if isinstance(default, int) else want)
+
+    def test_no_shape_of_a_block_is_a_500(self):
+        for fields in (
+            {"sprint": []},
+            {"sprint": "S1"},
+            {"origin": [1]},
+            {"communication": 3},
+            {"teamDynamics": "x"},
+            {"origin": {"conflictZones": 5}},
+            {"origin": {"conflictZones": ["a", 1, None]}},
+            {"origin": {"rebasePressure": 4}},
+            {"teamDynamics": {"xxlPrAuthors": 2, "silentRefactorers": "ab"}},
+            {"generatedAt": 5, "sourceRepo": [], "sprintSource": {}},
+        ):
+            with self.subTest(fields=fields):
+                self.write_log(json.dumps({"org": SPACE, **fields}))
+                body = self.status(repo=None)
+                self.assertEqual(body["detail"], "ok")
+                self.activity(repo=None)
+        # a list is counted whatever it holds, as it always was; the card is served its strings
+        self.write_log(json.dumps({"org": SPACE, "origin": {"conflictZones": ["a", 1, None]}}))
+        body = self.status(repo=None)
+        self.assertEqual(body["context"]["conflictZones"], ["a"])
+        self.assertIn("conflictZones.length > 0", body["originStress"]["reasons"])
+        self.write_log(json.dumps({"org": SPACE, "teamDynamics": {"xxlPrAuthors": [{}], "silentRefactorers": [1]}}))
+        self.assertEqual(self.status(repo=None)["teamDynamicsStress"]["level"], "High")
+
+    def test_a_log_that_cannot_be_read_is_a_reason_on_both_routes(self):
+        self.history([{"date": "2026-11-20", "sprint": "S9", "mine": 1, "team": 2}])
+        for text, reason in (
+            (None, "view-only -- no live signal on this machine"),
+            ("", "could not read stress-log.json: JSONDecodeError"),
+            ("{not json", "could not read stress-log.json: JSONDecodeError"),
+            (b"\xff\xfe\x00{", "could not read stress-log.json: UnicodeDecodeError"),
+            ("[1, 2]", "could not read stress-log.json: it is not an object"),
+            ('"a string"', "could not read stress-log.json: it is not an object"),
+            ("7", "could not read stress-log.json: it is not an object"),
+            ("null", "could not read stress-log.json: it is not an object"),
+        ):
+            with self.subTest(text=text):
+                log = self.hub / "stress-log.json"
+                if text is None:
+                    log.unlink(missing_ok=True)
+                else:
+                    self.write_log(text)
+                status = self.status()
+                self.assertTrue(status["detail"].startswith(reason), status["detail"])
+                self.assertIsNotNone(status["context"])
+                activity = self.activity()
+                self.assertEqual(activity["detail"], status["detail"])
+                self.assertEqual([e["count"] for e in activity["mine"]], [1])
+
+    def test_a_log_that_is_not_this_space_and_repository_is_refused_by_both_in_one_sentence(self):
+        self.history([{"date": "2026-11-20", "sprint": "S-widget", "mine": 1, "team": 2}])
+        frame = {"name": "S-other", "endDate": "2026-12-09", "daysRemaining": 2}
+        for fields, sentence in (
+            ({"org": "elsewhere"}, "view-only \u2014 live log on this machine is for 'elsewhere'"),
+            ({"org": None}, "view-only \u2014 the live log on this machine names no Space"),
+            ({"org": ""}, "view-only \u2014 the live log on this machine names no Space"),
+            ({"repoKey": "other"}, "view-only \u2014 live log on this machine is for 'other', not 'widget'"),
+            (
+                {"repoKey": None, "sourceRepo": "https://example.com/acme/other.git"},
+                "view-only \u2014 live log on this machine is for 'other', not 'widget'",
+            ),
+        ):
+            with self.subTest(fields=fields):
+                body = {"org": SPACE, "repoKey": "widget", "sprint": frame, **fields}
+                self.write_log(json.dumps({k: v for k, v in body.items() if v is not None}))
+                status = self.status()
+                self.assertEqual(status["detail"], sentence)
+                self.assertIsNone(status["sprintStress"])
+                activity = self.activity()
+                self.assertEqual(activity["detail"], sentence)
+                # the log's sprint frame is not used: the window is the history's own
+                self.assertEqual((activity["startDate"], activity["endDate"]), ("2026-11-20", "2026-11-20"))
+                self.assertEqual([e["count"] for e in activity["mine"]], [1])
+
+    def test_a_log_that_is_this_space_and_repository_frames_the_activity(self):
+        self.history([{"date": "2026-11-20", "sprint": "S1", "mine": 1, "team": 2, "mineChurn": "x"}])
+        for fields in ({}, {"repoKey": None, "sourceRepo": "https://example.com/acme/widget.git"}):
+            with self.subTest(fields=fields):
+                body = {"org": SPACE, "repoKey": "widget", "sprint": {"name": "S1", "endDate": "2026-12-01"}}
+                body.update(fields)
+                self.write_log(json.dumps({k: v for k, v in body.items() if v is not None}))
+                self.assertEqual(self.status()["detail"], "ok")
+                activity = self.activity()
+                self.assertEqual(activity["detail"], "ok")
+                self.assertEqual((activity["startDate"], activity["endDate"]), ("2026-11-20", "2026-12-01"))
+                self.assertEqual(activity["mine"], [{"date": "2026-11-20", "count": 1, "churn": 0}])
+
+    def test_with_sprint_awareness_off_both_routes_answer_as_before_and_read_nothing(self):
+        self.on = False
+        self.write_log("{not json")
+        with mock.patch.object(sprint, "_stress_log_path") as path:
+            self.assertEqual(self.status(), STATUS_OFF)
+            self.assertEqual(
+                self.activity(), {"startDate": "2026-11-25", "endDate": "2026-11-25", "mine": [], "team": []}
+            )
+        path.assert_not_called()
 
 
 if __name__ == "__main__":
