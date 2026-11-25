@@ -26,6 +26,16 @@
 # archive folder, and `**Outcome:** shipped|dropped` on a note archived WITHOUT
 # a spec. Both are read from consts.json, never typed here.
 #
+# One more fact beside the state, Ready: a live design someone has marked
+# finished, so its one move follows mechanically (docs/hub/design.md, "Marking
+# a live design finished"). Ready is either
+#   Design, no spec at all, and the note's Outcome word is shipped; or
+#   Spec, the spec live with a non-empty `> Docs:` value, and neither file's
+#   Outcome word dropped.
+# The words are read by the same two patterns as above: the first Outcome
+# line's whole value (shipped with anything after it is no word), and the
+# first Docs line. The Docs path is not checked here: MoveDesign checks it.
+#
 # PowerShell 5.1 clean: no ternary, no null-coalescing, ASCII hyphens only.
 #
 
@@ -173,8 +183,11 @@ function Resolve-P20DesignState {
 
       Returns State, Outcome ('' unless an archived note without a spec says
       shipped or dropped), Mismatch (the two files disagree about where the
-      design is -- the spec's folder wins), and Closed (the archived file's
-      date: the spec's when the spec is archived, else the note's).
+      design is -- the spec's folder wins), Closed (the archived file's
+      date: the spec's when the spec is archived, else the note's), and Ready
+      (a live design marked finished: a Design with no spec whose note says
+      shipped, or a Spec whose live spec carries a Docs line and neither file
+      says dropped).
     #>
     param(
         [ValidateSet('live', 'archive', 'none')][string]$Note = 'none',
@@ -227,11 +240,25 @@ function Resolve-P20DesignState {
         if ($m.Success) { $closed = $m.Value } else { $closed = '' }
     }
 
+    # Ready: a fact beside the state, never a state of its own.
+    $ready = $false
+    $noteWord = (Get-P20StampValue -Text $NoteText -Stamp $outcomeStamp).ToLowerInvariant()
+    if ($state -eq $states[0] -and $Spec -eq 'none') {
+        $ready = ($noteWord -eq [string]$outcomes[0])
+    }
+    elseif ($state -eq $states[1] -and $Spec -eq 'live') {
+        $docs = [regex]::Match($SpecText, [string]$consts.design.docsRegex)
+        $specWord = (Get-P20StampValue -Text $SpecText -Stamp $outcomeStamp).ToLowerInvariant()
+        $dropped = [string]$outcomes[1]
+        $ready = ($docs.Success -and $noteWord -ne $dropped -and $specWord -ne $dropped)
+    }
+
     return [PSCustomObject]@{
         State    = $state
         Outcome  = $outcome
         Mismatch = $mismatch
         Closed   = $closed
+        Ready    = $ready
     }
 }
 
@@ -355,6 +382,7 @@ function Read-P20DesignTree {
             Outcome     = $r.Outcome
             Mismatch    = $r.Mismatch
             Closed      = $r.Closed
+            Ready       = $r.Ready
             Title       = $title
             Description = $description
             Thread      = $thread

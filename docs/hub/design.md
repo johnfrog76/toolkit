@@ -90,11 +90,11 @@ space: toolkit
 | frontmatter `space:` | `NewDesign -Space <slug>` -- a declared Space; absent when none is named | the Space the note is for: its chip in the list, and where Promote files the thread |
 | `# Title` | `NewDesign -Title` | the title, by the rule under this table: a leading `#` heading, else the line under `## Title`, else the file name |
 | `> GitHub: <issue url>` | `NewItem -FromDesign` (Promote), after the title, through `Write-CardText` | the design's THREAD (`consts.json` `studio.threadRegex`): the issue's number and repo. Read from the note first, the spec when the note has none. Absent means not promoted yet, and a note published without it reads the same |
-| `> Docs: <path>` | on a SPEC, by `MoveDesign -To Complete` (L3), from `-Doc <path>` -- a path that must already exist. The line goes under the title the title rule finds (the leading `#` heading, or the title line under `## Title`), else first in the body after the frontmatter, a blank line either side -- never above the frontmatter, which would cost the spec its id; a spec that already has one keeps it. Where it is looked for follows where the design is: in a repository, that repository; `-Hub` alone, the hub; **`-Hub -Space <slug>`, the Space's own repository, not the hub** -- the hub holds the design, the product's repository holds its docs. That repository is the one the Space's address names (`spaces[].org`, or its one `projects[]` repo; on Azure DevOps the organisation, project and repository), found on this machine as a clone whose `origin` is that repository: the Space's configured checkout (`spaceCheckouts.<slug>.path`) first, then the folder you stand in, then the nav shortcuts' paths (`aliases.<Name>.path`), then `<wsRoot>/<repo>` (the machine's `wsRoot`, where code repositories are checked out). A `-Doc` missing from that clone is refused, naming the repository and where it is checked out; with no clone here (or a Space whose address names no single repository) there is nothing to check against, so the path is taken as written and one `Note:` line says why | where the durable part landed, shown on a Complete row (`consts.json` `design.docsLine`) |
+| `> Docs: <path>` | on a SPEC, by `MoveDesign -To Complete` (L3), from `-Doc <path>` -- a path that must already exist. The line goes under the title the title rule finds (the leading `#` heading, or the title line under `## Title`), else first in the body after the frontmatter, a blank line either side -- never above the frontmatter, which would cost the spec its id; a spec that already has one keeps it. Where it is looked for follows where the design is: in a repository, that repository; `-Hub` alone, the hub; **`-Hub -Space <slug>`, the Space's own repository, not the hub** -- the hub holds the design, the product's repository holds its docs. That repository is the one the Space's address names (`spaces[].org`, or its one `projects[]` repo; on Azure DevOps the organisation, project and repository), found on this machine as a clone whose `origin` is that repository: the Space's configured checkout (`spaceCheckouts.<slug>.path`) first, then the folder you stand in, then the nav shortcuts' paths (`aliases.<Name>.path`), then `<wsRoot>/<repo>` (the machine's `wsRoot`, where code repositories are checked out). A `-Doc` missing from that clone is refused, naming the repository and where it is checked out; with no clone here (or a Space whose address names no single repository) there is nothing to check against, so the path is taken as written and one `Note:` line says why. A person may type it on a live spec ahead of the move ([Marking a live design finished](#marking-a-live-design-finished)) | where the durable part landed, shown on a Complete row (`consts.json` `design.docsLine`); also read on a live design, as ready |
 | the headings | the template, `templates/DesignNote.template.md` | nothing -- they are for the person writing |
 | `**Created:**` | `NewDesign`, the day it ran | nothing yet |
 | `**Closed:** yyyy-MM-dd` | the move verb, when a file enters an archive folder, through `Add-ClosedStamp.ps1` | a FACT, not a state: the date on a Complete (the spec's) or Archived (the note's) design |
-| `**Outcome:** shipped` or `dropped` | the move verb, on a note archived WITHOUT a spec, and `dropped` on both files of a dropped spec (`consts.json` `stamps.outcome`, `design.outcomes`) | a fact, read only on an Archived design: a deck design that shipped as written, or an idea that never made it. Any other word, or none, reads as plain Archived |
+| `**Outcome:** shipped` or `dropped` | the move verb, on a note archived WITHOUT a spec, and `dropped` on both files of a dropped spec (`consts.json` `stamps.outcome`, `design.outcomes`); `shipped` may be typed by a person on a live note ahead of the move | the outcome, a fact read only on an Archived design: a deck design that shipped as written, or an idea that never made it. Any other word, or none, reads as plain Archived. Also read on a live design, as ready |
 | `## Journey` | the move verb, one dated line per move (L3, D-DL18) | nothing -- a record a person reads, never state |
 
 ### How the title is read
@@ -144,7 +144,7 @@ without `-Dropped` a live spec still refuses `-To Archive`. A design archived be
 
 **What the agent serves.** `GET /api/design` (a repo, through `gh`) and `GET /api/studio/design` (the hub,
 from disk) answer the same shape: `designs` -- one row per id, `{ id, short, state, title, description,
-thread, thread_number, thread_repo, closed, outcome, mismatch, docs, note, spec }`, in road order then by
+thread, thread_number, thread_repo, closed, outcome, mismatch, docs, ready, note, spec }`, in road order then by
 title -- plus `notShown: [{ path, reason }]` and `structure: { design, spec }` (which roots exist), so the
 web decides nothing. A hub row carries two more words, `space` and `thread_space`. **Every row carries its
 `cards`** (the Toolkit card's C3): `[{ file, id, title, status, space, archived }]`, every card whose
@@ -229,6 +229,35 @@ printed and the word in the note's Journey are the same.
 "a design leaves a folder only through the move verb", until `MoveDesign` gains a move that finishes the
 completion its spec's move started ([#582](https://github.com/johnfrog76/toolkit/issues/582)).
 Known gap: [A completed design's live note is moved by hand](../KNOWN-GAPS.md#a-completed-designs-live-note-is-moved-by-hand).
+
+## Marking a live design finished
+
+A live design can say it is finished before anything moves, with one line typed by whoever decides what
+the design means. The line is one the file contract already has (the `> Docs:` and `**Outcome:**` rows
+of [The file](#the-file)); what is new is that both halves read it on a live design, as **ready**: a
+fact beside the state, like `closed` and `outcome`, never a fifth state.
+
+- **A note with no spec:** on its own line in the footer, beside `**Created:**`, type
+  `**Outcome:** shipped` once the design shipped as written. The word is compared ignoring case, and
+  nothing may follow it: `shipped 2026-11-20` or `shipped. prose` is not ready. The date is the
+  `**Closed:**` stamp the move writes.
+- **A live spec:** under its title, type `> Docs: <path>` -- the document the durable part landed in,
+  relative to the root of the repository that holds the docs; for a hub Space folder, that is the Space's
+  repository, not the hub. The reader does not check the path exists: `MoveDesign` does, when it runs.
+- **Ready is derived** by the state rule both halves implement, and pinned by the same table,
+  `Tests/fixtures/design/states.json`: a **Design** with no spec at all whose note's first
+  `**Outcome:**` line says `shipped`; or a **Spec** whose live spec carries a non-empty `> Docs:` line,
+  when neither file's first `**Outcome:**` line says `dropped`. A note marked `shipped` whose spec is
+  live is not ready, nor is any archived design. A design with neither line reads exactly as before.
+- **Nothing moves until `MoveDesign` runs.** A ready Design implies `MoveDesign <id> -To Archive`; a
+  ready Spec, `MoveDesign <id> -To Complete -Doc <the Docs path>`, and the move keeps the line it finds.
+- **`dropped` is never written ahead of time.** Dropping a design needs its reason: run
+  `MoveDesign <id> -To Archive -Dropped -Reason <text>`. A live note marked `dropped` is not ready.
+
+So far the fact lives in the model alone: `Ready` on `Read-P20DesignTree`'s row in the CLI, `ready` on
+each row `GET /api/design` and `GET /api/studio/design` serve. Nothing draws it or acts on it yet -- no
+badge on the Design tab, no command that lists the ready designs, no unattended move. The templates carry
+no hint for either line: a hint holding the token at column 0 would read as the line itself.
 
 ## Examples
 

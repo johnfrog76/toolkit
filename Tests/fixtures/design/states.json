@@ -1,81 +1,153 @@
 {
-  "_": "ONE table for the design lifecycle's state rule (docs/hub/design.md, \"State -- derived, never stored\"), read by both readers of it: Scripts/Read-DesignTree.ps1 Resolve-P20DesignState (tkTestToolkit -Design) and agent/ado/design.py design_state() (Tests/test_design.py). The unit is the design: one id, a note and at most one spec. `note` and `spec` say where each file is -- live (design/ or spec/), archive (design/archive/ or spec/archive/), or null for none -- and noteLines / specLines are footer lines the file carries. expected is the state, the outcome a note archived without a spec may carry (null otherwise), whether the two files disagree about where the design is (mismatch -- the spec's folder wins and the row says so), and the Closed date, a fact about a design that has REACHED an archive state: the spec's for Complete, the note's for Archived, '' for Design and Spec (a note archived before its spec is still a Spec). If the two halves ever disagree about a row, one of them is wrong.",
+  "_": "ONE table for the design lifecycle's state rule (docs/hub/design.md, \"State -- derived, never stored\"), read by both readers of it: Scripts/Read-DesignTree.ps1 Resolve-P20DesignState (tkTestToolkit -Design) and agent/ado/design.py design_state() (Tests/test_design.py). The unit is the design: one id, a note and at most one spec. `note` and `spec` say where each file is -- live (design/ or spec/), archive (design/archive/ or spec/archive/), or null for none -- and noteLines / specLines are footer lines the file carries. expected is the state, the outcome a note archived without a spec may carry (null otherwise), whether the two files disagree about where the design is (mismatch -- the spec's folder wins and the row says so), the Closed date, a fact about a design that has REACHED an archive state: the spec's for Complete, the note's for Archived, '' for Design and Spec (a note archived before its spec is still a Spec), and ready, a fact about a LIVE design someone has marked finished (docs/hub/design.md, \"Marking a live design finished\"): a Design with no spec whose note's first Outcome line says exactly shipped (case ignored, nothing after it), or a Spec whose live spec carries a non-empty `> Docs:` line and neither file's Outcome word is dropped. If the two halves ever disagree about a row, one of them is wrong.",
   "rows": [
     {
       "name": "a note alone",
       "note": "live", "spec": null, "noteLines": [], "specLines": [],
-      "expected": { "state": "Design", "outcome": null, "mismatch": false, "closed": "" }
+      "expected": { "state": "Design", "outcome": null, "mismatch": false, "closed": "", "ready": false }
     },
     {
       "name": "a note with its spec beside it",
       "note": "live", "spec": "live", "noteLines": [], "specLines": [],
-      "expected": { "state": "Spec", "outcome": null, "mismatch": false, "closed": "" }
+      "expected": { "state": "Spec", "outcome": null, "mismatch": false, "closed": "", "ready": false }
     },
     {
       "name": "both archived: built, and documented",
       "note": "archive", "spec": "archive",
       "noteLines": ["**Closed:** 2026-11-20"], "specLines": ["**Closed:** 2026-11-20"],
-      "expected": { "state": "Complete", "outcome": null, "mismatch": false, "closed": "2026-11-20" }
+      "expected": { "state": "Complete", "outcome": null, "mismatch": false, "closed": "2026-11-20", "ready": false }
     },
     {
       "name": "a note archived alone, nothing said of it",
       "note": "archive", "spec": null, "noteLines": ["**Closed:** 2026-11-20"], "specLines": [],
-      "expected": { "state": "Archived", "outcome": null, "mismatch": false, "closed": "2026-11-20" }
+      "expected": { "state": "Archived", "outcome": null, "mismatch": false, "closed": "2026-11-20", "ready": false }
     },
     {
       "name": "the spec archived, the note left behind in design/",
       "note": "live", "spec": "archive", "noteLines": [], "specLines": ["**Closed:** 2026-11-20"],
-      "expected": { "state": "Complete", "outcome": null, "mismatch": true, "closed": "2026-11-20" }
+      "expected": { "state": "Complete", "outcome": null, "mismatch": true, "closed": "2026-11-20", "ready": false }
     },
     {
       "name": "the note archived before its spec",
       "note": "archive", "spec": "live", "noteLines": ["**Closed:** 2026-11-20"], "specLines": [],
-      "expected": { "state": "Spec", "outcome": null, "mismatch": true, "closed": "" }
+      "expected": { "state": "Spec", "outcome": null, "mismatch": true, "closed": "", "ready": false }
     },
     {
       "name": "a spec standing without a note",
       "note": null, "spec": "live", "noteLines": [], "specLines": [],
-      "expected": { "state": "Spec", "outcome": null, "mismatch": false, "closed": "" }
+      "expected": { "state": "Spec", "outcome": null, "mismatch": false, "closed": "", "ready": false }
     },
     {
       "name": "an archived spec standing without a note",
       "note": null, "spec": "archive", "noteLines": [], "specLines": ["**Closed:** 2026-11-20"],
-      "expected": { "state": "Complete", "outcome": null, "mismatch": false, "closed": "2026-11-20" }
+      "expected": { "state": "Complete", "outcome": null, "mismatch": false, "closed": "2026-11-20", "ready": false }
     },
     {
       "name": "an idea that never made it",
       "note": "archive", "spec": null,
       "noteLines": ["**Closed:** 2026-11-20", "**Outcome:** dropped"], "specLines": [],
-      "expected": { "state": "Archived", "outcome": "dropped", "mismatch": false, "closed": "2026-11-20" }
+      "expected": { "state": "Archived", "outcome": "dropped", "mismatch": false, "closed": "2026-11-20", "ready": false }
     },
     {
       "name": "a deck design that shipped as written",
       "note": "archive", "spec": null,
       "noteLines": ["**Closed:** 2026-11-20", "**Outcome:** shipped"], "specLines": [],
-      "expected": { "state": "Archived", "outcome": "shipped", "mismatch": false, "closed": "2026-11-20" }
+      "expected": { "state": "Archived", "outcome": "shipped", "mismatch": false, "closed": "2026-11-20", "ready": false }
     },
     {
-      "name": "an outcome line is a fact about an archived note only: on a live note it is not read",
+      "name": "a live note marked shipped is ready: the outcome stays a fact of an archived note, so it reads none, and the line is read as ready instead",
       "note": "live", "spec": null, "noteLines": ["**Outcome:** shipped"], "specLines": [],
-      "expected": { "state": "Design", "outcome": null, "mismatch": false, "closed": "" }
+      "expected": { "state": "Design", "outcome": null, "mismatch": false, "closed": "", "ready": true }
     },
     {
       "name": "a Complete design needs no outcome: its spec was built, and a stray line is not read",
       "note": "archive", "spec": "archive",
       "noteLines": ["**Closed:** 2026-11-01", "**Outcome:** dropped"], "specLines": ["**Closed:** 2026-11-20"],
-      "expected": { "state": "Complete", "outcome": null, "mismatch": false, "closed": "2026-11-20" }
+      "expected": { "state": "Complete", "outcome": null, "mismatch": false, "closed": "2026-11-20", "ready": false }
     },
     {
       "name": "a spec dropped: both archived, the spec carries the dropped outcome, so it reads Archived, not Complete",
       "note": "archive", "spec": "archive",
       "noteLines": ["**Closed:** 2026-11-20", "**Outcome:** dropped"], "specLines": ["**Closed:** 2026-11-20", "**Outcome:** dropped"],
-      "expected": { "state": "Archived", "outcome": "dropped", "mismatch": false, "closed": "2026-11-20" }
+      "expected": { "state": "Archived", "outcome": "dropped", "mismatch": false, "closed": "2026-11-20", "ready": false }
     },
     {
       "name": "an outcome word outside the contract's two reads as none",
       "note": "archive", "spec": null,
       "noteLines": ["**Closed:** 2026-11-20", "**Outcome:** maybe"], "specLines": [],
-      "expected": { "state": "Archived", "outcome": null, "mismatch": false, "closed": "2026-11-20" }
+      "expected": { "state": "Archived", "outcome": null, "mismatch": false, "closed": "2026-11-20", "ready": false }
+    },
+    {
+      "name": "a live note marked shipped in its footer, beside its Created line, is ready to archive",
+      "note": "live", "spec": null,
+      "noteLines": ["**Created:** 2026-11-01", "**Outcome:** shipped"], "specLines": [],
+      "expected": { "state": "Design", "outcome": null, "mismatch": false, "closed": "", "ready": true }
+    },
+    {
+      "name": "the outcome word is compared ignoring case: SHIPPED is ready",
+      "note": "live", "spec": null,
+      "noteLines": ["**Outcome:** SHIPPED"], "specLines": [],
+      "expected": { "state": "Design", "outcome": null, "mismatch": false, "closed": "", "ready": true }
+    },
+    {
+      "name": "a live note marked dropped is not ready: dropping a design needs its reason, so the word is never a trigger",
+      "note": "live", "spec": null,
+      "noteLines": ["**Outcome:** dropped"], "specLines": [],
+      "expected": { "state": "Design", "outcome": null, "mismatch": false, "closed": "", "ready": false }
+    },
+    {
+      "name": "shipped with a date after it is no outcome word, so the note is not ready",
+      "note": "live", "spec": null,
+      "noteLines": ["**Outcome:** shipped 2026-11-20"], "specLines": [],
+      "expected": { "state": "Design", "outcome": null, "mismatch": false, "closed": "", "ready": false }
+    },
+    {
+      "name": "a note marked shipped whose spec is live is not ready: the spec is what is waiting",
+      "note": "live", "spec": "live",
+      "noteLines": ["**Outcome:** shipped"], "specLines": [],
+      "expected": { "state": "Spec", "outcome": null, "mismatch": false, "closed": "", "ready": false }
+    },
+    {
+      "name": "a live spec with a Docs line, beside its live note, is ready to complete",
+      "note": "live", "spec": "live",
+      "noteLines": [], "specLines": ["> Docs: docs/x.md"],
+      "expected": { "state": "Spec", "outcome": null, "mismatch": false, "closed": "", "ready": true }
+    },
+    {
+      "name": "a live spec with a Docs line and no note is ready to complete",
+      "note": null, "spec": "live",
+      "noteLines": [], "specLines": ["> Docs: docs/x.md"],
+      "expected": { "state": "Spec", "outcome": null, "mismatch": false, "closed": "", "ready": true }
+    },
+    {
+      "name": "a live spec with a Docs line whose note says dropped is not ready: the two marks conflict",
+      "note": "live", "spec": "live",
+      "noteLines": ["**Outcome:** dropped"], "specLines": ["> Docs: docs/x.md"],
+      "expected": { "state": "Spec", "outcome": null, "mismatch": false, "closed": "", "ready": false }
+    },
+    {
+      "name": "a live spec with a Docs line that itself says dropped is not ready",
+      "note": "live", "spec": "live",
+      "noteLines": [], "specLines": ["> Docs: docs/x.md", "**Outcome:** dropped"],
+      "expected": { "state": "Spec", "outcome": null, "mismatch": false, "closed": "", "ready": false }
+    },
+    {
+      "name": "a live spec with a Docs line, its note already archived, is ready and still says the two disagree",
+      "note": "archive", "spec": "live",
+      "noteLines": ["**Closed:** 2026-11-20"], "specLines": ["> Docs: docs/x.md"],
+      "expected": { "state": "Spec", "outcome": null, "mismatch": true, "closed": "", "ready": true }
+    },
+    {
+      "name": "a Complete pair carrying both lines is done, not ready",
+      "note": "archive", "spec": "archive",
+      "noteLines": ["**Closed:** 2026-11-20", "**Outcome:** shipped"], "specLines": ["> Docs: docs/x.md", "**Closed:** 2026-11-20"],
+      "expected": { "state": "Complete", "outcome": null, "mismatch": false, "closed": "2026-11-20", "ready": false }
+    },
+    {
+      "name": "a live note marked shipped whose spec is archived is Complete and a mismatch, not ready",
+      "note": "live", "spec": "archive",
+      "noteLines": ["**Outcome:** shipped"], "specLines": ["**Closed:** 2026-11-20"],
+      "expected": { "state": "Complete", "outcome": null, "mismatch": true, "closed": "2026-11-20", "ready": false }
     }
   ]
 }

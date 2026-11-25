@@ -57,6 +57,7 @@ from ..core import log_writer
 from ..core.checkout import SpaceCheckout, space_checkout
 from ..core.config import card_types, load_config, org_folder, resolve_dirs, tracker, tracker_owner
 from ..core.consts import (
+    design_docs_line,
     design_id_key,
     design_outcomes,
     design_states,
@@ -194,6 +195,10 @@ class Design(BaseModel):
     outcome: str = ""  # a fact about an Archived note without a spec
     mismatch: str = ""  # the two files disagree about where the design is: the sentence, or ""
     docs: str = ""  # where a Complete spec's durable part landed
+    # A live design marked finished, so its one move follows: a fact beside the
+    # state, derived by design_state (docs/hub/design.md, "Marking a live
+    # design finished").
+    ready: bool = False
     note: DesignDoc | None = None
     spec: DesignDoc | None = None
     # The hub's rows carry two more words (agent/studio/notes.py); "" in a repo.
@@ -534,9 +539,13 @@ def design_state(note: str | None, spec: str | None, note_text: str = "", spec_t
 
     Returns ``state``, ``outcome`` ("" unless an Archived note says shipped or
     dropped), ``mismatch`` (the two files disagree about where the design is;
-    the spec's folder wins) and ``closed`` (a fact about a design that has
+    the spec's folder wins), ``closed`` (a fact about a design that has
     reached an archive state: the spec's date for Complete, the note's for
-    Archived). Pinned by Tests/fixtures/design/states.json, from both halves.
+    Archived) and ``ready`` (a live design marked finished: a Design with no
+    spec whose note's Outcome word is shipped, or a Spec whose live spec
+    carries a non-empty Docs line and neither file's Outcome word is dropped;
+    the Docs path is not checked here). Pinned by
+    Tests/fixtures/design/states.json, from both halves.
     """
     s_design, s_spec, s_complete, s_archived = design_states()
     state, mismatch = s_design, False
@@ -564,7 +573,22 @@ def design_state(note: str | None, spec: str | None, note_text: str = "", spec_t
     elif state == s_archived:
         closed = _stamp(spec_text if spec_dropped else note_text, stamp_closed())
     m = re.match(r"^\d{4}-\d{2}-\d{2}", closed)
-    return {"state": state, "outcome": outcome, "mismatch": mismatch, "closed": m.group(0) if m else ""}
+    # Ready: a fact beside the state, never a state of its own.
+    shipped, dropped = design_outcomes()
+    note_word = _stamp(note_text, stamp_outcome()).lower()
+    ready = False
+    if state == s_design and spec is None:
+        ready = note_word == shipped
+    elif state == s_spec and spec == LIVE:
+        spec_word = _stamp(spec_text, stamp_outcome()).lower()
+        ready = bool(re_design_docs().search(spec_text or "")) and dropped not in (note_word, spec_word)
+    return {
+        "state": state,
+        "outcome": outcome,
+        "mismatch": mismatch,
+        "closed": m.group(0) if m else "",
+        "ready": ready,
+    }
 
 
 def _mismatch_sentence(note: DesignDoc, spec: DesignDoc) -> str:
@@ -621,6 +645,7 @@ def group_designs(docs: list[DesignDoc]) -> tuple[list[Design], list[NotShown]]:
                 outcome=r["outcome"],
                 mismatch=_mismatch_sentence(note, spec) if (r["mismatch"] and note and spec) else "",
                 docs=spec.docs if spec else "",
+                ready=r["ready"],
                 note=note,
                 spec=spec,
             )
@@ -632,7 +657,9 @@ def group_designs(docs: list[DesignDoc]) -> tuple[list[Design], list[NotShown]]:
 
 
 def _lines_for(doc: DesignDoc | None) -> str:
-    """The stamp lines a parsed doc carries, re-spelled for the rule."""
+    """The lines a parsed doc carries that the rule reads, re-spelled for it:
+    the Closed and Outcome stamps, and a spec's Docs line -- without the last, the
+    shared table would pass on raw text while a row read ``ready`` as False."""
     if doc is None:
         return ""
     out = []
@@ -640,6 +667,8 @@ def _lines_for(doc: DesignDoc | None) -> str:
         out.append(f"{stamp_closed()} {doc.closed}")
     if doc.outcome:
         out.append(f"{stamp_outcome()} {doc.outcome}")
+    if doc.docs:
+        out.append(f"{design_docs_line()} {doc.docs}")
     return "\n".join(out)
 
 

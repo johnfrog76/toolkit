@@ -552,6 +552,7 @@ ID_B = "aaaaaaaa-0000-4000-8000-000000000002"
 ID_C = "aaaaaaaa-0000-4000-8000-000000000003"
 ID_D = "aaaaaaaa-0000-4000-8000-000000000004"
 ID_E = "aaaaaaaa-0000-4000-8000-000000000005"
+ID_F = "aaaaaaaa-0000-4000-8000-000000000006"
 
 
 def _front(doc_id: str, description: str = "") -> str:
@@ -579,6 +580,7 @@ class TheStateRule(unittest.TestCase):
                         "outcome": e["outcome"] or "",
                         "mismatch": e["mismatch"],
                         "closed": e["closed"],
+                        "ready": e["ready"],
                     },
                 )
 
@@ -608,7 +610,11 @@ class TheGrouping(unittest.TestCase):
                     "dropped.md": _front(ID_C)
                     + "# An idea that never made it\n\n**Closed:** 2026-11-20\n**Outcome:** dropped\n"
                 },
-                "spec": {"pair.spec.md": _front(ID_A, "not the row's line") + "# Pair (spec)\n"},
+                "spec": {
+                    "pair.spec.md": _front(ID_A, "not the row's line") + "# Pair (spec)\n",
+                    # A live spec marked finished, with no note: ready to complete.
+                    "ready.spec.md": _front(ID_F) + "# Ready (spec)\n\n> Docs: docs/ready.md\n",
+                },
                 "spec/archive": {
                     "built.spec.md": _front(ID_D, "Built and documented")
                     + "# Built (spec)\n\n> Docs: docs/hub/built.md\n\n**Closed:** 2026-10-01\n",
@@ -622,6 +628,7 @@ class TheGrouping(unittest.TestCase):
             [
                 ("Design", "A note alone"),
                 ("Spec", "Feature: the pair"),
+                ("Spec", "Ready (spec)"),
                 ("Complete", "Built (spec)"),
                 ("Complete", "Left behind"),
                 ("Archived", "An idea that never made it"),
@@ -650,6 +657,11 @@ class TheGrouping(unittest.TestCase):
             (built.description, built.docs, built.closed, built.note),
             ("Built and documented", "docs/hub/built.md", "2026-10-01", None),
         )
+        # Ready is proved on the row the route serves, not only by the rule: the
+        # rule is handed re-spelled lines, and the Docs line has to be among them.
+        ready = by[ID_F]
+        self.assertEqual((ready.state, ready.ready, ready.docs), ("Spec", True, "docs/ready.md"))
+        self.assertEqual([d.id for d in resp.designs if d.ready], [ID_F])
         left = by[ID_E]
         self.assertEqual(left.state, "Complete")
         self.assertIn("left behind in design/", left.mismatch)
@@ -686,9 +698,29 @@ class TheGrouping(unittest.TestCase):
         self.assertEqual((d.state, d.closed), ("Spec", ""))
         self.assertIn("archived before its spec", d.mismatch)
 
-    def test_a_live_note_with_an_outcome_line_reads_as_design_with_none(self):
+    def test_a_live_note_marked_shipped_reads_as_a_ready_design_with_no_outcome(self):
         resp = self._list({"design": {"x.md": _front(ID_A) + "# X\n\n**Outcome:** shipped\n"}})
-        self.assertEqual((resp.designs[0].state, resp.designs[0].outcome), ("Design", ""))
+        d = resp.designs[0]
+        self.assertEqual((d.state, d.outcome, d.ready), ("Design", "", True))
+
+    def test_a_row_cached_before_ready_was_read_still_answers_it(self):
+        # The disk cache keeps design_fields' dict by blob sha, and ready adds no
+        # key to it: a row parsed before the rule read ready rebuilds the same.
+        fields = {
+            "heading": "Ready (spec)",
+            "description": "",
+            "thread": "",
+            "thread_number": None,
+            "thread_repo": "",
+            "id": ID_A,
+            "closed": "",
+            "outcome": "",
+            "docs": "docs/ready.md",
+        }
+        text = _front(ID_A) + "# Ready (spec)\n\n> Docs: docs/ready.md\n"
+        self.assertEqual(design.design_fields(text), fields)
+        designs, _ = design.group_designs([design.design_doc(fields, "spec/ready.spec.md")])
+        self.assertEqual((designs[0].state, designs[0].ready), ("Spec", True))
 
 
 class TheSearch(unittest.TestCase):

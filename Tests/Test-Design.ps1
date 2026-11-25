@@ -112,6 +112,7 @@ try {
         Assert-Equal "$($row.name): outcome" $expectedOutcome $r.Outcome
         Assert-Equal "$($row.name): mismatch" ([bool]$e.mismatch) $r.Mismatch
         Assert-Equal "$($row.name): closed" ([string]$e.closed) $r.Closed
+        Assert-Equal "$($row.name): ready" ([bool]$e.ready) ([bool]$r.Ready)
     }
 
     # -- 1b. The title rule over the shared table -----------------------------
@@ -140,6 +141,7 @@ try {
     $idTwice = 'aaaaaaaa-0000-4000-8000-000000000004'
     $idSpecOnly = 'aaaaaaaa-0000-4000-8000-000000000005'
     $idLeft = 'aaaaaaaa-0000-4000-8000-000000000006'
+    $idReady = 'aaaaaaaa-0000-4000-8000-000000000008'
     Write-Lf (Join-Path $tree 'design/pair.md') "---`n${idKey}: $idPair`ndescription: `"The pair's one line`"`n---`n`n# Feature: the pair`n`n> GitHub: https://github.com/o/r/issues/7`n`nBody.`n"
     Write-Lf (Join-Path $tree 'spec/pair.spec.md') "---`n${idKey}: $idPair`ndescription: `"not the row's line`"`n---`n`n# Pair (spec)`n"
     Write-Lf (Join-Path $tree 'design/alone.md') "---`n${idKey}: $idAlone`n---`n`n# A note alone`n" -Crlf
@@ -151,14 +153,16 @@ try {
     Write-Lf (Join-Path $tree 'spec/archive/built.spec.md') "---`n${idKey}: $idSpecOnly`ndescription: 'Built and documented'`n---`n`n# Built (spec)`n`n$docsLine docs/hub/built.md`n`n$closedStamp 2026-10-01`n"
     Write-Lf (Join-Path $tree 'design/left.md') "---`n${idKey}: $idLeft`n---`n`n# Left behind`n"
     Write-Lf (Join-Path $tree 'spec/archive/left.spec.md') "---`n${idKey}: $idLeft`n---`n`n# Left (spec)`n`n$closedStamp 2026-10-02`n"
+    # A live spec marked finished, titled the `## Title` way, CRLF: ready to complete.
+    Write-Lf (Join-Path $tree 'spec/ready.spec.md') "---`n${idKey}: $idReady`n---`n`n## Title`n`nReady (spec)`n`n$docsLine docs/ready.md`n" -Crlf
 
     $read = Read-P20DesignTree -DesignDir (Join-Path $tree 'design') -SpecDir (Join-Path $tree 'spec') -Base $tree
     Assert-True 'structure: design/ is there' ([bool]$read.Structure.design)
     Assert-True 'structure: spec/ is there' ([bool]$read.Structure.spec)
     $by = @{}
     foreach ($d in $read.Designs) { $by[$d.Id] = $d }
-    Assert-Equal 'five designs are shown' 5 @($read.Designs).Count
-    Assert-Equal 'the states come in road order' 'Design,Spec,Complete,Complete,Archived' (@($read.Designs | ForEach-Object { $_.State }) -join ',')
+    Assert-Equal 'six designs are shown' 6 @($read.Designs).Count
+    Assert-Equal 'the states come in road order' 'Design,Spec,Spec,Complete,Complete,Archived' (@($read.Designs | ForEach-Object { $_.State }) -join ',')
     Assert-Equal 'within a state, by title' 'Built (spec),Left behind' (@($read.Designs | Where-Object { $_.State -eq 'Complete' } | ForEach-Object { $_.Title }) -join ',')
 
     $pair = $by[$idPair]
@@ -189,6 +193,14 @@ try {
     Assert-Equal 'its Docs line is read' 'docs/hub/built.md' $built.Docs
     Assert-Equal 'its Closed date is the spec''s' '2026-10-01' $built.Closed
     Assert-True 'it has no note' ($null -eq $built.Note)
+
+    $readyRow = $by[$idReady]
+    Assert-Equal 'a live spec with a Docs line is a Spec' 'Spec' $readyRow.State
+    Assert-True 'and its row reads as ready' ([bool]$readyRow.Ready)
+    Assert-Equal 'naming the document, read without a CR' 'docs/ready.md' $readyRow.Docs
+    Assert-True 'a Spec with no Docs line is not ready' (-not [bool]$pair.Ready)
+    Assert-True 'nor is a note alone with no Outcome line' (-not [bool]$alone.Ready)
+    Assert-True 'nor an archived design' ((-not [bool]$dropped.Ready) -and (-not [bool]$built.Ready))
 
     $left = $by[$idLeft]
     Assert-Equal 'a note left behind: the spec''s folder wins' 'Complete' $left.State
