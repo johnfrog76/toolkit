@@ -58,6 +58,11 @@
       Test-P20StandupDress     the dress guard: a model's sentence and its
                                group's facts -> '' or the guard it fails. The
                                CLI calls no model; the guard is the contract.
+      Read-P20StandupSessions  the session reader: which models worked in a
+                               Space's checkout (or its own git worktrees) in
+                               the window, from Claude Code's session files --
+                               {id, sessionId} pairs and nothing else. Nothing
+                               calls it yet.
 
     The agent's agent/solitaire/standup.py implements the same rule over the
     same files; Tests/fixtures/rituals/standup.json (issues),
@@ -89,6 +94,9 @@ if (-not (Get-Command Get-P20CardId -ErrorAction SilentlyContinue)) { . (Join-Pa
 if (-not (Get-Command Test-P20CardBillable -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Get-PromptFileStatus.ps1') }
 # The room's size, a Space's features.teamSize read the one way.
 if (-not (Get-Command Get-P20TeamSize -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Resolve-TeamSize.ps1') }
+# The session reader: Burn's projects folder and file walk, and the one way a script calls git.
+if (-not (Get-Command Get-P20ClaudeSessionFiles -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Read-ClaudeUsage.ps1') }
+if (-not (Get-Command Invoke-P20TrackerRead -ErrorAction SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1') }
 
 function Get-P20RitualData {
     <# The rituals contract plus the two data files it names, read from the package. #>
@@ -1078,6 +1086,207 @@ function Get-P20StandupCards {
         }
     }
     return $rows.ToArray()
+}
+
+# -- The session reader ---------------------------------------------------------
+#
+# Which models worked in a Space's checkout during a window, read from Claude
+# Code's own session files (the files Burn reads; Scripts/Read-ClaudeUsage.ps1
+# finds them). Three pure rules and two thin reads, the agent's
+# agent/solitaire/sessions.py the same over the same table
+# (Tests/fixtures/rituals/standup-sessions.json, its inside, porcelain,
+# sessions and privacy sections):
+#
+#   ConvertTo-P20SessionPath     a path compared the one way: '\' read as '/',
+#                                trailing separators off.
+#   Test-P20SessionPathInside    is this cwd inside one of these roots.
+#   ConvertFrom-P20WorktreePorcelain  `git worktree list --porcelain` -> roots.
+#   Get-P20StandupWorktreeRoots  the ONE git read: the checkout and its own
+#                                worktrees; the checkout alone when git fails.
+#   Get-P20StandupSessionPairs   (projects folder, window, roots) -> pairs.
+#   Read-P20StandupSessions      the two together, where the folder is there.
+#
+# What leaves: @{ id; sessionId } pairs, distinct, ordered by id then by
+# sessionId (ordinal), and nothing else. The cwd is compared here and dropped;
+# no path, project folder name or message text is returned or logged.
+
+function ConvertTo-P20SessionPath {
+    <#
+      A path as the reader compares it: every '\' read as '/', and trailing
+      separators taken off (a lone '/' and a drive's root keep theirs). Pure.
+    #>
+    param([string]$Path)
+    if ($null -eq $Path) { return '' }
+    $p = $Path.Trim().Replace('\', '/')
+    if (-not $p) { return '' }
+    $trimmed = $p.TrimEnd('/')
+    if (-not $trimmed) { return '/' }
+    if ($trimmed -match '^[A-Za-z]:$') { return ($trimmed + '/') }
+    return $trimmed
+}
+
+function Test-P20SessionPathInside {
+    <#
+      Whether -Path is one of -Roots or inside one: equal to it, or under it
+      past a separator, so '/repo-two' is not inside '/repo'. Separators either
+      way; a Windows root (a drive letter, or a '\\' share) is compared ignoring
+      case, any other ordinal. Pure: no file is touched, so the table drives it
+      on every host.
+    #>
+    param([string]$Path, [string[]]$Roots = @())
+    $p = ConvertTo-P20SessionPath $Path
+    if (-not $p) { return $false }
+    foreach ($root in @($Roots)) {
+        $r = ConvertTo-P20SessionPath $root
+        if (-not $r) { continue }
+        $cmp = [System.StringComparison]::Ordinal
+        if ($r -match '^[A-Za-z]:/' -or $r.StartsWith('//')) { $cmp = [System.StringComparison]::OrdinalIgnoreCase }
+        if ([string]::Equals($p, $r, $cmp)) { return $true }
+        $prefix = $r
+        if (-not $prefix.EndsWith('/')) { $prefix += '/' }
+        if ($p.StartsWith($prefix, $cmp)) { return $true }
+    }
+    return $false
+}
+
+function ConvertFrom-P20WorktreePorcelain {
+    <#
+      `git worktree list --porcelain` -> the working folder of every worktree
+      it lists, in its order: the checkout's own first, then each linked one.
+      A bare entry has no working folder and is left out. CRLF or LF. Pure.
+    #>
+    param([string]$Text)
+    $roots = @()
+    if (-not $Text) { return $roots }
+    $current = $null
+    $bare = $false
+    foreach ($raw in @(($Text -replace "`r", '') -split "`n")) {
+        $line = [string]$raw
+        if (-not $line) {
+            if ($null -ne $current -and -not $bare) { $roots += $current }
+            $current = $null
+            $bare = $false
+            continue
+        }
+        if ($line.StartsWith('worktree ')) {
+            if ($null -ne $current -and -not $bare) { $roots += $current }
+            $current = $line.Substring(9)
+            $bare = $false
+            continue
+        }
+        if ($line -ceq 'bare') { $bare = $true }
+    }
+    if ($null -ne $current -and -not $bare) { $roots += $current }
+    return $roots
+}
+
+function Get-P20StandupWorktreeRoots {
+    <#
+      The roots a session's cwd may sit in: the checkout, then its own git
+      worktrees, from ONE `git worktree list --porcelain` in the checkout
+      (Invoke-P20TrackerRead). When git cannot answer -- not a repository, no
+      git -- the checkout alone, and nothing is thrown.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Checkout)
+    $roots = @($Checkout)
+    $read = $null
+    try { $read = Invoke-P20TrackerRead 'git' @('-C', $Checkout, 'worktree', 'list', '--porcelain') }
+    catch { $read = $null }
+    if ($null -eq $read -or $read.Code -ne 0) { return $roots }
+    foreach ($r in @(ConvertFrom-P20WorktreePorcelain -Text (@($read.Out) -join "`n"))) {
+        # The checkout's own entry is listed again; a root is kept once.
+        $key = ConvertTo-P20SessionPath $r
+        if (@($roots | Where-Object { (ConvertTo-P20SessionPath $_) -eq $key }).Count -eq 0) { $roots += $r }
+    }
+    return $roots
+}
+
+function Get-P20StandupSessionPairs {
+    <#
+      Which models worked in the window, by session: from the session files
+      under -ProjectsRoot (Get-P20ClaudeSessionFiles, Burn's own walk -- a file
+      last written before -Since is not opened), every assistant line whose
+      model is not in consts.json models.notModels, whose timestamp is in
+      [-Since, -AsOf] and whose cwd is inside one of -Roots. A subagent's lines
+      carry the parent's sessionId, so they count toward it; a line with none
+      takes its file's session. Files are opened read-only and shared; a line
+      that is not JSON is skipped. Only type, message.model, sessionId,
+      timestamp and cwd are read. Returns @(@{ id; sessionId }), distinct,
+      ordered by id then by sessionId, ordinal.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectsRoot,
+        [Parameter(Mandatory = $true)]$Since,
+        [Parameter(Mandatory = $true)]$AsOf,
+        [string[]]$Roots = @()
+    )
+    $from = ConvertTo-P20RitualTime $Since
+    $to = ConvertTo-P20RitualTime $AsOf
+    if ($null -eq $from -or $null -eq $to -or -not (Test-Path -LiteralPath $ProjectsRoot -PathType Container)) { return @() }
+    $from = $from.ToUniversalTime()
+    $to = $to.ToUniversalTime()
+    $jsonArgs = @{}
+    if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $jsonArgs['DateKind'] = 'String' }
+    $notModels = @((Get-P20Consts).models.notModels)
+    $seen = @{}
+    foreach ($file in @(Get-P20ClaudeSessionFiles -ProjectsRoot $ProjectsRoot -SinceUtc $from.UtcDateTime)) {
+        $stream = $null
+        $reader = $null
+        try {
+            $share = [System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete
+            $stream = New-Object System.IO.FileStream($file.Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, $share)
+            $reader = New-Object System.IO.StreamReader($stream, (New-Object System.Text.UTF8Encoding($false)))
+            while ($null -ne ($line = $reader.ReadLine())) {
+                if (-not $line.Contains('"assistant"')) { continue }
+                $o = $null
+                try { $o = $line | ConvertFrom-Json @jsonArgs -ErrorAction Stop }
+                catch { continue }
+                if ($null -eq $o -or $o -isnot [System.Management.Automation.PSCustomObject]) { continue }
+                if ([string]$o.type -cne 'assistant' -or $null -eq $o.message) { continue }
+                $model = [string]$o.message.model
+                if (-not $model -or $notModels -ccontains $model) { continue }
+                $at = ConvertTo-P20UtcInstant $o.timestamp
+                if ($null -eq $at -or $at -lt $from -or $at -gt $to) { continue }
+                if (-not (Test-P20SessionPathInside -Path ([string]$o.cwd) -Roots $Roots)) { continue }
+                $session = [string]$o.sessionId
+                if (-not $session) { $session = [string]$file.Session }
+                $seen[$model + [char]0 + $session] = $true
+            }
+        }
+        catch { $null = $_ }
+        finally {
+            if ($reader) { $reader.Dispose() }
+            elseif ($stream) { $stream.Dispose() }
+        }
+    }
+    $keys = [string[]]@($seen.Keys)
+    [Array]::Sort($keys, [System.StringComparer]::Ordinal)
+    $pairs = @()
+    foreach ($k in $keys) {
+        $parts = $k.Split([char]0)
+        $pairs += [ordered]@{ id = $parts[0]; sessionId = $parts[1] }
+    }
+    return $pairs
+}
+
+function Read-P20StandupSessions {
+    <#
+      The session read for a Space: its checkout's roots (one git read) and
+      the pairs from this machine's Claude Code projects folder
+      (Get-P20ClaudeProjectsRoot, unless -ProjectsRoot names one). No folder,
+      no checkout: no pairs, and nothing is opened.
+    #>
+    param(
+        [string]$Checkout,
+        [Parameter(Mandatory = $true)]$Since,
+        [Parameter(Mandatory = $true)]$AsOf,
+        [string]$ProjectsRoot
+    )
+    if (-not $Checkout) { return @() }
+    if (-not $ProjectsRoot) { $ProjectsRoot = Get-P20ClaudeProjectsRoot }
+    if (-not (Test-Path -LiteralPath $ProjectsRoot -PathType Container)) { return @() }
+    $roots = @(Get-P20StandupWorktreeRoots -Checkout $Checkout)
+    return @(Get-P20StandupSessionPairs -ProjectsRoot $ProjectsRoot -Since $Since -AsOf $AsOf -Roots $roots)
 }
 
 function ConvertTo-P20StandupDay {

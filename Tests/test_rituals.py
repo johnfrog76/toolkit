@@ -1465,6 +1465,253 @@ class TheModelObject(unittest.TestCase):
                 self.assertIsNone(model_object(mid, "a-session"))
 
 
+def _session_line(spec: dict, content: str) -> str:
+    """One line spec of standup-sessions.json rendered as Claude Code writes a
+    line -- the same rendering tkTestToolkit -Rituals does."""
+    if "raw" in spec:
+        return spec["raw"]
+    kind = spec.get("type", "assistant")
+    line = {
+        "parentUuid": None,
+        "isSidechain": bool(spec.get("side")),
+        "message": {
+            "model": spec["model"],
+            "type": "message",
+            "role": "assistant" if kind == "assistant" else "user",
+            "content": [{"type": "text", "text": content}],
+        },
+        "type": kind,
+        "uuid": "00000000-0000-4000-8000-000000000000",
+        "timestamp": spec["t"],
+    }
+    if "cwd" in spec:
+        line["cwd"] = spec["cwd"]
+    if "sid" in spec:
+        line["sessionId"] = spec["sid"]
+    return json.dumps(line)
+
+
+def _session_tree(row: dict, projects: Path) -> None:
+    """A scratch projects folder from a sessions row. A file's last write is its
+    ``mtime`` (os.utime), else the row's asOf."""
+    from agent.solitaire.sessions import _instant
+
+    default = datetime.fromisoformat(row["window"]["asOf"]).timestamp()
+    for rel, value in row["files"].items():
+        lines, mtime = value, default
+        if isinstance(value, dict):
+            lines = value["lines"]
+            if "mtime" in value:
+                mtime = _instant(value["mtime"]).timestamp()
+        path = projects / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        text = "".join(_session_line(s, SESSIONS_TABLE["content"]) + "\n" for s in lines)
+        path.write_bytes(text.encode("utf-8"))
+        os.utime(path, (mtime, mtime))
+
+
+def _session_roots(row: dict) -> list[str]:
+    from agent.solitaire.sessions import parse_worktree_porcelain
+
+    return [row["checkout"], *row.get("worktrees", []), *parse_worktree_porcelain(row.get("porcelain", ""))]
+
+
+def _session_read(row: dict) -> list[dict]:
+    from agent.solitaire.sessions import session_pairs
+
+    with tempfile.TemporaryDirectory() as tmp:
+        projects = Path(tmp) / "projects"
+        projects.mkdir()
+        _session_tree(row, projects)
+        window = row["window"]
+
+        def snapshot():
+            return [
+                (str(f), f.stat().st_size, f.stat().st_mtime_ns, f.read_bytes())
+                for f in sorted(projects.rglob("*"))
+                if f.is_file()
+            ]
+
+        before = snapshot()
+        got = session_pairs(
+            projects,
+            datetime.fromisoformat(window["since"]),
+            datetime.fromisoformat(window["asOf"]),
+            _session_roots(row),
+        )
+        assert snapshot() == before, f"{row['name']}: the reader changed the projects folder"
+        return got
+
+
+def _session_secrets(row: dict) -> list[str]:
+    """Every path segment of four characters or more the row could leak: its
+    checkout, worktrees, porcelain folders, cwd values and project folder names,
+    each also split on '-'."""
+    from agent.solitaire.sessions import parse_worktree_porcelain
+
+    paths = [row["checkout"], *row.get("worktrees", []), *parse_worktree_porcelain(row.get("porcelain", ""))]
+    for value in row["files"].values():
+        for spec in value["lines"] if isinstance(value, dict) else value:
+            if "cwd" in spec:
+                paths.append(spec["cwd"])
+    folders = [rel.replace("\\", "/").split("/")[0] for rel in row["files"]]
+    words = set()
+    for text in [*paths, *folders]:
+        for seg in re.split(r"[\\/]", text):
+            for piece in [seg, *seg.split("-")]:
+                if len(piece) >= 4:
+                    words.add(piece)
+    return sorted(words)
+
+
+class TheSessionReader(unittest.TestCase):
+    """standup-sessions.json's ``inside``, ``porcelain``, ``sessions`` and
+    ``privacy`` sections -- the same rows tkTestToolkit -Rituals asserts from the
+    CLI's Read-P20StandupSessions and its rules. Every read is over a scratch
+    projects folder; this machine's own is never opened."""
+
+    def test_the_table_has_its_rows(self):
+        for section, least in (("inside", 12), ("porcelain", 3), ("sessions", 14), ("privacy", 2)):
+            with self.subTest(section=section):
+                self.assertGreaterEqual(len(SESSIONS_TABLE[section]), least)
+                self.assertTrue(all(row.get("name") for row in SESSIONS_TABLE[section]))
+
+    def test_every_inside_row(self):
+        from agent.solitaire.sessions import path_inside
+
+        for row in SESSIONS_TABLE["inside"]:
+            with self.subTest(row=row["name"]):
+                self.assertIs(path_inside(row["path"], row["roots"]), row["expected"])
+
+    def test_every_porcelain_row(self):
+        from agent.solitaire.sessions import parse_worktree_porcelain
+
+        for row in SESSIONS_TABLE["porcelain"]:
+            with self.subTest(row=row["name"]):
+                self.assertEqual(parse_worktree_porcelain(row["text"]), row["expected"])
+
+    def test_every_sessions_row(self):
+        stamped = 0
+        for row in SESSIONS_TABLE["sessions"]:
+            with self.subTest(row=row["name"]):
+                self.assertEqual(_session_read(row), row["expected"])
+                if any(isinstance(v, dict) and "mtime" in v for v in row["files"].values()):
+                    # The file's last write is what keeps it out: written at asOf, it counts.
+                    stamped += 1
+                    plain = {k: v["lines"] if isinstance(v, dict) else v for k, v in row["files"].items()}
+                    fresh = dict(row, files=plain)
+                    self.assertNotEqual(_session_read(fresh), [], "the stamped file's line is in the window")
+        self.assertGreaterEqual(stamped, 1)
+
+    def test_the_privacy_rules_over_every_sessions_row(self):
+        rules = {r["rule"]: r for r in SESSIONS_TABLE["privacy"]}
+        self.assertEqual(set(rules), {"keys", "strings"})
+        for row in SESSIONS_TABLE["sessions"]:
+            with self.subTest(row=row["name"]):
+                got = _session_read(row)
+                for pair in got:
+                    self.assertEqual(sorted(pair), sorted(rules["keys"]["allowed"]))
+                needles = [*rules["strings"]["needles"], *_session_secrets(row)]
+                expected_text = json.dumps(row["expected"]).lower()
+                for needle in needles:
+                    self.assertNotIn(needle.lower(), expected_text, "a needle the expected pairs hold proves nothing")
+                text = json.dumps(got).lower()
+                for needle in needles:
+                    self.assertNotIn(needle.lower(), text)
+
+    def test_the_worktrees_come_from_one_git_read_and_count(self):
+        from agent.solitaire import sessions
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve()
+            repo, sibling = base / "repo", base / "repo-wt"
+            repo.mkdir()
+
+            def git(*args):
+                subprocess.run(
+                    ["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.com", *args],
+                    check=True,
+                    capture_output=True,
+                )
+
+            git("init", "--quiet")
+            git("-c", "commit.gpgsign=false", "commit", "--allow-empty", "--quiet", "-m", "start")
+            git("worktree", "add", "--quiet", "--detach", str(sibling))
+            top = subprocess.run(
+                ["git", "-C", str(sibling), "rev-parse", "--show-toplevel"], check=True, capture_output=True, text=True
+            ).stdout.strip()
+            calls = []
+            real = sessions.git_read
+
+            def counting(args, cwd):
+                calls.append(args)
+                return real(args, cwd)
+
+            with mock.patch.object(sessions, "git_read", counting):
+                roots = sessions.worktree_roots(str(repo))
+            self.assertEqual(calls, [["worktree", "list", "--porcelain"]])
+            self.assertEqual(roots[0], str(repo))
+            self.assertTrue(sessions.path_inside(top + "/web", roots), "the sibling worktree is a root")
+            self.assertFalse(sessions.path_inside(str(base / "repo-two"), roots))
+
+            # End to end: CLAUDE_CONFIG_DIR at a scratch folder, a session in the sibling.
+            config_dir = base / "claude"
+            row = {
+                "window": {"since": "2026-11-20T00:00:00-08:00", "asOf": "2026-11-23T09:30:00-08:00"},
+                "files": {
+                    "-scratch-repo-wt/cccccccc-0000-4000-8000-000000000001.jsonl": [
+                        {
+                            "t": "2026-11-21T10:00:00.000Z",
+                            "sid": "cccccccc-0000-4000-8000-000000000001",
+                            "cwd": top,
+                            "model": "claude-opus-5-5",
+                        }
+                    ]
+                },
+            }
+            (config_dir / "projects").mkdir(parents=True)
+            _session_tree(row, config_dir / "projects")
+            with mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(config_dir)}):
+                got = sessions.read_sessions(
+                    str(repo),
+                    datetime.fromisoformat(row["window"]["since"]),
+                    datetime.fromisoformat(row["window"]["asOf"]),
+                )
+            self.assertEqual(got, [{"id": "claude-opus-5-5", "sessionId": "cccccccc-0000-4000-8000-000000000001"}])
+
+    def test_a_git_read_that_fails_leaves_the_checkout_alone(self):
+        from agent.solitaire import sessions
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(sessions.worktree_roots(tmp), [tmp])
+        with mock.patch.object(sessions, "git_read", return_value=None):
+            self.assertEqual(sessions.worktree_roots("/nowhere/repo"), ["/nowhere/repo"])
+
+    def test_no_projects_folder_reads_nothing(self):
+        from agent.solitaire import sessions
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with (
+                mock.patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": str(Path(tmp) / "absent")}),
+                mock.patch.object(sessions, "session_pairs") as pairs,
+                mock.patch.object(sessions, "worktree_roots") as roots,
+            ):
+                since = datetime.fromisoformat("2026-11-20T00:00:00-08:00")
+                self.assertEqual(sessions.read_sessions(tmp, since, since), [])
+            pairs.assert_not_called()
+            roots.assert_not_called()
+
+    def test_nothing_calls_it_yet(self):
+        """No route, no verb: no module of the agent imports the reader."""
+        for path in sorted((REPO_ROOT / "agent").rglob("*.py")):
+            if path.name == "sessions.py" and path.parent.name == "solitaire":
+                continue
+            with self.subTest(path=path.relative_to(REPO_ROOT).as_posix()):
+                text = path.read_text(encoding="utf-8")
+                callers = r"solitaire\.sessions|from \.sessions import|from \. import[^\n]*\bsessions\b"
+                self.assertNotRegex(text, callers)
+
+
 TEAM_TABLE = json.loads((FIXTURES / "standup-team.json").read_text(encoding="utf-8"))
 
 

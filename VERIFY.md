@@ -1368,6 +1368,17 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `Fixture hub copy removed (<path>)`, the folder and `.web.fixture` are gone, and no `Could not remove` line -- the
   removal waits for the stopped agent's handles. The macOS host proved the copy, the record, the removal and the
   `Config` read with the agent stubbed; a Windows temp path, a real agent holding the folder, and 5.1 are this row's.
+- [ ] **The session reader on a Windows path, under both hosts (Refs #571).** On the Windows PC, in `powershell` (5.1)
+  and again in `pwsh`, from the repository root: `tkTestToolkit -Rituals` passes its `-- The session reader --` block,
+  the Windows checkout row and the scratch repository's worktree checks among it. Then take a Space's checkout on a
+  drive-letter path that Claude Code worked in today, and run `. .\Scripts\Standup-Rules.ps1;
+  Read-P20StandupSessions -Checkout '<that folder, typed in another letter case>' -Since (Get-Date).Date -AsOf (Get-Date)
+  | ConvertTo-Json`: you should see one `{ "id": ..., "sessionId": ... }` per model that worked there today, and no
+  path, folder name or prompt text. Typed with forward slashes, or with a trailing `\`, the answer is the same. Start a
+  Claude Code session in a sibling worktree of that checkout (`git worktree add ..\<name>-wt`), and it is listed too;
+  a folder beside the checkout whose name only starts with the checkout's (`<name>-two`) is not. The macOS host proved
+  the rule over the shared table's Windows rows; a `cwd` Claude Code really writes on Windows, git's own worktree list
+  there, and 5.1 are this row's.
 
 ## Recording a run
 

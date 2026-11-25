@@ -40,6 +40,12 @@
                      in, {id, sessionId, name, family, known} or none out, a
                      known row's name and family the shipped map's own row --
                      the rows the agent asserts.
+    2c'''. Sessions  the same file's inside, porcelain, sessions and privacy
+                     rows: the path rule, the worktree list's parse, and the
+                     session reader over a scratch projects folder per row --
+                     {id, sessionId} pairs and nothing else, the folder left
+                     as it was; one git worktree list per read in a scratch
+                     repository; nothing calls the reader yet.
     2c'. The team    Tests/fixtures/rituals/standup-team.json: every size
                      row (a stored teamSize read as the room), every seat row
                      (who is present: the ones with work first, then the idle),
@@ -1021,6 +1027,220 @@ foreach ($lrow in $lookupRows) {
 foreach ($nm in @($consts.models.notModels)) {
     Assert-True "model object: '$nm' from models.notModels is no object" ($null -eq (Get-P20ModelObject -Id ([string]$nm) -SessionId 'a-session'))
 }
+
+# -- 1c'''. The session reader ---------------------------------------------
+# standup-sessions.json's inside, porcelain, sessions and privacy sections, the
+# SAME rows Tests/test_rituals.py asserts from agent/solitaire/sessions.py. Every
+# read is over a scratch projects folder built here; this machine's own Claude
+# Code folder is never opened (every call names -ProjectsRoot, or points
+# CLAUDE_CONFIG_DIR at a scratch folder and puts it back).
+Write-Host ""
+Write-Host "-- The session reader --" -ForegroundColor Cyan
+. (Join-Path $scriptDir 'Get-TestHost.ps1')
+# Timestamps stay text: PowerShell 7 would read an ISO string as a date.
+$sessJsonArgs = @{}
+if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $sessJsonArgs['DateKind'] = 'String' }
+$sessTable = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'standup-sessions.json')) | ConvertFrom-Json @sessJsonArgs
+$sessText = {
+    param($Value)
+    if ($Value -is [DateTime]) { return ([DateTime]$Value).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [System.Globalization.CultureInfo]::InvariantCulture) }
+    return [string]$Value
+}
+foreach ($sec in @(@('inside', 12), @('porcelain', 3), @('sessions', 14), @('privacy', 2))) {
+    $secRows = @($sessTable.($sec[0]))
+    Assert-True "the sessions table has its $($sec[0]) rows, each named" ($secRows.Count -ge $sec[1] -and @($secRows | Where-Object { -not [string]$_.name }).Count -eq 0) "$($secRows.Count) rows"
+}
+foreach ($irow in @($sessTable.inside)) {
+    $got = Test-P20SessionPathInside -Path ([string]$irow.path) -Roots ([string[]]@($irow.roots))
+    Assert-True "inside: $($irow.name)" ($got -eq [bool]$irow.expected) "got $got"
+}
+foreach ($prow in @($sessTable.porcelain)) {
+    $got = @(ConvertFrom-P20WorktreePorcelain -Text ([string]$prow.text))
+    $want = @($prow.expected | ForEach-Object { [string]$_ })
+    Assert-True "porcelain: $($prow.name)" (($got -join '|') -ceq ($want -join '|') -and $got.Count -eq $want.Count) ("got " + ($got -join ' | '))
+}
+
+$sessContent = [string]$sessTable.content
+$newSessionLine = {
+    # One line spec rendered as Claude Code writes a line -- the agent's suite renders the same.
+    param($Spec)
+    if ($Spec.PSObject.Properties['raw']) { return [string]$Spec.raw }
+    $kind = 'assistant'
+    if ($Spec.PSObject.Properties['type']) { $kind = [string]$Spec.type }
+    $role = 'user'
+    if ($kind -eq 'assistant') { $role = 'assistant' }
+    $message = [ordered]@{ model = [string]$Spec.model; type = 'message'; role = $role; content = @([ordered]@{ type = 'text'; text = $sessContent }) }
+    $line = [ordered]@{ parentUuid = $null; isSidechain = [bool]($Spec.PSObject.Properties['side'] -and $Spec.side); message = $message; type = $kind }
+    $line['uuid'] = '00000000-0000-4000-8000-000000000000'
+    $line['timestamp'] = & $sessText $Spec.t
+    if ($Spec.PSObject.Properties['cwd']) { $line['cwd'] = [string]$Spec.cwd }
+    if ($Spec.PSObject.Properties['sid']) { $line['sessionId'] = [string]$Spec.sid }
+    return ($line | ConvertTo-Json -Compress -Depth 10)
+}
+$newSessionTree = {
+    # A scratch projects folder from a sessions row. A file's last write is its
+    # mtime ([System.IO.File]::SetLastWriteTimeUtc), else the row's asOf.
+    param($Row, [string]$Projects, [switch]$NoMtime)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    $asOfUtc = (ConvertTo-P20RitualTime $Row.window.asOf).UtcDateTime
+    foreach ($p in @($Row.files.PSObject.Properties)) {
+        $lines = $p.Value
+        $mtime = $asOfUtc
+        if ($lines -isnot [System.Array] -and $lines.PSObject.Properties['lines']) {
+            if ($lines.PSObject.Properties['mtime'] -and -not $NoMtime) { $mtime = (ConvertTo-P20RitualTime (& $sessText $lines.mtime)).UtcDateTime }
+            $lines = $lines.lines
+        }
+        $path = Join-Path $Projects $p.Name
+        New-Item -ItemType Directory -Path (Split-Path -Parent $path) -Force | Out-Null
+        $text = ((@($lines) | ForEach-Object { & $newSessionLine $_ }) -join "`n") + "`n"
+        [System.IO.File]::WriteAllText($path, $text, $utf8NoBom)
+        [System.IO.File]::SetLastWriteTimeUtc($path, $mtime)
+    }
+}
+$sessSnapshot = {
+    param([string]$Dir)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return ((@(Get-ChildItem -LiteralPath $Dir -Recurse -Force -File | Sort-Object FullName | ForEach-Object {
+                        "$($_.FullName)|$($_.Length)|$($_.LastWriteTimeUtc.Ticks)|" + [BitConverter]::ToString($sha.ComputeHash([System.IO.File]::ReadAllBytes($_.FullName)))
+                    })) -join "`n")
+    }
+    finally { $sha.Dispose() }
+}
+$sessScratch = Join-Path ([System.IO.Path]::GetTempPath()) ('p20-sessions-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Path $sessScratch -Force | Out-Null
+$sessRead = {
+    # The reader over one row's scratch folder; the folder must read the same after.
+    param($Row, [switch]$NoMtime)
+    $projects = Join-Path $sessScratch ('projects-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Path $projects -Force | Out-Null
+    & $newSessionTree $Row $projects -NoMtime:$NoMtime
+    $roots = @([string]$Row.checkout)
+    if ($Row.PSObject.Properties['worktrees']) { $roots += @($Row.worktrees | ForEach-Object { [string]$_ }) }
+    if ($Row.PSObject.Properties['porcelain']) { $roots += @(ConvertFrom-P20WorktreePorcelain -Text ([string]$Row.porcelain)) }
+    $before = & $sessSnapshot $projects
+    $pairs = @(Get-P20StandupSessionPairs -ProjectsRoot $projects -Since (& $sessText $Row.window.since) -AsOf (& $sessText $Row.window.asOf) -Roots ([string[]]$roots))
+    $after = & $sessSnapshot $projects
+    return [pscustomobject]@{ Pairs = $pairs; Untouched = ($before -ceq $after) }
+}
+$pairsText = { param($Pairs) ((@($Pairs) | ForEach-Object { "$($_.id)=$($_.sessionId)" }) -join ', ') }
+
+$privacyRules = @{}
+foreach ($pr in @($sessTable.privacy)) { $privacyRules[[string]$pr.rule] = $pr }
+Assert-True 'privacy: the two rules, keys and strings' ((@($sessTable.privacy | ForEach-Object { [string]$_.rule } | Sort-Object) -join ',') -ceq 'keys,strings')
+$stamped = 0
+try {
+    foreach ($srow in @($sessTable.sessions)) {
+        $read = & $sessRead $srow
+        $want = @($srow.expected | Where-Object { $null -ne $_ })
+        Assert-True "sessions: $($srow.name)" ((& $pairsText $read.Pairs) -ceq (& $pairsText $want) -and $read.Pairs.Count -eq $want.Count) ("got " + (& $pairsText $read.Pairs))
+        Assert-True "sessions: $($srow.name) -- the folder is read-only to the reader" $read.Untouched
+        $hasMtime = @($srow.files.PSObject.Properties | Where-Object { $_.Value -isnot [System.Array] -and $_.Value.PSObject.Properties['mtime'] }).Count -gt 0
+        if ($hasMtime) {
+            # The file's last write is what keeps it out: written at asOf, it counts.
+            $stamped++
+            $fresh = & $sessRead $srow -NoMtime
+            Assert-True "sessions: $($srow.name) -- written at asOf, the same file counts" ($fresh.Pairs.Count -gt 0) 'the stamped line is not in the window'
+        }
+
+        # privacy: no key but id and sessionId; no needle and no path segment of the row.
+        $allowed = (@($privacyRules['keys'].allowed | ForEach-Object { [string]$_ } | Sort-Object) -join ',')
+        $badKeys = @($read.Pairs | Where-Object { (@($_.Keys | ForEach-Object { [string]$_ } | Sort-Object) -join ',') -cne $allowed })
+        Assert-True "privacy: $($srow.name) -- a pair carries id and sessionId and nothing else" ($badKeys.Count -eq 0)
+        $paths = @([string]$srow.checkout)
+        if ($srow.PSObject.Properties['worktrees']) { $paths += @($srow.worktrees | ForEach-Object { [string]$_ }) }
+        if ($srow.PSObject.Properties['porcelain']) { $paths += @(ConvertFrom-P20WorktreePorcelain -Text ([string]$srow.porcelain)) }
+        foreach ($p in @($srow.files.PSObject.Properties)) {
+            $ls = $p.Value
+            if ($ls -isnot [System.Array] -and $ls.PSObject.Properties['lines']) { $ls = $ls.lines }
+            foreach ($spec in @($ls)) { if ($spec.PSObject.Properties['cwd']) { $paths += [string]$spec.cwd } }
+            $paths += ($p.Name -replace '\\', '/').Split('/')[0]
+        }
+        $needles = @($privacyRules['strings'].needles | ForEach-Object { [string]$_ })
+        foreach ($t in $paths) {
+            foreach ($seg in @($t -split '[\\/]')) {
+                foreach ($piece in @(@($seg) + @($seg.Split('-')))) { if ($piece.Length -ge 4) { $needles += $piece } }
+            }
+        }
+        $wantJson = (ConvertTo-Json -InputObject @($want | ForEach-Object { [string]$_.id; [string]$_.sessionId }) -Compress)
+        $gotJson = (ConvertTo-Json -InputObject @($read.Pairs) -Compress -Depth 5)
+        $proves = @($needles | Where-Object { $wantJson.IndexOf($_, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 })
+        Assert-True "privacy: $($srow.name) -- no needle is part of an expected pair, so the check has teeth" ($proves.Count -eq 0) ($proves -join ', ')
+        $leaks = @($needles | Where-Object { $gotJson.IndexOf($_, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 } | Sort-Object -Unique)
+        Assert-True "privacy: $($srow.name) -- no path, folder name or prompt text in the output" ($leaks.Count -eq 0) ($leaks -join ', ')
+    }
+    Assert-True 'sessions: at least one row is kept out by its file''s last write alone' ($stamped -ge 1)
+
+    # The thin reads: ONE git worktree list in the checkout, a sibling worktree
+    # counted, the checkout alone when git fails, and nothing read with no folder.
+    $sessRepo = Join-Path $sessScratch 'repo'
+    $sessSibling = Join-Path $sessScratch 'repo-wt'
+    New-Item -ItemType Directory -Path $sessRepo -Force | Out-Null
+    $null = Invoke-P20TestGit -C $sessRepo init --quiet
+    $null = Invoke-P20TestGit -C $sessRepo -c user.name=Test -c user.email=test@example.com -c commit.gpgsign=false commit --allow-empty --quiet -m start
+    $null = Invoke-P20TestGit -C $sessRepo worktree add --quiet --detach $sessSibling
+    $siblingTop = ((Invoke-P20TestGit -C $sessSibling rev-parse --show-toplevel).Out -join '').Trim()
+    Assert-True 'the scratch repository has its sibling worktree' ([bool]$siblingTop) $siblingTop
+
+    $realGit = (Get-Command git -CommandType Application | Select-Object -First 1).Source
+    $global:P20SessGitCalls = @()
+    $global:P20SessRealGit = $realGit
+    function global:git { $global:P20SessGitCalls += , (@($args) -join ' '); & $global:P20SessRealGit @args }
+    try {
+        $roots = @(Get-P20StandupWorktreeRoots -Checkout $sessRepo)
+        $calls = @($global:P20SessGitCalls)
+        $global:P20SessGitCalls = @()
+        $failRoots = @(Get-P20StandupWorktreeRoots -Checkout $sessScratch)
+        $failCalls = @($global:P20SessGitCalls)
+
+        $configDir = Join-Path $sessScratch 'claude'
+        $e2e = [pscustomobject]@{
+            window = [pscustomobject]@{ since = '2026-11-20T00:00:00-08:00'; asOf = '2026-11-23T09:30:00-08:00' }
+            files  = [pscustomobject]@{ '-scratch-repo-wt/cccccccc-0000-4000-8000-000000000001.jsonl' = @([pscustomobject]@{ t = '2026-11-21T10:00:00.000Z'; sid = 'cccccccc-0000-4000-8000-000000000001'; cwd = $siblingTop; model = 'claude-opus-5-5' }) }
+        }
+        New-Item -ItemType Directory -Path (Join-Path $configDir 'projects') -Force | Out-Null
+        & $newSessionTree $e2e (Join-Path $configDir 'projects')
+        $savedConfigDir = [System.Environment]::GetEnvironmentVariable('CLAUDE_CONFIG_DIR')
+        try {
+            [System.Environment]::SetEnvironmentVariable('CLAUDE_CONFIG_DIR', $configDir)
+            $global:P20SessGitCalls = @()
+            $e2ePairs = @(Read-P20StandupSessions -Checkout $sessRepo -Since $e2e.window.since -AsOf $e2e.window.asOf)
+            $e2eCalls = @($global:P20SessGitCalls)
+            [System.Environment]::SetEnvironmentVariable('CLAUDE_CONFIG_DIR', (Join-Path $sessScratch 'absent'))
+            $global:P20SessGitCalls = @()
+            $nonePairs = @(Read-P20StandupSessions -Checkout $sessRepo -Since $e2e.window.since -AsOf $e2e.window.asOf)
+            $noneCalls = @($global:P20SessGitCalls)
+        }
+        finally { [System.Environment]::SetEnvironmentVariable('CLAUDE_CONFIG_DIR', $savedConfigDir) }
+    }
+    finally {
+        Remove-Item Function:\git -ErrorAction SilentlyContinue
+        Remove-Variable -Name P20SessGitCalls, P20SessRealGit -Scope Global -ErrorAction SilentlyContinue
+    }
+    Assert-True 'worktrees: one git worktree list --porcelain in the checkout' ($calls.Count -eq 1 -and $calls[0].StartsWith('-C ') -and $calls[0].EndsWith(' worktree list --porcelain')) ($calls -join ' ; ')
+    Assert-True 'worktrees: the checkout first, the sibling worktree a root' ($roots[0] -ceq $sessRepo -and (Test-P20SessionPathInside -Path ($siblingTop + '/web') -Roots $roots) -and -not (Test-P20SessionPathInside -Path (Join-Path $sessScratch 'repo-two') -Roots $roots)) ($roots -join ' | ')
+    Assert-True 'worktrees: where git cannot answer, the checkout alone, and nothing thrown' ($failCalls.Count -eq 1 -and $failRoots.Count -eq 1 -and $failRoots[0] -ceq $sessScratch) ($failRoots -join ' | ')
+    Assert-True 'sessions read: CLAUDE_CONFIG_DIR''s folder, a session in the sibling worktree counted, one git call' ((& $pairsText $e2ePairs) -ceq 'claude-opus-5-5=cccccccc-0000-4000-8000-000000000001' -and $e2eCalls.Count -eq 1) ((& $pairsText $e2ePairs) + ' / ' + $e2eCalls.Count)
+    Assert-True 'sessions read: no projects folder, no pairs and no git call' ($nonePairs.Count -eq 0 -and $noneCalls.Count -eq 0) "$($nonePairs.Count) / $($noneCalls.Count)"
+}
+catch { Assert-True 'the session reader cases ran to the end without a terminating error' $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $sessScratch -Recurse -Force -ErrorAction SilentlyContinue }
+
+# Nothing calls it yet: no verb, no wrapper, no bridge entry, no other script
+# names the reader -- only Scripts/Standup-Rules.ps1, which defines it, and its
+# twin agent/solitaire/sessions.py, which names it.
+$sessNames = @('Read-P20StandupSessions', 'Get-P20StandupSessionPairs', 'Get-P20StandupWorktreeRoots', 'ConvertFrom-P20WorktreePorcelain', 'Test-P20SessionPathInside')
+$sessCallers = @()
+foreach ($dir in @('Scripts', 'Prompt20Toolkit', 'Config', 'agent')) {
+    foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $pkgRoot $dir) -Recurse -File -Include '*.ps1', '*.psm1', '*.psd1', '*.json', '*.py' -ErrorAction SilentlyContinue)) {
+        if ($f.Name -eq 'Standup-Rules.ps1' -or ($f.Name -eq 'sessions.py' -and $f.Directory.Name -eq 'solitaire')) { continue }
+        $body = [System.IO.File]::ReadAllText($f.FullName)
+        foreach ($n in $sessNames) { if ($body.Contains($n)) { $sessCallers += "$($f.Name): $n" } }
+    }
+}
+$defaultCommands = ([System.IO.File]::ReadAllText((Join-Path $pkgRoot 'config.default.json')) | ConvertFrom-Json).commands
+$sessVerb = @($defaultCommands.PSObject.Properties | Where-Object { $_.Name -match 'Session' })
+Assert-True 'the session reader has no caller yet: no verb, no wrapper, no route' ($sessCallers.Count -eq 0 -and $sessVerb.Count -eq 0) (($sessCallers + @($sessVerb | ForEach-Object { $_.Name })) -join '; ')
 
 # -- 1d'. The team size ----------------------------------------------------
 # Tests/fixtures/rituals/standup-team.json, every row and every case, the SAME
