@@ -447,6 +447,8 @@ EXPECTED = {
     ("models", "file"): "Config/models.json",
     # The order a card's agent is worked out in: the agent reads it through model_agent_sources().
     ("models", "agentSources"): ["line", "assigned", "trailer", "none"],
+    # The ids no model produced: the agent reads them through model_not_models().
+    ("models", "notModels"): ["<synthetic>"],
     # Daily's window: the billing script, the CLI's Daily and GET /api/billing refuse
     # a window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
     ("billing", "text"): {
@@ -656,6 +658,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.org_roles_folder(), EXPECTED[("org", "rolesFolder")])
         self.assertEqual(C.models_file(), EXPECTED[("models", "file")])
         self.assertEqual(C.model_agent_sources(), tuple(EXPECTED[("models", "agentSources")]))
+        self.assertEqual(C.model_not_models(), tuple(EXPECTED[("models", "notModels")]))
         self.assertEqual(C.re_co_author_trailer().pattern, EXPECTED[("regex", "coAuthorTrailer")])
         trailer = "Fix\n\nCo-Authored-By: Claude Opus 5.5 <a@b>\r\nco-authored-by:  A Person  <p@q>\n"
         trailer += "Co-Authored-By: no email"
@@ -766,6 +769,8 @@ class NoPythonSourceRetypesIt(unittest.TestCase):
         ("org.file", "org.json"),
         # The model map's path: served through models_file(), never typed.
         ("models.file", "Config/models.json"),
+        # The ids no model produced: read through model_not_models(), never typed.
+        ("models.notModels", "<synthetic>"),
         # The trailer's key: read through re_co_author_trailer(), never typed into a pattern.
         ("regex.coAuthorTrailer", "Authored-By:"),
         # The gh read limits: served through gh_read_limit_*(), never typed as a --limit.

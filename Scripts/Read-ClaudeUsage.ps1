@@ -241,6 +241,8 @@ function Read-P20ClaudeMessages {
     $jsonArgs = @{}
     if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $jsonArgs['DateKind'] = 'String' }
 
+    # A line no model produced carries one of these ids: it is not counted.
+    $notModels = @((Get-P20Consts).models.notModels)
     $messages = @{}
     $skipped = 0
     $files = @(Get-P20ClaudeSessionFiles -ProjectsRoot $ProjectsRoot -SinceUtc $SinceUtc)
@@ -263,7 +265,7 @@ function Read-P20ClaudeMessages {
                 $m = $o.message
                 if ($null -eq $m -or $null -eq $m.usage) { continue }
                 $model = [string]$m.model
-                if (-not $model -or $model -eq '<synthetic>') { continue }
+                if (-not $model -or $notModels -contains $model) { continue }
                 $at = ConvertTo-P20UtcInstant $o.timestamp
                 if ($null -eq $at) { $skipped++; continue }
 

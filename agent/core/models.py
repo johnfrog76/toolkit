@@ -21,7 +21,7 @@ import functools
 import json
 from pathlib import Path
 
-from .consts import CONSTS_PATH, models_file
+from .consts import CONSTS_PATH, model_not_models, models_file
 
 
 def _map_file() -> dict:
@@ -60,6 +60,33 @@ def model_info(model_id: str | None) -> dict:
         "provider": row.get("provider"),
         "family": row.get("family"),
         "name": row.get("name") or mid,
+    }
+
+
+def model_object(model_id: str | None, session_id: str | None = None) -> dict | None:
+    """A model that did work, as the standup holds one: ``{id, sessionId, name, family,
+    known}``, or None when the id is not a model at all.
+
+    ``name``, ``family`` and ``known`` are ``model_info``'s answer for the id, so the
+    id is looked up and never parsed: an id with no row is ``known`` false, its name
+    the id as written and its family None, whatever words it holds. A row the map
+    keeps that ``current`` no longer names is still known. ``sessionId`` is the
+    session the model was seen in, None when there is none. An empty or missing id,
+    and an id ``models.notModels`` names -- ``<synthetic>`` -- is None: no object. The
+    CLI's mirror is ``Get-P20ModelObject``, and
+    ``Tests/fixtures/rituals/standup-sessions.json``'s ``lookup`` rows hold the two
+    to one table."""
+    mid = "" if model_id is None else str(model_id)
+    if not mid or mid in model_not_models():
+        return None
+    info = model_info(mid)
+    sid = "" if session_id is None else str(session_id)
+    return {
+        "id": mid,
+        "sessionId": sid or None,
+        "name": info["name"],
+        "family": info["family"],
+        "known": info["known"],
     }
 
 

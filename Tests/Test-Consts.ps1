@@ -309,6 +309,8 @@ $expected = [ordered]@{
     'models.file'               = 'Config/models.json'
     # The order a card's agent is worked out in: Resolve-P20CardAgent reads (Get-P20Consts).models.agentSources.
     'models.agentSources'       = 'line,assigned,trailer,none'
+    # The ids no model produced: Get-P20ModelObject and the usage reader read (Get-P20Consts).models.notModels.
+    'models.notModels'          = '<synthetic>'
     # Daily's window: the billing script, Daily and GET /api/billing refuse a
     # window in these words (Scripts/Resolve-BillingWindow.ps1 is the rule).
     'billing.text'              = 'halfWindow=-Since and -Until go together: pass both (YYYY-MM-DD), or neither for this week.,notADay={name} ''{value}'' is not a day: yyyy-MM-dd.,backwards=-Since {since} is after -Until {until}.'
@@ -596,6 +598,8 @@ $guarded = [ordered]@{
     'rituals.text.trackerGhMissing' = 'so the tracker was not asked'
     'rituals.text.trackerNotGitHub' = "reads a GitHub Space's issues"
     'ghReads.repoMissing'        = 'could not resolve to a repository'
+    # The usage reader and Get-P20ModelObject read the ids no model produced from models.notModels.
+    'models.notModels'           = '<synthetic>'
 }
 $allowed = @('Scripts/Get-Consts.ps1')
 
