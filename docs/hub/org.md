@@ -87,7 +87,7 @@ compared character for character (`A` is not `a`); a number given as an id is re
 ## Where a position's prompt is found
 
 A position's `prompt` names a **role**: a job description, one `<role>.prompt.md`. The toolkit ships
-five in its own `agentic/org/` -- `pm`, `team-lead`, `vp-of-engineering`, `vp-of-product` and `intern`,
+six in its own `agentic/org/` -- `pm`, `team-lead`, `vp-of-engineering`, `vp-of-product`, `intern` and `butler`,
 each described in [the roles](../../agentic/org/README.md#the-roles) with what it takes in and what it
 hands on -- and a hub may write its own. The name is looked up in three folders, in this order, and the
 first that has the file is the one used:
@@ -264,14 +264,15 @@ in flight, and no join with the standup's workers. The web's Org tab draws the t
 ## An example to copy
 
 [`samples/hub/org.json`](../../samples/hub/org.json) is a small tree, copied out with the rest of the
-sample hub: an owner, with a VP of product, a VP of engineering and a PM reporting to it; a team lead
-under the PM, with one staffed and one vacant seat, and a builder pool under the lead; and an intern under
-the PM. Seven seats in all. Every office names the role the toolkit ships for it -- `vp-of-product.prompt.md`,
-`vp-of-engineering.prompt.md`, `pm.prompt.md`, `team-lead.prompt.md` and `intern.prompt.md` -- and the
-sample hub copies none of them, so each is found in the toolkit's `agentic/org/`. The owner is a person and
-the builder a pool, so neither names a role.
+sample hub: an owner, with a VP of product, a VP of engineering and a PM reporting to it; a butler under
+the VP of product; a team lead under the PM, with one staffed and one vacant seat, and a builder pool under
+the lead; and an intern under the PM. Eight seats in all. Every office names the role the toolkit ships for
+it -- `vp-of-product.prompt.md`, `butler.prompt.md`, `vp-of-engineering.prompt.md`, `pm.prompt.md`,
+`team-lead.prompt.md` and `intern.prompt.md` -- and the sample hub copies none of them, so each is found in
+the toolkit's `agentic/org/`. The owner is a person and the builder a pool, so neither names a role.
 
-The lead reports to the PM because the PM is the seat that hands it a queue and carries its readies to the
-seat that merges; a team where engineering hands out the work would put the lead under the VP of
+The butler reports to the VP of product because whether a design is finished is the product's call: the
+butler stamps by itself and archives on that seat's yes. The lead reports to the PM because the PM is the
+seat that hands it a queue and carries its readies to the seat that merges; a team where engineering hands out the work would put the lead under the VP of
 engineering instead, as the example under [The shape](#the-shape) does. The roles name their neighbours
 by relationship, so either tree reads the same to them.
