@@ -151,6 +151,34 @@ class PrCommentsListTests(_PrCommentsCase):
         self.assertEqual(r.json(), {"count": 0, "items": []})
 
 
+class TheDetailNamesItsFile(_PrCommentsCase):
+    """The detail answers with the card's absolute path on this machine -- the
+    one it read, current/'s or archive/'s -- for the page's File line."""
+
+    def test_a_card_in_current_answers_with_its_path(self):
+        body = self.client.get(f"/api/pr-comments/{CARD_NAME}").json()
+        self.assertEqual(body["file_path"], str((self.hub / "test" / "current" / CARD_NAME).resolve()))
+
+    def test_a_card_in_archive_answers_with_the_archive_path(self):
+        archived = self.hub / "test" / "archive" / CARD_NAME
+        archived.parent.mkdir(exist_ok=True)
+        (self.hub / "test" / "current" / CARD_NAME).rename(archived)
+        body = self.client.get(f"/api/pr-comments/{CARD_NAME}").json()
+        self.assertEqual(body["file_path"], str(archived.resolve()))
+
+    def test_a_card_that_leads_out_of_the_hub_names_no_path(self):
+        outside = Path(self._tmp.name) / "outside.prompt.md"
+        card = self.hub / "test" / "current" / CARD_NAME
+        card.rename(outside)
+        card.symlink_to(outside)
+        body = self.client.get(f"/api/pr-comments/{CARD_NAME}").json()
+        self.assertEqual((body["round_num"], body["file_path"]), (2, ""))
+
+    def test_a_name_that_climbs_is_refused(self):
+        for name in ("..%2Fhub.json", "..", "a%5C..%5Cb"):
+            self.assertIn(self.client.get(f"/api/pr-comments/{name}").status_code, (400, 404), name)
+
+
 class SuggestTests(_PrCommentsCase):
     """``suggest`` declines before it builds anything when there is no key,
     and the prompt it sends is the file in agentic/, not an f-string. The

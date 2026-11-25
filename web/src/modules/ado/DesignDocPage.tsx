@@ -125,6 +125,7 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
                 </>
               ) : undefined
             }
+            path={readable && data.file_path ? data.file_path : undefined}
             url={readable ? data.url : undefined}
             actions={
               readable && data.thread ? (

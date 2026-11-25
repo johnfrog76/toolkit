@@ -27,8 +27,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..core import log_writer, model
-from ..core.config import AGENTIC_DIR, PROMPT_SUFFIX, resolve_dirs
+from ..core.config import AGENTIC_DIR, PROMPT_SUFFIX, hub_root, resolve_dirs
 from ..core.consts import token_pr_review_heading
+from .design import _inside
 
 api = APIRouter()
 
@@ -66,6 +67,10 @@ class PRCommentsListResponse(BaseModel):
 
 class PRCommentsDetailResponse(BaseModel):
     file: str
+    # The card's absolute path on this machine -- current/'s, or archive/'s when
+    # it fell back -- for the File line. Not a comment's ``file_path``, which is
+    # the reviewed file in the PR.
+    file_path: str = ""
     title: str
     pr_id: int
     round_num: int
@@ -338,6 +343,7 @@ async def get_pr_comments(filename: str):
     log_writer.write_log("CMD", "agent/pr-comments/detail", f"{filename} — {len(comments)} comments, {open_count} open")
     return PRCommentsDetailResponse(
         file=filename,
+        file_path=str(f.resolve()) if _inside(hub_root(), f) else "",
         title=_get_prompt_title(content),
         pr_id=pr_id,
         round_num=round_num,

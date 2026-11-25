@@ -12,7 +12,10 @@ when gh does not answer:
   (``repo_read.read_folder_rows``: the root and ``docs/`` to ``MAX_DEPTH``
   levels, one GraphQL query), however the folders nest.
 - ``GET /docs/{path}`` -- one document's text, ``path`` relative to the repo
-  root (``README.md``, ``docs/CLI.md``, ``docs/modules/ado.md``).
+  root (``README.md``, ``docs/CLI.md``, ``docs/modules/ado.md``). Where the
+  Space's checkout is ready on this machine (``design._checkout_for``, the
+  Design tab's resolution) and holds the file, ``file_path`` is its absolute
+  path for the page's File line; the text is still the tracker's.
 - ``GET /docs/asset/{path}`` -- the bytes of an image a document references
   (``docs/images/board.jpg``, ``assets/logo.png``), decoded from the contents
   route -- or, past the 1 MB that route inlines, from the blobs route by the
@@ -157,6 +160,10 @@ class DocDetail(DocEntry):
     title: str = ""  # the first `# ` heading, else the name
     body: str = ""
     issues: str = ""  # the repository's issues on github.com; "" when it has none
+    # The file's absolute path on this machine, when the Space's checkout is
+    # ready here and holds the file; "" otherwise. The body is still the
+    # tracker's: this is the File line's path, nothing is read from it.
+    file_path: str = ""
     reason: str | None = None
 
 
@@ -302,4 +309,10 @@ async def get_doc(path: str):
     repo = await design.repo_gate(OWNER_GRAINED_REASON)
     if repo is None:
         return DocDetail(supported=False)
-    return await asyncio.to_thread(read_doc, repo, path)
+    detail = await asyncio.to_thread(read_doc, repo, path)
+    if detail.reason is None:
+        # The Design tab's checkout, resolved the same way and fresh on every
+        # request: the path is offered only where the clone is ready here.
+        root = design._ready_root(await asyncio.to_thread(design._checkout_for, design.load_config(), repo))
+        detail.file_path = await asyncio.to_thread(design.local_file, root, path)
+    return detail

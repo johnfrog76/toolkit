@@ -153,6 +153,7 @@ export function DesignNotePage() {
                 </>
               ) : undefined
             }
+            path={readable && data.file_path ? data.file_path : undefined}
             refresh={readable ? { onClick: refetch, isFetching } : undefined}
             actions={
               readable ? (

@@ -226,6 +226,9 @@ class DesignDocDetail(DesignDoc):
     supported: bool = True
     repo: str = ""
     body: str = ""
+    # The file's absolute path on this machine, when it was read from the
+    # Space's ready checkout -- the File line's path; "" when read from GitHub.
+    file_path: str = ""
     reason: str | None = None
 
 
@@ -821,7 +824,17 @@ def read_design_doc_local(repo: str, root: Path, path: str) -> DesignDocDetail:
         return DesignDocDetail(repo=repo, folder=folder, name=name, path=path, reason=f"{root}: {e}")
     doc = parse_design_doc(text, path, f"{_blob_base(repo, checkout_branch(root))}/{path}")
     log_writer.write_log("CMD", "agent/design", f"{path} ({repo}; the clone at {root})")
-    return DesignDocDetail(**doc.model_dump(), repo=repo, body=text)
+    return DesignDocDetail(**doc.model_dump(), repo=repo, body=text, file_path=str(f.resolve()))
+
+
+def local_file(root: Path | None, path: str) -> str:
+    """The absolute path of ``path`` (repo-relative) in the ready clone at
+    ``root``, when the file is there and, links followed, inside it; else "".
+    For a File line: what is answered is a path on this machine, never stored."""
+    if root is None:
+        return ""
+    f = root / path
+    return str(f.resolve()) if _inside(root, f) and f.is_file() else ""
 
 
 def _checkout_for(cfg: dict, repo: str) -> SpaceCheckout | None:

@@ -85,6 +85,8 @@ export interface DesignNotesResponse {
 export interface DesignNoteDetail extends DesignNote {
   /** The file's hub-relative path, e.g. design/archive/old.md (L2). */
   path?: string;
+  /** Its absolute path on this machine, for the File line; "" when it leads out of the hub. */
+  file_path?: string;
   kind?: "note" | "spec" | string;
   archived?: boolean;
   body: string;

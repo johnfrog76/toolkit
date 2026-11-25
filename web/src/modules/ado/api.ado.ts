@@ -434,6 +434,8 @@ export interface DesignDocDetail extends DesignDoc {
   supported: boolean;
   repo: string;
   body: string;
+  /** Its absolute path on this machine when read from the Space's ready checkout; "" from GitHub. */
+  file_path?: string;
   reason?: string | null;
 }
 
@@ -502,6 +504,8 @@ export interface DocDetail extends DocEntry {
   body: string;
   /** The repository's issues on github.com; "" when it has none. */
   issues?: string;
+  /** Its absolute path on this machine when the Space's checkout is ready here and holds it; else "". */
+  file_path?: string;
   reason?: string | null;
 }
 
@@ -604,6 +608,8 @@ export interface PRCommentItem {
 
 export interface DetailResponse {
   file: string;
+  /** The card's absolute path on this machine (current/'s, or archive/'s); not a comment's file_path. */
+  file_path?: string;
   title: string;
   pr_id: number;
   round_num: number;

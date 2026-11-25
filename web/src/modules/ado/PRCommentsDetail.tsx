@@ -450,6 +450,7 @@ export function PRCommentsDetail({
             {detail.round_num > 1 && <Caption1>Round {detail.round_num}</Caption1>}
           </>
         }
+        path={detail.file_path || undefined}
         refresh={{ onClick: () => refetch(), isFetching }}
       />
 
