@@ -70,11 +70,11 @@ describe("DetailHeader", () => {
   });
 
   it("File line, case one: an absolute path, copied as it is", () => {
-    draw({ title: "T", path: "/Users/x/hub/card.md", url: "https://example.test/c" });
-    expect(screen.getByText("/Users/x/hub/card.md")).toBeTruthy();
+    draw({ title: "T", path: "/hub/org/card.md", url: "https://example.test/c" });
+    expect(screen.getByText("/hub/org/card.md")).toBeTruthy();
     expect(screen.queryByText("https://example.test/c")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Copy the file path" }));
-    expect(copyText).toHaveBeenCalledWith("/Users/x/hub/card.md");
+    expect(copyText).toHaveBeenCalledWith("/hub/org/card.md");
   });
 
   it("File line, case two: no path, so the URL, named by what", () => {
