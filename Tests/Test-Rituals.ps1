@@ -35,6 +35,11 @@
                      queue sentences, each worker's sentences and the work text
                      against standup-prose-<name>.txt, byte for byte, again
                      after a JSON round trip -- the same rows the agent asserts.
+    2c''. The model  Tests/fixtures/rituals/standup-sessions.json: every
+                     lookup row of the model object -- an id and a session id
+                     in, {id, sessionId, name, family, known} or none out, a
+                     known row's name and family the shipped map's own row --
+                     the rows the agent asserts.
     2c'. The team    Tests/fixtures/rituals/standup-team.json: every size
                      row (a stored teamSize read as the room), every seat row
                      (who is present: the ones with work first, then the idle),
@@ -962,6 +967,59 @@ for ($n = 0; $n -lt $proseCases.Count; $n++) {
     $back.asOf = $s.asOf
     Assert-True "${name}: the JSON round trip renders the same prose" ((Format-P20StandupWork -Standup $back -PackageRoot $pkgRoot) -ceq $text)
     Assert-True "${name}: no fakeWork line in the prose" (@($fakeWork | Where-Object { $text.Contains([string]$_) }).Count -eq 0)
+}
+
+# -- 1c''. The model object ----------------------------------------------
+# Tests/fixtures/rituals/standup-sessions.json's lookup rows, the SAME rows
+# Tests/test_rituals.py asserts from model_object: an id and a session id in,
+# the model object or $null out. A known row's name and family are the shipped
+# map's own row for the id, so the table does not move when a row is added.
+Write-Host ""
+Write-Host "-- The model object --" -ForegroundColor Cyan
+$sessionsTable = [System.IO.File]::ReadAllText((Join-Path $fixtureDir 'standup-sessions.json')) | ConvertFrom-Json
+$lookupRows = @($sessionsTable.lookup)
+Assert-True 'the sessions table has its lookup rows, each named' ($lookupRows.Count -ge 8 -and @($lookupRows | Where-Object { -not [string]$_.name }).Count -eq 0) "$($lookupRows.Count) rows"
+$shippedMap = Get-P20ModelMap
+$shippedCurrent = Get-P20ModelCurrent
+foreach ($lrow in $lookupRows) {
+    $hasId = $null -ne $lrow.PSObject.Properties['id']
+    $lid = $null
+    if ($hasId) { $lid = [string]$lrow.id }
+    $got = Get-P20ModelObject -Id $lid -SessionId ([string]$lrow.sessionId)
+    $want = $lrow.expected
+    if ($null -eq $want) {
+        Assert-True "model object: $($lrow.name)" ($null -eq $got) "got $($got | ConvertTo-Json -Compress)"
+        continue
+    }
+    $wantName = $null
+    $wantFamily = $null
+    if ([bool]$want.known) {
+        $mapRow = $null
+        if ($shippedMap.Contains($lid)) { $mapRow = $shippedMap[$lid] }
+        Assert-True "model object: $($lrow.name) -- the id has a row in the shipped map" ($null -ne $mapRow) $lid
+        if ($null -eq $mapRow) { continue }
+        $wantName = [string]$mapRow.name
+        $wantFamily = [string]$mapRow.family
+        if ($lrow.retired) {
+            $cur = [string]$shippedCurrent[$wantFamily]
+            Assert-True "model object: $($lrow.name) -- current names another id for its family" ($cur -and $cur -cne $lid) "current.$wantFamily is '$cur'"
+        }
+    }
+    else {
+        Assert-True "model object: $($lrow.name) -- the id has no row in the shipped map" (-not $shippedMap.Contains($lid)) $lid
+        $wantName = [string]$want.name
+        if ($null -ne $want.family) { $wantFamily = [string]$want.family }
+    }
+    $wantSession = $null
+    if ([string]$lrow.sessionId) { $wantSession = [string]$lrow.sessionId }
+    $keys = (@($got.PSObject.Properties | ForEach-Object { $_.Name })) -join ','
+    $same = ($null -ne $got) -and ($keys -ceq 'id,sessionId,name,family,known') -and ($got.id -ceq $lid) -and ($got.name -ceq $wantName) -and ($got.known -eq [bool]$want.known)
+    if ($null -eq $wantSession) { $same = $same -and ($null -eq $got.sessionId) } else { $same = $same -and ($got.sessionId -ceq $wantSession) }
+    if ($null -eq $wantFamily) { $same = $same -and ($null -eq $got.family) } else { $same = $same -and ($got.family -ceq $wantFamily) }
+    Assert-True "model object: $($lrow.name)" $same "got $($got | ConvertTo-Json -Compress)"
+}
+foreach ($nm in @($consts.models.notModels)) {
+    Assert-True "model object: '$nm' from models.notModels is no object" ($null -eq (Get-P20ModelObject -Id ([string]$nm) -SessionId 'a-session'))
 }
 
 # -- 1d'. The team size ----------------------------------------------------

@@ -158,6 +158,38 @@ function Get-P20ModelInfo {
     return [pscustomobject]@{ id = $mid; known = $true; provider = [string]$row.provider; family = [string]$row.family; name = $name }
 }
 
+function Get-P20ModelObject {
+    <#
+      A model that did work, as the standup holds one:
+      [pscustomobject]@{ id; sessionId; name; family; known }, or $null when the
+      id is not a model at all. name, family and known are Get-P20ModelInfo's
+      answer for the id, so the id is looked up and never parsed: an id with no
+      row is known $false, its name the id as written and its family $null,
+      whatever words it holds. A row the map keeps that `current` no longer names
+      is still known. sessionId is the session the model was seen in, $null when
+      there is none. An empty or missing id, and an id of consts.json
+      models.notModels (<synthetic>), is $null: no object.
+      agent/core/models.py's model_object is the same rule, and
+      Tests/fixtures/rituals/standup-sessions.json's lookup rows hold the two to
+      one table.
+    #>
+    param(
+        [AllowEmptyString()][AllowNull()][string]$Id,
+        [AllowEmptyString()][AllowNull()][string]$SessionId,
+        # The package root the map's path is relative to; the one consts.json sits in by default.
+        [string]$PackageRoot
+    )
+    $mid = "$Id"
+    if (-not $mid) { return $null }
+    if (@((Get-P20Consts).models.notModels) -ccontains $mid) { return $null }
+    $infoArgs = @{ Id = $mid }
+    if ($PackageRoot) { $infoArgs.PackageRoot = $PackageRoot }
+    $info = Get-P20ModelInfo @infoArgs
+    $sid = $null
+    if ("$SessionId") { $sid = "$SessionId" }
+    return [pscustomobject]@{ id = $mid; sessionId = $sid; name = $info.name; family = $info.family; known = $info.known }
+}
+
 # -- Who worked a card: the one reader over its sources --------------------------
 # Resolve-P20CardAgent and its pieces. agent/core/parsers.py's resolve_card_agent,
 # commit_co_authors and git_messages, and agent/core/models.py's

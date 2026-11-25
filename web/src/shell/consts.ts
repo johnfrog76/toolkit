@@ -524,6 +524,8 @@ export const MODELS = consts.models as {
    *  (docs/hub/cards.md, "How a card's agent is worked out"). The agent works it
    *  out and serves the answer; this half states it. */
   agentSources: string[];
+  /** The ids Claude Code writes on a line no model produced (`<synthetic>`): not a model, known or unknown. */
+  notModels: string[];
 };
 
 /**

@@ -1,0 +1,70 @@
+{
+  "_": "ONE table, read by both halves of the standup's model reading (docs/modules/solitaire-agile.md): an object of named sections, each a list of rows with a name. lookup asks the model object -- Scripts/Get-PromptFileStatus.ps1 Get-P20ModelObject (tkTestToolkit -Rituals) and agent/core/models.py model_object() (Tests/test_rituals.py) -- for an id and a session id. expected null is no object: an empty or missing id, or an id of consts.json models.notModels, is not a model, known or unknown. Otherwise the object is {id, sessionId, name, family, known}: id is the row's id as written, sessionId the row's sessionId (null when the row has none or it is empty). A row whose expected.known is true takes name and family from the shipped model map's OWN row for the id (Config/models.json, consts.json models.file), so the table does not move when a row is added or a name is changed; both suites first assert the id has a row there, and a row with retired true also asserts that the map's current block names some other id for its family. A row whose expected.known is false states name and family outright: the id as written and null, because an id is looked up and never parsed -- the ids are made up, and both suites assert the map has no row for them, so a model added later cannot collide with one. An id is matched exactly, case and all, as the map lookup (Get-P20ModelInfo, model_info) matches it today. If the two halves ever disagree about a row, one of them is wrong.",
+  "lookup": [
+    {
+      "name": "a known id takes its name and family from its row",
+      "id": "claude-opus-5-5",
+      "sessionId": "aaaaaaaa-0000-4000-8000-000000000001",
+      "expected": { "known": true }
+    },
+    {
+      "name": "another provider's known id, from its own row",
+      "id": "grok-4",
+      "sessionId": "aaaaaaaa-0000-4000-8000-000000000002",
+      "expected": { "known": true }
+    },
+    {
+      "name": "a retired id the map keeps is known, not unknown",
+      "id": "claude-opus-5",
+      "sessionId": "aaaaaaaa-0000-4000-8000-000000000003",
+      "retired": true,
+      "expected": { "known": true }
+    },
+    {
+      "name": "an unknown id reads as written, with no family",
+      "id": "acme-coder-1-fixture",
+      "sessionId": "aaaaaaaa-0000-4000-8000-000000000004",
+      "expected": { "known": false, "name": "acme-coder-1-fixture", "family": null }
+    },
+    {
+      "name": "an unknown id holding a family word is not that family",
+      "id": "claude-opus-9-fixture",
+      "sessionId": "aaaaaaaa-0000-4000-8000-000000000005",
+      "expected": { "known": false, "name": "claude-opus-9-fixture", "family": null }
+    },
+    {
+      "name": "an id is matched exactly, case and all",
+      "id": "Claude-Opus-5-5",
+      "sessionId": "aaaaaaaa-0000-4000-8000-000000000006",
+      "expected": { "known": false, "name": "Claude-Opus-5-5", "family": null }
+    },
+    {
+      "name": "a known id with no session has a null sessionId",
+      "id": "claude-sonnet-5-5",
+      "expected": { "known": true }
+    },
+    {
+      "name": "an empty sessionId is no session",
+      "id": "claude-haiku-5-5",
+      "sessionId": "",
+      "expected": { "known": true }
+    },
+    {
+      "name": "<synthetic> is not a model",
+      "id": "<synthetic>",
+      "sessionId": "aaaaaaaa-0000-4000-8000-000000000009",
+      "expected": null
+    },
+    {
+      "name": "an empty id is not a model",
+      "id": "",
+      "sessionId": "aaaaaaaa-0000-4000-8000-000000000010",
+      "expected": null
+    },
+    {
+      "name": "a missing id is not a model",
+      "sessionId": "aaaaaaaa-0000-4000-8000-000000000011",
+      "expected": null
+    }
+  ]
+}

@@ -1413,6 +1413,58 @@ def _answering(reply: dict):
     return complete, calls
 
 
+SESSIONS_TABLE = json.loads((FIXTURES / "standup-sessions.json").read_text(encoding="utf-8"))
+
+
+class TheModelObject(unittest.TestCase):
+    """Every ``lookup`` row of standup-sessions.json -- the same rows tkTestToolkit
+    -Rituals asserts from the CLI's Get-P20ModelObject: an id and a session id in,
+    the model object or None out. A known row's name and family are the shipped
+    map's own row for the id, so the table does not move when a row is added."""
+
+    def test_the_table_has_its_rows(self):
+        self.assertGreaterEqual(len(SESSIONS_TABLE["lookup"]), 8)
+        self.assertTrue(all(row.get("name") for row in SESSIONS_TABLE["lookup"]))
+
+    def test_every_lookup_row(self):
+        from agent.core.models import model_map, model_object, read_model_current
+
+        rows = model_map()
+        current = read_model_current()
+        for row in SESSIONS_TABLE["lookup"]:
+            with self.subTest(row=row["name"]):
+                mid = row.get("id")
+                got = model_object(mid, row.get("sessionId"))
+                want = row["expected"]
+                if want is None:
+                    self.assertIsNone(got)
+                    continue
+                if want["known"]:
+                    self.assertIn(mid, rows, "a known row's id must have a row in the shipped map")
+                    name, family = rows[mid]["name"], rows[mid]["family"]
+                    if row.get("retired"):
+                        self.assertIn(family, current)
+                        self.assertNotEqual(current[family], mid, "a retired id is one current no longer names")
+                else:
+                    self.assertNotIn(mid, rows, "an unknown row's id must have no row in the shipped map")
+                    name, family = want["name"], want["family"]
+                expected = {
+                    "id": mid,
+                    "sessionId": row.get("sessionId") or None,
+                    "name": name,
+                    "family": family,
+                    "known": want["known"],
+                }
+                self.assertEqual(got, expected)
+
+    def test_every_id_that_is_not_a_model_is_none(self):
+        from agent.core.models import model_object
+
+        for mid in C.model_not_models():
+            with self.subTest(id=mid):
+                self.assertIsNone(model_object(mid, "a-session"))
+
+
 TEAM_TABLE = json.loads((FIXTURES / "standup-team.json").read_text(encoding="utf-8"))
 
 

@@ -795,6 +795,12 @@ def model_agent_sources() -> tuple[str, ...]:
     return tuple(consts()["models"]["agentSources"])
 
 
+def model_not_models() -> tuple[str, ...]:
+    """``<synthetic>`` -- the ids Claude Code writes on a line no model produced. They
+    are not a model, known or unknown: ``models.model_object`` answers None for one."""
+    return tuple(consts()["models"]["notModels"])
+
+
 def billing_text() -> dict[str, str]:
     """Daily's window sentences -- ``halfWindow``, ``notADay`` ({name}, {value}) and
     ``backwards`` ({since}, {until}): the billing script, the CLI's Daily and
