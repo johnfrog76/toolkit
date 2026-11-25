@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "react-router";
 import { Badge, Caption1, Link, makeStyles, tokens } from "@fluentui/react-components";
 import { SparkleRegular } from "@fluentui/react-icons";
@@ -6,7 +6,9 @@ import { DetailHeader } from "../../shared/DetailHeader";
 import { CardActions, ROW } from "../../shared/CardActions";
 import { copyText } from "../../shared/copyText";
 import { EmptyState } from "../../shared/EmptyState";
+import { FrontMatterDetails, leftoverFrontMatter, unquoted } from "../../shared/FrontMatterDetails";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
+import { frontMatterOf } from "../../shared/prepareMarkdown";
 import { PanelFrame } from "../../shared/PanelFrame";
 import { useGetPromptQuery } from "./api.studio";
 import { promptReference } from "./PromptsCard";
@@ -21,6 +23,11 @@ import { groupLabel, senderLabel, workflowLabel } from "./prompts";
 // detail is here: the category again beside whose it is, who sends it, the
 // add-on, the ways of working, what it drives, when it changed, and whether a
 // copy of yours runs instead of ToolKit's.
+// What the header draws from the front matter itself: the title, the
+// description under it, the category badge. The rest (`argument-hint`, `agent`,
+// `tools`) is a collapsed row under the header.
+const DRAWN_KEYS = ["title", "description", "category"] as const;
+
 const useStyles = makeStyles({
   page: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalM, width: "100%" },
   copied: { color: tokens.colorPaletteGreenForeground1 },
@@ -39,6 +46,11 @@ export function PromptPage() {
     await copyText(data.body);
     setCopied("prompt");
   };
+
+  // The file's front matter feeds the header; the body is its prose alone.
+  const parts = useMemo(() => frontMatterOf(data?.body ?? ""), [data?.body]);
+  const description =
+    data?.description || unquoted(parts.frontMatter.find(([k]) => k === "description")?.[1] ?? "");
 
   const missing = error && "status" in error && error.status === 404;
   const detail =
@@ -110,6 +122,12 @@ export function PromptPage() {
                 </>
               ) : undefined
             }
+            description={readable ? description : undefined}
+            extra={
+              readable ? (
+                <FrontMatterDetails pairs={leftoverFrontMatter(parts.frontMatter, DRAWN_KEYS)} />
+              ) : undefined
+            }
             path={readable ? data.file_path : undefined}
             refresh={readable ? { onClick: refetch, isFetching } : undefined}
             actions={
@@ -142,7 +160,7 @@ export function PromptPage() {
         {readable && (
           <>
             <MarkdownViewer
-              content={data.body}
+              content={parts.body}
               titleAbove={data.title || data.name}
               style={{ marginTop: tokens.spacingVerticalS }}
             />

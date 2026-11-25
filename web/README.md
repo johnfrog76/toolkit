@@ -1491,6 +1491,11 @@ item's checkbox (GFM's bare `<input type="checkbox" disabled>`) is named by the 
 `markdownPlugins.test.tsx` renders the real pipeline: `jest.config.mjs`'s `transformIgnorePatterns`
 lets ts-jest compile exactly the markdown stack's ESM packages and React Router 8's (registry tests still mock every module).
 
+A file that opens with front matter feeds its page's header instead (`frontMatterOf`, `FrontMatterDetails`;
+`COMPONENTS.md`, `DetailHeader`): the Studio prompt page, the design note and design document pages and a review lift it off, draw the
+`description` under the title, and keep the remaining keys (`argument-hint`, `agent`, `tools`, `id`) in a collapsed
+**Details** row, so the body starts with its own prose.
+
 `MarkdownViewer` is the page a card is READ on:
 
 - **A centred column of 72 characters**, so a wide card does not leave a third of itself empty with

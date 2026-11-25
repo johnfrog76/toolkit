@@ -113,6 +113,14 @@ function breakFieldLines(text: string): string {
   return lines.join("\n");
 }
 
+/** A file's front matter lifted off its text: the text without it, and the
+ *  pairs as written. A page whose header already carries the facts draws the
+ *  text alone, so the body starts with the document's own prose. */
+export function frontMatterOf(text: string): PreparedMarkdown {
+  const [body, frontMatter] = splitFrontMatter(text ?? "");
+  return { body, frontMatter };
+}
+
 export function prepareMarkdown(text: string): PreparedMarkdown {
   const [withoutFront, frontMatter] = splitFrontMatter(text ?? "");
   return { body: breakFieldLines(stripComments(withoutFront)), frontMatter };

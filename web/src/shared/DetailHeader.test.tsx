@@ -54,6 +54,26 @@ describe("DetailHeader", () => {
     }
   });
 
+  it("puts a description directly under the title, above the meta, and none when absent", () => {
+    draw({ title: "T", description: "About it", meta: <span>the-meta</span>, path: "/hub/x.md" });
+    const order = [
+      screen.getByRole("heading", { level: 1 }),
+      screen.getByText("About it"),
+      screen.getByText("the-meta"),
+      screen.getByTestId("file-path"),
+    ];
+    for (let i = 0; i < order.length - 1; i++) {
+      expect(
+        order[i].compareDocumentPosition(order[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+  });
+
+  it("draws no description line when none is given", () => {
+    draw({ title: "T", path: "/hub/x.md" });
+    expect(screen.queryByTestId("detail-description")).toBeNull();
+  });
+
   it("orders the controls: actions, refresh, then the external link last", () => {
     draw({
       title: "T",

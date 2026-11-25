@@ -400,7 +400,8 @@ the clone's branch, so the reading room's relative links resolve as on the GitHu
 has no such page yet. The tier gate is unchanged: a machine below Tier 1 reads nothing, clone or not.
 
 **A note's reading room** is the house's reading page: the back arrow and the title, the `design note`
-badge, the Space it is for and its sentence, and ONE `MarkdownViewer` (the frontmatter is not drawn).
+badge, the Space it is for and its sentence, and ONE `MarkdownViewer`. The frontmatter feeds the header and is not drawn in the body: its `description` is
+the line under the title, and any other key (`id`) is in a collapsed **Details** row.
 Its links go through the one resolver, `shared/docLinks.ts`, with a base of its own (`noteLinks.ts`): a
 relative link to a sibling note opens that note's room; anything else is left as written, because a hub
 note has no github.com page to fall back on.
@@ -455,7 +456,8 @@ who sends it (`by hand`, or `sent by ToolKit: <verb or route>` -- `pr-review`'s 
 Suggest route), its add-on when not core, the ways of working it is for, what it drives, when it changed
 (linked to its history on GitHub when the agent has one; the Space's carry neither), `runs instead of
 ToolKit's on this machine` for a copy of yours in `agenticExtensionPath` under a shipped name, the file's address with its copy button (`FilePath` -- for the Space's, the
-file's address on GitHub), and ONE `MarkdownViewer` over the whole file. The list says read it (Open); the page says use it: its header's one exposed action is **Copy
+file's address on GitHub), and ONE `MarkdownViewer` over the file's prose. The frontmatter feeds the header: its `description` is the line
+under the title and `argument-hint`, `agent` and `tools` are a collapsed **Details** row, never raw rows above the body. The list says read it (Open); the page says use it: its header's one exposed action is **Copy
 prompt**, and its `...` holds **Copy reference**, as in a detail page's shape (`CardActions`, then Refresh). It is read-only: a prompt is changed in its file. A name the agent does not know says so in the
 agent's words.
 

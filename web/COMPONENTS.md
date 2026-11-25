@@ -98,7 +98,7 @@ that the foot holds the bottom), and `panelStructure.test.ts` for who may import
 ## `DetailHeader`
 
 **What it is for:** the header of every page that shows one record, and of every markdown viewer: back,
-the title (the page's one `h1`), a meta line, an extra slot under it, the File line, and the controls
+the title (the page's one `h1`), a description line, a meta line, an extra slot under it, the File line, and the controls
 on the right in the house order. A page that draws its own cannot keep the others' order; this is the
 one that does.
 
@@ -109,19 +109,31 @@ fails on a module page that owns an `h1` without it.
 
 Props:
 
-| Prop       | Type                               | Notes                                                                                               |
-| ---------- | ---------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `title`    | `ReactNode`                        | The `h1`. Leave it out while there is no record; the back button then stands alone.                 |
-| `meta`     | `ReactNode`                        | Badges and captions beside each other under the title.                                              |
-| `extra`    | `ReactNode`                        | Anything custom under the meta line.                                                                |
-| `path`     | `string`                           | The record's absolute path on this machine, when it is a local file.                                |
-| `url`      | `string`                           | Its address when it is not; read only when there is no `path`. With neither, there is no File line. |
-| `actions`  | `ReactNode`                        | Controls before refresh.                                                                            |
-| `refresh`  | `{ onClick, isFetching?, title? }` | The house refresh button, after `actions`.                                                          |
-| `external` | `ReactNode`                        | The link out, always the last control.                                                              |
+| Prop          | Type                               | Notes                                                                                               |
+| ------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `title`       | `ReactNode`                        | The `h1`. Leave it out while there is no record; the back button then stands alone.                 |
+| `description` | `ReactNode`                        | One line of prose directly under the title, above the meta (a prompt's `description`).              |
+| `meta`        | `ReactNode`                        | Badges and captions beside each other under the title.                                              |
+| `extra`       | `ReactNode`                        | Anything custom under the meta line.                                                                |
+| `path`        | `string`                           | The record's absolute path on this machine, when it is a local file.                                |
+| `url`         | `string`                           | Its address when it is not; read only when there is no `path`. With neither, there is no File line. |
+| `actions`     | `ReactNode`                        | Controls before refresh.                                                                            |
+| `refresh`     | `{ onClick, isFetching?, title? }` | The house refresh button, after `actions`.                                                          |
+| `external`    | `ReactNode`                        | The link out, always the last control.                                                              |
 
 **Used by:** every record page under `src/modules/`. **Pattern:** `FilePath` for the line (a fixed label with the copy icon and the address in its tooltip), `BackButton`
 and `RefreshButton` for the controls. **Test:** `DetailHeader.test.tsx`.
+
+**A file's front matter feeds the header, never the body.** A page whose file can open with front matter
+lifts it off with `frontMatterOf` (`shared/prepareMarkdown.ts`), hands the body to `MarkdownViewer`, draws
+the keys the header carries (the `description` in the `description` slot, the tags in `meta`), and gives the
+rest to `FrontMatterDetails` in the `extra` slot: a collapsed **Details** row, drawn only when something is
+left. The prompt page, the design note and design document pages and a review do this; a page that does
+not (the docs viewer) keeps `MarkdownViewer`'s own quiet line of front matter.
+
+**"On this page"** is `MarkdownViewer`'s, so every page that renders its body through it has it: a list of
+the h2/h3 headings (drawn at three or more), the zoom above it, a fold above the text under 1100px. A page
+does not draw its own. **Test:** `MarkdownViewer.test.tsx`.
 
 ## `ListPanel`
 

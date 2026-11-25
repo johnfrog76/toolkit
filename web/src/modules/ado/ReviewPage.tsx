@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { Caption1, Badge, Button, Spinner, makeStyles, tokens } from "@fluentui/react-components";
 import { CloudArrowUpRegular, SaveRegular } from "@fluentui/react-icons";
 import { DetailHeader } from "../../shared/DetailHeader";
+import { FrontMatterDetails, leftoverFrontMatter } from "../../shared/FrontMatterDetails";
+import { frontMatterOf } from "../../shared/prepareMarkdown";
 import { MarkdownBlock } from "../../shared/MarkdownBlock";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { PanelFrame } from "../../shared/PanelFrame";
@@ -13,6 +15,9 @@ import {
 } from "./api.ado";
 import { DocumentSearchRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
+
+// What the page draws itself (the period line above the body); the rest is a collapsed row.
+const REVIEW_DRAWN_KEYS = ["title", "period"] as const;
 
 const useStyles = makeStyles({
   page: {
@@ -68,6 +73,10 @@ export function ReviewPage() {
     isFetching: detailFetching,
   } = useGetReviewDetailQuery({ folder: activeFolder!, slugs, archived }, { skip: !activeFolder });
 
+  // The review's front matter (orgs, generated, ...) is a collapsed row under the
+  // header; the body is the review itself. The period is drawn above the body.
+  const parts = useMemo(() => frontMatterOf(reviewDetail?.content ?? ""), [reviewDetail?.content]);
+
   const commit = async (noPush: boolean) => {
     setCommitResult(null);
     const params = noPush ? ["-NoPush"] : [];
@@ -119,6 +128,13 @@ export function ReviewPage() {
                   </Badge>
                 )}
               </>
+            }
+            extra={
+              pendingFiles.length === 0 && reviewDetail ? (
+                <FrontMatterDetails
+                  pairs={leftoverFrontMatter(parts.frontMatter, REVIEW_DRAWN_KEYS)}
+                />
+              ) : undefined
             }
             path={pendingFiles.length === 0 ? reviewDetail?.path : undefined}
             refresh={pendingFiles.length > 0 ? { onClick: refetch, isFetching } : undefined}
@@ -186,10 +202,7 @@ export function ReviewPage() {
               <Caption1>&middot;</Caption1>
               <Caption1>{reviewDetail.folder}</Caption1>
             </div>
-            <MarkdownViewer
-              content={reviewDetail.content}
-              style={{ marginTop: tokens.spacingVerticalS }}
-            />
+            <MarkdownViewer content={parts.body} style={{ marginTop: tokens.spacingVerticalS }} />
           </>
         ) : null}
       </PanelFrame>
