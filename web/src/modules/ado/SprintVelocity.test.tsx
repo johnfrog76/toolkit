@@ -102,4 +102,9 @@ describe("SprintVelocity tiles", () => {
     );
     expect(screen.getByText(/Recorded as of 03\/04\/2026/)).toBeTruthy();
   });
+
+  it("draws no active-days tile when the as-of day is before the sprint starts", () => {
+    render(<SprintVelocity snapshot={snapshot({}, { asOf: "2026-02-01" })} />);
+    expect(screen.queryByText("active days")).toBeNull();
+  });
 });

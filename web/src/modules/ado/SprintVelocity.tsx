@@ -24,10 +24,10 @@ import {
 import type { StressStatusResponse, SprintActivityResponse, StressReposResponse } from "./api.ado";
 import { healthColor } from "../../shared/health";
 import { SPRINT_WORDS, lastRecordedDay } from "./sprintActivity";
+import { localDay } from "../../utility/dates";
 
 // Days left at or under this read as a warning; a count is never the danger colour.
 const FEW_DAYS_LEFT = 5;
-import { localDay } from "../../utility/dates";
 
 /**
  * Frozen data for deck use: pass a captured snapshot and the card renders it
@@ -322,10 +322,12 @@ export function SprintVelocity({ snapshot }: { snapshot?: SprintVelocitySnapshot
               <StatTile count={activityStats.team} label={SPRINT_WORDS.team} />
               {!selectedDate && (
                 <>
-                  <StatTile
-                    count={`${activityStats.activeDays}/${activityStats.elapsedDays}`}
-                    label="active days"
-                  />
+                  {activityStats.elapsedDays > 0 && (
+                    <StatTile
+                      count={`${activityStats.activeDays}/${activityStats.elapsedDays}`}
+                      label="active days"
+                    />
+                  )}
                   {hasLiveContext && (
                     <>
                       <Tooltip

@@ -92,7 +92,7 @@ export function SprintDailyChart({
             />
             <YAxis tick={{ fontSize: 10 }} width={30} allowDecimals={false} />
             <RTooltip content={<ChartTooltipContent />} cursor={{ fill: "transparent" }} />
-            <Bar dataKey="mine" stackId="a" fill="url(#svMine)" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="drawnMine" stackId="a" fill="url(#svMine)" radius={[0, 0, 0, 0]} />
             <Bar dataKey="rest" stackId="a" fill="url(#svTeam)" radius={[2, 2, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>

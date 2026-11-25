@@ -16,6 +16,8 @@ export interface SprintBar {
   mine: number;
   /** The team's commits that day, as recorded. It already includes mine. */
   team: number;
+  /** The part of the bar that is mine: mine, held at the team's count so the bar never outgrows it. */
+  drawnMine: number;
   /** The team's commits that are not mine: team minus mine, never below zero. */
   rest: number;
 }
@@ -45,6 +47,7 @@ export function buildSprintBars(
       label: cursor.toLocaleString("default", { weekday: "short", day: "numeric" }),
       mine: m,
       team: t,
+      drawnMine: Math.min(m, t),
       rest: Math.max(t - m, 0),
     });
     cursor.setDate(cursor.getDate() + 1);

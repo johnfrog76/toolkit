@@ -22,6 +22,8 @@ describe("buildSprintBars", () => {
       [e("2026-03-02", 3)],
     );
     expect(bars[0].rest).toBe(0);
+    expect(bars[0].drawnMine).toBe(3);
+    expect(bars[0].mine).toBe(4);
   });
 });
 
