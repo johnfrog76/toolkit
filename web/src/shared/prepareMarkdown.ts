@@ -264,17 +264,31 @@ export function sectionOf(headings: Heading[], id: string | null): string | null
 
 /** Drop the card's opening h1 when the page's own header already says it. A
  *  detail page prints the title in its header, then the card printed it again
- *  as the biggest thing on the page. Only an EXACT match goes: a card whose h1
- *  says something else keeps it. */
+ *  as the biggest thing on the page. The body's first h1 goes when its words
+ *  (spaces collapsed, case ignored) are the title's, even after a blockquote or
+ *  a note; a body whose h1 says something else keeps it, and the viewer draws
+ *  that one as a level-2 heading. */
 export function dropLeadingTitle(body: string, titleAbove: string | undefined): string {
   if (!titleAbove) return body;
   const lines = body.split("\n");
-  const first = lines.findIndex((l) => l.trim() !== "");
-  if (first < 0 || !/^#\s+\S/.test(lines[first])) return body;
+  // The body's FIRST top-level heading, outside code: a blockquote, a note or
+  // blank lines may come before it.
+  let inFence = false;
+  let first = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (FENCE.test(lines[i])) inFence = !inFence;
+    if (!inFence && /^#\s+\S/.test(lines[i])) {
+      first = i;
+      break;
+    }
+  }
+  if (first < 0) return body;
   const same = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
   if (same(headingText(lines[first])) !== same(titleAbove)) return body;
-  return lines
+  const before = lines.slice(0, first).join("\n");
+  const after = lines
     .slice(first + 1)
     .join("\n")
     .replace(/^\n+/, "");
+  return before.trim() ? `${before.trimEnd()}\n\n${after}` : after;
 }

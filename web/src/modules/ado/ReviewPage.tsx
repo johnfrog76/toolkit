@@ -202,7 +202,11 @@ export function ReviewPage() {
               <Caption1>&middot;</Caption1>
               <Caption1>{reviewDetail.folder}</Caption1>
             </div>
-            <MarkdownViewer content={parts.body} style={{ marginTop: tokens.spacingVerticalS }} />
+            <MarkdownViewer
+              content={parts.body}
+              titleAbove={reviewDetail.title || reviewDetail.period}
+              style={{ marginTop: tokens.spacingVerticalS }}
+            />
           </>
         ) : null}
       </PanelFrame>
