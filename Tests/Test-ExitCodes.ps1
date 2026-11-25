@@ -885,6 +885,66 @@ foreach ($case in $guardCases) {
 
 Write-Host ""
 
+# ── Through the bridge: the contract's own code, one shared table ────────────
+# Tests/fixtures/bridge/results.json is what POST /api/cmd/{name} answers per
+# outcome; Tests/test_bridge_results.py asserts the route's half. This is the
+# bridge script's half: agent/ado/bridge.ps1 run the way the agent runs it --
+# its own child host, TOOLKIT_QUIET_STARTUP and NO_COLOR set -- in a SCRATCH
+# package with the probe module switched on, for every row the script can have.
+# A stated refusal (the guard's, or the wrapper's own) exits 2; a script that
+# threw or exited some other way, having stated nothing, exits 1.
+
+Write-Host "── Through the bridge, a stated refusal exits 2 ───────" -ForegroundColor Cyan
+
+$bridgeFixtures = Join-Path (Join-Path $scriptDir 'fixtures') 'bridge'
+$bridgeTable = Get-Content -LiteralPath (Join-Path $bridgeFixtures 'results.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$bridgeBox = Join-Path ([System.IO.Path]::GetTempPath()) "exitcode-bridge-$([guid]::NewGuid())"
+$bridgePkg = Join-Path $bridgeBox 'pkg'
+$bridgeHub = Join-Path $bridgeBox 'hub'
+New-Item -ItemType Directory -Path (Join-Path (Join-Path $bridgePkg 'agent') 'ado') -Force | Out-Null
+New-Item -ItemType Directory -Path $bridgeHub -Force | Out-Null
+foreach ($name in @('utilities.psm1', 'config.default.json', 'consts.json')) {
+    Copy-Item -LiteralPath (Join-Path $pkgRoot $name) -Destination $bridgePkg
+}
+foreach ($folder in @('Scripts', 'Config', 'Prompt20Toolkit', 'templates')) {
+    Copy-Item -LiteralPath (Join-Path $pkgRoot $folder) -Destination $bridgePkg -Recurse
+}
+$bridgeScript = Join-Path (Join-Path (Join-Path $bridgePkg 'agent') 'ado') 'bridge.ps1'
+Copy-Item -LiteralPath (Join-Path (Join-Path (Join-Path $pkgRoot 'agent') 'ado') 'bridge.ps1') -Destination $bridgeScript
+foreach ($item in @(Get-ChildItem -LiteralPath (Join-Path $bridgeFixtures 'probe'))) {
+    Copy-Item -LiteralPath $item.FullName -Destination (Join-Path $bridgePkg 'Config') -Recurse
+}
+
+$savedBridgeEnv = @{}
+foreach ($k in @('TOOLKIT_QUIET_STARTUP', 'NO_COLOR', 'P20_USAGE_LOG_DIR')) { $savedBridgeEnv[$k] = [System.Environment]::GetEnvironmentVariable($k) }
+[System.Environment]::SetEnvironmentVariable('TOOLKIT_QUIET_STARTUP', '1')
+[System.Environment]::SetEnvironmentVariable('NO_COLOR', '1')
+[System.Environment]::SetEnvironmentVariable('P20_USAGE_LOG_DIR', $bridgeBox)
+try {
+    $bridgeRows = @($bridgeTable.rows | Where-Object { $null -ne $_.bridge })
+    Assert-True "the shared table has a row the bridge script can answer for every case it can have" ($bridgeRows.Count -ge 7)
+    foreach ($row in $bridgeRows) {
+        $local = @{ promptsRoot = $bridgeHub; features = @{ bridgeProbe = [bool]$row.flag } } | ConvertTo-Json -Depth 4
+        [System.IO.File]::WriteAllText((Join-Path $bridgePkg 'config.local.json'), $local, (New-Object System.Text.UTF8Encoding $false))
+        $bridgeArgs = @([string]$row.function) + @($row.params | ForEach-Object { [string]$_ })
+        $run = (@(Invoke-P20TestHost -File $bridgeScript -Arguments $bridgeArgs -NonInteractive) | ForEach-Object { "$_" }) -join "`n"
+        $code = $LASTEXITCODE
+        Assert-True "bridge: $($row.case) -- exits $($row.bridge.exit) (got $code)" ($code -eq [int]$row.bridge.exit) $run
+        Assert-True "bridge: $($row.case) -- says '$($row.bridge.says)'" ($run.Contains([string]$row.bridge.says)) $run
+        Assert-True "bridge: $($row.case) -- no stack trace" ($run -notmatch 'System\.Management\.Automation|\+ CategoryInfo') $run
+    }
+    Assert-True "bridge: the table holds both kinds of stated refusal" (@($bridgeRows | Where-Object { [int]$_.bridge.exit -eq 2 }).Count -eq 2)
+}
+catch {
+    Assert-True 'the cases ran to the end without a terminating error' $false $_.Exception.Message
+}
+finally {
+    foreach ($k in $savedBridgeEnv.Keys) { [System.Environment]::SetEnvironmentVariable($k, $savedBridgeEnv[$k]) }
+    Remove-Item -LiteralPath $bridgeBox -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host ""
+
 Remove-Item $script:probeDir -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host ""

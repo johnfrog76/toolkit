@@ -40,9 +40,11 @@
        quoting to get wrong and nothing to inject into.
 
     Exit code is the contract. 0 is success; anything else is the failure the
-    caller reports. A terminating error becomes exit 1 with its message on
-    stderr, because an unhandled exception's stack trace is not an error
-    message.
+    caller reports. A STATED refusal -- the CLI's refusal contract, AGENTS.md --
+    is exit 2, and nothing else is: any other terminating error is exit 1, as
+    is this script failing to start the toolkit at all, and a name this tree
+    does not define is 127. The message goes to stderr either way, because an
+    unhandled exception's stack trace is not an error message.
 
 .EXAMPLE
     pwsh -NoProfile -File bridge.ps1 Get-P20CommandMap
@@ -53,7 +55,7 @@
 # Not $args[0] + a param block: see decision 3 above.
 if ($args.Count -lt 1) {
     [Console]::Error.WriteLine('bridge.ps1: no function name given')
-    exit 2
+    exit 1
 }
 
 $fn = [string]$args[0]
@@ -81,7 +83,7 @@ $manifest = Join-Path (Join-Path $repoRoot 'Prompt20Toolkit') 'Prompt20Toolkit.p
 
 if (-not (Test-Path -LiteralPath $manifest)) {
     [Console]::Error.WriteLine("bridge.ps1: no toolkit manifest at $manifest")
-    exit 2
+    exit 1
 }
 
 # Under -File, PowerShell folds the warning stream into stdout, and importing
@@ -96,7 +98,7 @@ try {
 }
 catch {
     [Console]::Error.WriteLine("bridge.ps1: could not import $manifest -- $($_.Exception.Message)")
-    exit 2
+    exit 1
 }
 finally {
     $WarningPreference = $prevWarning
@@ -113,7 +115,15 @@ if (-not $resolved) {
     exit 127
 }
 
-# A clean return is 0; a terminating error is 1. Deliberately NOT
+# A clean return is 0; a stated refusal is 2; any other terminating error is 1.
+# The refusal is told apart by identity, not by wording: the guard
+# (Invoke-ToolkitScript) and Write-WrapperRefusal record the exception they
+# raise for a refusal in $global:P20StatedRefusal, and only that exception
+# exits 2. The record is cleared first, so it can only be this call's. A script
+# that threw, or exited non-zero without stating a reason, is re-raised
+# unrecorded and stays 1 -- whatever $LASTEXITCODE a terminal would have read.
+#
+# Deliberately NOT
 # `exit $LASTEXITCODE`: that variable holds the exit code of the last NATIVE
 # command anywhere inside the verb, so a tier probe whose `az` call failed made
 # a perfectly successful {cliPrefix}Env report as a failure. Exiting 0 on a
@@ -123,11 +133,13 @@ if (-not $resolved) {
 # The consequence, and it is the CLI's rather than the bridge's: a verb that
 # CATCHES its own failure, prints `Error: ...` via Write-CliError and returns
 # normally exits 0 here too. The text is in the reply's `output` either way.
+$global:P20StatedRefusal = $null
 try {
     & $fn @fnArgs
 }
 catch {
     [Console]::Error.WriteLine($_.Exception.Message)
+    if ($null -ne $global:P20StatedRefusal -and [object]::ReferenceEquals($_.Exception, $global:P20StatedRefusal)) { exit 2 }
     exit 1
 }
 

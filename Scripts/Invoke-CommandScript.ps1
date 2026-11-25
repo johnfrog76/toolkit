@@ -17,6 +17,19 @@
 # is a failure that said nothing.
 $script:StatedRefusalExitCode = 2
 
+# A stated refusal re-raised for a non-interactive caller. The exception is
+# recorded in $global:P20StatedRefusal before it is thrown, so agent/ado/bridge.ps1
+# can tell the refusal from a failure by identity: it exits 2 only when the
+# exception that reached it IS the recorded one. The bridge clears the record
+# before each call; a throw the guard re-raises as a failure is never recorded.
+# The message is the bare sentence, exactly what `throw $Message` carried.
+function Invoke-P20StatedRefusalRaise {
+    param([Parameter(Mandatory)][string]$Message)
+    $refusalError = New-Object System.Management.Automation.RuntimeException($Message)
+    $global:P20StatedRefusal = $refusalError
+    throw $refusalError
+}
+
 # -- One guard for every wrapper -----------------------------------------------
 # Runs a command's script and reads the exit code it left behind:
 #
@@ -33,7 +46,8 @@ $script:StatedRefusalExitCode = 2
 # verb that catches its own failure and returns cleanly reports `success` to the
 # web UI. For one of those -- TOOLKIT_QUIET_STARTUP, which the agent sets -- the
 # stated refusal is re-raised AFTER the guard, unreported, so the bridge exits
-# non-zero with the stated sentence on stderr and the browser is told `error`.
+# 2 with the stated sentence on stderr and the browser is told `error` with
+# `exit_code` 2 (Invoke-P20StatedRefusalRaise, above, is how it knows).
 # It is never re-raised in a terminal: there the exit code is readable and a
 # raw error record is exactly what this contract exists to remove.
 function Invoke-ToolkitScript {
@@ -81,8 +95,10 @@ function Invoke-ToolkitScript {
         # script that THREW (a terminating error under ErrorActionPreference Stop)
         # left no code at all -- the reset above made it 0 -- so NewSpace printed
         # "Error: An object at the specified path ... does not exist." and reported
-        # success. The guard has just stated it, so it is exit 2, and a
-        # non-interactive caller is told the same way a stated refusal tells it.
+        # success. The guard has just stated it, so it is exit 2 in a terminal. A
+        # non-interactive caller is handed the sentence too, but re-raised as a
+        # plain error, never recorded as a refusal: through the bridge a throw or
+        # a silent exit is a failure (exit 1), and only a stated refusal exits 2.
         if ($code) { $global:LASTEXITCODE = $code }
         else { $global:LASTEXITCODE = $script:StatedRefusalExitCode }
         if ($env:TOOLKIT_QUIET_STARTUP) { throw $failure }
@@ -91,7 +107,7 @@ function Invoke-ToolkitScript {
 
     if ($refusal) {
         $global:LASTEXITCODE = $script:StatedRefusalExitCode
-        if ($env:TOOLKIT_QUIET_STARTUP) { throw $refusal }
+        if ($env:TOOLKIT_QUIET_STARTUP) { Invoke-P20StatedRefusalRaise -Message $refusal }
     }
 }
 
@@ -106,5 +122,5 @@ function Write-WrapperRefusal {
     Write-ToolkitLog -Type ERR -Source $Name -Detail $Message
     Write-CliError -Message $Message -Hint $Hint
     $global:LASTEXITCODE = $script:StatedRefusalExitCode
-    if ($env:TOOLKIT_QUIET_STARTUP) { throw $Message }
+    if ($env:TOOLKIT_QUIET_STARTUP) { Invoke-P20StatedRefusalRaise -Message $Message }
 }

@@ -1265,6 +1265,9 @@ that across the boundary between a script and the wrapper that ran it:
 
 Through the agent (`TOOLKIT_QUIET_STARTUP`), every row but the first is `status: error` with the
 sentence: a stated refusal, a silent non-zero exit and a throw are each re-raised after the block.
+The reply's `exit_code` keeps them apart: `2` for a stated refusal -- the script's, or one the wrapper
+states itself -- and `1` for a silent non-zero exit or a throw, whatever `$LASTEXITCODE` the terminal
+would have read ([the bridge](ARCHITECTURE.md#the-bridge)).
 
 `tkArchive` on a name that matches nothing, `tkNewGrowth` without the `-DueDate` a training needs,
 `tkNewPrompt -Type` on a type that does not exist -- each exits `2` and prints one block, never the
@@ -1284,7 +1287,9 @@ That file is the one copy; `Tests/Test-Portability.ps1` refuses a script that ca
 `utilities.psm1` owns the alias and forwards `$PSBoundParameters`; the script in `Scripts/` does the
 work. A switch the wrapper does not declare is rejected by the **binder**, before the script runs --
 and a binding error sets no `$LASTEXITCODE`, so the failed call reports **success** with nothing
-started -- a switch in the help and not in the wrapper does exactly that.
+started -- a switch in the help and not in the wrapper does exactly that. (Through the bridge the
+same call is `status: error`, `exit_code` 1, with the binder's sentence: the bridge reads whether the
+function threw, and a binding error does.)
 So a switch goes in three places: the script's `param()`, the wrapper's, and the verb's `usage` in
 `config.default.json`. `tkTestToolkit -Menu` checks every script-backed verb in every direction --
 usage to wrapper, wrapper to script, and script to usage and wrapper (`-Help` excepted: the wrapper

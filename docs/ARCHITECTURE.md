@@ -184,8 +184,20 @@ against a stamp of each file it depends on (modification time, size and a digest
 bridgeable on the next request with no backend edit, and switching a module on makes its verbs
 callable on the next request too. Parameters travel as process argv -- no command string is built
 or parsed on either side -- and a reply is always a `CommandResponse` with one of four statuses
-(`success`, `error`, `rejected` -- nothing ran, `timeout`). `agent/README.md`, "The bridge" has the
-rest: which PowerShell it picks, the size limits, per-verb timeouts, and the exit-code contract a
+(`success`, `error`, `rejected` -- nothing ran, `timeout`). Its `exit_code` carries the CLI's
+[refusal contract](CLI.md#errors) across, so a caller can tell a verb that said no from one that broke:
+
+| Outcome | `status` | `exit_code` |
+| --- | --- | --- |
+| The verb worked | `success` | `0` |
+| A **stated refusal** -- the script's `Write-CliError` and `exit 2`, or the wrapper's own `Write-WrapperRefusal` | `error` | `2` |
+| A failure that stated nothing -- a script that threw, a silent non-zero exit, a switch the wrapper does not declare | `error` | `1` |
+| Nothing ran -- a name outside the command table (a module verb whose flag is off is one), or a parameter over a limit | `rejected` | `-1` |
+| The verb outlived its timeout | `timeout` | `-1` |
+
+Either way `error` is the sentence the verb stated, unchanged; `Tests/fixtures/bridge/results.json`
+is the table, asserted from the bridge script and from the route. `agent/README.md`, "The bridge" has
+the rest: which PowerShell it picks, the size limits, per-verb timeouts, and the exit-code contract a
 verb that catches its own failure still honours.
 
 ## The web UI

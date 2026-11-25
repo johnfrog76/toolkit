@@ -842,7 +842,10 @@ failure, and a client that types the body renders every outcome the same way.
 | `status` | `exit_code` | Means |
 | --- | --- | --- |
 | `success` | `0` | The verb ran and exited 0; its console output is in `output` |
-| `error` | the verb's | The verb ran and exited non-zero; `error` is its stderr. Also `-1` and `duration` 0 when there is no PowerShell host at all -- see [Which PowerShell](#which-powershell) |
+| `error` | `2` | A **stated refusal**: the verb said why, once -- a script's `Write-CliError` and `exit 2`, or the wrapper's own `Write-WrapperRefusal` -- and `error` is that sentence |
+| `error` | `1` | A failure that stated nothing: a script that threw, a silent non-zero exit, a switch the wrapper does not declare (the binder's sentence). `error` is its stderr |
+| `error` | `127` | `bridge.ps1` found no such function in this tree -- a name the table allowed but the tree no longer defines |
+| `error` | `-1` | No PowerShell host at all, `duration` 0 -- see [Which PowerShell](#which-powershell) |
 | `rejected` | `-1` | **Nothing ran.** The name is not in the command table, or a parameter broke a limit. `duration` is 0 |
 | `timeout` | `-1` | The verb outlived its timeout and was killed |
 
@@ -863,7 +866,8 @@ not hold a connection for two minutes while `az` hangs.
 
 ### One thing to know about `success`
 
-`bridge.ps1` exits 0 on a clean return and 1 on a terminating error. It deliberately does **not**
+`bridge.ps1` exits 0 on a clean return, 2 on a stated refusal and 1 on any other terminating error
+(and 1 when it cannot import the toolkit at all, so `2` means a refusal and nothing else). It deliberately does **not**
 exit with `$LASTEXITCODE`, which holds the exit code of the last *native* command anywhere inside
 the verb -- with that, a perfectly successful `tkEnv` would report as a failure whenever its `az`
 probe missed.
@@ -871,7 +875,14 @@ probe missed.
 A stated refusal still arrives as a failure. `bridge.ps1` sets `TOOLKIT_QUIET_STARTUP`, and under
 it the CLI's one guard, `Invoke-ToolkitScript`, re-raises an `exit 2` refusal instead of returning
 cleanly, so the reply is `status: "error"` with the verb's stated sentence, never `success`
-(`Tests/test_bridge_refusals.py`; the contract is AGENTS.md's "The refusal contract"). A verb that
+(`Tests/test_bridge_refusals.py`; the contract is AGENTS.md's "The refusal contract"). The guard
+records the exception it raises for a refusal in `$global:P20StatedRefusal` -- and so does
+`Write-WrapperRefusal` -- and `bridge.ps1`, which clears that record before it calls the function,
+exits 2 only when the exception that reached it IS the recorded one. A script that threw, or exited
+non-zero without stating a reason, is re-raised as a plain error and exits 1, though in a terminal the
+guard leaves `$LASTEXITCODE` at 2 for a throw as before: a terminal sees nothing new. The shared table
+is `Tests/fixtures/bridge/results.json`, asserted from `Tests/Test-ExitCodes.ps1` (the bridge script)
+and `Tests/test_bridge_results.py` (the route). A verb that
 catches its own failure outside that guard and returns normally still exits 0, and the bridge
 reports `success` with the text in `output` -- the same contract `Tests/Test-ExitCodes.ps1` asserts
 for the terminal, so the bridge and the CLI agree about what failed.

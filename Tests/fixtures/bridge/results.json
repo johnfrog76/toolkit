@@ -1,0 +1,65 @@
+{
+  "_comment": "What POST /api/cmd/{name} answers, one row per outcome: docs/ARCHITECTURE.md, \"The bridge\", and agent/README.md, \"The four statuses\". ONE table, two readers. Tests/Test-ExitCodes.ps1 runs agent/ado/bridge.ps1 the way the agent does, for every row with a bridge block, and asserts its exit code and that its output carries `says`. Tests/test_bridge_results.py posts every row to the route with the real bridge and asserts status, exit_code and error. Both build a SCRATCH package with the probe module in probe/ copied into its Config/ and features.bridgeProbe set to `flag`; `verb` is the name the route is called with, `function` the one the bridge script is called with, `params` what follows. exit_code 2 is a STATED refusal -- the guard (Invoke-ToolkitScript) or the wrapper (Write-WrapperRefusal) recorded the reason for this call; any other failure is 1; -1 means nothing ran. `error` is the reply's error field exactly; `says` is text the reply carries (output for a success, error otherwise). A bridge block of null is a row the bridge script cannot have: the allowlist and the timeout are the agent's.",
+  "rows": [
+    {
+      "case": "a verb that succeeds",
+      "verb": "ProbeOk", "function": "Invoke-P20BridgeProbeOk", "params": [], "flag": true,
+      "bridge": { "exit": 0, "says": "The probe ran." },
+      "route": { "status": "success", "exit_code": 0, "error": null, "says": "The probe ran." }
+    },
+    {
+      "case": "a stated refusal from a script: Write-CliError, then exit 2",
+      "verb": "ProbeStated", "function": "Invoke-P20BridgeProbeStated", "params": [], "flag": true,
+      "bridge": { "exit": 2, "says": "The probe card is not in current/." },
+      "route": { "status": "error", "exit_code": 2, "error": "The probe card is not in current/.", "says": "The probe card is not in current/." }
+    },
+    {
+      "case": "a refusal the wrapper states: Write-WrapperRefusal",
+      "verb": "ProbeWrapper", "function": "Invoke-P20BridgeProbeWrapper", "params": [], "flag": true,
+      "bridge": { "exit": 2, "says": "ProbeWrapper needs PROBE_KEY; it is not set." },
+      "route": { "status": "error", "exit_code": 2, "error": "ProbeWrapper needs PROBE_KEY; it is not set.", "says": "ProbeWrapper needs PROBE_KEY; it is not set." }
+    },
+    {
+      "case": "a script that throws, stating no reason",
+      "verb": "ProbeThrows", "function": "Invoke-P20BridgeProbeThrows", "params": [], "flag": true,
+      "bridge": { "exit": 1, "says": "The probe threw: an object at the specified path does not exist." },
+      "route": { "status": "error", "exit_code": 1, "error": "The probe threw: an object at the specified path does not exist.", "says": "The probe threw: an object at the specified path does not exist." }
+    },
+    {
+      "case": "a script that exits 3, stating no reason",
+      "verb": "ProbeSilent", "function": "Invoke-P20BridgeProbeSilent", "params": [], "flag": true,
+      "bridge": { "exit": 1, "says": "exit code 3" },
+      "route": { "status": "error", "exit_code": 1, "error": "exit code 3", "says": "exit code 3" }
+    },
+    {
+      "case": "a refusal caught inside the verb, then a throw: the record is not this failure's",
+      "verb": "ProbeStale", "function": "Invoke-P20BridgeProbeStale", "params": [], "flag": true,
+      "bridge": { "exit": 1, "says": "The probe failed after a refusal it caught." },
+      "route": { "status": "error", "exit_code": 1, "error": "The probe failed after a refusal it caught.", "says": "The probe failed after a refusal it caught." }
+    },
+    {
+      "case": "a name outside the command table",
+      "verb": "ProbeMissing", "function": "Invoke-P20BridgeProbeMissing", "params": [], "flag": true,
+      "bridge": { "exit": 127, "says": "is not a function in this toolkit" },
+      "route": { "status": "rejected", "exit_code": -1, "error": "'ProbeMissing' is not a command in this CLI.", "says": "is not a command in this CLI" }
+    },
+    {
+      "case": "a verb that outlives its timeout",
+      "verb": "ProbeSlow", "function": "Invoke-P20BridgeProbeSlow", "params": [], "flag": true,
+      "bridge": null,
+      "route": { "status": "timeout", "exit_code": -1, "error": "Command timed out after 3 seconds.", "says": "timed out" }
+    },
+    {
+      "case": "a module verb whose flag is off",
+      "verb": "ProbeOk", "function": "Invoke-P20BridgeProbeOk", "params": [], "flag": false,
+      "bridge": { "exit": 127, "says": "is not a function in this toolkit" },
+      "route": { "status": "rejected", "exit_code": -1, "error": "'ProbeOk' is not a command in this CLI.", "says": "is not a command in this CLI" }
+    },
+    {
+      "case": "a switch the wrapper does not declare: the binder refuses, nothing runs",
+      "verb": "ProbeOk", "function": "Invoke-P20BridgeProbeOk", "params": ["-NoSuchSwitch"], "flag": true,
+      "bridge": { "exit": 1, "says": "A parameter cannot be found that matches parameter name 'NoSuchSwitch'." },
+      "route": { "status": "error", "exit_code": 1, "error": "A parameter cannot be found that matches parameter name 'NoSuchSwitch'.", "says": "A parameter cannot be found that matches parameter name 'NoSuchSwitch'." }
+    }
+  ]
+}
