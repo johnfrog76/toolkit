@@ -1230,7 +1230,12 @@ foreach ($g in $dressGroups) {
     Assert-True "dress: $($g.id)'s prose sentence passes its own guard" ($got -ceq '') "got '$got'"
 }
 foreach ($row in $dressRows) {
-    $got = Test-P20StandupDress -Facts $dressGroups[[int]$row.group] -Sentence ([string]$row.sentence) -PackageRoot $pkgRoot
+    $facts = $dressGroups[[int]$row.group]
+    if ($row.PSObject.Properties['worker']) {
+        $facts = $facts.PSObject.Copy()
+        $facts.worker = [string]$row.worker
+    }
+    $got = Test-P20StandupDress -Facts $facts -Sentence ([string]$row.sentence) -PackageRoot $pkgRoot
     $want = [string]$row.reason
     $shown = ([string]$row.sentence) -replace "`n", '\n'
     Assert-True "dress: '$shown' is $(if ($want) { $want } else { 'kept' })" ($got -ceq $want) "got '$got'"
