@@ -11,6 +11,38 @@ until the release folds them in here.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-25
+
+### Added
+
+- A sixth role ships in `agentic/org/`, the butler: run weekly as a routine you schedule, it gives every design note and spec with no id its own with `StampDesign` and reports what it stamped, which designs look finished with the evidence and the `MoveDesign` call that would archive them, and what it left and why. It archives nothing itself. The sample hub's `org.json` seats it under the VP of product.
+- Four more roles ship in `agentic/org/` beside the intern: the PM, who plans the work and keeps the record; the team lead, who briefs builders and hands on one pull request at a time, made ready; the VP of engineering, who holds the engineering standards and the merge; and the VP of product, who owns scope, voice and the release notes. Each names its neighbours by relationship and carries a section for whoever covers the seat, and the sample hub's `org.json` now names a role for every office.
+- The org's roles ship in `agentic/org/`, starting with the intern: a role that assists the seat planning the work by drafting milestones, breakdowns of a too-big story, close-outs with their evidence, a severity for each bug and the shipped designs to archive, and hands every draft to that seat to decide and write. A position in `org.json` can name a shipped role without copying it, and a role of your own in the hub's `agentic/org/` under the same name wins.
+- The web UI shows what's new in the version you just updated to: a **What's new** dialog with that release's notes opens the first time you open a new version, and **What's new** in the account menu, after All settings, opens it again whenever you like.
+
+### Changed
+
+- The toolkit's own plan for a set of cards is now called a release everywhere you read it -- `Plan`,
+  `Backlog`, the board's Release filter, the card menu's Plan release, the standup's suggestion and PM
+  Corner, and the docs -- and "milestone" on its own now always means a GitHub milestone. Nothing in a hub
+  needs to change: the card's `**Milestone:**` line, the `milestones/` folder and the `-Milestone` switches
+  keep their names and read exactly as before.
+- The intern now fetches the tracker's milestones and where each one stands for the team, still writing nothing, and no longer proposes designs to archive: that is the butler's round. Every role now opens by reading its situation -- the Space, the tracker, the open cards, what waits on whom -- before it does its job, and the roles page gives each role a short bio.
+- Every page that shows one record now has the same header. Its File line is a short **Copy the file path** or **Copy the file link** button, with the full address in its tooltip and the same width whatever the address; the docs viewer, the 1:1 session page and the issue page carry it, while the design note and a PR's review comments show no line yet.
+- A 1:1 session, a growth item, a card's review comments and a reference document are opened by their exact
+  file name, so on a disk that ignores letter case, a request that spells the name in other case is now not found.
+
+### Fixed
+
+- On Linux, `Web -Stop`, `-Restart` and `-Status` recognise a `node` dev server on the dev port, so an
+  orphaned dev server of this checkout is stopped instead of being called "not a dev server" and left running,
+  and a process holding a port is named by its program rather than by its main thread.
+- `Web -Dev -Fixture` serves a temporary copy of the fixture hub, removed by `Web -Stop`, so saving a
+  setting there no longer changes a file in the checkout; and `Config`, with the settings drawer that reads
+  it, now lists the Space the environment override names, as every other command does.
+- A real run's counts block is no longer refused by the counts writer when the pytest line ends `(via python3 (PATH))`, so release counts can be written from a run that used the PATH Python.
+- The agent's routes that open a hub file by its name take the file from the folder's own listing.
+
 ## [1.7.0] - 2026-11-22
 
 ### Added
