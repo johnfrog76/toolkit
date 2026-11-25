@@ -22,7 +22,11 @@ import {
   useGetStressReposQuery,
 } from "./api.ado";
 import type { StressStatusResponse, SprintActivityResponse, StressReposResponse } from "./api.ado";
-import { daysRemainingHealthColor, deficitHealth, healthColor } from "../../shared/health";
+import { healthColor } from "../../shared/health";
+import { SPRINT_WORDS, lastRecordedDay } from "./sprintActivity";
+
+// Days left at or under this read as a warning; a count is never the danger colour.
+const FEW_DAYS_LEFT = 5;
 import { localDay } from "../../utility/dates";
 
 /**
@@ -141,26 +145,20 @@ export function SprintVelocity({ snapshot }: { snapshot?: SprintVelocitySnapshot
       mine,
       team,
       activeDays,
-      elapsedWorkdays: elapsedDates.length,
+      elapsedDays: elapsedDates.length,
       mineChurn,
       teamChurn,
       anyChurnRecorded,
     };
   }, [activity, dateOptions, selectedDate, snapshot?.asOf]);
 
-  // Last date with real recorded git activity in the committed history — true
+  // The last day the committed history records, whatever its count -- true
   // regardless of whether a live stress-log exists on this machine, unlike
   // status.generatedAt (only present when detail === "ok").
-  const lastRecordedDate = useMemo(() => {
-    if (!activity) return null;
-    let latest: string | null = null;
-    for (const d of [...activity.mine, ...activity.team]) {
-      if (d.count > 0 && (latest === null || d.date > latest)) {
-        latest = d.date;
-      }
-    }
-    return latest;
-  }, [activity]);
+  const lastRecordedDate = useMemo(
+    () => (activity ? lastRecordedDay(activity.mine, activity.team) : null),
+    [activity],
+  );
 
   const isLoading = statusLoading || activityLoading;
   const isFetching = statusFetching || activityFetching;
@@ -172,7 +170,8 @@ export function SprintVelocity({ snapshot }: { snapshot?: SprintVelocitySnapshot
 
   const ctx = status?.context ?? null;
   const daysRemaining = ctx?.daysRemaining ?? null;
-  const sprintDaysHealthColor = daysRemainingHealthColor(daysRemaining);
+  const sprintDaysColor =
+    daysRemaining !== null && daysRemaining <= FEW_DAYS_LEFT ? healthColor("warn") : undefined;
   const hasLiveContext = status?.detail === "ok";
   const repo = repoLabel(status?.sourceRepo ?? null);
 
@@ -315,16 +314,16 @@ export function SprintVelocity({ snapshot }: { snapshot?: SprintVelocitySnapshot
       {(ctx || activityStats?.anyChurnRecorded) && (
         <StatTiles>
           {daysRemaining !== null && ctx && (
-            <StatTile count={daysRemaining} label="days left" color={sprintDaysHealthColor} />
+            <StatTile count={daysRemaining} label="days left" color={sprintDaysColor} />
           )}
           {ctx && activityStats && (
             <>
-              <StatTile count={activityStats.mine} label="commits" />
-              <StatTile count={activityStats.team} label="merges" />
+              <StatTile count={activityStats.mine} label={SPRINT_WORDS.mine} />
+              <StatTile count={activityStats.team} label={SPRINT_WORDS.team} />
               {!selectedDate && (
                 <>
                   <StatTile
-                    count={`${activityStats.activeDays}/${activityStats.elapsedWorkdays}`}
+                    count={`${activityStats.activeDays}/${activityStats.elapsedDays}`}
                     label="active days"
                   />
                   {hasLiveContext && (
@@ -334,22 +333,14 @@ export function SprintVelocity({ snapshot }: { snapshot?: SprintVelocitySnapshot
                         relationship="description"
                         withArrow
                       >
-                        <StatTile
-                          count={ctx.mergeVelocity}
-                          label="velocity"
-                          color={healthColor(deficitHealth(ctx.mergeVelocity, 6, 8))}
-                        />
+                        <StatTile count={ctx.mergeVelocity} label="velocity" />
                       </Tooltip>
                       <Tooltip
                         content="Commits landed on origin/main since you branched"
                         relationship="description"
                         withArrow
                       >
-                        <StatTile
-                          count={ctx.upstreamMerges}
-                          label="upstream merges"
-                          color={healthColor(deficitHealth(ctx.upstreamMerges, 6, 11))}
-                        />
+                        <StatTile count={ctx.upstreamMerges} label="upstream merges" />
                       </Tooltip>
                     </>
                   )}
