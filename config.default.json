@@ -696,7 +696,7 @@
         "Walks design/, design/archive/, spec/ and spec/archive/ and adds an id: <uuid> line to the frontmatter of every markdown file that has none, creating the frontmatter block when there is none. README.md is not a design and is skipped.",
         "A spec gets the SAME id as the note whose file stem it shares (design/<stem>.md and spec/<stem>.spec.md). An id that is already there is never changed, a file that needs nothing is not written, and a second run writes nothing. Each file keeps its own line endings.",
         "By default it works on the git root of the current directory, printed on the first line, which must hold design/. -Hub works on the hub's design/ and spec/ instead (and a Space folder's own). -WhatIf names every file it would stamp and writes none.",
-        "It stamps files; it does not commit them. Nothing is stamped until the owner runs it."
+        "It stamps files; it does not commit them. Nothing is stamped until StampDesign runs, whether the owner runs it or the seat the org gives that job to."
       ]
     },
     "MoveDesign": {
