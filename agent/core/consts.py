@@ -248,7 +248,7 @@ def re_closed_stamp_date() -> re.Pattern:
     Built from the stamp rather than retyped: the date shape belongs to this
     half (nothing else parses it), the stamp does not.
     """
-    return re.compile(r"(?m)^" + re.escape(stamp_closed()) + r"\s*(\d{4}-\d{2}-\d{2})")
+    return re.compile(r"(?m)^" + re.escape(stamp_closed()) + r"[ \t]*(\d{4}-\d{2}-\d{2})")
 
 
 def env_teams_webhook_prefix() -> str:

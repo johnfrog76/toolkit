@@ -70,6 +70,49 @@ class FolderStateTests(unittest.TestCase):
         self.assertEqual([s for s, _ in order], ["Active", "In Progress", "Code Review", "Backlog"])
 
 
+class SameLineTests(unittest.TestCase):
+    """A value is what follows its token ON THE SAME LINE. The card readers of
+    Tests/fixtures/parsers/same-line.json (Tests/Test-Status.ps1 asserts the SAME
+    rows; the design readers are Tests/test_design.py's): a bare token reads as
+    no value, never the line below it, on either line ending."""
+
+    def test_every_card_row_of_the_shared_table(self):
+        import json
+        import re
+
+        from agent.core.consts import consts, re_closed_stamp_date, rituals_work_thread_regex
+        from agent.core.parsers import card_ado_url, card_billable
+        from agent.solitaire.standup import _stamp_day
+
+        readers = {"stampDay", "billable", "adoLink", "prUrl", "sprint", "workThread"}
+        table = json.loads((FIXTURES / "same-line.json").read_text(encoding="utf-8"))
+        rows = [r for r in table["rows"] if r["reader"] in readers]
+        self.assertEqual({r["reader"] for r in rows}, readers)
+        for row in rows:
+            with self.subTest(row=row["name"]):
+                eol = "\r\n" if row.get("crlf") else "\n"
+                text = f"# Task K7M2: x{eol}{eol}" + eol.join(row["lines"]) + eol
+                reader = row["reader"]
+                if reader == "stampDay":
+                    stamp = consts()["stamps"][row["stamp"]]
+                    got = _stamp_day(text, stamp) or ""
+                    if row["stamp"] == "closed":
+                        m = re_closed_stamp_date().search(text)
+                        self.assertEqual(m.group(1) if m else "", got)
+                elif reader == "billable":
+                    got = card_billable(text)
+                elif reader == "adoLink":
+                    got = card_ado_url(text) or ""
+                elif reader == "prUrl":
+                    got = _parse_status_metadata(text)["pr_url"] or ""
+                elif reader == "sprint":
+                    got = _parse_status_metadata(text)["sprint"]
+                else:
+                    m = re.search(rituals_work_thread_regex(), text)
+                    got = m.group(1) if m else ""
+                self.assertEqual(got, row["expected"])
+
+
 class StatusMetadataTests(unittest.TestCase):
     def test_active_status(self):
         meta = _parse_status_metadata(_read("active.md"))

@@ -168,9 +168,11 @@ function Add-P20DocsLineText {
 }
 
 function Get-P20StampValue {
-    # The text after a `**Stamp:**` line, '' when the file has none.
+    # The text after a `**Stamp:**` on that line, '' when the file has none.
+    # The value is what follows the stamp on its OWN line: a bare stamp reads
+    # as no value, never the line below it, on either line ending.
     param([string]$Text, [string]$Stamp)
-    $m = [regex]::Match($Text, '(?m)^' + [regex]::Escape($Stamp) + '\s*(.*?)\s*$')
+    $m = [regex]::Match($Text, '(?m)^' + [regex]::Escape($Stamp) + '[ \t]*([^\r\n]*?)[ \t]*\r?$')
     if ($m.Success) { return $m.Groups[1].Value.Trim() }
     return ''
 }

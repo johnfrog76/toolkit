@@ -1,0 +1,663 @@
+{
+  "_": "ONE table for every line a file is read by as `<token> <value>`: the value is what follows the token ON THE SAME LINE, and a token with nothing after it on its line reads as no value -- never the line below it, on either line ending. Each row's text is its lines joined by LF, or by CRLF where `crlf` is true, with a final line ending. `reader` names the rule: stampValue (a design file's `**Outcome:**` or `**Closed:**` value, `stamp` the key in consts.json stamps; Get-P20StampValue and design._stamp), docs (design.docsRegex, group 1), thread (studio.threadRegex, group 1) -- asserted by tkTestToolkit -Design and Tests/test_design.py; stampDay (the day after a footer stamp; Get-P20StampDayRegex, re_closed_stamp_date and standup._stamp_day), billable (Test-P20CardBillable, card_billable; expected is whether the card is billable), adoLink (Get-P20CardAdoUrl, card_ado_url), prUrl (Get-P20CardPrUrl, the card model's pr_url), sprint (Get-P20CardSprintLabel, the card model's sprint; '--' for none) and workThread (rituals.workThreadRegex, group 1) -- asserted by tkTestToolkit -PromptStatus and Tests/test_parsers.py. expected '' is no value. docs/hub/cards.md, \"3. The footer -- one fact per line\"; docs/hub/design.md, \"The file\".",
+  "rows": [
+    {
+      "name": "outcome: a bare stamp above a text line reads as no value",
+      "reader": "stampValue",
+      "stamp": "outcome",
+      "lines": [
+        "**Outcome:**",
+        "shipped"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "outcome: a bare stamp above a text line reads as no value, CRLF",
+      "reader": "stampValue",
+      "stamp": "outcome",
+      "lines": [
+        "**Outcome:**",
+        "shipped"
+      ],
+      "crlf": true,
+      "expected": ""
+    },
+    {
+      "name": "outcome: a bare stamp with trailing blanks above a text line reads as no value",
+      "reader": "stampValue",
+      "stamp": "outcome",
+      "lines": [
+        "**Outcome:** \t ",
+        "shipped"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "outcome: the value on the stamp's line is read",
+      "reader": "stampValue",
+      "stamp": "outcome",
+      "lines": [
+        "**Outcome:** shipped"
+      ],
+      "expected": "shipped"
+    },
+    {
+      "name": "outcome: the value on the stamp's line is read, CRLF",
+      "reader": "stampValue",
+      "stamp": "outcome",
+      "lines": [
+        "**Outcome:** shipped",
+        "next"
+      ],
+      "crlf": true,
+      "expected": "shipped"
+    },
+    {
+      "name": "outcome: spaces and tabs after the stamp, then the value, still read",
+      "reader": "stampValue",
+      "stamp": "outcome",
+      "lines": [
+        "**Outcome:** \t shipped \t"
+      ],
+      "expected": "shipped"
+    },
+    {
+      "name": "closed: a bare stamp above a text line reads as no value",
+      "reader": "stampValue",
+      "stamp": "closed",
+      "lines": [
+        "**Closed:**",
+        "2026-11-20"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "closed: a bare stamp above a text line reads as no value, CRLF",
+      "reader": "stampValue",
+      "stamp": "closed",
+      "lines": [
+        "**Closed:**",
+        "2026-11-20"
+      ],
+      "crlf": true,
+      "expected": ""
+    },
+    {
+      "name": "closed: a bare stamp with trailing blanks above a text line reads as no value",
+      "reader": "stampValue",
+      "stamp": "closed",
+      "lines": [
+        "**Closed:** \t ",
+        "2026-11-20"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "closed: the value on the stamp's line is read",
+      "reader": "stampValue",
+      "stamp": "closed",
+      "lines": [
+        "**Closed:** 2026-11-20"
+      ],
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "closed: the value on the stamp's line is read, CRLF",
+      "reader": "stampValue",
+      "stamp": "closed",
+      "lines": [
+        "**Closed:** 2026-11-20",
+        "next"
+      ],
+      "crlf": true,
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "closed: spaces and tabs after the stamp, then the value, still read",
+      "reader": "stampValue",
+      "stamp": "closed",
+      "lines": [
+        "**Closed:** \t 2026-11-20 \t"
+      ],
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "docs: an empty Docs line above prose reads as none",
+      "reader": "docs",
+      "lines": [
+        "> Docs:",
+        "The prose that follows."
+      ],
+      "expected": ""
+    },
+    {
+      "name": "docs: an empty Docs line above prose reads as none, CRLF",
+      "reader": "docs",
+      "lines": [
+        "> Docs:",
+        "The prose that follows."
+      ],
+      "crlf": true,
+      "expected": ""
+    },
+    {
+      "name": "docs: blanks after an empty Docs line do not reach the next line",
+      "reader": "docs",
+      "lines": [
+        "> Docs: \t",
+        "docs/x.md"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "docs: the path on the line is read",
+      "reader": "docs",
+      "lines": [
+        "> Docs: docs/x.md"
+      ],
+      "expected": "docs/x.md"
+    },
+    {
+      "name": "docs: the path on the line is read, CRLF, the CR not part of it",
+      "reader": "docs",
+      "lines": [
+        "> Docs: docs/x.md",
+        "next"
+      ],
+      "crlf": true,
+      "expected": "docs/x.md"
+    },
+    {
+      "name": "docs: spaces and tabs around the path still read it",
+      "reader": "docs",
+      "lines": [
+        ">  Docs: \t docs/x.md \t"
+      ],
+      "expected": "docs/x.md"
+    },
+    {
+      "name": "docs: a bare quote mark above a Docs-like line is not a Docs line",
+      "reader": "docs",
+      "lines": [
+        ">",
+        "Docs: docs/x.md"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "thread: a bare GitHub line above an address reads as none",
+      "reader": "thread",
+      "lines": [
+        "> GitHub:",
+        "https://github.com/o/r/issues/7"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "thread: a bare GitHub line above an address reads as none, CRLF",
+      "reader": "thread",
+      "lines": [
+        "> GitHub:",
+        "https://github.com/o/r/issues/7"
+      ],
+      "crlf": true,
+      "expected": ""
+    },
+    {
+      "name": "thread: the address on the line is read",
+      "reader": "thread",
+      "lines": [
+        "> GitHub: https://github.com/o/r/issues/7"
+      ],
+      "expected": "https://github.com/o/r/issues/7"
+    },
+    {
+      "name": "thread: the address on the line is read, CRLF",
+      "reader": "thread",
+      "lines": [
+        "> GitHub: https://github.com/o/r/issues/7",
+        "next"
+      ],
+      "crlf": true,
+      "expected": "https://github.com/o/r/issues/7"
+    },
+    {
+      "name": "thread: spaces and tabs around the address still read it",
+      "reader": "thread",
+      "lines": [
+        "> GitHub: \t https://github.com/o/r/issues/7 \t"
+      ],
+      "expected": "https://github.com/o/r/issues/7"
+    },
+    {
+      "name": "stampDay closed: a bare stamp above a dated line reads as no day",
+      "reader": "stampDay",
+      "stamp": "closed",
+      "lines": [
+        "**Closed:**",
+        "2026-11-20"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "stampDay closed: a bare stamp above a dated line reads as no day, CRLF",
+      "reader": "stampDay",
+      "stamp": "closed",
+      "lines": [
+        "**Closed:**",
+        "2026-11-20"
+      ],
+      "crlf": true,
+      "expected": ""
+    },
+    {
+      "name": "stampDay closed: the day on the stamp's line is read",
+      "reader": "stampDay",
+      "stamp": "closed",
+      "lines": [
+        "**Closed:** 2026-11-20 (moved by hand)"
+      ],
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "stampDay closed: the day on the stamp's line is read, CRLF",
+      "reader": "stampDay",
+      "stamp": "closed",
+      "lines": [
+        "**Closed:** 2026-11-20"
+      ],
+      "crlf": true,
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "stampDay closed: spaces and tabs after the stamp, then the day, still read",
+      "reader": "stampDay",
+      "stamp": "closed",
+      "lines": [
+        "**Closed:** \t 2026-11-20"
+      ],
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "stampDay started: a bare stamp above a dated line reads as no day",
+      "reader": "stampDay",
+      "stamp": "started",
+      "lines": [
+        "**Started:**",
+        "2026-11-20"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "stampDay started: a bare stamp above a dated line reads as no day, CRLF",
+      "reader": "stampDay",
+      "stamp": "started",
+      "lines": [
+        "**Started:**",
+        "2026-11-20"
+      ],
+      "crlf": true,
+      "expected": ""
+    },
+    {
+      "name": "stampDay started: the day on the stamp's line is read",
+      "reader": "stampDay",
+      "stamp": "started",
+      "lines": [
+        "**Started:** 2026-11-20 (moved by hand)"
+      ],
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "stampDay started: the day on the stamp's line is read, CRLF",
+      "reader": "stampDay",
+      "stamp": "started",
+      "lines": [
+        "**Started:** 2026-11-20"
+      ],
+      "crlf": true,
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "stampDay started: spaces and tabs after the stamp, then the day, still read",
+      "reader": "stampDay",
+      "stamp": "started",
+      "lines": [
+        "**Started:** \t 2026-11-20"
+      ],
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "stampDay created: a bare stamp above a dated line reads as no day",
+      "reader": "stampDay",
+      "stamp": "created",
+      "lines": [
+        "**Created:**",
+        "2026-11-20"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "stampDay created: a bare stamp above a dated line reads as no day, CRLF",
+      "reader": "stampDay",
+      "stamp": "created",
+      "lines": [
+        "**Created:**",
+        "2026-11-20"
+      ],
+      "crlf": true,
+      "expected": ""
+    },
+    {
+      "name": "stampDay created: the day on the stamp's line is read",
+      "reader": "stampDay",
+      "stamp": "created",
+      "lines": [
+        "**Created:** 2026-11-20 (moved by hand)"
+      ],
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "stampDay created: the day on the stamp's line is read, CRLF",
+      "reader": "stampDay",
+      "stamp": "created",
+      "lines": [
+        "**Created:** 2026-11-20"
+      ],
+      "crlf": true,
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "stampDay created: spaces and tabs after the stamp, then the day, still read",
+      "reader": "stampDay",
+      "stamp": "created",
+      "lines": [
+        "**Created:** \t 2026-11-20"
+      ],
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "stampDay review: a bare stamp above a dated line reads as no day",
+      "reader": "stampDay",
+      "stamp": "review",
+      "lines": [
+        "**Review:**",
+        "2026-11-20"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "stampDay review: a bare stamp above a dated line reads as no day, CRLF",
+      "reader": "stampDay",
+      "stamp": "review",
+      "lines": [
+        "**Review:**",
+        "2026-11-20"
+      ],
+      "crlf": true,
+      "expected": ""
+    },
+    {
+      "name": "stampDay review: the day on the stamp's line is read",
+      "reader": "stampDay",
+      "stamp": "review",
+      "lines": [
+        "**Review:** 2026-11-20 (moved by hand)"
+      ],
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "stampDay review: the day on the stamp's line is read, CRLF",
+      "reader": "stampDay",
+      "stamp": "review",
+      "lines": [
+        "**Review:** 2026-11-20"
+      ],
+      "crlf": true,
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "stampDay review: spaces and tabs after the stamp, then the day, still read",
+      "reader": "stampDay",
+      "stamp": "review",
+      "lines": [
+        "**Review:** \t 2026-11-20"
+      ],
+      "expected": "2026-11-20"
+    },
+    {
+      "name": "billable: a bare stamp above a line starting no is billable",
+      "reader": "billable",
+      "lines": [
+        "**Billable:**",
+        "no, wait"
+      ],
+      "expected": true
+    },
+    {
+      "name": "billable: a bare stamp above a line starting no is billable, CRLF",
+      "reader": "billable",
+      "lines": [
+        "**Billable:**",
+        "no"
+      ],
+      "crlf": true,
+      "expected": true
+    },
+    {
+      "name": "billable: no on the stamp's line is not billable",
+      "reader": "billable",
+      "lines": [
+        "**Billable:** no"
+      ],
+      "expected": false
+    },
+    {
+      "name": "billable: no on the stamp's line is not billable, CRLF",
+      "reader": "billable",
+      "lines": [
+        "**Billable:** No",
+        "next"
+      ],
+      "crlf": true,
+      "expected": false
+    },
+    {
+      "name": "billable: spaces and tabs after the stamp, then no, still read",
+      "reader": "billable",
+      "lines": [
+        "**Billable:** \t no"
+      ],
+      "expected": false
+    },
+    {
+      "name": "adoLink: a bare ADO Link line above an address reads as none",
+      "reader": "adoLink",
+      "lines": [
+        "**ADO Link:**",
+        "https://dev.azure.com/org/proj/_workitems/edit/12"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "adoLink: a bare ADO Link line above an address reads as none, CRLF",
+      "reader": "adoLink",
+      "lines": [
+        "**ADO Link:**",
+        "https://dev.azure.com/org/proj/_workitems/edit/12"
+      ],
+      "crlf": true,
+      "expected": ""
+    },
+    {
+      "name": "adoLink: the address on the line is read",
+      "reader": "adoLink",
+      "lines": [
+        "**ADO Link:** https://dev.azure.com/org/proj/_workitems/edit/12"
+      ],
+      "expected": "https://dev.azure.com/org/proj/_workitems/edit/12"
+    },
+    {
+      "name": "adoLink: the address on the line is read, CRLF",
+      "reader": "adoLink",
+      "lines": [
+        "**ADO Link:** https://dev.azure.com/org/proj/_workitems/edit/12",
+        "next"
+      ],
+      "crlf": true,
+      "expected": "https://dev.azure.com/org/proj/_workitems/edit/12"
+    },
+    {
+      "name": "adoLink: spaces and tabs after the stamp, then the address, still read",
+      "reader": "adoLink",
+      "lines": [
+        "**ADO Link:** \t https://dev.azure.com/org/proj/_workitems/edit/12"
+      ],
+      "expected": "https://dev.azure.com/org/proj/_workitems/edit/12"
+    },
+    {
+      "name": "prUrl: a bare PR URL line above an address reads as none",
+      "reader": "prUrl",
+      "lines": [
+        "PR URL:",
+        "https://github.com/o/r/pull/3"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "prUrl: a bare PR URL line above an address reads as none, CRLF",
+      "reader": "prUrl",
+      "lines": [
+        "PR URL:",
+        "https://github.com/o/r/pull/3"
+      ],
+      "crlf": true,
+      "expected": ""
+    },
+    {
+      "name": "prUrl: the address on the line is read",
+      "reader": "prUrl",
+      "lines": [
+        "PR URL: https://github.com/o/r/pull/3"
+      ],
+      "expected": "https://github.com/o/r/pull/3"
+    },
+    {
+      "name": "prUrl: the address on the line is read, CRLF",
+      "reader": "prUrl",
+      "lines": [
+        "PR URL: https://github.com/o/r/pull/3",
+        "next"
+      ],
+      "crlf": true,
+      "expected": "https://github.com/o/r/pull/3"
+    },
+    {
+      "name": "prUrl: spaces and tabs after the token, then the address, still read",
+      "reader": "prUrl",
+      "lines": [
+        "PR URL: \t https://github.com/o/r/pull/3"
+      ],
+      "expected": "https://github.com/o/r/pull/3"
+    },
+    {
+      "name": "sprint: a bare Sprint line above text reads as no sprint",
+      "reader": "sprint",
+      "lines": [
+        "**Sprint:**",
+        "Sprint 4"
+      ],
+      "expected": "--"
+    },
+    {
+      "name": "sprint: a bare Sprint line above text reads as no sprint, CRLF",
+      "reader": "sprint",
+      "lines": [
+        "**Sprint:**",
+        "Sprint 4"
+      ],
+      "crlf": true,
+      "expected": "--"
+    },
+    {
+      "name": "sprint: a bare Sprint line with trailing blanks reads as no sprint",
+      "reader": "sprint",
+      "lines": [
+        "**Sprint:** \t",
+        "Sprint 4"
+      ],
+      "expected": "--"
+    },
+    {
+      "name": "sprint: the sprint on the line is read, its last path segment",
+      "reader": "sprint",
+      "lines": [
+        "**Sprint:** Search Coach\\Sprint 4"
+      ],
+      "expected": "Sprint 4"
+    },
+    {
+      "name": "sprint: the sprint on the line is read, CRLF",
+      "reader": "sprint",
+      "lines": [
+        "**Sprint:** Proj/Sprint 4",
+        "next"
+      ],
+      "crlf": true,
+      "expected": "Sprint 4"
+    },
+    {
+      "name": "sprint: spaces and tabs after the stamp, then the sprint, still read",
+      "reader": "sprint",
+      "lines": [
+        "**Sprint:** \t Sprint 4"
+      ],
+      "expected": "Sprint 4"
+    },
+    {
+      "name": "workThread: a bare GitHub line above an issue reads as none",
+      "reader": "workThread",
+      "lines": [
+        "> GitHub:",
+        "#12"
+      ],
+      "expected": ""
+    },
+    {
+      "name": "workThread: a bare GitHub line above an issue reads as none, CRLF",
+      "reader": "workThread",
+      "lines": [
+        "> GitHub:",
+        "https://github.com/o/r/issues/7"
+      ],
+      "crlf": true,
+      "expected": ""
+    },
+    {
+      "name": "workThread: the issue on the line is read",
+      "reader": "workThread",
+      "lines": [
+        "> GitHub: #12"
+      ],
+      "expected": "12"
+    },
+    {
+      "name": "workThread: the issue on the line is read, CRLF",
+      "reader": "workThread",
+      "lines": [
+        "> GitHub: https://github.com/o/r/issues/7",
+        "next"
+      ],
+      "crlf": true,
+      "expected": "7"
+    },
+    {
+      "name": "workThread: spaces and tabs after the token, then the issue, still read",
+      "reader": "workThread",
+      "lines": [
+        "> GitHub: \t <https://github.com/o/r/issues/7>"
+      ],
+      "expected": "7"
+    }
+  ]
+}

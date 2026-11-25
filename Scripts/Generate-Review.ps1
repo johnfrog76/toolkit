@@ -216,7 +216,7 @@ function Get-ItemKind {
 # is wrong.
 function Get-P20StampDate {
     param([string]$Content, [string]$Stamp)
-    if ($Content -match ('(?m)^' + [regex]::Escape($Stamp) + '\s*(\d{4}-\d{2}-\d{2})')) { return $Matches[1] }
+    if ($Content -match ('(?m)^' + [regex]::Escape($Stamp) + '[ \t]*(\d{4}-\d{2}-\d{2})')) { return $Matches[1] }
     return $null
 }
 

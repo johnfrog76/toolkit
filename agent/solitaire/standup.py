@@ -1032,7 +1032,7 @@ def card_title(content: str, file: str, cid: str | None) -> str:
 
 def _stamp_day(content: str, stamp: str) -> str | None:
     """The yyyy-MM-dd a footer stamp (``**Started:**``, ``**Created:**``) carries; None without one."""
-    m = re.search(r"(?m)^" + re.escape(stamp) + r"\s*(\d{4}-\d{2}-\d{2})", content or "")
+    m = re.search(r"(?m)^" + re.escape(stamp) + r"[ \t]*(\d{4}-\d{2}-\d{2})", content or "")
     return m.group(1) if m else None
 
 

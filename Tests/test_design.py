@@ -560,6 +560,71 @@ def _front(doc_id: str, description: str = "") -> str:
     return f"---\nid: {doc_id}\n{desc}---\n\n"
 
 
+class AValueIsOnItsTokensLine(unittest.TestCase):
+    """The design readers of Tests/fixtures/parsers/same-line.json (tkTestToolkit
+    -Design is their other side; the card readers are Tests/test_parsers.py's): a
+    bare token reads as no value, never the line below it, on either ending."""
+
+    def test_every_design_row_of_the_shared_table(self):
+        from agent.core.consts import consts, re_design_docs, re_studio_thread
+
+        table = json.loads((Path(__file__).parent / "fixtures" / "parsers" / "same-line.json").read_text("utf-8"))
+        rows = [r for r in table["rows"] if r["reader"] in ("stampValue", "docs", "thread")]
+        self.assertEqual({r["reader"] for r in rows}, {"stampValue", "docs", "thread"})
+        for row in rows:
+            with self.subTest(row["name"]):
+                eol = "\r\n" if row.get("crlf") else "\n"
+                text = f"# S{eol}{eol}" + eol.join(row["lines"]) + eol
+                if row["reader"] == "stampValue":
+                    got = design._stamp(text, consts()["stamps"][row["stamp"]])
+                else:
+                    rx = re_design_docs() if row["reader"] == "docs" else re_studio_thread()
+                    m = rx.search(text)
+                    got = m.group(1).strip() if m else ""
+                self.assertEqual(got, row["expected"])
+
+    def test_design_fields_reads_no_outcome_and_no_docs_from_a_bare_line(self):
+        for eol in ("\n", "\r\n"):
+            with self.subTest(eol=repr(eol)):
+                lines = [_front(ID_A).rstrip("\n"), "# N", "", "**Outcome:**", "shipped", "> Docs:", "x.md", ""]
+                text = eol.join(lines)
+                fields = design.design_fields(text)
+                self.assertEqual((fields["outcome"], fields["docs"]), ("", ""))
+
+
+class ARowKeptUnderTheOldRule(unittest.TestCase):
+    """The disk cache of parsed rows is keyed by blob sha inside a versioned
+    namespace (design.DESIGN_ROWS). The rule that reads a line's value changed,
+    so a row kept under the previous namespace must be parsed again, not reused."""
+
+    TEXT = _front(ID_F) + "# Kept before the same-line rule\n\n**Outcome:**\nshipped\n"
+
+    def setUp(self):
+        design.clear_cache()
+
+    def _list(self) -> design.DesignListResponse:
+        with mock.patch.object(design.subprocess, "run", side_effect=FakeRepo({"design": {"kept.md": self.TEXT}})):
+            return design.list_design(REPO)
+
+    def test_a_row_kept_under_the_previous_version_is_parsed_again(self):
+        from agent.ado import repo_read
+
+        self.assertNotEqual(design.DESIGN_ROWS, "design-rows-2")
+        sha = blob_sha(self.TEXT)
+        # What the old rule kept for this file: the next line read as the outcome.
+        stale = {**design.design_fields(self.TEXT), "outcome": "shipped"}
+        repo_read._save_rows("design-rows-2", {sha: stale})
+        [row] = self._list().designs
+        self.assertEqual((row.state, row.outcome, row.ready), ("Design", "", False))
+        # The check bites: the same stale row under the CURRENT namespace is reused.
+        try:
+            repo_read._save_rows(design.DESIGN_ROWS, {sha: stale})
+            design.clear_cache()
+            self.assertTrue(self._list().designs[0].ready)
+        finally:
+            repo_read._save_rows(design.DESIGN_ROWS, {sha: design.design_fields(self.TEXT)})
+
+
 class TheStateRule(unittest.TestCase):
     """design_state over the ONE table both halves assert (Tests/fixtures/design/
     states.json; tkTestToolkit -Design is the CLI's side), row for row."""
@@ -569,8 +634,9 @@ class TheStateRule(unittest.TestCase):
         self.assertGreaterEqual(len(table["rows"]), 7)
         for row in table["rows"]:
             with self.subTest(row["name"]):
-                note_text = "# N\n\n" + "\n".join(row["noteLines"]) + "\n"
-                spec_text = "# S\n\n" + "\n".join(row["specLines"]) + "\n"
+                eol = "\r\n" if row.get("crlf") else "\n"
+                note_text = f"# N{eol}{eol}" + eol.join(row["noteLines"]) + eol
+                spec_text = f"# S{eol}{eol}" + eol.join(row["specLines"]) + eol
                 got = design.design_state(row["note"], row["spec"], note_text, spec_text)
                 e = row["expected"]
                 self.assertEqual(

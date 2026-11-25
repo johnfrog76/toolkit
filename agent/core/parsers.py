@@ -164,7 +164,7 @@ def card_billable(content: str) -> bool:
     and so does the standup (a not-billable card is not a standup row). The CLI's
     mirror is ``Test-P20CardBillable`` in ``Scripts/Get-PromptFileStatus.ps1``,
     which Daily and the standup read through."""
-    return not re.search(r"(?mi)^" + re.escape(stamp_billable()) + r"\s*no\b", content or "")
+    return not re.search(r"(?mi)^" + re.escape(stamp_billable()) + r"[ \t]*no\b", content or "")
 
 
 def card_status(content: str, folder: str = "") -> str:
@@ -406,7 +406,7 @@ def card_ado_url(content: str) -> str | None:
     None. What makes a card ``linked``, and what ``tracker()`` reads to say which
     tracker the card belongs to (docs/hub/cards.md, "The model, as the agent serves
     it"). Mirror: ``Get-P20CardAdoUrl``."""
-    m = re.search(r"(?m)^\*\*ADO Link:\*\*\s*(https://\S+)", content or "")
+    m = re.search(r"(?m)^\*\*ADO Link:\*\*[ \t]*(https://\S+)", content or "")
     return m.group(1).strip() if m else None
 
 
@@ -702,7 +702,7 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder:
     # The TOKEN is the contract (consts.json); capturing what follows it is this
     # half's business, so the pattern is built from the token rather than
     # retyping it.
-    m = re.search(r"(?m)^" + re.escape(token_pr_url()) + r"\s*(https://\S+)", content)
+    m = re.search(r"(?m)^" + re.escape(token_pr_url()) + r"[ \t]*(https://\S+)", content)
     if m:
         pr_url = m.group(1).strip()
 
@@ -715,7 +715,7 @@ def _parse_status_metadata(content: str, type_names=_DEFAULT_TYPE_NAMES, folder:
         previous_round = m.group(1)
 
     sprint = "--"
-    m = re.search(r"(?m)^\*\*Sprint:\*\*\s*(.+)", content)
+    m = re.search(r"(?m)^\*\*Sprint:\*\*[ \t]*(\S[^\r\n]*)", content)
     if m:
         segments = re.split(r"[/\\]", m.group(1).strip())
         sprint = segments[-1].strip()

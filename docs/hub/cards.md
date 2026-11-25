@@ -147,6 +147,13 @@ After a `---` rule, bold-label lines. **This is the part of the model that is st
 | `**Created:**` | `yyyy-MM-dd`, the day the card was made -- or the day the work was, with `NewPrompt -Date` | `NewPrompt` | Daily, reviews, the engagement timeline. `stamps.created` |
 | `**Closed:**` | `yyyy-MM-dd`, the day it was archived. **Never rewritten**: re-archiving does not change when a card closed | `Archive`, through `Add-ClosedStamp.ps1` | the same. `stamps.closed` |
 
+**A value is on its stamp's own line.** What a footer line says is what follows the stamp on the same
+line; a stamp with nothing after it on its line says nothing, and the line below it is never read as its
+value, with either line ending. A bare `**Sprint:**` reads as no sprint, a bare `**ADO Link:**` as no link,
+a bare `**Billable:**` above a line starting `no` as billable, and a bare `**Created:**`, `**Started:**`,
+`**Review:**` or `**Closed:**` above a date as no day. Spaces and tabs after the stamp are still skipped.
+Both halves hold to one table, `Tests/fixtures/parsers/same-line.json`.
+
 A verb that adds a footer line to a card that already exists goes through **`Set-P20CardLine`**
 (`Scripts/Set-CardLine.ps1`): the line lands directly above `**Created:**`, and a card that already says
 what was asked is not written. Cards from before the stamps existed carry no dates; git history can lend
@@ -368,7 +375,8 @@ holds wins:
 
 Rows 1 and 2 are FOLDER states, read before the text and whatever it says: a card in `backlog/` is
 planned and not in play, a card in `archive/` is done. A file is in exactly one folder, so the two never
-meet. Both halves read the folder by its last path segment -- `Get-PromptFileStatus -Content -Folder` and
+meet. Row 3's address is on the `PR URL:` line itself (`consts.json` `regex.prUrlLine`): a bare `PR URL:`
+line above an address is not a pull request. Both halves read the folder by its last path segment -- `Get-PromptFileStatus -Content -Folder` and
 `card_status(content, folder)` -- held to one table, `Tests/fixtures/parsers/states.json`.
 
 The five words are `consts.json` `status` -- the vocabulary the web sorts and colours by, and the board's

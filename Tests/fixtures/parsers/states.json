@@ -15,6 +15,10 @@
     { "name": "an empty card in archive/ is Done", "folder": "archive", "content": "# Task K7M2: x\n", "status": "Done" },
     { "name": "archive/ is read first: a PR URL there is Done", "folder": "archive", "content": "PR URL: https://example.test/pr/1\n", "status": "Done" },
     { "name": "a path ending in archive is Done", "folder": "/hub/demo/archive", "content": "- 80e2168 x\n", "status": "Done" },
-    { "name": "a folder that only CONTAINS the word is not that folder", "folder": "/hub/backlog-notes/current", "content": "", "status": "Active" }
+    { "name": "a folder that only CONTAINS the word is not that folder", "folder": "/hub/backlog-notes/current", "content": "", "status": "Active" },
+    { "name": "a bare PR URL line above an address is not a pull request", "folder": "current", "content": "# Task K7M2: x\n\nPR URL:\nhttps://example.test/pr/1\n", "status": "Active" },
+    { "name": "a bare PR URL line above an address is not a pull request, CRLF", "folder": "current", "content": "# Task K7M2: x\r\n\r\nPR URL:\r\nhttps://example.test/pr/1\r\n", "status": "Active" },
+    { "name": "a PR URL on its own line is Code Review, CRLF", "folder": "current", "content": "# Task K7M2: x\r\n\r\nPR URL: https://example.test/pr/1\r\n", "status": "Code Review" },
+    { "name": "spaces and tabs after the PR URL token, then the address, are Code Review", "folder": "current", "content": "# Task K7M2: x\n\nPR URL: \t https://example.test/pr/1\n", "status": "Code Review" }
   ]
 }

@@ -521,15 +521,15 @@ if ($pendingPrChecks.Count -gt 0) {
 #     folder move or a rewritten history cannot bill a card on a day it was not open.
 #   - **Billable:** no takes a card off the timesheet. No line means billable.
 $billingConsts = Get-P20Consts
-$createdRx = '(?m)^' + [regex]::Escape($billingConsts.stamps.created) + '\s*(\d{4}-\d{2}-\d{2})'
-$closedRx = '(?m)^' + [regex]::Escape($billingConsts.stamps.closed) + '\s*(\d{4}-\d{2}-\d{2})'
+$createdRx = Get-P20StampDayRegex -Stamp ([string]$billingConsts.stamps.created)
+$closedRx = Get-P20StampDayRegex -Stamp ([string]$billingConsts.stamps.closed)
 $prUrlRx = $billingConsts.regex.prUrlLine
 # A person's own tokens: the day a card was moved by hand -- Move -To InProgress
 # writes **Started:**, -To CodeReview writes **Review:** -- read the way git's
 # days are, so the rule "the cards decide" is true of a person's lines too.
 #
-$startedRx = $billingConsts.regex.startedLine + '\s*(\d{4}-\d{2}-\d{2})'
-$reviewRx = $billingConsts.regex.reviewLine + '\s*(\d{4}-\d{2}-\d{2})'
+$startedRx = Get-P20StampDayRegex -Stamp ([string]$billingConsts.stamps.started)
+$reviewRx = Get-P20StampDayRegex -Stamp ([string]$billingConsts.stamps.review)
 
 # -- A weekend is billed on the Monday after ----------------------------------
 # Only weekdays render, so a Saturday **Closed:** used to vanish: active Thursday

@@ -1013,10 +1013,10 @@ function Get-P20StandupCards {
     #>
     param([string]$CurrentDir, [string]$ArchiveDir, [Parameter(Mandatory)][string]$Pattern)
     $c = Get-P20Consts
-    $closedRx = '(?m)^' + [regex]::Escape([string]$c.stamps.closed) + '\s*(\d{4}-\d{2}-\d{2})'
+    $closedRx = Get-P20StampDayRegex -Stamp ([string]$c.stamps.closed)
     # What moved: the day its work began -- **Started:**, else **Created:** -- and its bullets.
-    $startedRx = '(?m)^' + [regex]::Escape([string]$c.stamps.started) + '\s*(\d{4}-\d{2}-\d{2})'
-    $createdRx = '(?m)^' + [regex]::Escape([string]$c.stamps.created) + '\s*(\d{4}-\d{2}-\d{2})'
+    $startedRx = Get-P20StampDayRegex -Stamp ([string]$c.stamps.started)
+    $createdRx = Get-P20StampDayRegex -Stamp ([string]$c.stamps.created)
     $hashRx = [string]$c.regex.commitBullet
     # The model map and its current block, read once for every card.
     $modelMap = Get-P20ModelMap

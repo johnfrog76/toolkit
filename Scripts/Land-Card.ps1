@@ -161,7 +161,7 @@ $cardId = Get-P20CardId -Name ($leaf -replace '-r\d+(?=\.prompt\.md$)', '') -Pat
 # number when the card has none (a Code Review by a **Review:** line), and the
 # active Space's tracker then says where to ask.
 $prUrl = ''
-$prLine = [regex]::Match($original, '(?m)^' + [regex]::Escape($prToken) + '\s*(https://\S+)')
+$prLine = [regex]::Match($original, '(?m)^' + [regex]::Escape($prToken) + '[ \t]*(https://\S+)')
 if ($prLine.Success) { $prUrl = $prLine.Groups[1].Value.Trim() }
 
 $prHost = ''

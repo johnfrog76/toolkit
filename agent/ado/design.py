@@ -88,7 +88,7 @@ LIST_TTL_SECONDS = 60
 # The disk cache of parsed rows (repo_read.read_folder_rows). The number is the
 # parse's version: change what design_fields reads and bump it, so every row is
 # parsed again rather than read as the old rule left it.
-DESIGN_ROWS = "design-rows-2"
+DESIGN_ROWS = "design-rows-3"
 
 # A document's name: one markdown file, no path. What the route accepts is
 # exactly what the listing can produce -- nothing else reaches gh.
@@ -463,8 +463,10 @@ def parse_doc(text: str, name: str) -> tuple[str, str, str, int | None, str]:
 
 
 def _stamp(text: str, stamp: str) -> str:
-    """The text after a ``**Stamp:**`` line, "" when the file has none."""
-    m = re.search(r"(?m)^" + re.escape(stamp) + r"\s*(.*?)\s*$", text or "")
+    """The text after a ``**Stamp:**`` on that line, "" when the file has none.
+    The value is what follows the stamp on its OWN line: a bare stamp reads as
+    no value, never the line below it, on either line ending."""
+    m = re.search(r"(?m)^" + re.escape(stamp) + r"[ \t]*([^\r\n]*?)[ \t]*\r?$", text or "")
     return m.group(1).strip() if m else ""
 
 

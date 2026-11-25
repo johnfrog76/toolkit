@@ -530,6 +530,42 @@ class TheMoveDesignVerb(unittest.TestCase):
                     f"design/board-ideas.md already carries '{OUTCOME} {value}', which reads as no outcome",
                 )
 
+    def test_a_bare_outcome_line_reads_as_no_outcome_and_is_refused_not_kept(self):
+        # The value is on the token's own line: a bare Outcome line above a line
+        # reading shipped is no outcome, so a move would contradict it, on either ending.
+        for eol in ("\n", "\r\n"):
+            with self.subTest(eol=repr(eol)):
+                path = self.repo / "design/board-ideas.md"
+                self.write(path, (self.NOTE + f"{OUTCOME}\nshipped\n").replace("\n", eol))
+                self.commit(self.repo)
+                for what_if in ("", " -WhatIf"):
+                    self.assert_refused(
+                        f"board-ideas -To Archive{what_if}",
+                        f"design/board-ideas.md already carries '{OUTCOME}', which reads as no outcome, "
+                        "and -To Archive would record it shipped.",
+                    )
+
+    def test_ready_reads_a_bare_line_as_no_mark(self):
+        # A bare Outcome line above shipped is held as no mark; an empty Docs line
+        # above prose on a live spec is no mark at all -- neither is ready.
+        rid = "20000000-0000-4000-8000-00000000000{}".format
+        for eol in ("\n", "\r\n"):
+            with self.subTest(eol=repr(eol)):
+                self.write(
+                    self.repo / "design/bare-outcome.md",
+                    f"---\nid: {rid(1)}\n---\n\n# Bare outcome\n\nText.\n\n{OUTCOME}\nshipped\n".replace("\n", eol),
+                )
+                self.write(
+                    self.repo / "spec/bare-docs.spec.md",
+                    f"---\nid: {rid(2)}\n---\n\n# Bare docs\n\n{DOCS}\nThe prose that follows.\n".replace("\n", eol),
+                )
+                self.commit(self.repo)
+                data = self.ready_json()
+                self.assertEqual(data["ready"], [])
+                held = {h["id"]: h["reason"] for h in data["held"]}
+                self.assertEqual(set(held), {rid(1)})
+                self.assertIn(f"Its note says '{OUTCOME}', which is neither shipped nor dropped", held[rid(1)])
+
     def test_dropped_over_a_written_shipped_is_refused(self):
         self.note_with_outcome("shipped")
         for what_if in ("", " -WhatIf"):

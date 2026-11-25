@@ -80,7 +80,7 @@ function Test-P20CardBillable {
     #>
     param([AllowEmptyString()][AllowNull()][string]$Content)
     $stamp = [string](Get-P20Consts).stamps.billable
-    return -not ([regex]::IsMatch("$Content", '(?mi)^' + [regex]::Escape($stamp) + '\s*no\b'))
+    return -not ([regex]::IsMatch("$Content", '(?mi)^' + [regex]::Escape($stamp) + '[ \t]*no\b'))
 }
 
 function Get-P20CardAssigned {
@@ -475,6 +475,48 @@ function Get-P20CardLineValue {
     return @{ Present = $true; Value = $value }
 }
 
+function Get-P20StampDayRegex {
+    <#
+      The pattern that reads the yyyy-MM-dd after a footer stamp (`**Closed:**`,
+      `**Started:**`, `**Created:**`, `**Review:**`), group 1 the day. The day is
+      on the stamp's own line: the white space after it never crosses a line end,
+      so a bare stamp above a dated line reads as no day. agent/core/consts.py's
+      re_closed_stamp_date and agent/solitaire/standup.py's _stamp_day are the
+      same rule (Tests/fixtures/parsers/same-line.json).
+    #>
+    param([Parameter(Mandatory)][string]$Stamp)
+    return '(?m)^' + [regex]::Escape($Stamp) + '[ \t]*(\d{4}-\d{2}-\d{2})'
+}
+
+function Get-P20CardPrUrl {
+    <#
+      The address on the card's `PR URL:` line, '' when it has none. The address
+      is on the token's own line, as the state rule reads it (regex.prUrlLine).
+      The token is matched ignoring case, as the Status table always read it.
+      agent/core/parsers.py's status metadata (pr_url) is the same rule.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Content)
+    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape([string](Get-P20Consts).tokens.prUrl) + '[ \t]*(https://\S+)', 'IgnoreCase')
+    if ($m.Success) { return $m.Groups[1].Value.Trim() }
+    return ''
+}
+
+function Get-P20CardSprintLabel {
+    <#
+      The Status table's Sprint column: the last path segment of the card's first
+      `**Sprint:**` line ("Search Coach\Sprint 4" -> "Sprint 4"), cut at twenty
+      characters; '--' with no line, or a bare one. agent/core/parsers.py's status
+      metadata (sprint) is the same.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Content)
+    $m = [regex]::Match("$Content", '(?m)^' + [regex]::Escape([string](Get-P20Consts).stamps.sprint) + '[ \t]*(\S[^\r\n]*)', 'IgnoreCase')
+    if (-not $m.Success) { return '--' }
+    $segments = $m.Groups[1].Value.Trim() -split '[/\\]'
+    $sprint = $segments[-1].Trim()
+    if ($sprint.Length -gt 20) { $sprint = $sprint.Substring(0, 18) + '..' }
+    return $sprint
+}
+
 function Get-P20CardAdoUrl {
     <#
       The card's own `**ADO Link:**` address when it is an https:// one, else ''.
@@ -482,7 +524,7 @@ function Get-P20CardAdoUrl {
       tracker the card belongs to. agent/core/parsers.py's card_ado_url is the same.
     #>
     param([AllowEmptyString()][AllowNull()][string]$Content)
-    if ([string]$Content -match '(?m)^\*\*ADO Link:\*\*\s*(https://\S+)') { return $Matches[1].Trim() }
+    if ([string]$Content -match '(?m)^\*\*ADO Link:\*\*[ \t]*(https://\S+)') { return $Matches[1].Trim() }
     return ''
 }
 

@@ -114,7 +114,7 @@ $expected = [ordered]@{
     'tokens.spec'             = '> Spec:'
     # The card's Tags: line: Tag writes it, the suggestion and the board's filter read it.
     'tokens.tags'             = 'Tags:'
-    'regex.prUrlLine'        = '(?m)^PR URL:\s*https://'
+    'regex.prUrlLine'        = '(?m)^PR URL:[ \t]*https://'
     'regex.prReviewHeading'   = '(?m)^##\s+PR Review Comments'
     'regex.commitBullet'      = '(?m)^\s*-\s+`?([0-9a-f]{7,})`?'
     'regex.startedLine'       = '(?m)^\*\*Started:\*\*'
@@ -215,7 +215,7 @@ $expected = [ordered]@{
     'studio.promptsRoute'     = '/api/studio/prompts'
     # The Spaces card's one read of every GitHub Space's ledger.
     'studio.ledgerRoute'      = '/api/studio/ledger'
-    'studio.threadRegex'      = '(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/([0-9]{1,9}))\s*$'
+    'studio.threadRegex'      = '(?m)^>[ \t]*GitHub:[ \t]*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/([0-9]{1,9}))[ \t]*\r?$'
     # The design lifecycle's identity (L1): the frontmatter key, the id's shape and
     # the state and outcome words. NewDesign and StampDesign write them; lists
     # travel comma-joined.
@@ -224,7 +224,7 @@ $expected = [ordered]@{
     'design.states'           = 'Design,Spec,Complete,Archived'
     'design.outcomes'         = 'shipped,dropped'
     'design.docsLine'         = '> Docs:'
-    'design.docsRegex'        = '(?m)^>\s*Docs:\s*(\S.*?)\s*$'
+    'design.docsRegex'        = '(?m)^>[ \t]*Docs:[ \t]*(\S[^\r\n]*?)[ \t]*\r?$'
     'design.cardLineRegex'    = '(?m)^>[ \t]*(Design|Spec):[ \t]*(?:\[([^\]\r\n]*)\]\(([^)\r\n]*)\))?[ \t]*([^\r\n]*?)[ \t]*\r?$'
     # Solitaire Agile's Ritual Engine: the standup the CLI's Standup and
     # the agent's GET /api/ritual/standup both render, word for word. text is a
@@ -253,7 +253,7 @@ $expected = [ordered]@{
     'rituals.grains'             = 'detail,work,brief'
     'rituals.numberWords'        = 'zero,one,two,three,four,five,six,seven,eight,nine,ten,eleven,twelve'
     'rituals.workHeadRegex'      = '^(?:[A-Za-z]+:\s+)?(.+?)(?:\s+--\s+|:\s+|$)'
-    'rituals.workThreadRegex'    = '(?m)^>\s*GitHub:\s*<?(?:https://github\.com/[^/\s>]+/[^/\s>]+/issues/|#)([0-9]{1,9})(?![0-9])'
+    'rituals.workThreadRegex'    = '(?m)^>[ \t]*GitHub:[ \t]*<?(?:https://github\.com/[^/\s>]+/[^/\s>]+/issues/|#)([0-9]{1,9})(?![0-9])'
     'rituals.workDesignRegex'    = 'design/([A-Za-z0-9][A-Za-z0-9_-]*)\.md'
     'rituals.workSmallWordRegex' = '^[a-z]{1,3}$'
     # The also-ons fold (D-SA9): the most groups a folded sentence names.

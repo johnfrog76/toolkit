@@ -255,7 +255,7 @@ if ($PSBoundParameters.ContainsKey('FromCard')) {
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
     $cardText = ([System.IO.File]::ReadAllText($cardPath)) -replace "`r`n", "`n"
-    $linkMatch = [regex]::Match($cardText, '(?m)^' + [regex]::Escape($cardLinkStamp) + '\s*(https://\S+)')
+    $linkMatch = [regex]::Match($cardText, '(?m)^' + [regex]::Escape($cardLinkStamp) + '[ \t]*(https://\S+)')
     if ($linkMatch.Success) {
         Write-CliError -Message "Card $cardId is already linked: $($linkMatch.Groups[1].Value)" `
             -Hint 'A card is published once; its issue is where the conversation goes now.'

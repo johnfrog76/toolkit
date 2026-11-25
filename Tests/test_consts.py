@@ -60,7 +60,7 @@ EXPECTED = {
     ("tokens", "spec"): "> Spec:",
     # The card's Tags: line: Tag writes it, the suggestion and the board's filter read it.
     ("tokens", "tags"): "Tags:",
-    ("regex", "prUrlLine"): r"(?m)^PR URL:\s*https://",
+    ("regex", "prUrlLine"): r"(?m)^PR URL:[ \t]*https://",
     ("regex", "prReviewHeading"): r"(?m)^##\s+PR Review Comments",
     ("regex", "commitBullet"): r"(?m)^\s*-\s+`?([0-9a-f]{7,})`?",
     ("regex", "startedLine"): r"(?m)^\*\*Started:\*\*",
@@ -172,12 +172,15 @@ EXPECTED = {
     ("design", "states"): ["Design", "Spec", "Complete", "Archived"],
     ("design", "outcomes"): ["shipped", "dropped"],
     ("design", "docsLine"): "> Docs:",
-    ("design", "docsRegex"): r"(?m)^>\s*Docs:\s*(\S.*?)\s*$",
+    ("design", "docsRegex"): r"(?m)^>[ \t]*Docs:[ \t]*(\S[^\r\n]*?)[ \t]*\r?$",
     (
         "design",
         "cardLineRegex",
     ): r"(?m)^>[ \t]*(Design|Spec):[ \t]*(?:\[([^\]\r\n]*)\]\(([^)\r\n]*)\))?[ \t]*([^\r\n]*?)[ \t]*\r?$",
-    ("studio", "threadRegex"): r"(?m)^>\s*GitHub:\s*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/([0-9]{1,9}))\s*$",
+    (
+        "studio",
+        "threadRegex",
+    ): r"(?m)^>[ \t]*GitHub:[ \t]*(https://github\.com/([^/\s]+)/([^/\s]+)/issues/([0-9]{1,9}))[ \t]*\r?$",
     ("rituals", "route"): "/api/ritual/standup",
     ("rituals", "triageRoute"): "/api/ritual/triage",
     ("rituals", "milestonesRoute"): "/api/ritual/milestones",
@@ -215,7 +218,7 @@ EXPECTED = {
     (
         "rituals",
         "workThreadRegex",
-    ): r"(?m)^>\s*GitHub:\s*<?(?:https://github\.com/[^/\s>]+/[^/\s>]+/issues/|#)([0-9]{1,9})(?![0-9])",
+    ): r"(?m)^>[ \t]*GitHub:[ \t]*<?(?:https://github\.com/[^/\s>]+/[^/\s>]+/issues/|#)([0-9]{1,9})(?![0-9])",
     ("rituals", "workDesignRegex"): r"design/([A-Za-z0-9][A-Za-z0-9_-]*)\.md",
     ("rituals", "workSmallWordRegex"): r"^[a-z]{1,3}$",
     # The also-ons fold (D-SA9): the most groups a folded sentence names.

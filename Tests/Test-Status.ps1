@@ -141,6 +141,37 @@ foreach ($row in @($stateTable.rows)) {
     Assert-Status "states.json: $($row.name)" ([string]$row.status) (Get-PromptFileStatus -Content ([string]$row.content) -Folder ([string]$row.folder))
 }
 
+# -- A value is on its token's own line: one shared table ----------------------
+# Tests/fixtures/parsers/same-line.json -- Tests/test_parsers.py asserts the SAME
+# rows (the card readers; the design readers are tkTestToolkit -Design's). A bare
+# token reads as no value, never the line below it, on either line ending.
+$sameLine = Get-Content (Join-Path $fixtureDir 'same-line.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$lineConsts = Get-P20Consts
+$cardReaders = @('stampDay', 'billable', 'adoLink', 'prUrl', 'sprint', 'workThread')
+$sameLineRows = @(@($sameLine.rows) | Where-Object { $cardReaders -contains [string]$_.reader })
+$readersWithout = @($cardReaders | Where-Object { $r = $_; -not @($sameLineRows | Where-Object { $_.reader -eq $r }).Count })
+Assert-Status 'same-line.json: every card reader has rows' '' ($readersWithout -join ', ')
+foreach ($row in $sameLineRows) {
+    $eol = "`n"
+    if ($row.crlf) { $eol = "`r`n" }
+    $text = "# Task K7M2: x$eol$eol" + (@($row.lines) -join $eol) + $eol
+    $got = switch ([string]$row.reader) {
+        'stampDay' {
+            $m = [regex]::Match($text, (Get-P20StampDayRegex -Stamp ([string]$lineConsts.stamps.([string]$row.stamp))))
+            if ($m.Success) { $m.Groups[1].Value } else { '' }
+        }
+        'billable' { [string](Test-P20CardBillable $text) }
+        'adoLink' { Get-P20CardAdoUrl $text }
+        'prUrl' { Get-P20CardPrUrl $text }
+        'sprint' { Get-P20CardSprintLabel $text }
+        'workThread' {
+            $m = [regex]::Match($text, [string]$lineConsts.rituals.workThreadRegex)
+            if ($m.Success) { $m.Groups[1].Value } else { '' }
+        }
+    }
+    Assert-Status "same-line.json: $($row.name)" ([string]$row.expected) ([string]$got)
+}
+
 # -- Edge case: empty file is Active ------------------------------------------
 
 Assert-Status "empty content        -> Active"      'Active'      (Get-PromptFileStatus '')

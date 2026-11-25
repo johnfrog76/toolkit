@@ -293,20 +293,11 @@ foreach ($file in $files) {
     $adoUrl = Get-P20CardAdoUrl $content
 
     # PR URL from PR Review Comments section
-    $prUrl = ''
-    # The TOKEN is the contract; capturing the URL after it is this script's own.
-    if ($content -match ('(?m)^' + [regex]::Escape($script:Consts.tokens.prUrl) + '\s*(https://\S+)')) {
-        $prUrl = $Matches[1].Trim()
-    }
+    # (the one reader, Get-PromptFileStatus.ps1: the address on the token's own line)
+    $prUrl = Get-P20CardPrUrl $content
 
-    # Sprint from footer - take last path segment (e.g. "Search Coach\Sprint 4" -> "Sprint 4")
-    $sprint = '--'
-    if ($content -match '(?m)^\*\*Sprint:\*\*\s*(.+)') {
-        $sprintRaw = $Matches[1].Trim()
-        $segments = $sprintRaw -split '[/\\]'
-        $sprint = $segments[-1].Trim()
-        if ($sprint.Length -gt 20) { $sprint = $sprint.Substring(0, 18) + '..' }
-    }
+    # Sprint from footer - the last path segment (e.g. "Search Coach\Sprint 4" -> "Sprint 4")
+    $sprint = Get-P20CardSprintLabel $content
 
     # Last modified -- the folder's git log, else the filesystem: a hub that is
     # not a repository, or a card the log never named (new, not yet committed).

@@ -103,8 +103,10 @@ try {
     foreach ($row in $table.rows) {
         $note = 'none'; if ($row.note) { $note = [string]$row.note }
         $spec = 'none'; if ($row.spec) { $spec = [string]$row.spec }
-        $noteText = "# N`n`n" + (@($row.noteLines) -join "`n") + "`n"
-        $specText = "# S`n`n" + (@($row.specLines) -join "`n") + "`n"
+        $eol = "`n"
+        if ($row.crlf) { $eol = "`r`n" }
+        $noteText = "# N$eol$eol" + (@($row.noteLines) -join $eol) + $eol
+        $specText = "# S$eol$eol" + (@($row.specLines) -join $eol) + $eol
         $r = Resolve-P20DesignState -Note $note -Spec $spec -NoteText $noteText -SpecText $specText
         $e = $row.expected
         $expectedOutcome = ''; if ($e.outcome) { $expectedOutcome = [string]$e.outcome }
@@ -113,6 +115,36 @@ try {
         Assert-Equal "$($row.name): mismatch" ([bool]$e.mismatch) $r.Mismatch
         Assert-Equal "$($row.name): closed" ([string]$e.closed) $r.Closed
         Assert-Equal "$($row.name): ready" ([bool]$e.ready) ([bool]$r.Ready)
+    }
+
+    # -- 1a. A value is on its token's own line: the shared table -------------
+    # Tests/fixtures/parsers/same-line.json's design readers (Tests/test_design.py
+    # is their other side; the card readers are tkTestToolkit -PromptStatus's).
+    Write-Host ""
+    Write-Host "-- A design line's value: the same-line table -----------" -ForegroundColor Cyan
+
+    $lineTable = Get-Content (Join-Path $pkgRoot 'Tests/fixtures/parsers/same-line.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    $lineConsts = Get-P20Consts
+    $designReaders = @('stampValue', 'docs', 'thread')
+    $lineRows = @(@($lineTable.rows) | Where-Object { $designReaders -contains [string]$_.reader })
+    foreach ($reader in $designReaders) {
+        Assert-True "same-line.json has $reader rows" (@($lineRows | Where-Object { $_.reader -eq $reader }).Count -gt 0)
+    }
+    foreach ($row in $lineRows) {
+        $eol = "`n"
+        if ($row.crlf) { $eol = "`r`n" }
+        $text = "# S$eol$eol" + (@($row.lines) -join $eol) + $eol
+        $got = ''
+        if ($row.reader -eq 'stampValue') {
+            $got = Get-P20StampValue -Text $text -Stamp ([string]$lineConsts.stamps.([string]$row.stamp))
+        }
+        else {
+            $rx = [string]$lineConsts.design.docsRegex
+            if ($row.reader -eq 'thread') { $rx = [string]$lineConsts.studio.threadRegex }
+            $m = [regex]::Match($text, $rx)
+            if ($m.Success) { $got = $m.Groups[1].Value.Trim() }
+        }
+        Assert-Equal "same-line.json: $($row.name)" ([string]$row.expected) $got
     }
 
     # -- 1b. The title rule over the shared table -----------------------------

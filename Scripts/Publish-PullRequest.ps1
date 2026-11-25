@@ -183,7 +183,7 @@ Write-Host "[*] Card: $cardName" -ForegroundColor DarkGray
 
 # -- The pull request, from the card's PR URL: line -----------------------------
 $text = [System.IO.File]::ReadAllText($cardPath) -replace "`r`n", "`n"
-$prLine = [regex]::Match($text, '(?m)^' + [regex]::Escape($c.tokens.prUrl) + '\s*(https://\S+)[ \t]*$')
+$prLine = [regex]::Match($text, '(?m)^' + [regex]::Escape($c.tokens.prUrl) + '[ \t]*(https://\S+)[ \t]*$')
 if (-not $prLine.Success) {
     Write-CliError -Message "$cardName has no $($c.tokens.prUrl) line, so there is no pull request to publish." `
         -Hint "Open it first: ${p}NewPR <id> -Draft writes the line."

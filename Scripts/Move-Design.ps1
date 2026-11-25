@@ -327,7 +327,7 @@ if ($Ready) {
     $scopeArgs = @()
     if ($Hub) { $scopeArgs += '-Hub' }
     if ($Space) { $scopeArgs += '-Space'; $scopeArgs += $Space }
-    $outcomeRx = '(?m)^' + [regex]::Escape($outcomeStamp) + '\s*(.*?)\s*$'
+    $outcomeRx = '(?m)^' + [regex]::Escape($outcomeStamp) + '[ \t]*([^\r\n]*?)[ \t]*\r?$'
     $fileAt = { param([string]$RelPath) return (Join-Path $base ($RelPath -replace '/', [IO.Path]::DirectorySeparatorChar)) }
     # The first Outcome line a live file carries, the word read as the rule
     # reads it: Has, Word (lowercased) and Said (the line as one line).
@@ -597,7 +597,7 @@ function Test-P20WrittenOutcome {
     # value that is neither (it reads as no outcome), or nothing.
     param([string]$RelPath, [string]$Word, [string]$Move, [string]$Hint)
     $agrees = ''
-    $rx = '(?m)^' + [regex]::Escape($outcomeStamp) + '[ \t]*(.*?)[ \t]*$'
+    $rx = '(?m)^' + [regex]::Escape($outcomeStamp) + '[ \t]*([^\r\n]*?)[ \t]*\r?$'
     foreach ($w in (Get-P20WrittenLines -RelPath $RelPath -Pattern $rx)) {
         $value = $w.Value.ToLowerInvariant()
         if ($value -eq $Word) { $agrees = $w.Value; continue }
@@ -618,7 +618,7 @@ function Assert-P20NotDropped {
     # A completion is a build: a file that already says dropped would read as
     # Archived after it while the Journey says Complete.
     param([string]$RelPath)
-    $rx = '(?m)^' + [regex]::Escape($outcomeStamp) + '[ \t]*(.*?)[ \t]*$'
+    $rx = '(?m)^' + [regex]::Escape($outcomeStamp) + '[ \t]*([^\r\n]*?)[ \t]*\r?$'
     foreach ($w in (Get-P20WrittenLines -RelPath $RelPath -Pattern $rx)) {
         if ($w.Value.ToLowerInvariant() -ne [string]$outcomes[1]) { continue }
         Write-CliError -Message "$RelPath already carries '$($w.Line)', and -To Complete would record it built." `
@@ -644,7 +644,7 @@ function Add-P20JourneyLine {
         # The first line is the design's birth, dated from **Created:** when the
         # note has one -- added by the first move, so a note tells the whole road.
         $created = $today
-        $cm = [regex]::Match($text, '(?m)^' + [regex]::Escape($createdStamp) + '\s*(\d{4}-\d{2}-\d{2})')
+        $cm = [regex]::Match($text, '(?m)^' + [regex]::Escape($createdStamp) + '[ \t]*(\d{4}-\d{2}-\d{2})')
         if ($cm.Success) { $created = $cm.Groups[1].Value }
         $first = "- $created $stateDesign`: written as $NoteRel in $repoName."
         if ($Thread) { $first += " Thread: $Thread" }
