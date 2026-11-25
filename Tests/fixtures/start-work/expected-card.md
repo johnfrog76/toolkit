@@ -32,4 +32,4 @@ Two scripts still call git with a raw `2>&1`, which Windows PowerShell 5.1 turns
 **Started:** 2026-10-14
 **Created:** 2026-10-12
 
-## The prompt (agentic/build.prompt.md)
+## The prompt (agentic/org/build.prompt.md)

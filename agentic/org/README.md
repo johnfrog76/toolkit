@@ -22,6 +22,7 @@ them, who decides what) is its Space's how-we-work note, which every role reads 
 
 | Role | Takes in | Hands on | Suggested model |
 |---|---|---|---|
+| `build` | one card, or an issue with no card, in the hand-off block `tkStartWork` prints, and the Space's how-we-work note | a draft pull request whose card says what it did (`tkThreadHash`, then `pr-ship`), to the seat that handed it the card, with anything it found and did not fix | chosen per card by the seat that hands it out |
 | `pm` | the owner's direction, the open issues (`tkTriage`) and the active cards (`tkStatus`), a ready from a lead, a merge's hash, and the drafts of a seat that assists it | a queue of cards whose specs are ready, to the seats that lead the work; each ready, checked once more, to the seat that merges; what merged and closed onto the cards and the tracker (`tkLand`); and its decision on each draft, written itself (`tkRoute`, `tkMoveDesign`, the tracker) | Opus (`opus`) |
 | `team-lead` | a card or a queue of them, for one lane or Space | a pull request made ready, one at a time, proved and caught up with its base; and the findings its lane turned up, to the seat that plans the work | Opus (`opus`); its builders chosen per card |
 | `vp-of-engineering` | a ready pull request, named by its head | a merge, reported with its hash to the seat that keeps the record, or a finding that sends the pull request back; the engineering standards every lane holds | the team's choice: a judgement seat |
@@ -48,10 +49,13 @@ and the other roles only ever say "the seat that merges", so they read the same 
 is, which a stand-in runs; what waits for the holder, the decisions a stand-in does not make; and the short
 list a stand-in keeps for the holder's return.
 
-**The builder's brief is not here yet.** A builder is handed one card rather than holding an office, so it
-is a pool in `org.json` rather than a seat, and the brief it works from is still `build.prompt.md` in the
-folder above, which `tkStartWork` carries. A hub that wants a role the toolkit does not ship writes its
-own and names it in `org.json` (see below).
+**The builder is a role here too.** A builder is handed one card rather than holding an office, so it is a
+pool in `org.json` rather than a seat, but the job it does on that card is written the same way, in
+`build.prompt.md`. It is the role `tkStartWork` carries at the end of every hand-off block, and it serves a
+person working alone as well as a team, so it is listed for every way of working, not only with Team Agile.
+`tkStartWork` finds it where a position's role is found (below), so a builder's role in your hub's
+`agentic/org/` is the one handed over. A hub that wants a role the toolkit does not ship writes its own and
+names it in `org.json` (see below).
 
 ## How work moves between the roles
 

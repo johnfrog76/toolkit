@@ -137,6 +137,7 @@ if ($Help) {
 . (Join-Path $PSScriptRoot 'Resolve-Tracker.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-HowIWork.ps1')
 . (Join-Path $PSScriptRoot 'Resolve-AgenticPrompt.ps1')
+. (Join-Path $PSScriptRoot 'Read-OrgChart.ps1')
 . (Join-Path $PSScriptRoot 'Invoke-TrackerRead.ps1')
 . (Join-Path $PSScriptRoot 'Ritual-Common.ps1')
 # The card's title, read from its heading by the standup's own rule (one rule, not two).
@@ -169,6 +170,37 @@ function Get-P20RelativeTo {
     $base = (([string]$Root) -replace '\\', '/').TrimEnd('/')
     if ($base -and $full.StartsWith($base + '/', [System.StringComparison]::OrdinalIgnoreCase)) { return $full.Substring($base.Length + 1) }
     return $full
+}
+
+function Resolve-P20StartWorkRole {
+    # A role, by its file NAME: this machine's agenticExtensionPath copy first, as
+    # for every shipped prompt; then the three places a position's role is found
+    # (Get-P20OrgPromptDirs: the hub's agentic/org/, the hub's agentic/, the
+    # toolkit's agentic/org/), so a hub's own role wins over the shipped one.
+    # '' when none has it.
+    param([string]$Name, [string]$HubRoot, [string]$PackageRoot)
+    $own = Resolve-P20AgenticPrompt -Name $Name -PackageRoot $PackageRoot
+    if ($own.Source -eq 'extension') { return [string]$own.Path }
+    $manifest = Read-P20HubManifest -Root $HubRoot -WarningAction SilentlyContinue
+    $names = Get-P20HubFolderNames -PromptsRoot $HubRoot -PackageRoot $PackageRoot -Manifest $manifest
+    $lookup = Get-P20OrgPromptDirs -PromptsRoot $HubRoot -AgenticFolder ([string]$names['agentic']) -PackageRoot $PackageRoot
+    return [string](Find-P20OrgPrompt -Name $Name -PromptDirs $lookup.Dirs)
+}
+
+function Get-P20AgenticLeaf {
+    # The file name an agentic/<name> or agentic/<roles>/<name> path names, or ''
+    # for any other path. Slashes either way; the folder names in any case.
+    param([string]$Path)
+    $leaf = ([string]$Path).Trim() -replace '\\', '/'
+    $roles = [string](Get-P20Consts).org.rolesFolder
+    foreach ($prefix in @("agentic/$roles/", 'agentic/')) {
+        if ($leaf.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $rest = $leaf.Substring($prefix.Length)
+            if ($rest -and $rest.IndexOf('/') -lt 0) { return $rest }
+            return ''
+        }
+    }
+    return ''
 }
 
 function Get-P20StartWorkPrompts {
@@ -436,6 +468,11 @@ if ($Prompt) {
     foreach ($cand in $candidates) {
         if (Test-Path -LiteralPath $cand -PathType Leaf) { $promptPath = (Get-Item -LiteralPath $cand).FullName; break }
     }
+    # A shipped prompt's path that is not there -- agentic/build.prompt.md, from
+    # before the builder's brief became a role -- is found as a role, by its name.
+    $name = ''
+    if (-not $promptPath -and -not [System.IO.Path]::IsPathRooted($given)) { $name = Get-P20AgenticLeaf $given }
+    if ($name) { $promptPath = Resolve-P20StartWorkRole -Name $name -HubRoot $hubRoot -PackageRoot $repoRoot }
     if (-not $promptPath) {
         Write-CliError -Message "-Prompt names '$given', which is not a file." `
             -Hint 'A path relative to this folder or to the Toolkit package, or an absolute one. Leave -Prompt out for the kind''s own prompt.'
@@ -455,10 +492,22 @@ else {
         exit 2  # stated refusal
     }
     $leaf = $row -replace '\\', '/'
+    $name = Get-P20AgenticLeaf $row
+    $roles = [string](Get-P20Consts).org.rolesFolder
     if ([System.IO.Path]::IsPathRooted($row)) { $promptPath = $row }
-    elseif ($leaf.StartsWith('agentic/', [System.StringComparison]::OrdinalIgnoreCase) -and $leaf.IndexOf('/', 8) -lt 0) {
-        # A shipped prompt: the one lookup, so a tuned copy in agenticExtensionPath wins here as everywhere.
-        $promptPath = [string](Resolve-P20AgenticPrompt -Name $leaf.Substring(8) -PackageRoot $repoRoot).Path
+    elseif ($name -and $leaf.StartsWith("agentic/$roles/", [System.StringComparison]::OrdinalIgnoreCase)) {
+        # A role: found where a position's role is, so a hub's own wins (and a tuned copy in agenticExtensionPath first).
+        $promptPath = Resolve-P20StartWorkRole -Name $name -HubRoot $hubRoot -PackageRoot $repoRoot
+        if (-not $promptPath) { $promptPath = Join-Path $repoRoot $row }
+    }
+    elseif ($name) {
+        # A shipped prompt: the one lookup, so a tuned copy in agenticExtensionPath wins here as everywhere. A row
+        # written before the builder's brief became a role names it here; it is found as the role.
+        $promptPath = [string](Resolve-P20AgenticPrompt -Name $name -PackageRoot $repoRoot).Path
+        if (-not (Test-Path -LiteralPath $promptPath -PathType Leaf)) {
+            $role = Resolve-P20StartWorkRole -Name $name -HubRoot $hubRoot -PackageRoot $repoRoot
+            if ($role) { $promptPath = $role }
+        }
     }
     else { $promptPath = Join-Path $repoRoot $row }
     if (-not (Test-Path -LiteralPath $promptPath -PathType Leaf)) {

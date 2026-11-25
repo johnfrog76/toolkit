@@ -493,7 +493,8 @@ class StartWorkThroughTheBridge(unittest.TestCase):
             shutil.copytree(PKG_ROOT / folder, self.pkg / folder)
         (self.pkg / "agent" / "ado").mkdir(parents=True)
         shutil.copy(bridge.BRIDGE_PS1, self.pkg / "agent" / "ado" / "bridge.ps1")
-        # The shipped startWork.prompts rows name agentic/build.prompt.md, and the block carries it.
+        # The shipped startWork.prompts rows name the builder's role, agentic/org/build.prompt.md,
+        # and the block carries it.
         shutil.copytree(PKG_ROOT / "agentic", self.pkg / "agentic")
 
         self.hub = root / "hub"
@@ -548,7 +549,8 @@ class StartWorkThroughTheBridge(unittest.TestCase):
         self.assertEqual(body["status"], "success", body.get("error") or body["output"])
         # The golden runs to the prompt's heading; the prompt is the shipped file's own text.
         golden = (self.FIXTURES / "expected-card.md").read_text("utf-8").replace("\r\n", "\n").rstrip("\n")
-        prompt = (PKG_ROOT / "agentic" / "build.prompt.md").read_text("utf-8").replace("\r\n", "\n").rstrip("\n")
+        role = PKG_ROOT / "agentic" / "org" / "build.prompt.md"
+        prompt = role.read_text("utf-8").replace("\r\n", "\n").rstrip("\n")
         want = f"{golden}\n{prompt}"
         self.assertEqual(body["output"].replace("\r\n", "\n").strip("\n"), want)
         # The hand-off asks an agent to name itself on the card (docs/hub/cards.md, "The Agent line").

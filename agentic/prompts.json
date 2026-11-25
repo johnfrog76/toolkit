@@ -29,7 +29,7 @@
       "sender": "by hand",
       "module": "core",
       "drives": "ThreadHash, then pr-ship",
-      "category": "ship"
+      "category": "org"
     },
     "pr-ship": {
       "workflows": [

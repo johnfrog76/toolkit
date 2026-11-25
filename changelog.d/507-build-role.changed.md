@@ -1,0 +1,1 @@
+- The builder's brief is now a role, `agentic/org/build.prompt.md`, written like the other roles, and `tkStartWork` finds it where a position's role is found: a builder's role in your hub's `agentic/org/` (or its `agentic/`) is the one the hand-off carries. A `startWork.prompts` row or a `-Prompt` naming the old path, `agentic/build.prompt.md`, still finds it.

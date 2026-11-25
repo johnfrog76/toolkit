@@ -130,7 +130,10 @@ class TheShippedSet(PromptsCase):
                 self.assertEqual(row["sender"], entry["sender"])
                 self.assertEqual(row["by_hand"], entry["sender"] == "by hand")
                 self.assertEqual(row["drives"], entry["drives"])
-                self.assertEqual(row["path"], f"agentic/{name}.prompt.md")
+                # A core prompt lives in agentic/, or in the roles folder below it when it is a role (build).
+                flat = PKG_ROOT / "agentic" / f"{name}.prompt.md"
+                where = "agentic" if flat.is_file() else "agentic/org"
+                self.assertEqual(row["path"], f"{where}/{name}.prompt.md")
                 self.assertTrue(row["changed"])
 
     def test_the_two_the_tools_send_say_so(self):
