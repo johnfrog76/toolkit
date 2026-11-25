@@ -291,6 +291,9 @@ export interface Milestone {
   due: string;
   /** The day GitHub closed it, "" while open. */
   closed_at: string;
+  /** The instant GitHub closed it, as GitHub wrote it; "" while open, or from
+   *  an agent that predates it. */
+  closed_time?: string;
   /** The day it was made, and the day GitHub last changed it (an issue closing
    *  in it is a change); "" from an agent that predates them. */
   created_at?: string;

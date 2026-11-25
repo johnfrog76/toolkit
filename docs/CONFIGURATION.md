@@ -441,6 +441,13 @@ card's foot says which source was read: the clone and its branch, or the reposit
 setting, or with one that is not a clone of the Space's repository, the tab reads GitHub's default branch as it
 always has, and its search is GitHub's code search.
 
+**Team Agile's Releases timeline reads it too.** The tags merged into the Space's default branch (a project's
+`defaultBranch`, as `NewPR` reads it), their changelog sections and the `changelog.d/` entries waiting for the
+next release are read from the same clone, checked the same way, at that branch rather than whatever the
+clone has checked out; without it the
+timeline says which setting it needs and draws no release
+([Team Agile](modules/solitaire-agile.md#releases-the-timeline), "Releases: the timeline").
+
 **One resolver.** `Resolve-P20SpaceCheckout` (`Scripts/Resolve-SpaceCheckout.ps1`) is the one thing that finds a
 Space's clone, and this setting is its first candidate, before the folder you stand in and the nav shortcuts'
 paths -- so `MoveDesign -Hub -Space <slug> -To Complete` checks `-Doc` in the configured checkout too. A

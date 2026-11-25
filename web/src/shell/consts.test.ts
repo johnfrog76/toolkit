@@ -33,6 +33,7 @@ import {
   TESTS,
   TOKENS,
   REPLY_STATUSES_BY_TRACKER,
+  CHANGELOG,
   SIGN_IN,
   USAGE,
   VISIBILITY,
@@ -253,6 +254,8 @@ describe("consts.json", () => {
       route: "/api/ritual/standup",
       triageRoute: "/api/ritual/triage",
       milestonesRoute: "/api/ritual/milestones",
+      releasesRoute: "/api/ritual/releases",
+      releaseTitlesRoute: "/api/ritual/releases/titles",
       orgRoute: "/api/ritual/org",
       assignMe: "me",
       ceremoniesFile: "Config/ceremonies.json",
@@ -560,6 +563,25 @@ describe("consts.json", () => {
     });
   });
 
+  it("states the changelog's file shapes", () => {
+    const { _: doc, ...changelog } = CHANGELOG as typeof CHANGELOG & { _: string };
+    expect(doc).toMatch(/Keep a Changelog/);
+    expect(changelog).toEqual({
+      file: "CHANGELOG.md",
+      folder: "changelog.d",
+      fragmentRegex: "^([A-Za-z0-9][A-Za-z0-9_-]*)\\.([A-Za-z]+)\\.md$",
+      releaseHeadingRegex: "^##\\s+\\[([^\\]]+)\\](?:\\s+-\\s+(\\S+))?\\s*$",
+      kinds: { added: "Added", changed: "Changed", removed: "Removed", fixed: "Fixed" },
+    });
+    expect(
+      new RegExp(CHANGELOG.releaseHeadingRegex).exec("## [1.7.0] - 2026-11-22")?.slice(1),
+    ).toEqual(["1.7.0", "2026-11-22"]);
+    expect(new RegExp(CHANGELOG.fragmentRegex, "i").exec("326.added.md")?.slice(1)).toEqual([
+      "326",
+      "added",
+    ]);
+  });
+
   // Every key of the contract is stated by this half, so a key added to
   // consts.json fails here until the web says what it resolved for it -- the
   // same rule Tests/Test-Consts.ps1 and Tests/test_consts.py hold.
@@ -570,6 +592,7 @@ describe("consts.json", () => {
         "agent",
         "assets",
         "billing",
+        "changelog",
         "communication",
         "design",
         "docs",

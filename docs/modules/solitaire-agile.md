@@ -49,10 +49,11 @@ says why its slots are empty.
 9. [The team size: who is in the room](#the-team-size-who-is-in-the-room)
 10. [The suggestion: one next move, derived](#the-suggestion-one-next-move-derived)
 11. [The PM Corner: the line, the chevron, the confetti](#the-pm-corner-the-line-the-chevron-the-confetti)
-12. [Milestones: the tab and the award](#milestones-the-tab-and-the-award)
-13. [The file shape, and how a standup is read](#the-file-shape-and-how-a-standup-is-read)
-14. [The tests](#the-tests)
-15. [Known gaps](#known-gaps)
+12. [Releases: the timeline](#releases-the-timeline)
+13. [Milestones: the tab and the award](#milestones-the-tab-and-the-award)
+14. [The file shape, and how a standup is read](#the-file-shape-and-how-a-standup-is-read)
+15. [The tests](#the-tests)
+16. [Known gaps](#known-gaps)
 
 ## The switch, and its scope
 
@@ -321,6 +322,8 @@ sentence where the terminal says `gh`'s own refusal.
 | `GET /api/ritual/standup?space=<slug>&since=<yyyy-MM-dd>&refresh=1` | `features.solitaireAgile` per request, with the active Space's answer applied (**404** unless the switch is on and the Space you are in works with agents; the detail names which is off); `space` scoped like `/api/issue-report` (an undeclared slug 404); `since` widens yesterday's window as `Standup -Since` does, and a `since` that is not a day, or is after today, is a **422** naming it; `refresh=1` reads the tracker again past the kept read ([below](#one-tracker-read-kept-a-minute)) | the same two `gh` reads as `Standup` (the issues with `milestone`, `body` and `createdAt`), and `gh api user` while the suggestion is on, through the same data files, kept a minute -- or, for a local Space, its cards. | nothing |
 | `GET /api/ritual/triage?space=<slug>&refresh=1` | the same | `gh label list`, `gh issue list --state open` with `milestone` and `assignees`, and `gh api user` (who "me" is, best effort), kept a minute and shared with the standup | nothing |
 | `GET /api/ritual/milestones?space=<slug>&refresh=1` | the same | one `gh api --method GET repos/{owner}/{repo}/milestones -f state=all -F per_page=100` per repo -- the ado core's own reader -- kept a minute ([Milestones](#milestones-the-tab-and-the-award)) | nothing |
+| `GET /api/ritual/releases?space=<slug>&refresh=1` | the same | the Space's checkout on this machine (`spaceCheckouts.<slug>.path`): one `git for-each-ref` for the default branch's ref, one `git for-each-ref --merged` for the tags merged into it, one `git log <previous>..<tag>` per release, `CHANGELOG.md` and `changelog.d/` at that ref; and the milestones read above, when the tracker answers ([Releases](#releases-the-timeline)) | nothing |
+| `GET /api/ritual/releases/titles?space=<slug>&numbers=<n,n>&refresh=1` | the same | one `gh api graphql` of aliased `issueOrPullRequest` lookups for the first 50 numbers, kept a minute ([Releases](#releases-the-timeline), "The titles read") | nothing |
 | `GET /api/ritual/org?tree=<id>` | the same -- **404** where the module is off, the detail naming which is off. No `space`: the file is the engineer's | `org.json` at the hub root and, for each position's `prompt`, that prompt in the hub's agentic folder (`promptTitle`, `promptRef`, through the Studio's one prompt record). A missing file is 404 `missing` (or `no-hub`), an invalid one 409 with its `kind`, an unknown `tree` 422 ([the response and its answers](../hub/org.md#the-response)) | nothing |
 | `POST /api/cmd/Route` | the bridge: `Route` is in the CLI's command table only while the flag resolves on -- the switch on and the Space answered `agents` | -- | what `Route` writes, and nothing else |
 | `POST /api/cmd/StartWork` | the bridge, the same way: off, the call is `rejected`; a stated refusal is `status: error` with the verb's sentence | the card (or `gh issue view`), the Space's note or answer, the prompt | nothing -- with `-Launch`, what the launch writes, in the repository the agent runs in |
@@ -1270,6 +1273,132 @@ launch off and on beside the two that stay a plain start with it on (a Space wor
 has sized); and four chair's readings end to end -- one with the launch on, where the Next line and the
 Corner end in the same `-Launch` -- whose goldens (`corner-<case>.brief.txt`) `Tests/regenerate_joined_goldens.py` writes.
 
+## Releases: the timeline
+
+The Releases tab opens on a **timeline** of the Space's releases, with the GitHub milestones reached in
+each standing over it. A release is a tag merged into the Space's default branch, and what it said is its
+section of the changelog; the release **in progress** runs from the last such tag to the tip of the default
+branch, and what it will say is the entries waiting in `changelog.d/` there -- exactly what the next
+release's notes will be. Off, it is absent with the rest of the module: no tab, nothing fetched, and
+`GET /api/ritual/releases` and `GET /api/ritual/releases/titles` each a **404**.
+
+**Where each fact is read.** Everything but the milestones is local, read from the Space's own
+repository as it is cloned on this machine -- the checkout the Design tab reads,
+`spaceCheckouts.<slug>.path` in `config.local.json`, checked against the Space's repository the same way
+(`agent/core/checkout.py`).
+
+- **The default branch, not what the clone has checked out.** Its name is found the way `ThreadHash` finds
+  the base branch: the Space project's `defaultBranch` (its `projects[]` entry for the repository, the field
+  `NewPR` reads), else what origin's `HEAD` points at, else `main` or `master`. The release in progress is
+  read to `origin/<branch>` when the clone has that ref, else to the local `<branch>`, else -- the clone has
+  neither -- to `HEAD`, the branch checked out. `source.ref` names which (`origin/main`, `main`, `HEAD`).
+  One `git for-each-ref` over the clone's branches answers it. So a feature branch checked out, with
+  commits of its own, does not move the release: its commits and its `changelog.d/` entries are not in it.
+- **The tags.** One `git for-each-ref --merged=<that ref> refs/tags`: a tag on a branch never merged into
+  the default branch is not a release. A release tag is `vX.Y.Z` (or `X.Y.Z`), and a pre-release tag such as
+  `v1.8.0-rc.1` is not a release here. Each tag carries its day and its instant.
+- **The commits.** One `git log <previous tag>..<tag>` per release (`<last tag>..<that ref>` for the one in
+  progress): a subject ending `(#N)` names a pull request -- a squash merge's -- and `Refs #N`, `Closes #N`,
+  `Fixes #N` or `Resolves #N` anywhere in a message names an issue.
+- **The notes,** read at that ref, not from the working tree. A shipped release's are its
+  `## [x.y.z] - date` section of `CHANGELOG.md` (one `git show <ref>:CHANGELOG.md`); the release in
+  progress's are `changelog.d/`'s entries (one `git grep` of the folder at the ref) under their headings, in
+  Keep a Changelog order, the files in name order, as `Scripts/Fold-Changelog.ps1` would fold them. The file
+  shapes are `consts.json` `changelog` (the What's New dialog parses the toolkit's own changelog by the same
+  heading).
+
+Every child process goes through the agent's one reader (`run_read`).
+
+**The milestones** are the tracker's: the ado core's one reader, kept a minute and shared with the
+[Milestones](#milestones-the-tab-and-the-award) read below. Where each one belongs is one rule,
+`place_milestones` in `agent/solitaire/releases.py`. Only a **reached** milestone belongs to a tag. Where
+GitHub gave it a close time (the core's milestone row carries it as `closed_time`, the instant as GitHub
+wrote it) and the tags carry their instants, the instants decide: it belongs to the oldest tag made at or
+after the close, so a milestone closed on a tag's day but after the tag is the next release's. Otherwise --
+a milestone every issue of which closed but which nobody closed on GitHub has no close time -- the day
+decides, as it did before: reached on day *d* (GitHub's close day, else its last change, the award's own
+day), it belongs to the oldest tag dated *d* or later, so the day of a tag counts in it. One reached after
+the last tag, or not reached at all (open, empty, or closed with an issue reopened), is the release in
+progress's: the one it is still aimed at. `Tests/fixtures/releases/placement.json` is the rule's table; its
+first four rows carry no instants and read by the day exactly as before.
+
+**No checkout, no tracker.** With no checkout configured, or one that is not a clone of the Space's
+repository, `source.ok` is false with the setting's own sentence and there is no release; the page draws it
+plainly, as a fact. With no tracker -- no `gh`, a `local` Space, `gh` not answering -- `tracker.ok` is false
+with its reason, every release is still there, and the page says in one plain line that the GitHub
+milestones were not read.
+
+**The response.** `ceremony` (`releases`), `space`, `repo`, `source` (`ok`, `reason`, and `ref`, what the
+release in progress was read to) and `tracker` (`ok`, `reason`), and `releases`: the one in progress
+first, then each tag newest first. A release is `tag` (`""` in progress), `version` (`1.7.0`, or
+`Unreleased`), `inProgress`, `date` (the tag's day, `""` in progress), `since` and `previous` (the tag before
+it, and its day), `commits`, `url` (the GitHub Release, or the compare view from the last tag to the default
+branch -- `HEAD` when it was read there), `notes` (each `heading` and `entries`), `pulls` (each `number`,
+`title` -- the squash subject -- and `url`), `issues` (each `number` and `url`; `title` is `""`, being the
+tracker's: the titles read below) and `milestones`: the core's milestone rows with `reachedOn`, the day it
+was reached or `""`.
+`Tests/fixtures/releases/repo.json` is the route's table: a repository built as real git in the test --
+with an origin ref, a tag on a side branch never merged, and a feature branch checked out one commit past
+the default branch -- and what the route serves for it, plus variants (no origin ref, and a configured
+default branch the clone does not have).
+
+**The titles read.** An issue's title is the tracker's, so the panel asks for it when it opens on a
+release, in a second read: `GET /api/ritual/releases/titles?space=<slug>&numbers=<n,n,...>`
+(`consts.json` `rituals.releaseTitlesRoute`), on the same router and so under the same gate -- **404**
+wherever Team Agile is off in the Space. The numbers are the release's issues; the first 50 of them,
+ascending, are asked in ONE `gh api graphql` call of aliased `issueOrPullRequest(number: N)` lookups -- the
+shape the standup's dates read sends -- with the query in a file and the owner and name as `-f` fields,
+never in a URL. The answer is kept a minute, like every ritual read, and forgotten when a verb runs through
+the bridge; `?refresh=1` reads again. It answers `space`, `repo`, `tracker` (`ok`, `reason`), `asked` (how
+many numbers came), `limit` (50) and `titles` (each `number` and `title`, ascending); a number GitHub cannot
+resolve is left out, never an error. No number is no call. No tracker -- no `gh`, a `local` Space, `gh` not
+answering -- is `tracker.ok` false with its reason, and no title. A number that is not one is a **422**
+naming it.
+
+**The page** (`ReleasesPage.tsx`). One `h1`, **Releases**, with the repository beside it. The timeline is
+one horizontal track, newest first: the release in progress at the left, drawn open (an outlined node on a
+dashed rail), then each tag going back in time, filled. A stop says its tag (or `In progress`), its day (or
+`since <last tag>`), and how many entries its notes hold. Over a stop stand its GitHub milestones as gold
+flags -- filled for one reached there, outlined for one the release in progress is still aimed at -- and
+a release with a milestone reached in it has a gold ring round its node. Nothing on the timeline uses
+error colours: only the agent not answering is drawn as an error.
+
+A click on a stop, or on one of its flags, opens the **side panel**: the tag as an `h2`, its window
+(`From v1.6.0 (9 November 2026) to 22 November 2026`) and its commit count, its GitHub Release (or the
+compare view), its GitHub milestones each with its line (`reached 5 October 2026`, `open, 1 of 3 closed`)
+and bar, the flag that was clicked marked, its notes under their headings (`Notes so far` in progress),
+its pull requests (number and subject) and its issues (number, and title once the titles read answers),
+all linked to GitHub. A note's entry is drawn as the inline markdown it is written in -- a code span, bold,
+emphasis, a link, a `#N` linked to the repository's issue -- through the shared renderer
+(`shared/InlineMarkdown.tsx`), never as a heading, a list or a block of its own, and with no raw HTML.
+Until the titles read answers, and wherever it cannot (no tracker, `gh` failing), the issues are their
+numbers and nothing more is drawn; a release with no issue asks for no title; and past the read's 50,
+the panel says `Titles read for the first 50 of 73 issues.` under the list. The panel sits beside the
+timeline on a wide screen and under it on a narrow one. The track scrolls sideways when it is wider than
+the page, and a step scrolls it so the selected stop is wholly in view with a stop's left edge at the
+track's left: no stop is cut in half there, at the far end either -- a little room after the last stop
+lets the farthest scroll sit on a stop's edge too.
+
+**The keyboard.** The track is one tab stop. Left and Right step between releases, Home and End jump to
+the ends, and focus follows the step; with the panel open, it follows too. Enter or Space opens the panel,
+Escape or **Close** shuts it, focus going back to the stop. Each stop's accessible name is the whole fact
+-- `v0.3.0, shipped 12 October 2026, 1 entry, 1 milestone reached` -- and it is the button's own text: what
+the stop draws, with the punctuation and the words only a screen reader needs (`shipped`, the milestones)
+hidden in between, so the name always holds the visible words. The open stop names the panel
+(`aria-expanded`, `aria-controls`). The flags are not a second tab stop: the panel lists every milestone.
+The panel's links are drawn in the panel's own text colour, underlined, so they keep their contrast in
+every theme.
+
+Under the timeline, for now, the flat list of the Space's GitHub milestones and its award, below, headed
+`GitHub milestones` as the page's second level. It goes once the award fires from the timeline.
+
+**What is not built.** Release-candidate checkpoints (a `-rc.N` tag is left off, not drawn on the way to
+its release); later plan files as forward buckets, and a plan's `Planned` group, which would stand in the side panel above the notes;
+a milestone's own issues, and the planned, carried and unplanned grouping of a shipped release; a card's
+"shipped in"; moving the award onto the timeline, and its mark kept by the agent; and more than the
+Space's first repository for tags -- a Space of several repositories reads its first
+([Known gaps](#known-gaps)).
+
 ## Milestones: the tab and the award
 
 Where the work is going, and the one place Team Agile celebrates getting there. The Releases tab (named Milestones until it was renamed; the route, the reader and the
@@ -1294,8 +1423,9 @@ kept read -- one `gh` call per repo a minute ([above](#one-tracker-read-kept-a-m
 **A milestone with no issues is never reached.** 0 of 0 is not an achievement: an empty milestone reads
 `no issues yet`, open or closed on the tracker, and is never awarded.
 
-**The tab.** The panel is headed **Releases**, and its subtitle and every row say
-`GitHub milestone`, so it never claims to be derived from anything else. The empty state reads
+**The list.** Under [the timeline](#releases-the-timeline), the list is headed **GitHub milestones** (an
+`h2`, the timeline's `Releases` being the page's one `h1`), its subtitle `how far along each is`, and every
+row says `GitHub milestone`, so it never claims to be derived from anything else. The empty state reads
 `No GitHub milestones yet`: GitHub milestones are made on the tracker, and each one shows here with its
 progress. One row per GitHub milestone, in the Stats card's order (`ado/milestones.ts`: in flight, most
 complete first; then reached, the one GitHub still shows open first; then empty): the title and a state
@@ -1969,7 +2099,9 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the PM Corner | `Tests/fixtures/rituals/corner.json` from both halves: every row from the raw read through each half's card reader, the join and the window (shape, milestone, remaining, pick, noun, line, command), every shape of `rituals.cornerShapes` reached by a row, the long milestone read whole (and the card model's `sprint` not it), the launch rows (a delegation's command with it off and on, differing in nothing else), and the four `briefs` cases end to end -- `corner-<case>.brief.txt` byte for byte, the Corner the last line, its command the suggestion's where the two share a delegated pick, again after a JSON round trip; typed, `Standup -Brief` ending on the Corner's line; the agent's route carrying `corner` (its fields, a shape of the contract, the brief's last line), none with the Space's switch off and none on an Azure DevOps Space |
 | `web/src/modules/solitaireAgile/PmCorner.test.tsx`, `celebrate.test.ts` | the Corner: the line verbatim, the chevron opening the hand-off for the pick (a card by its id), no chevron for reached or nothing in reach; reached ending in `: see Releases`, a link that goes to the tab; NO confetti -- not on first sight, not on the transition to reached, nothing marked; the mark held in memory when storage throws |
 | `Tests/test_ritual_milestones.py` | `GET /api/ritual/milestones` over `Tests/fixtures/rituals/milestones.json`: gh's rows in and the route's out, `reached` by shape (open, every issue closed with GitHub open and closed, closed on GitHub with one open, empty open and closed -- never reached), due dates with and without, the bar the tracker's numbers; the `gh` argv with fields and no `&` or `?`; one read a minute and `?refresh=1` reading again; no space the active one, an ADO Space and tier below 1 a tracker reason with `gh` never asked, `gh` failing a reason and not kept, an unknown Space a 404 naming it, the hub unwritten; 404 off |
+| `Tests/test_ritual_releases.py` | `GET /api/ritual/releases` over `Tests/fixtures/releases/repo.json`, a repository built as real git in the test: each release in order with its tag, version, days, previous tag, commit count, link, notes, pull requests, issues and milestones, and `source.ref`; a `-rc` tag not a release; a tag on a branch never merged not a release; the feature branch checked out not in the release in progress, nor its `changelog.d/` entry; the variants -- no origin ref read to the local branch, a configured branch the clone lacks read to `HEAD`; the default branch's name and ref as a table (configured, origin's `HEAD`, `main` then `master`, neither); a projects entry matched by repository; `changelog.d/` read at a ref from one `git grep`; the titles read -- one `gh api graphql` with the owner and name as fields and no `&` in its argv, the numbers ascending, one GitHub cannot resolve left out, kept a minute and read again on `refresh`, no number no call, past the cap the first 50 asked and `asked` saying how many came, no tracker and `gh` failing a reason, a number that is not one a 422, an unknown Space a 404; a pull request's subject and links; each milestone's `reachedOn`; the changelog's sections by version with `[Unreleased]` left out and continuation lines joined; `changelog.d/` by kind in Keep a Changelog order, its README, a dotfile, a wrong name and an unknown kind skipped; `place_milestones` over `Tests/fixtures/releases/placement.json`; no tracker (tier below 1, `gh` failing) every release with no milestone and a reason; no checkout, and a checkout of another repository, a sentence naming the setting or the repository; no tag yet one release in progress; an unknown Space a 404; the clone and the hub unwritten; 404 off, and 404 where the Space works alone, for both routes |
 | `web/src/modules/solitaireAgile/MilestonesPage.test.tsx`, `RitualPage.test.tsx` | the tab over the same table: the Stats card's order, each bar's value the tracker's closed over total, the due date where there is one, the state words; the award rule as a table (every milestone's state, marked and not -- an empty one never awarded); the award: the first reached with no mark opens its dialog with the title, the line and the gold trophy by its accessible name (the only drawing in the box), one burst at the app's root and NOT inside the dialog, closing it opening the next, then both `awarded` and marked, a new visit no dialog and no burst; leaving mid-award never shows that one again; another Space's milestone its own; reduced motion the dialog and no rain; no tracker, no milestones, the agent away; and the confetti's one caller -- no file but `AwardDialog.tsx` imports `Confetti.tsx`, none but it imports `react-confetti`. The strip: three tabs, each an address; `registry.solitaireAgile.test.tsx` holds the old `/milestones` address redirecting to `/releases`. Dialog queries are awaited and by role, as a screen reader reaches them; a query that says there is no dialog passes `hidden: true`, so it means none in the tree at all |
+| `web/src/modules/solitaireAgile/ReleasesPage.test.tsx` | the timeline over the route's table (`Tests/fixtures/releases/repo.json`): one `h1`, the Space asked about, one stop a release with the one in progress first and each named by the whole fact, one tab stop; the flags filled for reached and outlined for aimed at, none a tab stop; a click opening the side panel with its `h2`, window, GitHub link, milestones, notes, pull requests and issues, the stop naming it; the release in progress's notes so far and compare link; an entry's code span and bold drawn, no backticks and no block; the issues' titles from one read of that release's numbers, the numbers alone with no tracker or before the read answers and nothing drawn as an error, no read for a release with no issue, the cap line past the read's 50; Left, Right, Home and End stepping with focus and the panel following, focus never scrolling the track itself; Escape and Close shutting it with focus back on the stop; a flag opening its release; no tracker, no checkout (plain) and the agent away (an error); the track's scroll as a table (a stop in view left alone, one cut at the right bringing the fewest stops in on a stop's edge, one off to the left at the left edge, the room after the last stop). `shared/InlineMarkdown.test.tsx` holds the inline renderer with the real react-markdown: a code span, bold, emphasis, a link opening in a new tab, no block, no raw HTML, `#N` linked only when told where the issues are. The browser walk is `npm run smoke:matrix` (`web/tests/smokeReleases.mjs`): the track, a click, Left and Right with focus following, Escape giving focus back, a code span drawn, and at 390 wide no stop cut at the track's left; `npm run smoke:a11y` scans the page with the panel open |
 | `web/src/shell/ConfettiProvider.test.tsx`, and `MilestonesPage.test.tsx`'s "one mount, one hook, one caller" | the root's burst: a throw draws one, a throw while it rains is absorbed, the next throw after it ends is a fresh burst, reduced motion draws nothing, and with no provider the hook is a no-op; the package imported by `shared/Confetti.tsx` alone, the wrapper mounted (as a lazy part) by `shell/ConfettiProvider.tsx` alone, the provider mounted once in `shell/main.tsx`, and `AwardDialog.tsx` the one file that calls `useConfetti()` |
 | `tkTestToolkit -Triage` | every case of `Tests/fixtures/rituals/triage.json` -- the groups in order, each group's counts, context and numbers, each issue's worker, size, who, severity and deep-water, the sizes -- and the text against `triage-<name>.txt` byte for byte, again after a JSON round trip; the who rule; `Tests/fixtures/parsers/assigned-lines.json` through `Get-P20CardAssigned`; off is no `Triage`, no `Route`, no `-Assign`, no bridge entry; `Triage` typed with `gh` stubbed (who: `me`, `@<login>`, `nobody`); **`Route` typed with `gh` stubbed as a function that writes down every call**: the exact `gh issue edit` argv for each switch, alone and all four in order, `-Assign me` (`--add-assignee @me`, and under `-WhatIf` printed and not made), `-Assign <size>` the `-Size` write byte for byte, `-WhatIf` writing nothing, the two moves printed, every refusal exit 2 with one `Error:` block and no write, the hub untouched; `-Assign` on a card -- the `**Assigned:**` line above `**Created:**`, LF and CRLF kept, no BOM, an unchanged card not written, the sizes from the repo, a local Space's card taking `-Assign me` alone, and its refusals (a size with no repository to read labels from among them) |
 | `tkTestToolkit -Rituals`, `Tests/test_rituals.py` -- the suggestion | who "me" is (the viewer's assignee `me` and a candidate, another's `@<login>` excluded `theirs`, no viewer every assignee theirs; the route asking `gh api user` once with the suggestion on, never with it off); `Tests/fixtures/suggestion/table.json` from both halves: every `nearest` row (the order and the nearest), every `rows` row (the candidates in order, the pick, its shape, sentence and command, each excluded ref with the first exclusion it met), every shape and every exclusion of the contract reached by a row, every `switch` row, and the three `briefs` cases end to end -- the joined fill, the suggestion attached, the candidates, the pick and `suggestion-<case>.brief.txt` byte for byte (with something waiting the Next line is the queue's; switched off it is today's), again after a JSON round trip; the card reader's milestone (whole), Created day, Tags and Assigned, and `Tests/fixtures/parsers/card-milestone.json` through both halves' readers; typed, `Standup -AsJson` carrying the rule's candidates with each line naming the prefixed command, the brief's Next line staying the queue's while walks wait, and `spaces.<slug>.features.suggestions=false` in the hub leaving no candidate; the agent's route carrying `suggestions` (the fields, the order, the line) and none with the Space's switch off |
@@ -2017,6 +2149,10 @@ Each of these is a block on [Known gaps](../KNOWN-GAPS.md), with its issue:
 - **The bell and Home's tips do not suggest yet.** They are the suggestion's later surfaces, behind the
   same switch; the chair's line and [the PM Corner](#the-pm-corner-the-line-the-chevron-the-confetti) are the two built
   ([The bell and Home's tips carry no suggestion](../KNOWN-GAPS.md#the-bell-and-homes-tips-carry-no-suggestion)).
+- **The Releases timeline is a first version.** It draws no `-rc` checkpoint and no later plan, and keeps the
+  GitHub milestones list under it ([The Releases timeline is a first version](../KNOWN-GAPS.md#the-releases-timeline-is-a-first-version)).
+- **A Space of several repositories reads its first for tags.** The timeline reads one checkout, the first
+  repository's ([The Releases timeline reads one repository](../KNOWN-GAPS.md#the-releases-timeline-reads-one-repository)).
 - **The celebration's mark is per browser.** Another browser, or one whose site data was cleared, celebrates a
   reached milestone once more on first sight
   ([A reached milestone celebrates once per browser](../KNOWN-GAPS.md#a-reached-milestone-celebrates-once-per-browser)).

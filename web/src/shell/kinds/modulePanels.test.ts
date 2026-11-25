@@ -58,6 +58,8 @@ const NOT_A_LIST: Record<string, string> = {
   "lounge/TicTacToe.tsx": "a game: the board's cells",
   "lounge/WordRing.tsx": "a game: the ring's letters and the words kept",
   "solitaireAgile/OrgPage.tsx": "the Org page: the org chart, a scene of offices and their seats",
+  "solitaireAgile/ReleasesPage.tsx":
+    "the Releases page: a timeline of stops and flags, a scene, and one release's side panel",
   "solitaireAgile/StandupPage.tsx": "the Standup page: the grain tabs and the brief's lines",
   "solitaireAgile/TriagePage.tsx": "the Triage page: one issue at a time, and the choices for it",
 };

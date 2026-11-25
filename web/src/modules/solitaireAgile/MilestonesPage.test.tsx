@@ -180,14 +180,14 @@ describe("the Releases tab", () => {
     expect(asked[0]).toBe(SPACE);
   });
 
-  it("the heading is Releases, the subtitle and every row say GitHub milestone", () => {
+  it("the heading names GitHub milestones (the page's second level), and every row says GitHub milestone", () => {
     localStorage.setItem(
       AWARD_SEEN_KEY,
       JSON.stringify(table.expected.map((m) => awardKey(SPACE, m))),
     );
     render(<MilestonesPage />);
-    expect(screen.getByRole("heading", { name: "Releases" })).toBeTruthy();
-    expect(screen.getByTestId("releases-subtitle").textContent).toMatch(/^GitHub milestones/);
+    expect(screen.getByRole("heading", { name: "GitHub milestones", level: 2 })).toBeTruthy();
+    expect(screen.getByTestId("releases-subtitle").textContent).toBe("how far along each is");
     const sources = screen.getAllByTestId("milestone-source");
     expect(sources).toHaveLength(screen.getAllByTestId("milestone-row").length);
     expect(sources.every((s) => s.textContent === "GitHub milestone")).toBe(true);
@@ -347,7 +347,7 @@ describe("the Releases tab", () => {
         "GitHub milestones are made on the tracker; each one shows here with its progress.",
       ),
     ).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Releases" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "GitHub milestones" })).toBeTruthy();
   });
 
   it("the agent away: an error, never an empty list", () => {

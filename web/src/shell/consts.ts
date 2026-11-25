@@ -210,6 +210,10 @@ export const RITUALS = consts.rituals as {
   triageRoute: string;
   /** The Releases tab's read: the tracker's milestones with its own counts. */
   milestonesRoute: string;
+  /** The Releases timeline's read: the Space's tags, notes and milestones within each. */
+  releasesRoute: string;
+  /** One release's issue titles, from the tracker in one batched read: the panel's. */
+  releaseTitlesRoute: string;
   /** The org chart's read: the tree in use, with each position's prompt title and reading-room ref. */
   orgRoute: string;
   /** "me": the one answer to who takes an item that is not a size (D-AR10) --
@@ -526,6 +530,24 @@ export const MODELS = consts.models as {
   agentSources: string[];
   /** The ids Claude Code writes on a line no model produced (`<synthetic>`): not a model, known or unknown. */
   notModels: string[];
+};
+
+/**
+ * A repository's release notes, as Keep a Changelog writes them
+ * (changelog.d/README.md). The What's New dialog parses the toolkit's own
+ * changelog by the heading; the agent's Releases timeline reads a Space's.
+ */
+export const CHANGELOG = consts.changelog as {
+  /** The changelog at a repository's root. */
+  file: string;
+  /** The entries waiting for the next release, one `<id>.<kind>.md` each. */
+  folder: string;
+  /** A waiting entry's name: group 1 the id, group 2 the kind (ignoring case). */
+  fragmentRegex: string;
+  /** A section's heading, `## [x.y.z] - date`: group 1 the version, group 2 the date. */
+  releaseHeadingRegex: string;
+  /** A fragment's kind -> the heading it goes under, in Keep a Changelog order. */
+  kinds: Record<string, string>;
 };
 
 /**

@@ -509,6 +509,124 @@ export const milestonesEndpoints = api.injectEndpoints({
 
 export const { useGetRitualMilestonesQuery } = milestonesEndpoints;
 
+// -- Releases (the timeline) ---------------------------------------------
+//
+// The Space's releases, read from its checkout on the agent's machine: the
+// release in progress (the last tag to the tip of the Space's default branch,
+// its notes the changelog.d/ entries waiting there) first, then each tag merged
+// into that branch, newest first, with its CHANGELOG.md section. The
+// GitHub milestones reached within each ride along when the tracker answered
+// (docs/modules/solitaire-agile.md, "Releases: the timeline"). A READ.
+
+/** A pull request or an issue of a release, linked on the Space's repository. */
+export interface ReleaseRef {
+  number: number;
+  /** A pull request's squash subject; "" for an issue (its title is the tracker's). */
+  title: string;
+  url: string;
+}
+
+/** The core's milestone, with the day it was reached ("" while it is not). */
+export interface ReleaseMilestone extends Milestone {
+  reachedOn: string;
+}
+
+export interface Release {
+  /** "" for the release in progress. */
+  tag: string;
+  /** "1.7.0"; "Unreleased" in progress. */
+  version: string;
+  inProgress: boolean;
+  /** The tag's day; "" in progress. */
+  date: string;
+  /** The previous tag's day; "" for the first. */
+  since: string;
+  previous: string;
+  commits: number;
+  /** The GitHub Release; the compare view in progress. */
+  url: string;
+  notes: { heading: string; entries: string[] }[];
+  pulls: ReleaseRef[];
+  issues: ReleaseRef[];
+  milestones: ReleaseMilestone[];
+}
+
+export interface ReleasesResponse {
+  ceremony: "releases";
+  space: string;
+  repo: string;
+  /** false: the checkout was not read; `reason` says why, and there are no releases.
+   *  `ref` is what the release in progress was read to: `origin/<branch>`, the
+   *  local `<branch>`, or `HEAD` when the clone has neither. */
+  source: { ok: boolean; reason: string; ref?: string };
+  /** false: no tracker answered; the releases are there, with no milestones. */
+  tracker: { ok: boolean; reason: string };
+  releases: Release[];
+}
+
+export const RELEASES_QUERY = underBase(RITUALS.releasesRoute);
+
+/** The query for one Space's releases; "" asks for the Space you are in. */
+export function releasesQuery(space: string): string {
+  return space ? `${RELEASES_QUERY}?space=${encodeURIComponent(space)}` : RELEASES_QUERY;
+}
+
+export const releasesEndpoints = api.injectEndpoints({
+  endpoints: (builder) => ({
+    // GET /api/ritual/releases?space=<slug> -- the tags, their notes, the milestones within
+    getRitualReleases: builder.query<ReleasesResponse, string>({
+      query: releasesQuery,
+      keepUnusedDataFor: CACHE_TTL,
+    }),
+  }),
+});
+
+export const { useGetRitualReleasesQuery } = releasesEndpoints;
+
+/** The titles of one release's issues, the tracker's: the panel's second read. */
+export interface ReleaseTitlesResponse {
+  space: string;
+  repo: string;
+  /** false: no title was read; the panel keeps the numbers and draws nothing more. */
+  tracker: { ok: boolean; reason: string };
+  /** How many numbers were asked, and how many one read takes. */
+  asked: number;
+  limit: number;
+  /** Ascending; a number GitHub could not resolve is not here. */
+  titles: { number: number; title: string }[];
+}
+
+export const RELEASE_TITLES_QUERY = underBase(RITUALS.releaseTitlesRoute);
+
+/** The titles query for one release's issues; "" asks about the Space you are in. */
+export function releaseTitlesQuery({
+  space,
+  numbers,
+}: {
+  space: string;
+  numbers: number[];
+}): string {
+  const q = new URLSearchParams();
+  if (space) q.set("space", space);
+  q.set("numbers", [...numbers].sort((a, b) => a - b).join(","));
+  return `${RELEASE_TITLES_QUERY}?${q.toString()}`;
+}
+
+export const releaseTitlesEndpoints = api.injectEndpoints({
+  endpoints: (builder) => ({
+    // GET /api/ritual/releases/titles?space=<slug>&numbers=<n,n> -- one batched tracker read
+    getRitualReleaseTitles: builder.query<
+      ReleaseTitlesResponse,
+      { space: string; numbers: number[] }
+    >({
+      query: releaseTitlesQuery,
+      keepUnusedDataFor: CACHE_TTL,
+    }),
+  }),
+});
+
+export const { useGetRitualReleaseTitlesQuery } = releaseTitlesEndpoints;
+
 // -- The org chart (the Org tab) ------------------------------------------
 //
 // The hub's org.json, the tree in use, as GET /api/ritual/org serves it

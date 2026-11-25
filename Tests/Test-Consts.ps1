@@ -233,6 +233,8 @@ $expected = [ordered]@{
     'rituals.route'             = '/api/ritual/standup'
     'rituals.triageRoute'       = '/api/ritual/triage'
     'rituals.milestonesRoute'   = '/api/ritual/milestones'
+    'rituals.releasesRoute'     = '/api/ritual/releases'
+    'rituals.releaseTitlesRoute' = '/api/ritual/releases/titles'
     'rituals.orgRoute'          = '/api/ritual/org'
     'rituals.assignMe'          = 'me'
     'rituals.ceremoniesFile'    = 'Config/ceremonies.json'
@@ -296,6 +298,13 @@ $expected = [ordered]@{
     'signIn.envField'           = 'azSignIn'
     'usage.burnRoute'           = '/api/usage/burn'
     # The statuses a reply may set, per tracker: ReplyPR's GitHub refusal and the PR Comments status box read them.
+    # A repository's release notes: the agent's Releases timeline reads a Space's
+    # checkout by them; Fold-Changelog.ps1 folds by the same shapes.
+    'changelog.file'                = 'CHANGELOG.md'
+    'changelog.folder'              = 'changelog.d'
+    'changelog.fragmentRegex'       = '^([A-Za-z0-9][A-Za-z0-9_-]*)\.([A-Za-z]+)\.md$'
+    'changelog.releaseHeadingRegex' = '^##\s+\[([^\]]+)\](?:\s+-\s+(\S+))?\s*$'
+    'changelog.kinds'               = 'added=Added,changed=Changed,removed=Removed,fixed=Fixed'
     'replyStatuses.ado'         = 'fixed,active,pending,byDesign,wontFix,closed'
     'replyStatuses.github'      = 'fixed,closed,active'
     'usage.readingsFolder'      = 'readings'

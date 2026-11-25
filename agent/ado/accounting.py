@@ -575,6 +575,7 @@ class Milestone(BaseModel):
     closed: int = 0
     due: str = ""  # the day, "" when none is set
     closed_at: str = ""  # the day GitHub closed it, "" while open
+    closed_time: str = ""  # the instant GitHub closed it, as GitHub wrote it; "" while open
     created_at: str = ""  # the day it was made on GitHub
     updated_at: str = ""  # the day GitHub last changed it -- an issue closing in it is one
     reached: bool = False  # every issue closed, and at least one issue
@@ -621,6 +622,7 @@ def github_milestone_rows(repo: str) -> tuple[list[Milestone], str | None]:
                 closed=n_closed,
                 due=str(r.get("due_on") or "")[:10],
                 closed_at=str(r.get("closed_at") or "")[:10],
+                closed_time=str(r.get("closed_at") or ""),
                 created_at=str(r.get("created_at") or "")[:10],
                 updated_at=str(r.get("updated_at") or "")[:10],
                 reached=milestone_reached(n_open, n_closed),

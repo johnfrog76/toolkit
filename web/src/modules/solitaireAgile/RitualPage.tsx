@@ -2,7 +2,7 @@ import { useNavigate } from "react-router";
 import { Tab, TabList, makeStyles, tokens } from "@fluentui/react-components";
 import { StandupPage } from "./StandupPage";
 import { TriagePage } from "./TriagePage";
-import { MilestonesPage } from "./MilestonesPage";
+import { ReleasesPage } from "./ReleasesPage";
 import { ROUTES } from "./paths";
 import { TabRows } from "../../shared/TabRows";
 import { lazyPart } from "../../shell/lazy";
@@ -64,7 +64,7 @@ export function RitualPage({ ceremony }: { ceremony: Ceremony }) {
       {ceremony === "triage" ? (
         <TriagePage />
       ) : ceremony === "releases" ? (
-        <MilestonesPage />
+        <ReleasesPage />
       ) : ceremony === "org" ? (
         <OrgPage />
       ) : (

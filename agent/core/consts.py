@@ -515,6 +515,41 @@ def rituals_milestones_route() -> str:
     return consts()["rituals"]["milestonesRoute"]
 
 
+def rituals_releases_route() -> str:
+    """The Releases timeline's route, with the /api prefix: ``/api/ritual/releases``."""
+    return consts()["rituals"]["releasesRoute"]
+
+
+def rituals_release_titles_route() -> str:
+    """One release's issue titles, with the /api prefix: ``/api/ritual/releases/titles``."""
+    return consts()["rituals"]["releaseTitlesRoute"]
+
+
+def changelog_file() -> str:
+    """``CHANGELOG.md`` -- a repository's release notes, at its root."""
+    return consts()["changelog"]["file"]
+
+
+def changelog_folder() -> str:
+    """``changelog.d`` -- the entries waiting for the next release."""
+    return consts()["changelog"]["folder"]
+
+
+def changelog_fragment_regex() -> str:
+    """A waiting entry's file name: group 1 the id, group 2 the kind (ignoring case)."""
+    return consts()["changelog"]["fragmentRegex"]
+
+
+def changelog_release_heading_regex() -> str:
+    """A changelog section's heading: group 1 the version, group 2 the date."""
+    return consts()["changelog"]["releaseHeadingRegex"]
+
+
+def changelog_kinds() -> dict[str, str]:
+    """A fragment's kind -> the heading it goes under, in Keep a Changelog order."""
+    return dict(consts()["changelog"]["kinds"])
+
+
 def rituals_org_route() -> str:
     """The org chart's route, with the /api prefix: ``/api/ritual/org``."""
     return consts()["rituals"]["orgRoute"]

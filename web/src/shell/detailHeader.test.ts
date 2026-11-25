@@ -20,7 +20,7 @@ const NOT_A_RECORD: Record<string, string> = {
   "solitaireAgile/StandupPage.tsx": "today's round, derived; not a file",
   "solitaireAgile/TriagePage.tsx": "the tracker's queue, a list",
   "solitaireAgile/OrgPage.tsx": "the org's tree, a view over many seats",
-  "solitaireAgile/MilestonesPage.tsx": "the releases, a list",
+  "solitaireAgile/ReleasesPage.tsx": "the releases' timeline, a view over many tags",
   "deck/engine/PresenterNotes.tsx":
     "the presenter's notes window, part of the player; not a page of a record",
 };
@@ -50,6 +50,7 @@ const PANEL_HEADERS: Record<string, string> = Object.fromEntries(
     "lounge/TicTacToe.tsx",
     "lounge/GoBoard.tsx",
     "growth/SkillsSnapshot.tsx",
+    "solitaireAgile/MilestonesPage.tsx",
   ].map((f) => [f, CARD]),
 );
 
