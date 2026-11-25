@@ -948,10 +948,65 @@ describe("a prompt's reading room", () => {
     mount(promptPath("pr-ship"));
     expect(askedFor).toBe("pr-ship");
     expect(screen.getByRole("heading", { name: "pr-ship" })).toBeTruthy();
-    expect(screen.getByTestId("viewer").textContent).toBe(PR_SHIP.body);
+    // The front matter feeds the header: the viewer is handed the prose alone.
+    expect(screen.getByTestId("viewer").textContent).toBe("# PR Ship\n");
     expect(screen.getByText("ToolKit's")).toBeTruthy();
     expect(screen.getByText("for working on a team in Azure")).toBeTruthy();
     expect(await fileLineValue()).toContain(PR_SHIP.file_path);
+  });
+
+  it("the front matter feeds the header: the description under the title, the rest in a collapsed row, no raw rows in the body", () => {
+    oneAnswer = {
+      data: {
+        ...PR_SHIP,
+        description: "Ship the card",
+        body: '---\ndescription: "Ship the card"\nargument-hint: "a card id"\nagent: "agent"\ntools: "Bash, Read"\n---\n\nFirst prose.\n',
+      },
+    };
+    mount(promptPath("pr-ship"));
+    const header = screen.getByTestId("detail-header");
+    const title = within(header).getByRole("heading", { name: "pr-ship" });
+    const description = within(header).getByTestId("detail-description");
+    expect(description.textContent).toBe("Ship the card");
+    // Title, then the description, then the tags.
+    const tags = within(header).getByTestId("detail-meta");
+    expect(
+      title.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      description.compareDocumentPosition(tags) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // The other keys are a collapsed details row in the header, quotes taken off.
+    const details = within(header).getByTestId("front-matter-details");
+    expect(details.tagName).toBe("DETAILS");
+    expect(details.hasAttribute("open")).toBe(false);
+    expect(details.textContent).toContain("argument-hint");
+    expect(details.textContent).toContain("a card id");
+    expect(details.textContent).toContain("Bash, Read");
+    expect(details.textContent).not.toContain('"');
+    // The body starts with the prompt's own prose: no key/value rows, no rule.
+    expect(screen.getByTestId("viewer").textContent).toBe("First prose.\n");
+  });
+
+  it("a Description key in any case feeds the header, and is not left in the Details row", () => {
+    oneAnswer = {
+      data: {
+        ...PR_SHIP,
+        description: "",
+        body: '---\nDescription: "From the key"\n---\n\nProse.\n',
+      },
+    };
+    mount(promptPath("pr-ship"));
+    expect(screen.getByTestId("detail-description").textContent).toBe("From the key");
+    expect(screen.queryByTestId("front-matter-details")).toBeNull();
+  });
+
+  it("a prompt with no front matter renders its text whole, with no details row", () => {
+    oneAnswer = { data: { ...BENCH, description: "", body: "# Bench\n\nJust prose.\n" } };
+    mount(promptPath("yours/bench-billing"));
+    expect(screen.getByTestId("viewer").textContent).toBe("# Bench\n\nJust prose.\n");
+    expect(screen.queryByTestId("detail-description")).toBeNull();
+    expect(screen.queryByTestId("front-matter-details")).toBeNull();
   });
 
   it("carries the detail the row does not: category, sender, add-on, what it drives, when it changed", () => {

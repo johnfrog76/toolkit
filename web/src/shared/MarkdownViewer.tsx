@@ -320,6 +320,7 @@ export function MarkdownViewer({ content, titleAbove, maxHeight, style, links, a
         : new Map(headings.map((h) => [h.line, h.id])),
     [idStyle, prepared.body, headings],
   );
+  const hasPageTitle = !!titleAbove;
   const [here, setHere] = useState<string | null>(null);
   // Inside a part of a section, the section is marked too.
   const hereSection = useMemo(() => sectionOf(headings, here), [headings, here]);
@@ -404,13 +405,21 @@ export function MarkdownViewer({ content, titleAbove, maxHeight, style, links, a
   // focus a contents link had just put on a heading.
   const components: Components = useMemo(
     () => ({
-      h1({ node, ...props }) {
+      h1({ node, children, ...props }) {
+        const id = idByLine.get(node?.position?.start.line ?? -1);
+        // A page that titles itself (`titleAbove`) owns the page's one h1: a
+        // body h1 that is not that title is drawn the same and read as a
+        // level-2 heading.
+        if (hasPageTitle)
+          return (
+            <div role="heading" aria-level={2} className={styles.h1} id={id} tabIndex={-1}>
+              {children}
+            </div>
+          );
         return (
-          <h1
-            className={styles.h1}
-            id={idByLine.get(node?.position?.start.line ?? -1)}
-            {...props}
-          />
+          <h1 className={styles.h1} id={id} {...props}>
+            {children}
+          </h1>
         );
       },
       h2({ node, children, ...props }) {
@@ -521,7 +530,7 @@ export function MarkdownViewer({ content, titleAbove, maxHeight, style, links, a
         return <hr className={styles.hr} />;
       },
     }),
-    [styles, idByLine, links, jumpTo],
+    [styles, idByLine, links, jumpTo, hasPageTitle],
   );
 
   return (

@@ -172,3 +172,30 @@ describe("GitHub's heading ids, for a repo's document", () => {
     expect(headingsOf(body).map((h: { id: string }) => h.id)).toEqual(["round", "round-2"]);
   });
 });
+
+describe("dropLeadingTitle: after a note", () => {
+  const { dropLeadingTitle } = jest.requireActual("./prepareMarkdown");
+  it("drops the first h1 when it is the title, even after a blockquote and blank lines", () => {
+    const body = "> A note.\n\n# Build\n\nText\n\n## Steps\n";
+    expect(dropLeadingTitle(body, "build")).toBe("> A note.\n\nText\n\n## Steps\n");
+  });
+  it("keeps a section heading that shares the title's words (a later section)", () => {
+    const body = "Intro prose.\n\n## Problem\nx\n\n# Build\n\nSection body\n";
+    expect(dropLeadingTitle(body, "Build")).toBe(body);
+    const afterH2 = "## Problem\nx\n\n# Build\nSection body\n";
+    expect(dropLeadingTitle(afterH2, "Build")).toBe(afterH2);
+  });
+  it("keeps the heading when prose comes before it", () => {
+    const body = "Some prose first.\n\n# Build\n\nText\n";
+    expect(dropLeadingTitle(body, "Build")).toBe(body);
+  });
+  it("reads a comment before the title as leading", () => {
+    expect(dropLeadingTitle("<!-- a\nb -->\n\n# Build\n\nText\n", "Build")).toBe(
+      "<!-- a\nb -->\n\nText\n",
+    );
+  });
+  it("keeps an h1 that says something else, and one inside a code fence", () => {
+    expect(dropLeadingTitle("> n\n\n# Other\n", "Build")).toBe("> n\n\n# Other\n");
+    expect(dropLeadingTitle("```\n# Build\n```\n", "Build")).toBe("```\n# Build\n```\n");
+  });
+});

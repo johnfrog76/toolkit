@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
+import { Body1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
 import { BackButton } from "./BackButton";
 import { FilePath } from "./FilePath";
 import { RefreshButton } from "./RefreshButton";
@@ -8,8 +8,8 @@ import { RefreshButton } from "./RefreshButton";
  * The header of every page that shows ONE record, and of every markdown viewer:
  * the parts in one order, so the pages cannot drift.
  *
- *   left   back, then the title (the page's h1), the meta slot, the extra slot,
- *          and the File line
+ *   left   back, then the title (the page's h1), its description line, the meta
+ *          slot, the extra slot, and the File line
  *   right  `actions`, then refresh, then `external` (the link out) last
  *
  * The File line has one rule: the record's absolute path on this machine when it
@@ -20,6 +20,9 @@ import { RefreshButton } from "./RefreshButton";
  *
  * Before the record has loaded, give no `title`: the back button stands alone.
  */
+/** Lines a header's description keeps at phone width. */
+const DESCRIPTION_LINES_PHONE = 3;
+
 const useStyles = makeStyles({
   row: {
     display: "flex",
@@ -61,6 +64,19 @@ const useStyles = makeStyles({
     alignItems: "center",
     color: tokens.colorNeutralForeground3,
   },
+  description: {
+    margin: 0,
+    color: tokens.colorNeutralForeground2,
+    overflowWrap: "anywhere",
+    // Whole at desktop width. On a phone it is clamped to a few lines the way
+    // a card item's description is (CardItem), the full text in its title.
+    "@media (max-width: 600px)": {
+      display: "-webkit-box",
+      WebkitBoxOrient: "vertical",
+      WebkitLineClamp: String(DESCRIPTION_LINES_PHONE),
+      overflow: "hidden",
+    },
+  },
   right: {
     display: "flex",
     alignItems: "center",
@@ -72,6 +88,8 @@ const useStyles = makeStyles({
 export interface DetailHeaderProps {
   /** The page's h1. Absent while there is no record to title. */
   title?: ReactNode;
+  /** One line of prose under the title (a prompt's `description`), above the meta. */
+  description?: ReactNode;
   /** Badges and captions beside each other, under the title. */
   meta?: ReactNode;
   /** Anything custom under the meta line (a 1:1 session's Retro, Agenda, Prep). */
@@ -93,6 +111,7 @@ const present = (node: ReactNode) => node != null && node !== false && node !== 
 
 export function DetailHeader({
   title,
+  description,
   meta,
   extra,
   path,
@@ -113,6 +132,16 @@ export function DetailHeader({
             <Subtitle2 as="h1" className={styles.title}>
               {title}
             </Subtitle2>
+            {present(description) && (
+              <Body1
+                as="p"
+                className={styles.description}
+                data-testid="detail-description"
+                title={typeof description === "string" ? description : undefined}
+              >
+                {description}
+              </Body1>
+            )}
             {present(meta) && (
               <div className={styles.meta} data-testid="detail-meta">
                 {meta}

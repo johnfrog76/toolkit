@@ -113,6 +113,14 @@ function breakFieldLines(text: string): string {
   return lines.join("\n");
 }
 
+/** A file's front matter lifted off its text: the text without it, and the
+ *  pairs as written. A page whose header already carries the facts draws the
+ *  text alone, so the body starts with the document's own prose. */
+export function frontMatterOf(text: string): PreparedMarkdown {
+  const [body, frontMatter] = splitFrontMatter(text ?? "");
+  return { body, frontMatter };
+}
+
 export function prepareMarkdown(text: string): PreparedMarkdown {
   const [withoutFront, frontMatter] = splitFrontMatter(text ?? "");
   return { body: breakFieldLines(stripComments(withoutFront)), frontMatter };
@@ -256,17 +264,41 @@ export function sectionOf(headings: Heading[], id: string | null): string | null
 
 /** Drop the card's opening h1 when the page's own header already says it. A
  *  detail page prints the title in its header, then the card printed it again
- *  as the biggest thing on the page. Only an EXACT match goes: a card whose h1
- *  says something else keeps it. */
+ *  as the biggest thing on the page. The body's first h1 goes when its words
+ *  (spaces collapsed, case ignored) are the title's, even after a blockquote or
+ *  a note; a body whose h1 says something else keeps it, and the viewer draws
+ *  that one as a level-2 heading. */
 export function dropLeadingTitle(body: string, titleAbove: string | undefined): string {
   if (!titleAbove) return body;
   const lines = body.split("\n");
-  const first = lines.findIndex((l) => l.trim() !== "");
-  if (first < 0 || !/^#\s+\S/.test(lines[first])) return body;
+  // Only a LEADING title goes (the product's one title rule, the agent's
+  // doc_title): the first heading of the body, when it is level one. Blank
+  // lines, blockquotes and comments may come before it; any prose, any other
+  // heading or a code fence means the body has no title of its own.
+  let first = -1;
+  let inComment = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const t = line.trim();
+    if (inComment) {
+      inComment = !t.includes("-->");
+      continue;
+    }
+    if (t === "" || t.startsWith(">")) continue;
+    if (t.startsWith("<!--")) {
+      inComment = !t.includes("-->");
+      continue;
+    }
+    if (/^#\s+\S/.test(line)) first = i;
+    break;
+  }
+  if (first < 0) return body;
   const same = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
   if (same(headingText(lines[first])) !== same(titleAbove)) return body;
-  return lines
+  const before = lines.slice(0, first).join("\n");
+  const after = lines
     .slice(first + 1)
     .join("\n")
     .replace(/^\n+/, "");
+  return before.trim() ? `${before.trimEnd()}\n\n${after}` : after;
 }

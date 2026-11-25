@@ -151,7 +151,9 @@ export function DocsLanding() {
         <>
           {icon}
           <div className={styles.titleBlock}>
-            <Subtitle2>{readable ? data.title : "Docs"}</Subtitle2>
+            <Subtitle2 as="h1" style={{ margin: 0 }}>
+              {readable ? data.title : "Docs"}
+            </Subtitle2>
             {list.data?.repo ? <Caption1 className={styles.meta}>{list.data.repo}</Caption1> : null}
             {summary ? <Caption1 className={styles.meta}>{summary}</Caption1> : null}
           </div>

@@ -10,6 +10,8 @@ import { FOLDERS } from "../../shell/consts";
 import { DetailHeader } from "../../shared/DetailHeader";
 import { EmptyState } from "../../shared/EmptyState";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
+import { FrontMatterDetails, leftoverFrontMatter } from "../../shared/FrontMatterDetails";
+import { frontMatterOf } from "../../shared/prepareMarkdown";
 import { PanelFrame } from "../../shared/PanelFrame";
 
 // The reading room for ONE design or spec (Studio S2, D-S11) -- the house's
@@ -18,6 +20,9 @@ import { PanelFrame } from "../../shared/PanelFrame";
 // MarkdownViewer. When the document names a thread (a `> GitHub:` line), the
 // thread is part of that one document, after the file -- read from the same
 // route the issue's own reading room reads, so one zoom, one "On this page".
+// What the header draws from the front matter itself; the rest is a collapsed row.
+const DOC_DRAWN_KEYS = ["title", "id", "description"] as const;
+
 const useStyles = makeStyles({
   page: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalM, width: "100%" },
 });
@@ -45,9 +50,14 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
     { id: data?.thread_number ?? 0, repo: data?.repo.split("/")[1] },
     { skip: !threadHere },
   );
+  // The front matter feeds the header (its id, its description); the body is the prose.
+  const parts = useMemo(() => frontMatterOf(data?.body ?? ""), [data?.body]);
   const content = useMemo(
-    () => (readable ? designDocument(data, threadHere ? thread : undefined) : ""),
-    [readable, data, threadHere, thread],
+    () =>
+      readable
+        ? designDocument({ ...data, body: parts.body }, threadHere ? thread : undefined)
+        : "",
+    [readable, data, parts.body, threadHere, thread],
   );
 
   // The document's place in the repo: its relative links resolve against it,
@@ -90,6 +100,7 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
         headerLeft={
           <DetailHeader
             title={readable ? data.title : undefined}
+            description={readable ? data.description : undefined}
             meta={
               readable ? (
                 <>
@@ -121,8 +132,14 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
                   ) : null}
                   {data.id ? <Caption1 title={data.id}>{data.id.slice(0, 8)}</Caption1> : null}
                   <Caption1>{data.repo}</Caption1>
-                  {data.description ? <Caption1>{data.description}</Caption1> : null}
                 </>
+              ) : undefined
+            }
+            extra={
+              readable ? (
+                <FrontMatterDetails
+                  pairs={leftoverFrontMatter(parts.frontMatter, DOC_DRAWN_KEYS)}
+                />
               ) : undefined
             }
             url={readable ? data.url : undefined}
