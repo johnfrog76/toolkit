@@ -403,7 +403,7 @@ has no such page yet. The tier gate is unchanged: a machine below Tier 1 reads n
 badge, the Space it is for and its sentence, and ONE `MarkdownViewer`. The frontmatter feeds the header and is not drawn in the body: its `description` is
 the line under the title, its `id` is the short id in the header's meta (the full value in a tooltip), and any
 other key is in a collapsed **Details** row. The body's own `# Title` is dropped when it is the page's title
-(only a leading one: after prose or another heading it is a section), and any other body `# ` heading is drawn
+(only a leading one: after prose or another heading it is a section), and any other body top-level heading is drawn
 as a level-2 heading, so the page has one `h1`.
 Its links go through the one resolver, `shared/docLinks.ts`, with a base of its own (`noteLinks.ts`): a
 relative link to a sibling note opens that note's room; anything else is left as written, because a hub
