@@ -202,6 +202,17 @@ switch.
 | `GET /api/dashboard/pipelines/{project}` | 1 | ADO via `az` |
 | `POST /api/cmd/{name}` | the verb's own | the bridge: runs any verb in the CLI's command table, so the verbs above are callable from the browser with no backend change |
 
+The Sprint tab's three routes -- `GET /api/stress-status`, `GET /api/stress-sprint-activity` and
+`GET /api/stress-repos` -- are gated on the Space's `features.sprintAwareness` and answer as off
+without reading anything where it is off. With it on, all three read the hub-root stress log
+one way, and no shape of it fails one of them (`stress-repos` takes only its default repository from
+it): a log that is missing, unreadable or not an object, or that names another Space, no Space,
+or another repository than the one asked for, is not used, and both routes say why in `detail`, in
+the same sentence; the activity route then draws the repository's committed history in its own
+window. Days left comes from the sprint's end date on the day it is read -- the log's, else the
+Space's `sprint.endDate` -- and from the log's stored number only when no date is known; with
+neither the card shows no countdown. [The agent's README](../../agent/README.md) has the detail.
+
 A Tier-1 route on a machine below Tier 1 answers with an empty list and a `reason` when the gap is one
 the reader can close (no identity), and with the honest empty otherwise. At Tier 1 the same field says
 why an empty list is empty when something failed: an org with no `projects` (the reason names the slug

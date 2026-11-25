@@ -534,7 +534,7 @@ route list.
 | `GET /engagement/{slug}/skills` | `ado/reporting` | Tier 2+ | `archive/`, reviews | — |
 | `GET /engagement/{slug}/reviews` | `ado/reporting` | Tier 2+, `features.growth` | review folders in the hub, never `reviews/archive/`; `?archived=true` reads only that | — |
 | `GET /stress-status` | `ado/sprint` | `features.sprintAwareness` | `stress-log*.json` | — |
-| `GET /stress-sprint-activity` | `ado/sprint` | `features.sprintAwareness` | `stress-log*.json`, `git log` | — |
+| `GET /stress-sprint-activity` | `ado/sprint` | `features.sprintAwareness` | `stress-log*.json`, the Space's `stress-history.<repo>.json` | — |
 | `GET /stress-repos` | `ado/sprint` | `features.sprintAwareness` | config aliases, local checkouts | — |
 | `POST /cmd/{name}` | `ado/bridge` | the name must be a key in the CLI's `$script:ModuleState.CommandMap` | — | whatever the CLI verb writes |
 
@@ -623,6 +623,21 @@ read from the active Space. In this half the list is `ORG_FEATURES` in `core/con
 The sprint gate is the honest kind. With `features.sprintAwareness` off, `/stress-status` returns
 `{"enabled": false, "detail": "sprint awareness is off for this org"}` **without reading the log
 file** -- not a 404, not an empty success that looks like "no data this sprint".
+
+With it on, `/stress-status`, `/stress-sprint-activity` and `/stress-repos` read the log through
+one reader, `_read_log`, so one file reads one way on all three (`/stress-repos` takes only the
+log's `repoKey`, as its default repository, and says no reason). A missing file, one that is not UTF-8 or not JSON,
+and one that is not an object answer the route's no-reading shape with the reason in `detail` (the
+activity route's window then comes from the committed history alone). So does a log that is not the
+active Space's and the asked repository's (`_log_refusal`): one that names another Space, or none,
+and one whose `repoKey` -- else the last segment of its `sourceRepo` -- names another repository
+than `?repo=`, each in the same sentence on both routes. Every number the score compares is read by
+`_number` -- a JSON number, or nothing -- so `null`, a string, a boolean or a NaN is the field's
+default and never a 500. Days left is worked out at read time from the log's `sprint.endDate`, else
+the Space's `sprint.endDate`, never below 0; the log's stored `daysRemaining` is used only when no
+day is known, and with none of the three there is no countdown: `daysRemaining` is `null` and no
+reason is scored from it. `_today` is the clock seam the tests hold. `Tests/test_route_edges.py`
+pins each row.
 
 `/billing` degrades with a message rather than a parse error. If the script is missing, or produces
 nothing because there is no hub to read, the response is a `BillingResponse` whose `raw` says so:

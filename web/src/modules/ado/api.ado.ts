@@ -847,6 +847,8 @@ export interface SprintActivityResponse {
   endDate: string;
   mine: SprintActivityEntry[];
   team: SprintActivityEntry[];
+  /** "ok" when the stress log framed the window, else why it did not; absent with sprint awareness off. */
+  detail?: string;
 }
 
 export interface StressRepoInfo {
