@@ -106,4 +106,27 @@ describe("DetailHeader", () => {
     draw({ title: "T", meta: <span>m</span> });
     expect(screen.getByTestId("detail-meta").textContent).toBe("m");
   });
+
+  it("empty slots take no space: no meta wrapper, no extra, no controls wrapper", () => {
+    const { container } = draw({
+      title: "T",
+      meta: false,
+      extra: null,
+      actions: undefined,
+    });
+    expect(screen.queryByTestId("detail-meta")).toBeNull();
+    // the title block holds the h1 and nothing else
+    expect(screen.getByRole("heading", { level: 1 }).parentElement?.children).toHaveLength(1);
+    // the row holds the left side alone
+    expect(screen.getByTestId("detail-header").children).toHaveLength(1);
+    expect(container.querySelectorAll("[data-testid=file-path]")).toHaveLength(0);
+  });
+
+  it("the File line's tooltip is the button's description", async () => {
+    draw({ title: "T", path: "/hub/org/card.md" });
+    const button = screen.getByRole("button", { name: "Copy the file path" });
+    fireEvent.focus(button);
+    const tip = await screen.findByRole("tooltip");
+    expect(button.getAttribute("aria-describedby")).toBe(tip.id);
+  });
 });

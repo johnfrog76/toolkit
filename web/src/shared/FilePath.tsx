@@ -26,8 +26,15 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalXS,
     flexShrink: 0,
     whiteSpace: "nowrap",
+    // Whole at any width: the label and the icon are never clipped.
+    minWidth: "max-content",
   },
-  button: { minWidth: "auto", color: tokens.colorNeutralForeground3 },
+  button: {
+    minWidth: "auto",
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+    color: tokens.colorNeutralForeground3,
+  },
   copied: { color: tokens.colorPaletteGreenForeground1 },
 });
 
@@ -48,7 +55,7 @@ export function FilePath({ path }: { path?: string }) {
   };
   return (
     <span className={styles.root} data-testid="file-path">
-      <Tooltip content={path} relationship="description">
+      <Tooltip content={path} relationship="description" positioning="below-start">
         <Button
           size="small"
           appearance="subtle"

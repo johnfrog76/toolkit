@@ -31,19 +31,28 @@ const useStyles = makeStyles({
     flex: 1,
     minWidth: 0,
   },
+  // The left side asks for a readable measure before it shares the row: when the
+  // row cannot hold it beside the controls, the controls drop to their own line
+  // instead of squeezing the title into a sliver.
   left: {
     display: "flex",
     alignItems: "center",
     columnGap: tokens.spacingHorizontalS,
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: "20rem",
     minWidth: 0,
   },
   titleBlock: {
     display: "flex",
     flexDirection: "column",
+    alignItems: "flex-start",
     rowGap: tokens.spacingVerticalXS,
+    flex: 1,
     minWidth: 0,
   },
+  // A heading brings the browser's own margins; the header's rhythm is its row gap.
+  title: { margin: 0, overflowWrap: "anywhere" },
   meta: {
     display: "flex",
     columnGap: tokens.spacingHorizontalS,
@@ -79,6 +88,9 @@ export interface DetailHeaderProps {
   external?: ReactNode;
 }
 
+/** A slot that holds something to draw: not absent, not false, not an empty string. */
+const present = (node: ReactNode) => node != null && node !== false && node !== "";
+
 export function DetailHeader({
   title,
   meta,
@@ -91,20 +103,22 @@ export function DetailHeader({
 }: DetailHeaderProps) {
   const styles = useStyles();
   const address = path || url;
-  const hasRight = actions != null || refresh != null || external != null;
+  const hasRight = present(actions) || refresh != null || present(external);
   return (
     <div className={styles.row} data-testid="detail-header">
       <div className={styles.left}>
         <BackButton />
         {title != null && (
           <div className={styles.titleBlock}>
-            <Subtitle2 as="h1">{title}</Subtitle2>
-            {meta != null && (
+            <Subtitle2 as="h1" className={styles.title}>
+              {title}
+            </Subtitle2>
+            {present(meta) && (
               <div className={styles.meta} data-testid="detail-meta">
                 {meta}
               </div>
             )}
-            {extra}
+            {present(extra) ? extra : null}
             {address ? <FilePath path={address} /> : null}
           </div>
         )}
