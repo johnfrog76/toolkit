@@ -66,7 +66,7 @@ GitHub Space, where they answer through `gh`.
 
 | Half | Azure DevOps's | NOT Azure DevOps's, though it sits beside it |
 | --- | --- | --- |
-| CLI | twelve verbs and the work-item form of `NewPrompt` (below), the `Scripts/` they run, the tier check | `NewPrompt -Title`, `Archive`, `Billable`, `Status`, `Sync`, `ThreadHash` |
+| CLI | eleven verbs and the work-item form of `NewPrompt` (below), the `Scripts/` they run, the tier check | `NewPrompt -Title`, `Archive`, `Billable`, `Status`, `Sync`, `ThreadHash` |
 | Agent | `ado/accounting.py` -- `/prs`, `/work-items`, `/dashboard`, `/dashboard/pipelines/{project}`; the identity those filter by | `ado/status.py`, `ado/reporting.py` (Daily, engagement), `ado/pr_comments.py` (reads files), `ado/bridge.py` |
 | Web | `MyWork`, `MyPRs`, `Dashboard`, the work-item tab of the New card dialog, *Open on Azure DevOps* and *Create PR* on a card, the repo filter, `ConnectAdoCard` | `Board`, `PromptStatus`, `PromptDetailPage`, `Billing` (Daily), `EnvCard`, `ConfigSettings` |
 | A card | the `**ADO Link:**` line, the `PR URL:` line, the review rounds | everything else ([the card](../hub/cards.md)) |
@@ -157,12 +157,13 @@ the card's `reason` line, never an error (`gh_repo_reason` in `agent/ado/account
 
 ## The verbs
 
-Twelve verbs are on the add-on's list, `$script:ModuleState.AdoCommands` in `utilities.psm1`, plus ONE FORM of a thirteenth:
-`NewPrompt <id>` needs ADO, `NewPrompt -Title` does not, so the verb itself is not on the list. Ten of them
+Twelve verbs are on `$script:ModuleState.AdoCommands` in `utilities.psm1` -- eleven of them this add-on's, and `LogPeerReview`,
+which is growth's -- plus ONE FORM of a twelfth of the add-on's: `NewPrompt <id>` needs ADO, `NewPrompt -Title` does not, so
+the verb itself is not on the list. Ten of the twelve
 check the tier ONCE, before running, and say what is unavailable and why -- never a silent empty result,
 never a raw API error. `Dashboard` has its own Tier 2 view of local cards and repo status, and `LogPeerReview` has no tier check at all.
 
-Eleven of the twelve are in the table below; the twelfth is `LogPeerReview`, a growth verb that logs a review of a colleague's pull request and is org-scoped. Being on the list does one thing: `Menu` leaves its row out where no tracker is shown, and marks it `(unavailable)` at Tier 2 or 3. It is not a tier check on the verb itself.
+The table below has the eleven that are the add-on's, and the `NewPrompt <id>` form; the twelfth name on the list is `LogPeerReview`, a growth verb that logs a review of a colleague's pull request and is org-scoped. Being on the list does one thing: `Menu` leaves its row out where no tracker is shown, and marks it `(unavailable)` at Tier 2 or 3. It is not a tier check on the verb itself.
 
 | Verb | Does | Touches a card? |
 | --- | --- | --- |
@@ -282,7 +283,9 @@ and `hub.json`), or the first `az` call that failed, as one sentence naming the 
   **reached, not closed** -- the one thing left to do on the tracker -- and a closed one wears its closed
   date. In flight first (most complete at the top), then reached, then empty; one tile row above the list
   (reached, in flight, issues left). Read only: a milestone is made and closed on GitHub.
-- **Dashboard** -- a Home card at Tier 1 (not a page of its own): the terminal's morning view --
+- **Dashboard** -- a card on Home's **Sprint** tab (not a page of its own), drawn only at Tier 1 on an
+  active Azure DevOps Space, so the board has to be answering: after Engagement Summary and Work Breakdown,
+  and after Sprint Velocity where sprint awareness is on. It is the terminal's morning view --
   pull requests across projects, assigned items with staleness, recent pipeline runs.
 - **Settings** -- the org's address, tenant and status; the **Azure DevOps** row (`features.ado`), whose
   switch shows what is in effect when unset.
