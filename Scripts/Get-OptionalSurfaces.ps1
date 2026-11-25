@@ -589,6 +589,8 @@ function Get-P20OptionalSurfaces {
     # nothing but a README: a product that has not written its first note has
     # not answered, and `on` with `0 designs` would say it had. The hub's folders are read
     # the same way and said in the note, never a second state: the row is one.
+    # Beside each count, `N ready` when N designs are marked finished (the
+    # reader's Ready -- MoveDesign -Ready lists them); none adds nothing.
     # One reader for the tree, Scripts/Read-DesignTree.ps1 -- the same one the
     # stamp and the agent's /api/design share through the states fixture.
     if (-not (Get-Command Read-P20DesignTree -ErrorAction SilentlyContinue)) {
@@ -607,17 +609,22 @@ function Get-P20OptionalSurfaces {
     if ($repoTop -and (Test-Path -LiteralPath (Join-Path $repoTop 'design') -PathType Container)) {
         $tree = Read-P20DesignTree -DesignDir (Join-Path $repoTop 'design') -SpecDir (Join-Path $repoTop 'spec') -Base $repoTop
         $unstamped = @($tree.NotShown | Where-Object { $_.Reason -eq 'no id' }).Count
+        # The designs marked finished (the reader's Ready; MoveDesign -Ready lists them):
+        # said only when there is one, so a tree with no mark reads as it always has.
+        $readyCount = @($tree.Designs | Where-Object { $_.Ready }).Count
+        $readyTail = ''
+        if ($readyCount -gt 0) { $readyTail = ", $readyCount ready" }
         if (@($tree.Designs).Count -eq 0 -and @($tree.NotShown).Count -eq 0) {
             $designNote = 'no designs in this repository yet'
         }
         elseif ($unstamped -eq 0) {
             $designState = $states.On
-            $designNote = "$(@($tree.Designs).Count) designs in this repository"
+            $designNote = "$(@($tree.Designs).Count) designs in this repository$readyTail"
             $designLine = "$($Prefix)StampDesign -WhatIf"
         }
         else {
             $designState = $states.Off
-            $designNote = "$unstamped file$(if ($unstamped -ne 1) { 's' }) not stamped in this repository"
+            $designNote = "$unstamped file$(if ($unstamped -ne 1) { 's' }) not stamped in this repository$readyTail"
             $designLine = "$($Prefix)StampDesign"
         }
     }
@@ -627,7 +634,10 @@ function Get-P20OptionalSurfaces {
         if (Test-Path -LiteralPath $hubDesign -PathType Container) {
             $hubTree = Read-P20DesignTree -DesignDir $hubDesign -SpecDir $hubSpec -Base ([string]$Config.PromptsRoot)
             $hubUnstamped = @($hubTree.NotShown | Where-Object { $_.Reason -eq 'no id' }).Count
-            if ($hubUnstamped -eq 0) { $designNote += "; the hub: $(@($hubTree.Designs).Count) designs" }
+            $hubReady = @($hubTree.Designs | Where-Object { $_.Ready }).Count
+            $hubReadyTail = ''
+            if ($hubReady -gt 0) { $hubReadyTail = ", $hubReady ready" }
+            if ($hubUnstamped -eq 0) { $designNote += "; the hub: $(@($hubTree.Designs).Count) designs$hubReadyTail" }
             else { $designNote += "; the hub: $hubUnstamped not stamped ($($Prefix)StampDesign -Hub)" }
         }
     }

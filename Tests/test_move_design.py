@@ -837,6 +837,241 @@ class TheMoveDesignVerb(unittest.TestCase):
         self.assertIn("X=2", out)
         self.assertIn("is not inside a git repository", out)
 
+    # -- -Ready: what the tree says is ready, and what is held -----------------------
+
+    def rid(self, n: int) -> str:
+        return f"10000000-0000-4000-8000-{n:012d}"
+
+    def marked_tree(self):
+        """One design per row of the marker's table that the read tells apart, in the repository."""
+        r = self.repo
+        rid = self.rid
+        note = lambda n, title, tail="": f"---\nid: {rid(n)}\n---\n\n# {title}\n\nText.\n{tail}"  # noqa: E731
+        spec = lambda n, title, tail="": f"---\nid: {rid(n)}\n---\n\n# {title}\n\n{tail}Contract.\n"  # noqa: E731
+        self.write(
+            r / "design/m01-shipped.md",
+            note(1, "Shipped as written", f"\n**Created:** 2026-10-01\n{OUTCOME} shipped\n"),
+        )
+        self.write(r / "design/m02-loud.md", note(2, "Shipped, loudly", f"\n{OUTCOME} SHIPPED\n"))
+        self.write(r / "design/m03-dropped.md", note(3, "Marked dropped", f"\n{OUTCOME} dropped\n"))
+        self.write(r / "design/m04-dated.md", note(4, "Shipped with a date", f"\n{OUTCOME} shipped 2026-11-20\n"))
+        self.write(r / "design/m06-pair.md", note(6, "A note marked over a live spec", f"\n{OUTCOME} shipped\n"))
+        self.write(r / "spec/m06-pair.spec.md", spec(6, "Pair (spec)"))
+        self.write(r / "design/m07-docs.md", note(7, "Built and documented"))
+        self.write(r / "spec/m07-docs.spec.md", spec(7, "Docs (spec)", f"{DOCS} docs/board.md\n\n"))
+        self.write(r / "spec/m07b-alone.spec.md", spec(17, "A spec alone, documented", f"{DOCS} docs/board.md\n\n"))
+        self.write(r / "design/m08-conflict.md", note(8, "Documented but dropped", f"\n{OUTCOME} dropped\n"))
+        self.write(r / "spec/m08-conflict.spec.md", spec(8, "Conflict (spec)", f"{DOCS} docs/board.md\n\n"))
+        self.write(r / "spec/m10-missing.spec.md", spec(10, "Docs nowhere (spec)", f"{DOCS} docs/nope.md\n\n"))
+        self.write(r / "design/archive/m11-early.md", note(11, "A note archived early", f"\n{CLOSED} 2026-10-01\n"))
+        self.write(r / "spec/m11-early.spec.md", spec(11, "Early (spec)", f"{DOCS} docs/board.md\n\n"))
+        self.write(
+            r / "design/archive/m12-done.md", note(12, "Long done", f"\n{CLOSED} 2026-09-01\n{OUTCOME} shipped\n")
+        )
+        self.write(r / "spec/archive/m12-done.spec.md", spec(12, "Done (spec)", f"{DOCS} docs/board.md\n\n"))
+        self.write(r / "design/m13-left.md", note(13, "Left behind", f"\n{OUTCOME} shipped\n"))
+        self.write(r / "spec/archive/m13-left.spec.md", spec(13, "Left (spec)", f"{CLOSED} 2026-10-02\n\n"))
+        self.write(
+            r / "spec/m15-titled.spec.md",
+            f"---\nid: {rid(15)}\n---\n\n## Title\n\nTitled the second way\n\n{DOCS} docs/board.md\n",
+        )
+        self.commit(r)
+        # An open card worked against the first design, in the hub's Space.
+        self.write(
+            self.hub / "demo/current/Task141-board-work.md",
+            f"# Task 141: Board work\n\n> Design: [Shipped as written](../../x.md) {rid(1)}\n",
+        )
+        self.commit(self.hub)
+
+    READY_IDS = {1: "Archive", 2: "Archive", 7: "Complete", 17: "Complete", 11: "Complete", 15: "Complete"}
+    HELD_IDS = {3, 4, 6, 8, 10, 13}
+
+    def ready_json(self, flags: str = "", at: Path | None = None, local: dict | None = None) -> dict:
+        out = self.run_verbs(f"tkMoveDesign -Ready -AsJson {flags}; 'X=' + $LASTEXITCODE", at, local)
+        self.assertIn("X=0", out)
+        lines = [line for line in out.splitlines() if line.startswith("{")]
+        self.assertEqual(len(lines), 1, f"-AsJson prints one JSON line and nothing else:\n{out}")
+        others = [line for line in out.splitlines() if line.strip() and not line.startswith("{") and line != "X=0"]
+        self.assertEqual(others, [], out)
+        return json.loads(lines[0])
+
+    def test_ready_with_nothing_marked_says_so_in_one_line(self):
+        before = self.snapshot(self.repo)
+        out = self.move("-Ready")
+        self.assertIn("X=0", out)
+        lines = [line for line in out.strip().splitlines() if line.strip() and line != "X=0"]
+        self.assertEqual(len(lines), 2, out)
+        self.assertRegex(lines[0], r"^Git root: ")
+        self.assertEqual(
+            lines[1], "No design in this repository is marked finished: nothing is ready, and nothing is held."
+        )
+        self.assertEqual(self.ready_json(), {"ready": [], "held": [], "counts": {"ready": 0, "held": 0}})
+        self.assertEqual(self.snapshot(self.repo), before)
+
+    def test_ready_lists_the_ready_and_the_held_and_moves_nothing(self):
+        self.marked_tree()
+        before_repo, before_hub = self.snapshot(self.repo), self.snapshot(self.hub)
+        data = self.ready_json()
+        ready = {d["id"]: d for d in data["ready"]}
+        held = {d["id"]: d for d in data["held"]}
+        self.assertEqual(set(ready), {self.rid(n) for n in self.READY_IDS})
+        self.assertEqual(set(held), {self.rid(n) for n in self.HELD_IDS})
+        self.assertEqual(data["counts"], {"ready": 6, "held": 6})
+        for n, to in self.READY_IDS.items():
+            row = ready[self.rid(n)]
+            self.assertEqual(set(row), {"id", "title", "state", "call", "args", "notes"})
+            self.assertEqual(row["state"], "Design" if to == "Archive" else "Spec")
+            if to == "Archive":
+                self.assertEqual(row["call"], f"tkMoveDesign {self.rid(n)} -To Archive")
+                self.assertEqual(row["args"], [self.rid(n), "-To", "Archive"])
+            else:
+                self.assertEqual(row["call"], f'tkMoveDesign {self.rid(n)} -To Complete -Doc "docs/board.md"')
+                self.assertEqual(row["args"], [self.rid(n), "-To", "Complete", "-Doc", "docs/board.md"])
+        # A shipped mark with an open card is ready; the card is named, as information.
+        self.assertEqual(
+            ready[self.rid(1)]["notes"],
+            [
+                (
+                    "Open card worked against it: Task141-board-work. "
+                    "The mark is the decision; the move does not wait for them."
+                )
+            ],
+        )
+        self.assertIn("Its note is already design/archive/m11-early.md", ready[self.rid(11)]["notes"][0])
+        self.assertEqual(ready[self.rid(7)]["notes"], [])
+        reasons = {n: held[self.rid(n)]["reason"] for n in self.HELD_IDS}
+        self.assertIn("-To Archive -Dropped -Reason", reasons[3])
+        self.assertIn("'**Outcome:** shipped 2026-11-20', which is neither shipped nor dropped", reasons[4])
+        self.assertIn("its spec spec/m06-pair.spec.md is live", reasons[6])
+        self.assertIn("the two marks disagree", reasons[8])
+        self.assertEqual(
+            reasons[10], "MoveDesign would refuse it: -Doc docs/nope.md does not exist in this repository."
+        )
+        self.assertIn("It is Complete: its spec is already spec/archive/m13-left.spec.md", reasons[13])
+        self.assertIn("by hand", reasons[13])
+        self.assertNotIn("#", reasons[13].replace("## Journey", ""), "no issue number in the output")
+        self.assertEqual({held[self.rid(n)]["state"] for n in (3, 4)}, {"Design"})
+        self.assertEqual(held[self.rid(13)]["state"], "Complete")
+
+        # The text says the same, ready first, then held, then one count line.
+        text = self.move("-Ready")
+        self.assertIn("X=0", text)
+        for row in data["ready"]:
+            self.assertIn(f"  {row['title']} ({row['state']}, {row['id']})\n    {row['call']}\n", text)
+            for note in row["notes"]:
+                self.assertIn(f"    Note: {note}", text)
+        for row in data["held"]:
+            self.assertIn(f"  {row['title']} ({row['state']}, {row['id']})\n    {row['reason']}\n", text)
+        self.assertLess(text.index("Ready (6)"), text.index("Held (6)"))
+        self.assertIn("6 ready, 6 held in this repository. Nothing was moved.", text)
+        self.assertNotIn("Error:", text)
+        # Nothing moved, nothing written, nothing staged -- with -WhatIf too.
+        self.assertIn("6 ready, 6 held", self.move("-Ready -WhatIf"))
+        self.assertEqual(self.snapshot(self.repo), before_repo)
+        self.assertEqual(self.snapshot(self.hub), before_hub)
+        self.assertEqual(_staged(self.repo), [])
+
+    def test_every_ready_call_run_as_printed_succeeds_and_a_held_one_is_refused(self):
+        self.marked_tree()
+        data = self.ready_json()
+        script = "; ".join(f"{row['call']}; 'X{row['id']}=' + $LASTEXITCODE" for row in data["ready"])
+        out = self.run_verbs(script)
+        for row in data["ready"]:
+            self.assertIn(f"X{row['id']}=0", out)
+        self.assertNotIn("Error:", out)
+        r = self.repo
+        for name in ("m01-shipped", "m02-loud"):
+            self.assertTrue((r / f"design/archive/{name}.md").exists(), name)
+            self.assertIn(f"{OUTCOME} shipped".lower(), self.read(r / f"design/archive/{name}.md").lower())
+        for name in ("m07-docs", "m07b-alone", "m11-early", "m15-titled"):
+            self.assertTrue((r / f"spec/archive/{name}.spec.md").exists(), name)
+            self.assertFalse((r / f"spec/{name}.spec.md").exists(), name)
+        self.assertTrue((r / "design/archive/m07-docs.md").exists())
+        # The read now lists only what is held.
+        after = self.ready_json()
+        self.assertEqual(after["ready"], [])
+        self.assertEqual({d["id"] for d in after["held"]}, {self.rid(n) for n in self.HELD_IDS})
+        # Each held design's implied move is refused by MoveDesign itself.
+        before = self.snapshot(self.repo)
+        implied = {
+            3: "-To Archive",
+            4: "-To Archive",
+            6: "-To Archive",
+            8: '-To Complete -Doc "docs/board.md"',
+            10: '-To Complete -Doc "docs/nope.md"',
+            13: "-To Archive",
+        }
+        for n, move in implied.items():
+            self.assertIn("X=2", self.move(f"{self.rid(n)} {move}"), n)
+        self.assertEqual(self.snapshot(self.repo), before)
+
+    def test_ready_refuses_anything_that_names_or_shapes_a_move(self):
+        self.marked_tree()
+        for args in (
+            "-Ready -To Archive",
+            f"{self.rid(1)} -Ready",
+            "-Ready -Doc docs/board.md",
+            "-Ready -Dropped",
+            "-Ready -Reason why",
+        ):
+            self.assert_refused(args, "-Ready only lists: it moves nothing, so it takes no ")
+        self.assert_refused("-Ready -To Archive -WhatIf", "-Ready only lists")
+        self.assert_refused(f"{self.rid(1)} -To Archive -AsJson", "-AsJson belongs to -Ready")
+
+    def test_ready_in_the_hub_carries_the_flags_and_says_an_unchecked_docs_path(self):
+        self.space_with_a_spec("https://github.com/o/not-cloned-here")
+        self.write(
+            self.hub / "prod/spec/shipped.spec.md",
+            f"---\nid: {ID_D}\n---\n\n# Shipped (spec)\n\n{DOCS} docs/anywhere.md\n",
+        )
+        self.write(self.hub / "design/hub-note.md", f"---\nid: {ID_A}\n---\n\n# A hub note\n\n{OUTCOME} shipped\n")
+        self.commit(self.hub)
+        before = self.snapshot(self.hub)
+        data = self.ready_json("-Hub -Space prod", at=self.hub)
+        self.assertEqual(len(data["ready"]), 1, data)
+        row = data["ready"][0]
+        self.assertEqual(row["call"], f'tkMoveDesign {ID_D} -To Complete -Doc "docs/anywhere.md" -Hub -Space prod')
+        self.assertEqual(row["args"][-3:], ["-Hub", "-Space", "prod"])
+        self.assertEqual(len(row["notes"]), 1)
+        self.assertTrue(
+            row["notes"][0].startswith("-Doc docs/anywhere.md is taken as written, not checked: for the Prod Space,")
+        )
+        hub_root = self.ready_json("-Hub", at=self.hub)
+        self.assertEqual([r["call"] for r in hub_root["ready"]], [f"tkMoveDesign {ID_A} -To Archive -Hub"])
+        self.assertEqual(self.snapshot(self.hub), before)
+        self.assertEqual(_git(self.hub, "status", "--porcelain").strip(), "")
+        # Where the Space's clone IS here and the path is missing from it, MoveDesign would refuse: held.
+        self.space_with_a_spec("https://github.com/o/r")
+        local = {"spaceCheckouts": {"prod": {"path": self.repo.as_posix()}}}
+        self.write(
+            self.hub / "prod/spec/shipped.spec.md", f"---\nid: {ID_D}\n---\n\n# Shipped (spec)\n\n{DOCS} docs/nope.md\n"
+        )
+        data = self.ready_json("-Hub -Space prod", at=self.hub, local=local)
+        self.assertEqual(data["ready"], [])
+        self.assertIn("MoveDesign would refuse it: -Doc docs/nope.md does not exist in o/r", data["held"][0]["reason"])
+        # And the call as printed for a checked path runs.
+        self.write(
+            self.hub / "prod/spec/shipped.spec.md",
+            f"---\nid: {ID_D}\n---\n\n# Shipped (spec)\n\n{DOCS} docs/board.md\n",
+        )
+        self.commit(self.hub)
+        data = self.ready_json("-Hub -Space prod", at=self.hub, local=local)
+        self.assertEqual(data["ready"][0]["notes"], [])
+        out = self.run_verbs(f"{data['ready'][0]['call']}; 'X=' + $LASTEXITCODE", at=self.hub, local=local)
+        self.assertIn("X=0", out)
+        self.assertTrue((self.hub / "prod/spec/archive/shipped.spec.md").exists())
+
+    def test_ready_for_a_space_repository_carries_its_flag(self):
+        self.space_with_a_spec("https://github.com/o/r")
+        self.marked_tree()
+        local = {"spaceCheckouts": {"prod": {"path": self.repo.as_posix()}}}
+        data = self.ready_json("-Space prod", at=self.hub, local=local)
+        self.assertIn(f"tkMoveDesign {self.rid(1)} -To Archive -Space prod", [r["call"] for r in data["ready"]])
+        out = self.run_verbs(
+            f"tkMoveDesign {self.rid(1)} -To Archive -Space prod; 'X=' + $LASTEXITCODE", self.hub, local
+        )
+        self.assertIn("X=0", out)
+
 
 if __name__ == "__main__":
     unittest.main()

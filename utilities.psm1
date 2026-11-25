@@ -2223,7 +2223,7 @@ function global:Set-P20DesignStamp {
 }
 
 function global:Move-P20Design {
-    <# MoveDesign -- move a design along its road: to a spec, the archive, or complete (L3). #>
+    <# MoveDesign -- move a design along its road: to a spec, the archive, or complete (L3); -Ready lists what is marked finished. #>
     [CmdletBinding()]
     param(
         [string]$Name,
@@ -2234,6 +2234,8 @@ function global:Move-P20Design {
         [switch]$Hub,
         [string]$Space,
         [switch]$WhatIf,
+        [switch]$Ready,
+        [switch]$AsJson,
         [switch]$Help
     )
     if ($Help) { Show-CommandHelp 'MoveDesign'; return }

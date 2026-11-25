@@ -278,6 +278,30 @@ try {
         $row = Get-DesignRow -In $stamped
         Assert-Equal 'a repository whose files are all stamped is on' $states.On $row.state
         Assert-True 'and the note counts its designs' ($row.note -like '1 designs*') "note: '$($row.note)'"
+        Assert-Equal 'with no design marked finished the note reads as it always has' '1 designs in this repository' $row.note
+
+        # Two designs marked finished, one of each kind: the note counts them as ready.
+        $marked = Join-Path $base 'marked'
+        New-Item -ItemType Directory -Path $marked -Force | Out-Null
+        Push-Location $marked
+        try { $null = Invoke-P20TestGit init -q . } finally { Pop-Location }
+        Write-Lf (Join-Path $marked 'design/shipped.md') "---`n${idKey}: $idAlone`n---`n`n# Shipped`n`n$outcomeStamp shipped`n"
+        Write-Lf (Join-Path $marked 'spec/built.spec.md') "---`n${idKey}: $idPair`n---`n`n# Built (spec)`n`n$docsLine docs/built.md`n"
+        Write-Lf (Join-Path $marked 'design/still.md') "---`n${idKey}: $idLeft`n---`n`n# Still going`n"
+        $row = Get-DesignRow -In $marked
+        Assert-Equal 'two designs marked finished: the note says 2 ready' '3 designs in this repository, 2 ready' $row.note
+        # The hub's count carries its own, beside the hub's designs.
+        $hubAt = Join-Path $base 'markedhub'
+        Write-Lf (Join-Path $hubAt 'design/hub-shipped.md') "---`n${idKey}: $idDropped`n---`n`n# Hub shipped`n`n$outcomeStamp SHIPPED`n"
+        Write-Lf (Join-Path $hubAt 'design/hub-open.md') "---`n${idKey}: $idSpecOnly`n---`n`n# Hub open`n"
+        Push-Location $marked
+        try { $row = (Get-P20OptionalSurfaces -Prefix 'tk' -PackageRoot $pkgRoot -Config @{ PromptsRoot = $hubAt } | Where-Object { $_.key -eq 'design' }) }
+        finally { Pop-Location }
+        Assert-Equal 'and the hub''s ready count sits beside the hub''s designs' '3 designs in this repository, 2 ready; the hub: 2 designs, 1 ready' $row.note
+        Push-Location $stamped
+        try { $row = (Get-P20OptionalSurfaces -Prefix 'tk' -PackageRoot $pkgRoot -Config @{ PromptsRoot = (Join-Path $base 'nospec') } | Where-Object { $_.key -eq 'design' }) }
+        finally { Pop-Location }
+        Assert-Equal 'a hub with nothing marked adds no ready count either' '1 designs in this repository; the hub: 1 designs' $row.note
 
         Write-Lf (Join-Path $stamped 'spec/archive/old.spec.md') "# Old, unstamped`n"
         $row = Get-DesignRow -In $stamped

@@ -77,6 +77,18 @@
 .PARAMETER WhatIf
     Print every move and stamp; write nothing.
 
+.PARAMETER Ready
+    A read that moves nothing: list the designs the tree says are ready (a
+    live note marked **Outcome:** shipped, a live spec carrying > Docs:),
+    each with the exact call that moves it -- checked through this verb's own
+    -WhatIf, so a call MoveDesign would refuse is never listed as ready --
+    and the designs that carry a mark but are held, each with why. Takes the
+    scope flags and nothing else.
+
+.PARAMETER AsJson
+    With -Ready: the same lists as one JSON object,
+    { ready: [{id, title, state, call, args, notes}], held: [{id, title, state, reason}], counts }.
+
 .EXAMPLE
     {cliPrefix}MoveDesign board-ideas -To Spec
 .EXAMPLE
@@ -87,6 +99,8 @@
     {cliPrefix}MoveDesign board-ideas -To Archive -Hub -WhatIf
 .EXAMPLE
     {cliPrefix}MoveDesign board-ideas -To Spec -Space toolkit
+.EXAMPLE
+    {cliPrefix}MoveDesign -Ready -Hub -AsJson
 
 .NOTES
     PowerShell 5.1 compatible (ASCII dashes only).
@@ -111,6 +125,10 @@ param(
     [Parameter(Mandatory = $false)]
     [switch]$WhatIf,
     [Parameter(Mandatory = $false)]
+    [switch]$Ready,
+    [Parameter(Mandatory = $false)]
+    [switch]$AsJson,
+    [Parameter(Mandatory = $false)]
     [switch]$Help
 )
 
@@ -126,12 +144,15 @@ if ($Help) {
     Write-Host ""
     Write-Host "  Usage:" -ForegroundColor Yellow
     Write-Host "    ${p}MoveDesign <name|id> -To Spec|Archive|Complete [-Dropped] [-Reason <text>] [-Doc <path>] [-Hub] [-Space <slug>] [-WhatIf]"
+    Write-Host "    ${p}MoveDesign -Ready [-Hub] [-Space <slug>] [-AsJson]"
     Write-Host ""
     Write-Host "  Spec scaffolds the spec beside the note; Archive moves the note to design/archive/ (shipped,"
     Write-Host "  or dropped with -Dropped -Reason, which on a Spec archives the spec and the note together); Complete archives the spec and the note together and"
     Write-Host "  needs -Doc <path>. Every move writes one line into the note's ## Journey. In a repo it"
     Write-Host "  stages and never commits; -Space <slug> stages in that Space's checkout on this machine"
     Write-Host "  (spaceCheckouts.<slug>.path); -Hub works on the hub's folders and follows storeSync."
+    Write-Host "  -Ready moves nothing: it lists the designs marked finished, each with the call that moves it,"
+    Write-Host "  and the marked ones that are held, each with why."
     Write-Host ""
     return
 }
@@ -154,12 +175,31 @@ $threadLineWord = [string]$consts.studio.threadLine
 $prefix = Get-CliPrefix
 
 # -- What was asked ------------------------------------------------------------------
-if ([string]::IsNullOrWhiteSpace($Name)) {
+# -Ready is a read: it takes the scope flags and nothing that names or shapes a move.
+if ($Ready) {
+    $moveArgs = @()
+    if (-not [string]::IsNullOrWhiteSpace($Name)) { $moveArgs += 'a design name' }
+    if ($To) { $moveArgs += '-To' }
+    if ($Doc) { $moveArgs += '-Doc' }
+    if ($Dropped) { $moveArgs += '-Dropped' }
+    if ($Reason) { $moveArgs += '-Reason' }
+    if ($moveArgs.Count -gt 0) {
+        Write-CliError -Message "-Ready only lists: it moves nothing, so it takes no $($moveArgs -join ', ')." `
+            -Hint "${prefix}MoveDesign -Ready [-Hub] [-Space <slug>] lists the designs marked finished; run the call it prints to move one."
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+}
+elseif ($AsJson) {
+    Write-CliError -Message '-AsJson belongs to -Ready: a move prints what it does, not JSON.' `
+        -Hint "${prefix}MoveDesign -Ready -AsJson"
+    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+}
+if (-not $Ready -and [string]::IsNullOrWhiteSpace($Name)) {
     Write-CliError -Message 'MoveDesign needs the design to move: a note or spec name, the stem, or its id.' `
         -Hint "${prefix}MoveDesign <name|id> -To Spec|Archive|Complete"
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
 }
-if (-not $To) {
+if (-not $Ready -and -not $To) {
     Write-CliError -Message 'MoveDesign needs -To: Spec, Archive or Complete.' `
         -Hint "${prefix}MoveDesign $Name -To Spec"
     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
@@ -202,7 +242,7 @@ if ($Hub) {
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
     $promptsRoot = ConvertTo-P20LongPath -Path (Resolve-Path -LiteralPath $promptsRoot).Path
-    Write-Host "Hub: $promptsRoot"
+    if (-not $AsJson) { Write-Host "Hub: $promptsRoot" }
     $base = $promptsRoot
     $where = 'the hub'
     $repoName = 'the hub'
@@ -248,8 +288,10 @@ else {
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
     $top = ConvertTo-P20LongPath -Path (Resolve-Path -LiteralPath $top).Path
-    if ($Space) { Write-Host "Git root: $top (the $spaceLabel Space's checkout)" }
-    else { Write-Host "Git root: $top" }
+    if (-not $AsJson) {
+        if ($Space) { Write-Host "Git root: $top (the $spaceLabel Space's checkout)" }
+        else { Write-Host "Git root: $top" }
+    }
     if (-not (Test-Path -LiteralPath (Join-Path $top 'design') -PathType Container)) {
         Write-CliError -Message "$top has no design/ folder." `
             -Hint "A product keeps its designs in design/ with spec/ beside it; use -Hub for the hub's."
@@ -273,6 +315,211 @@ else {
 # -- The design --------------------------------------------------------------------
 $tree = Read-P20DesignTree -DesignDir $designDir -SpecDir $specDir -Base $base
 $designs = @($tree.Designs)
+
+# -- -Ready: what the tree says is ready, and what is marked but held ----------------
+# A read that moves nothing and writes nothing (docs/hub/design.md, "Marking a
+# live design finished"). Ready is the reader's fact (Read-P20DesignTree's
+# Ready); each ready design's one call is then run through THIS verb with
+# -WhatIf, so anything MoveDesign would refuse is listed as held with its own
+# sentence and never printed as a call to run. A line under ready is one a
+# scheduled run may run as printed.
+if ($Ready) {
+    $scopeArgs = @()
+    if ($Hub) { $scopeArgs += '-Hub' }
+    if ($Space) { $scopeArgs += '-Space'; $scopeArgs += $Space }
+    $outcomeRx = '(?m)^' + [regex]::Escape($outcomeStamp) + '\s*(.*?)\s*$'
+    $fileAt = { param([string]$RelPath) return (Join-Path $base ($RelPath -replace '/', [IO.Path]::DirectorySeparatorChar)) }
+    # The first Outcome line a live file carries, the word read as the rule
+    # reads it: Has, Word (lowercased) and Said (the line as one line).
+    $outcomeOf = {
+        param($Row)
+        $none = [PSCustomObject]@{ Has = $false; Word = ''; Said = '' }
+        if (-not $Row -or $Row.Archived) { return $none }
+        $path = & $fileAt $Row.Path
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $none }
+        $m = [regex]::Match(((Read-CardText -Path $path) -replace "`r`n", "`n"), $outcomeRx)
+        if (-not $m.Success) { return $none }
+        $value = $m.Groups[1].Value.Trim()
+        return [PSCustomObject]@{ Has = $true; Word = $value.ToLowerInvariant(); Said = ("$outcomeStamp $value").Trim() }
+    }
+    # A value on a printed call: double quotes, or single quotes when the
+    # value holds a character PowerShell reads inside double quotes.
+    $quote = {
+        param([string]$Value)
+        if ($Value -match '["`$]') { return "'" + $Value.Replace("'", "''") + "'" }
+        return '"' + $Value + '"'
+    }
+    $droppedWord = [string]$outcomes[1]
+
+    # The open cards a design was worked against: every declared Space's
+    # current/ whose `> Design:` line names the id (the rows' cards on the
+    # Design tab read the same line). Read only when something is ready.
+    $cardIndex = @{ Read = $false; ById = @{} }
+    $cardsFor = {
+        param([string]$Id)
+        if (-not $cardIndex.Read) {
+            $cardIndex.Read = $true
+            $hubAt = ''
+            if ($Hub) { $hubAt = $promptsRoot }
+            else {
+                $candidate = Get-P20PromptsRoot -PackageRoot $repoRoot
+                if ($candidate -and (Test-P20HubRoot $candidate)) { $hubAt = $candidate }
+            }
+            if ($hubAt) {
+                $currentName = [string]$consts.folders.current
+                $seen = @{}
+                $spaces = @()
+                if ($global:P20Config -and $global:P20Config.Spaces) { $spaces = @($global:P20Config.Spaces) }
+                foreach ($s in $spaces) {
+                    $folder = $hubAt
+                    if ([string]$s.promptsFolder) { $folder = Join-Path $hubAt ([string]$s.promptsFolder) }
+                    $cur = Join-Path $folder $currentName
+                    if ($seen.ContainsKey($cur) -or -not (Test-Path -LiteralPath $cur -PathType Container)) { continue }
+                    $seen[$cur] = $true
+                    foreach ($f in @(Get-ChildItem -LiteralPath $cur -Filter '*.md' -File | Sort-Object Name)) {
+                        $bound = Get-P20CardDesign -Text (Read-CardText -Path $f.FullName)
+                        if (-not $bound -or -not $bound.Id) { continue }
+                        if (-not $cardIndex.ById.ContainsKey($bound.Id)) { $cardIndex.ById[$bound.Id] = @() }
+                        $cardIndex.ById[$bound.Id] += [System.IO.Path]::GetFileNameWithoutExtension($f.Name)
+                    }
+                }
+            }
+        }
+        if ($cardIndex.ById.ContainsKey($Id)) { return $cardIndex.ById[$Id] }
+        return
+    }
+
+    $readyRows = @()
+    $heldRows = @()
+    foreach ($d in $designs) {
+        $state = [string]$d.State
+        $noteMark = & $outcomeOf $d.Note
+        $specMark = & $outcomeOf $d.Spec
+        if ($d.Ready) {
+            $moveTo = 'Archive'
+            if ($state -eq $stateSpec) { $moveTo = 'Complete' }
+            $callArgs = @($d.Id, '-To', $moveTo)
+            $shown = "$($d.Id) -To $moveTo"
+            $dry = @{ Name = $d.Id; To = $moveTo; WhatIf = $true }
+            if ($moveTo -eq 'Complete') {
+                $callArgs += '-Doc'; $callArgs += [string]$d.Docs
+                $shown += " -Doc $(& $quote ([string]$d.Docs))"
+                $dry.Doc = [string]$d.Docs
+            }
+            $callArgs += $scopeArgs
+            if ($scopeArgs.Count -gt 0) { $shown += ' ' + ($scopeArgs -join ' ') }
+            if ($Hub) { $dry.Hub = $true }
+            if ($Space) { $dry.Space = $Space }
+            # The verb's own checks, the -WhatIf road: nothing is moved or written.
+            $global:LASTEXITCODE = 0
+            $global:P20StatedError = $null
+            $said = @(& $PSCommandPath @dry *>&1 | ForEach-Object { "$_" })
+            $code = $LASTEXITCODE
+            $refusal = [string]$global:P20StatedError
+            $global:P20StatedError = $null
+            $global:LASTEXITCODE = 0
+            if ($code -ne 0) {
+                if (-not $refusal) { $refusal = "its -WhatIf run ended with exit code $code." }
+                $heldRows += [PSCustomObject]@{ Id = $d.Id; Title = [string]$d.Title; State = $state; Reason = "MoveDesign would refuse it: $refusal" }
+                continue
+            }
+            $notes = @()
+            foreach ($line in $said) {
+                if ($line -match '^Note:\s*(.+)$') { $notes += $Matches[1].Trim() }
+            }
+            if ($d.Mismatch -and $d.Note -and $d.Note.Archived) {
+                $notes += "Its note is already $($d.Note.Path); the completion journals onto it there."
+            }
+            $cards = @(& $cardsFor $d.Id)
+            if ($cards.Count -gt 0) {
+                $noun = 'card'
+                if ($cards.Count -ne 1) { $noun = 'cards' }
+                $notes += "Open $noun worked against it: $($cards -join ', '). The mark is the decision; the move does not wait for them."
+            }
+            $readyRows += [PSCustomObject]@{
+                Id = $d.Id; Title = [string]$d.Title; State = $state
+                Call = "${prefix}MoveDesign $shown"; Args = $callArgs; Notes = $notes
+            }
+            continue
+        }
+        # Not ready: held when a live file carries a mark the rule does not
+        # act on, or the files disagree about where the design is.
+        $heldWhy = ''
+        if ($d.Mismatch -and $d.Note -and -not $d.Note.Archived -and $d.Spec -and $d.Spec.Archived) {
+            $heldWhy = "It is $state`: its spec is already $($d.Spec.Path), and its note is still $($d.Note.Path). MoveDesign does not archive the note again; move it into design/$archiveName/ by hand and say why in its ## Journey."
+        }
+        elseif ($state -eq $stateDesign -and $noteMark.Has) {
+            if ($noteMark.Word -eq $droppedWord) {
+                $heldWhy = "Its note says '$($noteMark.Said)'. Dropping a design is a decision with its reason: ${prefix}MoveDesign $($d.Id) -To Archive -Dropped -Reason `"...`"$(if ($scopeArgs.Count) { ' ' + ($scopeArgs -join ' ') })."
+            }
+            else {
+                $heldWhy = "Its note says '$($noteMark.Said)', which is neither $($outcomes[0]) nor $droppedWord, so it is no mark. Make the line '$outcomeStamp $($outcomes[0])' when the design shipped as written."
+            }
+        }
+        elseif ($state -eq $stateSpec -and $d.Spec -and -not $d.Spec.Archived) {
+            $saysDropped = @()
+            if ($noteMark.Word -eq $droppedWord) { $saysDropped += "its note ($($d.Note.Path))" }
+            if ($specMark.Word -eq $droppedWord) { $saysDropped += "its spec ($($d.Spec.Path))" }
+            if ($d.Docs -and $saysDropped.Count -gt 0) {
+                $heldWhy = "Its spec names its docs ($docsLine $($d.Docs)), but $($saysDropped -join ' and ') says '$outcomeStamp $droppedWord': the two marks disagree. Take out the one that is wrong."
+            }
+            elseif (-not $d.Docs) {
+                $whose = ''; $mark = $null
+                if ($noteMark.Has) { $whose = 'Its note'; $mark = $noteMark }
+                elseif ($specMark.Has) { $whose = 'Its spec'; $mark = $specMark }
+                if ($mark) {
+                    $heldWhy = "$whose says '$($mark.Said)', but its spec $($d.Spec.Path) is live: a Spec is marked finished by a '$docsLine <path>' line in the spec, naming the document its durable part landed in."
+                    if ($mark.Word -eq $droppedWord) { $heldWhy += " To drop it: ${prefix}MoveDesign $($d.Id) -To Archive -Dropped -Reason `"...`"$(if ($scopeArgs.Count) { ' ' + ($scopeArgs -join ' ') })." }
+                }
+            }
+        }
+        if ($heldWhy) {
+            $heldRows += [PSCustomObject]@{ Id = $d.Id; Title = [string]$d.Title; State = $state; Reason = $heldWhy }
+        }
+    }
+
+    if ($AsJson) {
+        $readyOut = @()
+        foreach ($r in $readyRows) {
+            $readyOut += [ordered]@{ id = $r.Id; title = $r.Title; state = $r.State; call = $r.Call; args = @($r.Args); notes = @($r.Notes) }
+        }
+        $heldOut = @()
+        foreach ($h in $heldRows) {
+            $heldOut += [ordered]@{ id = $h.Id; title = $h.Title; state = $h.State; reason = $h.Reason }
+        }
+        Write-Output ([ordered]@{
+                ready  = @($readyOut)
+                held   = @($heldOut)
+                counts = [ordered]@{ ready = $readyRows.Count; held = $heldRows.Count }
+            } | ConvertTo-Json -Depth 6 -Compress)
+        exit 0
+    }
+    if ($readyRows.Count -eq 0 -and $heldRows.Count -eq 0) {
+        Write-Host "No design in $where is marked finished: nothing is ready, and nothing is held."
+        exit 0
+    }
+    if ($readyRows.Count -gt 0) {
+        Write-Host ""
+        Write-Host "Ready ($($readyRows.Count)): each call moves one design, as printed." -ForegroundColor Green
+        foreach ($r in $readyRows) {
+            Write-Host "  $($r.Title) ($($r.State), $($r.Id))"
+            Write-Host "    $($r.Call)"
+            foreach ($n in $r.Notes) { Write-Host "    Note: $n" -ForegroundColor DarkGray }
+        }
+    }
+    if ($heldRows.Count -gt 0) {
+        Write-Host ""
+        Write-Host "Held ($($heldRows.Count)): marked or left behind, and not a call to run." -ForegroundColor Yellow
+        foreach ($h in $heldRows) {
+            Write-Host "  $($h.Title) ($($h.State), $($h.Id))"
+            Write-Host "    $($h.Reason)"
+        }
+    }
+    Write-Host ""
+    Write-Host "$($readyRows.Count) ready, $($heldRows.Count) held in $where. Nothing was moved."
+    exit 0
+}
+
 $wanted = $Name.Trim()
 $wantedLower = $wanted.ToLowerInvariant()
 $stemOf = {

@@ -191,7 +191,10 @@ filters by outcome: shipped, dropped, or nothing said.
 **The CLI names it.** `{cliPrefix}Env` and `{cliPrefix}Menu -All` carry a `Design lifecycle` row: `on` when
 the repository you stand in has `design/` and every file in the four folders is stamped, `off` with the
 count of unstamped files when some are not, `not configured` when there is no `design/` to read -- and the
-hub's own count in the note. Its question is `How do I keep a design with its product?`.
+hub's own count in the note. Beside each count the note says `N ready` when N designs there are
+[marked finished](#marking-a-live-design-finished) (`3 designs in this repository, 2 ready; the hub: 15
+designs, 1 ready`); with none marked it adds nothing, so the row reads as it did before. Its question is
+`How do I keep a design with its product?`.
 
 **Identity is the `id:` line, and `StampDesign` is how a file gets one.** `NewDesign` writes it at birth.
 A note written before that, or by hand, has none; `{cliPrefix}StampDesign` adds one to every markdown
@@ -254,10 +257,55 @@ fact beside the state, like `closed` and `outcome`, never a fifth state.
 - **`dropped` is never written ahead of time.** Dropping a design needs its reason: run
   `MoveDesign <id> -To Archive -Dropped -Reason <text>`. A live note marked `dropped` is not ready.
 
-So far the fact lives in the model alone: `Ready` on `Read-P20DesignTree`'s row in the CLI, `ready` on
-each row `GET /api/design` and `GET /api/studio/design` serve. Nothing draws it or acts on it yet -- no
-badge on the Design tab, no command that lists the ready designs, no unattended move. The templates carry
-no hint for either line: a hint holding the token at column 0 would read as the line itself.
+The fact is on the model: `Ready` on `Read-P20DesignTree`'s row in the CLI, `ready` on each row
+`GET /api/design` and `GET /api/studio/design` serve. The CLI reads it in two places: the `Design
+lifecycle` row's `N ready` (above, "The CLI names it"), and `{cliPrefix}MoveDesign -Ready`, below. No
+badge draws it on the Design tab yet, and nothing moves a ready design unattended: a person runs the call.
+The templates carry no hint for either line: a hint holding the token at column 0 would read as the line
+itself.
+
+### Listing what is ready: `MoveDesign -Ready`
+
+`{cliPrefix}MoveDesign -Ready` is a read. It moves nothing and writes nothing, with or without `-WhatIf`,
+and exits 0 whether or not anything is ready. It takes the verb's scope flags and nothing else: none for
+the repository you stand in, `-Hub`, `-Hub -Space <slug>`, or `-Space <slug>` for that Space's checkout.
+A design name, `-To`, `-Doc`, `-Dropped` or `-Reason` beside it is a stated refusal (exit 2): `-Ready`
+only lists.
+
+It prints the designs the rule says are ready, each with the exact call that moves it, then the designs
+that carry a mark but are held, each with why, then one count line. With nothing ready and nothing held it
+prints one line saying so, under the line that names where it read. Each ready call is first run through
+`MoveDesign`'s own `-WhatIf`, so a call the verb would refuse is never printed as ready: that design is
+held, with the verb's own sentence. A line under ready is one that can be run as printed.
+
+| The design | Listed | What the line says |
+| --- | --- | --- |
+| a live note, no spec, `**Outcome:** shipped` | ready | `MoveDesign <id> -To Archive [flags]` |
+| a live spec with `> Docs: <path>` (a live or archived note, or none) | ready | `MoveDesign <id> -To Complete -Doc "<path>" [flags]`, the path exactly as the line has it |
+| either, with open cards in a Space's `current/` naming its id | ready, with a note | the call, then the open cards by name. The mark is the decision; the move does not wait for them |
+| a Space-folder spec (`-Hub -Space`) whose Space's repository has no clone here | ready, with a note | the call, then `MoveDesign`'s own `Note:` sentence: the path is taken as written, not checked |
+| a live spec whose note is already in `design/archive/` | ready, with a note | the call, then that the completion journals onto the archived note |
+| a ready design whose call `MoveDesign` would refuse (the Docs path missing where it can be checked, a file of that name already archived) | held | `MoveDesign would refuse it:` and the verb's own sentence |
+| a live note marked `dropped` | held | that dropping is a decision with its reason, and the `-To Archive -Dropped -Reason` call to make it |
+| a live note whose `**Outcome:**` is neither word (`maybe`, `shipped 2026-11-20`) | held | that the line is no mark, and the line that would be |
+| a live spec with a Docs line, and a note or spec marked `dropped` | held | that the two marks disagree |
+| a live spec with no Docs line, and an `**Outcome:**` line on the note or the spec | held | that a Spec is marked finished by a Docs line in the spec |
+| a note left in `design/` after its spec was archived (Complete or Archived) | held | the state, both paths, and [the one hand move](../KNOWN-GAPS.md#a-completed-designs-live-note-is-moved-by-hand) that finishes it |
+| a live design with no mark, or any archived design | not listed | |
+
+Every call names the design by its full id and carries the same scope flags `-Ready` was given.
+`-AsJson` prints the same lists as one JSON line, for a script:
+
+```json
+{ "ready": [{ "id": "...", "title": "...", "state": "Design", "call": "tkMoveDesign <id> -To Archive -Hub",
+              "args": ["<id>", "-To", "Archive", "-Hub"], "notes": [] }],
+  "held":  [{ "id": "...", "title": "...", "state": "Spec", "reason": "..." }],
+  "counts": { "ready": 1, "held": 1 } }
+```
+
+`args` is the call's arguments after the verb, one element each, so a caller need not parse `call`. The
+`Design lifecycle` row's `N ready` counts what the rule says; `-Ready` may hold one of those when
+`MoveDesign` would refuse its call, so its own count can be lower.
 
 ## Examples
 

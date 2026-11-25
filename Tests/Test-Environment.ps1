@@ -352,6 +352,50 @@ Assert-True 'so does the in-module call' `
 Assert-True 'and the two blocks are identical' ($directBlock -eq $moduleBlock) `
     "direct:`n$directBlock`n---`nin-module:`n$moduleBlock"
 
+# -- 2b. The Design lifecycle row counts what is marked finished, in both renderers --
+# Standing in a repository whose design/ has two designs marked finished, Env and
+# Menu -All both say 2 ready, from the one resolver, in the same words; in one with
+# none marked the row reads exactly as it did before there was a ready count.
+. (Join-Path $testDir 'Get-TestHost.ps1')
+$designRow = {
+    param([string]$Repo)
+    $repoQ = $Repo -replace "'", "''"
+    $out = Invoke-InChild @"
+Set-Location -LiteralPath '$repoQ'
+"ENV-ROW=`$((tkEnv *>&1 | Out-String) -split "``r?``n" | Where-Object { `$_ -match 'Design lifecycle' } | Select-Object -First 1)"
+"MENU-ROW=`$((tkMenu -All *>&1 | Out-String) -split "``r?``n" | Where-Object { `$_ -match 'Design lifecycle' } | Select-Object -First 1)"
+"@
+    $envNote = ''; $menuNote = ''
+    foreach ($line in ($out -split "`r?`n")) {
+        # Env writes `<state> -- <note>`, Menu -All `<state> (<note>)`: the note is the row's.
+        if ($line -match '^ENV-ROW=.*Design lifecycle\s+\S+ -- (.*?)\s*$') { $envNote = $Matches[1] }
+        if ($line -match '^MENU-ROW=.*Design lifecycle\s+\S+ \((.*)\)\s*$') { $menuNote = $Matches[1] }
+    }
+    return [PSCustomObject]@{ Env = $envNote; Menu = $menuNote; Out = $out }
+}
+$writeLf = {
+    param([string]$Path, [string]$Text)
+    New-Item -ItemType Directory -Path (Split-Path -Parent $Path) -Force | Out-Null
+    [System.IO.File]::WriteAllText($Path, $Text, (New-Object System.Text.UTF8Encoding($false)))
+}
+$markedRepo = Join-Path $sandboxRoot 'marked-repo'
+$plainRepo = Join-Path $sandboxRoot 'plain-repo'
+foreach ($r in @($markedRepo, $plainRepo)) {
+    New-Item -ItemType Directory -Path $r -Force | Out-Null
+    $null = Invoke-P20TestGit init -q $r
+}
+& $writeLf (Join-Path $markedRepo 'design/shipped.md') "---`nid: aaaaaaaa-0000-4000-8000-0000000000e1`n---`n`n# Shipped`n`n**Outcome:** shipped`n"
+& $writeLf (Join-Path $markedRepo 'spec/built.spec.md') "---`nid: aaaaaaaa-0000-4000-8000-0000000000e2`n---`n`n# Built (spec)`n`n> Docs: docs/built.md`n"
+& $writeLf (Join-Path $plainRepo 'design/open.md') "---`nid: aaaaaaaa-0000-4000-8000-0000000000e3`n---`n`n# Open`n"
+$marked = & $designRow $markedRepo
+Assert-True 'standing in a repository with two designs marked finished, Env says 2 ready' `
+    ($marked.Env -eq '2 designs in this repository, 2 ready') $marked.Out
+Assert-True 'and Menu -All says the same words' ($marked.Env -eq $marked.Menu) "env: $($marked.Env)`nmenu: $($marked.Menu)"
+$plain = & $designRow $plainRepo
+Assert-True 'with none marked, the row reads as it always has: no ready count' `
+    ($plain.Env -eq '1 designs in this repository') $plain.Out
+Assert-True 'and Menu -All says the same words there too' ($plain.Env -eq $plain.Menu) "env: $($plain.Env)`nmenu: $($plain.Menu)"
+
 # -- 3. The accessors, with the shadow forced ---------------------------------
 # The cheap guard. Every name the accessors used to read through the scope chain
 # is deliberately taken by the probe script, which is exactly what a module
