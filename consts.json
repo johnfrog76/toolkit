@@ -223,6 +223,7 @@
     "triageRoute": "/api/ritual/triage",
     "milestonesRoute": "/api/ritual/milestones",
     "releasesRoute": "/api/ritual/releases",
+    "releaseTitlesRoute": "/api/ritual/releases/titles",
     "orgRoute": "/api/ritual/org",
   "assignMe": "me",
     "ceremoniesFile": "Config/ceremonies.json",
@@ -466,7 +467,7 @@
   },
 
   "changelog": {
-    "_": "A repository's release notes, as Keep a Changelog writes them (changelog.d/README.md). file is the changelog at the repository's root; folder holds the entries waiting for the next release, one <id>.<kind>.md each (fragmentRegex: group 1 the id, group 2 the kind, matched ignoring case), every name but README.md and a dotfile. releaseHeadingRegex is a section's heading, `## [x.y.z] - date` (group 1 the version, group 2 the date when there is one); `## [Unreleased]` matches and is not a release. kinds maps a fragment's kind to the heading it goes under, in Keep a Changelog order. The agent's GET rituals.releasesRoute reads a Space's checkout by these (agent/solitaire/releases.py), the web's What's New parses the toolkit's own changelog by the heading (web/src/shell/changelogParse.ts), and the CLI's release step Scripts/Fold-Changelog.ps1 folds by the same shapes.",
+    "_": "A repository's release notes, as Keep a Changelog writes them (changelog.d/README.md). file is the changelog at the repository's root; folder holds the entries waiting for the next release, one <id>.<kind>.md each (fragmentRegex: group 1 the id, group 2 the kind, matched ignoring case), every name but README.md and a dotfile. releaseHeadingRegex is a section's heading, `## [x.y.z] - date` (group 1 the version, group 2 the date when there is one); `## [Unreleased]` matches and is not a release. kinds maps a fragment's kind to the heading it goes under, in Keep a Changelog order. The agent's GET rituals.releasesRoute reads a Space's checkout by these (agent/solitaire/releases.py) -- the release in progress to the Space's default branch, and only the tags merged into it -- and GET rituals.releaseTitlesRoute reads the titles of one release's issues from the tracker in one batched call, for the panel the web opens on it; the web's What's New parses the toolkit's own changelog by the heading (web/src/shell/changelogParse.ts), and the CLI's release step Scripts/Fold-Changelog.ps1 folds by the same shapes.",
     "file": "CHANGELOG.md",
     "folder": "changelog.d",
     "fragmentRegex": "^([A-Za-z0-9][A-Za-z0-9_-]*)\\.([A-Za-z]+)\\.md$",

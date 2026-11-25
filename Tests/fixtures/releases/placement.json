@@ -1,48 +1,78 @@
 {
-  "_": "Where a GitHub milestone belongs on the Releases timeline (docs/modules/solitaire-agile.md, \"Releases: the timeline\"): ONE rule, agent/solitaire/releases.py place_milestones, asserted from Tests/test_ritual_releases.py, and the table a future verb answers to. `tags` are newest first, each [tag, its day]. A milestone's reached day is GitHub's close, else its last change, and only when it is reached (every issue closed, and at least one). Reached on day d, it is the oldest tag dated d or later's -- reached between two tags is the later one's, and the day of a tag counts in it. Reached after the last tag, or not reached at all, it is the release in progress's, keyed \"\". Each release keeps the tracker's order.",
+  "_": "Where a GitHub milestone belongs on the Releases timeline (docs/modules/solitaire-agile.md, \"Releases: the timeline\"): ONE rule, agent/solitaire/releases.py place_milestones, asserted from Tests/test_ritual_releases.py, and the table a future verb answers to. `tags` are newest first, each [tag, its day] or [tag, its day, its instant]. A milestone counts only when it is reached (every issue closed, and at least one). Where GitHub gave it a close time (`closed_time`) and the tags carry their instants, the instants decide: it is the oldest tag made at or after the close -- so a milestone closed on a tag's day but after the tag is the next release's. Otherwise the day decides, as it always did: its reached day is GitHub's close day, else its last change, and it is the oldest tag dated that day or later's -- the day of a tag counts in it. Reached after the last tag, or not reached at all, it is the release in progress's, keyed \"\". Each release keeps the tracker's order. The first four cases carry no instants, so they read by the day exactly as before the instants existed.",
   "cases": [
     {
       "name": "between two tags is the later one's; the day of a tag counts in it",
       "tags": [["v0.3.0", "2026-10-12"], ["v0.2.0", "2026-10-01"], ["v0.1.0", "2026-09-10"]],
       "milestones": [
-        { "title": "First list", "reached": true, "closed_at": "2026-09-08", "updated_at": "2026-09-08" },
-        { "title": "Sorting", "reached": true, "closed_at": "", "updated_at": "2026-10-01" },
-        { "title": "Search", "reached": true, "closed_at": "2026-10-05", "updated_at": "2026-10-06" },
-        { "title": "Export", "reached": false, "closed_at": "", "updated_at": "2026-10-20" },
-        { "title": "Polish", "reached": true, "closed_at": "2026-10-22", "updated_at": "2026-10-22" },
-        { "title": "Parking lot", "reached": false, "closed_at": "", "updated_at": "2026-09-01" }
+        {"title": "First list", "reached": true, "closed_at": "2026-09-08", "updated_at": "2026-09-08"},
+        {"title": "Sorting", "reached": true, "closed_at": "", "updated_at": "2026-10-01"},
+        {"title": "Search", "reached": true, "closed_at": "2026-10-05", "updated_at": "2026-10-06"},
+        {"title": "Export", "reached": false, "closed_at": "", "updated_at": "2026-10-20"},
+        {"title": "Polish", "reached": true, "closed_at": "2026-10-22", "updated_at": "2026-10-22"},
+        {"title": "Parking lot", "reached": false, "closed_at": "", "updated_at": "2026-09-01"}
       ],
-      "expected": {
-        "": ["Export", "Polish", "Parking lot"],
-        "v0.3.0": ["Search"],
-        "v0.2.0": ["Sorting"],
-        "v0.1.0": ["First list"]
-      }
+      "expected": {"": ["Export", "Polish", "Parking lot"], "v0.3.0": ["Search"], "v0.2.0": ["Sorting"], "v0.1.0": ["First list"]}
     },
     {
       "name": "no tag yet: every milestone is the release in progress's",
       "tags": [],
       "milestones": [
-        { "title": "Reached", "reached": true, "closed_at": "2026-09-08", "updated_at": "2026-09-08" },
-        { "title": "Open", "reached": false, "closed_at": "", "updated_at": "2026-09-09" }
+        {"title": "Reached", "reached": true, "closed_at": "2026-09-08", "updated_at": "2026-09-08"},
+        {"title": "Open", "reached": false, "closed_at": "", "updated_at": "2026-09-09"}
       ],
-      "expected": { "": ["Reached", "Open"] }
+      "expected": {"": ["Reached", "Open"]}
     },
     {
       "name": "closed on GitHub with an issue reopened is not reached, so it is still aimed at",
       "tags": [["v1.0.0", "2026-11-01"]],
       "milestones": [
-        { "title": "Reopened", "reached": false, "closed_at": "2026-10-01", "updated_at": "2026-10-03" }
+        {"title": "Reopened", "reached": false, "closed_at": "2026-10-01", "updated_at": "2026-10-03"}
       ],
-      "expected": { "": ["Reopened"], "v1.0.0": [] }
+      "expected": {"": ["Reopened"], "v1.0.0": []}
     },
     {
       "name": "reached before the first tag is the first tag's",
       "tags": [["v1.0.0", "2026-11-01"]],
       "milestones": [
-        { "title": "Early", "reached": true, "closed_at": "2026-01-01", "updated_at": "2026-01-01" }
+        {"title": "Early", "reached": true, "closed_at": "2026-01-01", "updated_at": "2026-01-01"}
       ],
-      "expected": { "": [], "v1.0.0": ["Early"] }
+      "expected": {"": [], "v1.0.0": ["Early"]}
+    },
+    {
+      "name": "closed on a tag's day after the tag is the next release's; before it, the tag's",
+      "tags": [["v0.3.0", "2026-10-12", "2026-10-12T12:00:00Z"], ["v0.2.0", "2026-10-01", "2026-10-01T12:00:00Z"], ["v0.1.0", "2026-09-10", "2026-09-10T12:00:00Z"]],
+      "milestones": [
+        {"title": "After the tag", "reached": true, "closed_at": "2026-10-01", "closed_time": "2026-10-01T15:00:00Z", "updated_at": "2026-10-01"},
+        {"title": "Before the tag", "reached": true, "closed_at": "2026-10-01", "closed_time": "2026-10-01T09:00:00Z", "updated_at": "2026-10-01"},
+        {"title": "At the tag", "reached": true, "closed_at": "2026-10-01", "closed_time": "2026-10-01T12:00:00Z", "updated_at": "2026-10-01"},
+        {"title": "After the last tag", "reached": true, "closed_at": "2026-10-12", "closed_time": "2026-10-12T18:00:00Z", "updated_at": "2026-10-12"}
+      ],
+      "expected": {"": ["After the last tag"], "v0.3.0": ["After the tag"], "v0.2.0": ["Before the tag", "At the tag"], "v0.1.0": []}
+    },
+    {
+      "name": "no close time (reached, never closed on GitHub): the day rule, so the tag's day counts in it",
+      "tags": [["v0.3.0", "2026-10-12", "2026-10-12T12:00:00Z"], ["v0.2.0", "2026-10-01", "2026-10-01T12:00:00Z"], ["v0.1.0", "2026-09-10", "2026-09-10T12:00:00Z"]],
+      "milestones": [
+        {"title": "Never closed", "reached": true, "closed_at": "", "closed_time": "", "updated_at": "2026-10-01"}
+      ],
+      "expected": {"": [], "v0.3.0": [], "v0.2.0": ["Never closed"], "v0.1.0": []}
+    },
+    {
+      "name": "a tag with no instant: the day rule, even for a milestone with a close time",
+      "tags": [["v1.0.0", "2026-11-01"]],
+      "milestones": [
+        {"title": "Same day", "reached": true, "closed_at": "2026-11-01", "closed_time": "2026-11-01T20:00:00Z", "updated_at": "2026-11-01"}
+      ],
+      "expected": {"": [], "v1.0.0": ["Same day"]}
+    },
+    {
+      "name": "a tag written in another zone is compared as the same instant: 23:00+02:00 is before 22:00Z",
+      "tags": [["v1.0.0", "2026-11-01", "2026-11-01T23:00:00+02:00"]],
+      "milestones": [
+        {"title": "Closed an hour after the tag", "reached": true, "closed_at": "2026-11-01", "closed_time": "2026-11-01T22:00:00Z", "updated_at": "2026-11-01"}
+      ],
+      "expected": {"": ["Closed an hour after the tag"], "v1.0.0": []}
     }
   ]
 }

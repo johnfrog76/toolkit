@@ -13,7 +13,9 @@
 // The pages are the registry's routes: the core's (the ado module's table and
 // the Studio's) in both passes, and each opt-in module's descriptor routes in
 // the ON pass, a route with a parameter opened on the fixture hub's own file.
-// A route the registry adds is a row to add to PAGES below.
+// A route the registry adds is a row to add to PAGES below. A row with `open`
+// reaches a state of its page before the scan (the Releases timeline's side
+// panel), and is named by its `label`.
 //
 // It prints the findings grouped by impact -- critical, serious, moderate,
 // minor -- one line per rule on a page in a theme and a mode, with the selector
@@ -32,6 +34,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { answerWithAgents, launchChromium, openRoute, setFlags, startStack } from "./smokeStack.mjs";
+import { openReleasePanel, seedReleasesCheckout } from "./smokeReleases.mjs";
 
 const FIXTURE_HUB = "Tests/fixtures/hub";
 const SPACE = "test";
@@ -108,6 +111,14 @@ const PAGES = [
   { group: "solitaireAgile", module: "solitaireAgile", route: "/solitaire-agile" },
   { group: "solitaireAgile", module: "solitaireAgile", route: "/solitaire-agile/triage" },
   { group: "solitaireAgile", module: "solitaireAgile", route: "/solitaire-agile/releases" },
+  // The timeline again, its side panel open on the third release (smokeReleases.mjs).
+  {
+    group: "solitaireAgile",
+    module: "solitaireAgile",
+    route: "/solitaire-agile/releases",
+    label: "/solitaire-agile/releases (panel open)",
+    open: openReleasePanel,
+  },
   { group: "solitaireAgile", module: "solitaireAgile", route: "/deck/ritual/standup" },
 ];
 
@@ -141,10 +152,15 @@ async function auditPass(browser, stack, { mode, theme }, findings, notes, AxeBu
   try {
     for (const p of pages) {
       errors.length = 0;
+      const where = p.label ?? p.route;
       try {
-        await openRoute(page, stack.base, p.route);
+        if (p.open) {
+          if (!(await p.open(page, stack.base))) notes.push(`${where} [${theme}, modules ${mode}]: did not reach its state`);
+        } else {
+          await openRoute(page, stack.base, p.route);
+        }
       } catch (err) {
-        notes.push(`${p.route} [${theme}, modules ${mode}]: did not open -- ${String(err.message ?? err).split("\n")[0]}`);
+        notes.push(`${where} [${theme}, modules ${mode}]: did not open -- ${String(err.message ?? err).split("\n")[0]}`);
         continue;
       }
       // Settle before axe looks: a page draws in phases (a badge arrives with its
@@ -162,16 +178,16 @@ async function auditPass(browser, stack, { mode, theme }, findings, notes, AxeBu
           .waitForFunction(() => !/\bLoading\b/.test(document.body.innerText), null, { timeout: LOADING_GRACE_MS })
           .then(() => page.waitForTimeout(SETTLE_MS))
           .catch(() => {});
-        if (await stillLoading()) notes.push(`${p.route} [${theme}, modules ${mode}]: still loading when axe ran`);
+        if (await stillLoading()) notes.push(`${where} [${theme}, modules ${mode}]: still loading when axe ran`);
       }
       const text = await page.evaluate(() => document.body.innerText);
-      if (NOT_DRAWN.test(text)) notes.push(`${p.route} [${theme}, modules ${mode}]: drew "${NOT_DRAWN.exec(text)[0]}"`);
-      if (errors.length > 0) notes.push(`${p.route} [${theme}, modules ${mode}]: page error -- ${errors.join(" | ")}`);
+      if (NOT_DRAWN.test(text)) notes.push(`${where} [${theme}, modules ${mode}]: drew "${NOT_DRAWN.exec(text)[0]}"`);
+      if (errors.length > 0) notes.push(`${where} [${theme}, modules ${mode}]: page error -- ${errors.join(" | ")}`);
       let result;
       try {
         result = await new AxeBuilder({ page }).exclude(TABSTER_DUMMY).analyze();
       } catch (err) {
-        notes.push(`${p.route} [${theme}, modules ${mode}]: axe did not run -- ${String(err.message ?? err).split("\n")[0]}`);
+        notes.push(`${where} [${theme}, modules ${mode}]: axe did not run -- ${String(err.message ?? err).split("\n")[0]}`);
         continue;
       }
       for (const v of result.violations) {
@@ -181,7 +197,7 @@ async function auditPass(browser, stack, { mode, theme }, findings, notes, AxeBu
           help: v.help,
           helpUrl: v.helpUrl,
           group: p.group,
-          route: p.route,
+          route: where,
           theme,
           mode,
           // The selector, and the element itself cut short with its class list
@@ -234,6 +250,10 @@ export async function runA11y({ repoRoot, agentPort, webPort, python }) {
         // so the ON pass runs on the fixture's Space answered so.
         const answered = await answerWithAgents(stack.base, SPACE);
         if (answered.status !== "success") throw new Error(`answer the Space With agents: ${answered.error ?? answered.status}`);
+        // The Releases timeline reads the Space's checkout: give it one, so the
+        // scan sees the track and its panel rather than the no-checkout sentence.
+        const seeded = await seedReleasesCheckout(stack, SPACE);
+        if (seeded.status !== "success") throw new Error(`set the Space's checkout: ${seeded.error ?? seeded.status}`);
       }
       const wrote = await setFlags(stack.base, Object.fromEntries(FLAGS.map((f) => [f, mode === "on"])));
       if (wrote.status !== "success") throw new Error(`Config -Set every module flag ${mode}: ${wrote.error ?? wrote.status}`);

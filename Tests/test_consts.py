@@ -182,6 +182,7 @@ EXPECTED = {
     ("rituals", "triageRoute"): "/api/ritual/triage",
     ("rituals", "milestonesRoute"): "/api/ritual/milestones",
     ("rituals", "releasesRoute"): "/api/ritual/releases",
+    ("rituals", "releaseTitlesRoute"): "/api/ritual/releases/titles",
     ("rituals", "orgRoute"): "/api/ritual/org",
     ("rituals", "assignMe"): "me",
     ("rituals", "ceremoniesFile"): "Config/ceremonies.json",
@@ -623,6 +624,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_triage_route(), EXPECTED[("rituals", "triageRoute")])
         self.assertEqual(C.rituals_milestones_route(), EXPECTED[("rituals", "milestonesRoute")])
         self.assertEqual(C.rituals_releases_route(), EXPECTED[("rituals", "releasesRoute")])
+        self.assertEqual(C.rituals_release_titles_route(), EXPECTED[("rituals", "releaseTitlesRoute")])
         self.assertEqual(C.changelog_file(), EXPECTED[("changelog", "file")])
         self.assertEqual(C.changelog_folder(), EXPECTED[("changelog", "folder")])
         self.assertEqual(C.changelog_fragment_regex(), EXPECTED[("changelog", "fragmentRegex")])

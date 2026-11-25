@@ -1,8 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import type { Release, ReleaseMilestone, ReleasesResponse } from "./api.solitaireAgile";
-import { ReleasesPage, milestoneWords, stopLabel } from "./ReleasesPage";
+import type {
+  Release,
+  ReleaseMilestone,
+  ReleaseTitlesResponse,
+  ReleasesResponse,
+} from "./api.solitaireAgile";
+import {
+  ReleasesPage,
+  milestoneWords,
+  scrollToShow,
+  stopLabel,
+  titlesCapWords,
+  trackSpacer,
+} from "./ReleasesPage";
 
 // The Releases timeline (docs/modules/solitaire-agile.md, "Releases: the
 // timeline"), drawn from the route's own table: Tests/fixtures/releases/repo.json,
@@ -24,6 +36,8 @@ interface GhRow {
 interface Table {
   repo: string;
   milestones: GhRow[];
+  issueTitles: Record<string, string>;
+  source: { ok: boolean; reason: string; ref: string };
   expected: (Omit<Release, "pulls" | "issues" | "milestones"> & {
     pulls: number[];
     issues: number[];
@@ -48,6 +62,7 @@ function served(row: GhRow): ReleaseMilestone {
     closed: row.closed_issues,
     due: "",
     closed_at: closed,
+    closed_time: row.closed_at ?? "",
     created_at: row.created_at.slice(0, 10),
     updated_at: row.updated_at.slice(0, 10),
     reached,
@@ -65,9 +80,26 @@ const ok = (over: Partial<ReleasesResponse> = {}): ReleasesResponse => ({
   ceremony: "releases",
   space: "widgets",
   repo: table.repo,
-  source: { ok: true, reason: "" },
+  source: table.source,
   tracker: { ok: true, reason: "" },
   releases,
+  ...over,
+});
+
+// The titles read as the route answers it for the numbers asked (Tests/test_ritual_releases.py
+// holds the agent to the same table's issueTitles).
+const titlesFor = (
+  numbers: number[],
+  over: Partial<ReleaseTitlesResponse> = {},
+): ReleaseTitlesResponse => ({
+  space: "widgets",
+  repo: table.repo,
+  tracker: { ok: true, reason: "" },
+  asked: numbers.length,
+  limit: 50,
+  titles: numbers
+    .filter((n) => table.issueTitles[String(n)])
+    .map((n) => ({ number: n, title: table.issueTitles[String(n)] })),
   ...over,
 });
 
@@ -75,10 +107,19 @@ let response: { data?: ReleasesResponse; isLoading: boolean; error?: unknown } =
   isLoading: false,
 };
 let asked: string[] = [];
+let titlesAsked: { space: string; numbers: number[]; skip: boolean }[] = [];
+let titles: (numbers: number[]) => ReleaseTitlesResponse | undefined = (n) => titlesFor(n);
 jest.mock("./api.solitaireAgile", () => ({
   useGetRitualReleasesQuery: (space: string) => {
     asked.push(space);
     return response;
+  },
+  useGetRitualReleaseTitlesQuery: (
+    arg: { space: string; numbers: number[] },
+    opts: { skip?: boolean } = {},
+  ) => {
+    titlesAsked.push({ ...arg, skip: !!opts.skip });
+    return { data: opts.skip ? undefined : titles(arg.numbers) };
   },
 }));
 jest.mock("../../shell/api", () => ({
@@ -88,6 +129,8 @@ jest.mock("./MilestonesPage", () => ({ MilestonesPage: () => <p>the milestones l
 
 beforeEach(() => {
   asked = [];
+  titlesAsked = [];
+  titles = (n) => titlesFor(n);
   response = { isLoading: false, data: ok() };
 });
 
@@ -112,7 +155,7 @@ describe("the Releases timeline", () => {
     render(<ReleasesPage />);
     expect(stops().map((b) => b.getAttribute("aria-label"))).toEqual([
       "In progress, since v0.3.0, 3 entries, 1 milestone reached, 2 milestones open",
-      "v0.3.0, shipped 12 October 2026, 1 entry, 1 milestone reached",
+      "v0.3.0, shipped 12 October 2026, 1 entry, 2 milestones reached",
       "v0.2.0, shipped 1 October 2026, 2 entries, 1 milestone reached",
       "v0.1.0, shipped 10 September 2026, 1 entry, 1 milestone reached",
     ]);
@@ -129,6 +172,7 @@ describe("the Releases timeline", () => {
       ["Polish, GitHub milestone reached 22 October 2026", "true"],
       ["Parking lot, GitHub milestone open, no issues yet", "false"],
       ["Search, GitHub milestone reached 5 October 2026", "true"],
+      ["Empty state, GitHub milestone reached 1 October 2026", "true"],
       ["Sorting, GitHub milestone reached 1 October 2026", "true"],
       ["First list, GitHub milestone reached 8 September 2026", "true"],
     ]);
@@ -168,8 +212,82 @@ describe("the Releases timeline", () => {
     expect(p.getByText("Notes so far")).toBeTruthy();
     expect(p.getByText("Export the list as a file.")).toBeTruthy();
     expect(p.getByRole("link", { name: /Compare on GitHub/ }).getAttribute("href")).toBe(
-      `${base}/compare/v0.3.0...HEAD`,
+      `${base}/compare/v0.3.0...main`,
     );
+  });
+
+  it("an entry's inline markdown is drawn: a code span and bold, no backticks, no block", () => {
+    render(<ReleasesPage />);
+    fireEvent.click(stops()[0]);
+    const item = within(panel()!)
+      .getAllByRole("listitem")
+      .find((li) => li.textContent?.startsWith("The export's columns"))!;
+    expect(item.querySelector("code")?.textContent).toBe("export.csv");
+    expect(item.querySelector("strong")?.textContent).toBe("in order");
+    expect(item.textContent).toBe("The export's columns are named in export.csv, in order.");
+    expect(item.querySelector("p, h1, h2, h3, h4")).toBeNull();
+  });
+
+  it("the panel's issues carry their titles from one read of that release's numbers", () => {
+    render(<ReleasesPage />);
+    fireEvent.click(stops()[2]);
+    expect(titlesAsked[titlesAsked.length - 1]).toEqual({
+      space: "widgets",
+      numbers: [2, 4, 6],
+      skip: false,
+    });
+    expect(screen.getAllByTestId("release-issue").map((li) => li.textContent)).toEqual([
+      "#2 Say what an empty list means",
+      "#4 Sort the list",
+      "#6 The empty list shows nothing",
+    ]);
+    expect(screen.queryByTestId("release-titles-cap")).toBeNull();
+  });
+
+  it("no tracker, or the read not answered yet: the numbers alone, and nothing drawn as an error", () => {
+    titles = (n) =>
+      titlesFor(n, { tracker: { ok: false, reason: "gh is not installed." }, titles: [] });
+    const { unmount } = render(<ReleasesPage />);
+    fireEvent.click(stops()[2]);
+    expect(screen.getAllByTestId("release-issue").map((li) => li.textContent)).toEqual([
+      "#2",
+      "#4",
+      "#6",
+    ]);
+    expect(screen.queryByText(/gh is not installed/)).toBeNull();
+    unmount();
+    titles = () => undefined;
+    render(<ReleasesPage />);
+    fireEvent.click(stops()[1]);
+    expect(screen.getAllByTestId("release-issue").map((li) => li.textContent)).toEqual([
+      "#8",
+      "#10",
+    ]);
+  });
+
+  it("a release with no issue asks for no title", () => {
+    response = {
+      isLoading: false,
+      data: ok({ releases: releases.map((r, i) => (i === 3 ? { ...r, issues: [] } : r)) }),
+    };
+    render(<ReleasesPage />);
+    fireEvent.click(stops()[3]);
+    expect(titlesAsked[titlesAsked.length - 1]).toEqual({
+      space: "widgets",
+      numbers: [],
+      skip: true,
+    });
+    expect(screen.queryAllByTestId("release-issue")).toHaveLength(0);
+  });
+
+  it("past the read's cap, the panel says how many of the titles it read", () => {
+    titles = (n) => titlesFor(n, { asked: 73, limit: 50 });
+    render(<ReleasesPage />);
+    fireEvent.click(stops()[2]);
+    expect(screen.getByTestId("release-titles-cap").textContent).toBe(
+      "Titles read for the first 50 of 73 issues.",
+    );
+    expect(titlesCapWords(73, 50)).toBe("Titles read for the first 50 of 73 issues.");
   });
 
   it("Left and Right step between releases, Home and End jump, focus follows and so does the panel", () => {
@@ -245,6 +363,47 @@ describe("the Releases timeline", () => {
     response = { isLoading: false, error: { status: 500 } };
     render(<ReleasesPage />);
     expect(screen.getByText("Could not read the releases")).toBeTruthy();
+  });
+});
+
+describe("the track's scroll", () => {
+  // Four stops of 132 in a 358-wide view: the 390 phone, its gutters taken off.
+  const edges = [0, 1, 2, 3].map((i) => ({ left: i * 132, right: (i + 1) * 132 }));
+
+  it("a stop already wholly in view does not move the track", () => {
+    expect(scrollToShow(edges, 1, 0, 358)).toBeNull();
+    expect(scrollToShow(edges, 3, 264, 358)).toBeNull();
+  });
+
+  it("a stop cut at the right brings in the fewest stops, on a stop's edge", () => {
+    // The third ends at 396: 38 past the view, so the track starts at the second stop.
+    expect(scrollToShow(edges, 2, 0, 358)).toBe(132);
+    expect(scrollToShow(edges, 3, 0, 358)).toBe(264);
+  });
+
+  it("a stop off to the left goes to the left edge", () => {
+    expect(scrollToShow(edges, 0, 132, 358)).toBe(0);
+    expect(scrollToShow(edges, 1, 200, 358)).toBe(132);
+  });
+
+  it("the room after the last stop is what a whole number of stops leaves of the view", () => {
+    expect(trackSpacer(358, 132)).toBe(94);
+    expect(trackSpacer(396, 132)).toBe(0);
+    expect(trackSpacer(0, 132)).toBe(0);
+    // With it the farthest scroll is a stop's edge: 4 * 132 + 94 - 358 = 264.
+    expect(4 * 132 + trackSpacer(358, 132) - 358).toBe(264);
+  });
+
+  it("stepping scrolls the track itself: focus never scrolls it first", () => {
+    render(<ReleasesPage />);
+    const spy = jest.spyOn(HTMLElement.prototype, "focus");
+    stops()[0].focus();
+    spy.mockClear();
+    fireEvent.keyDown(screen.getByRole("group", { name: "Releases, newest first" }), {
+      key: "ArrowRight",
+    });
+    expect(spy).toHaveBeenCalledWith({ preventScroll: true });
+    spy.mockRestore();
   });
 });
 

@@ -543,8 +543,8 @@ the timeline (`ReleasesPage.test.tsx`), its one `h1` `Releases`, and under it th
 
 | `GET /api/ritual/releases` answers | The timeline shows |
 | --- | --- |
-| releases, the tracker read | one stop a release, `In progress` first (an open node on a dashed rail), then each tag newest first: its tag, its day, its count of entries; a gold flag over a stop for each GitHub milestone reached in it, outlined over `In progress` for one still aimed at; a click on a stop or flag opens the side panel -- the tag as an `h2`, its window and commits, the GitHub Release (`Compare on GitHub` in progress), its milestones, its notes (`Notes so far` in progress), its pull requests and issues; Left and Right step, focus and the panel following |
-| releases, no tracker (`tracker.ok` false) | every stop, no flag, and `GitHub milestones not read: <reason>` in plain text |
+| releases, the tracker read | one stop a release, `In progress` first (an open node on a dashed rail), then each tag newest first: its tag, its day, its count of entries; a gold flag over a stop for each GitHub milestone reached in it, outlined over `In progress` for one still aimed at; a click on a stop or flag opens the side panel -- the tag as an `h2`, its window and commits, the GitHub Release (`Compare on GitHub` in progress), its milestones, its notes (`Notes so far` in progress, each entry's inline markdown drawn), its pull requests, and its issues with their titles once `GET /api/ritual/releases/titles` answers; Left and Right step, focus and the panel following |
+| releases, no tracker (`tracker.ok` false) | every stop, no flag, and `GitHub milestones not read: <reason>` in plain text; in the panel, the issues by number alone, nothing more drawn |
 | no checkout (`source.ok` false) | `No releases read`, with the setting's sentence, drawn plainly; no stop |
 | nothing (the agent is away) | `Could not read the releases` -- an error |
 

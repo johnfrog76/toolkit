@@ -15,6 +15,9 @@
 //      Azure DevOps address, so the board draws four lanes and the planned
 //      card in Active; after the Team Agile pass the Space has a GitHub one,
 //      so it draws five, Backlog first, holding that card.
+//      THE RELEASES TIMELINE follows the Team Agile pass (smokeReleases.mjs):
+//      the Space given a clone with three tags, the track walked by click and
+//      by key at desktop and phone width.
 //   2. THE FLIP with no restart -- flipCase, shared with --studio.
 //   3. FRESH AND HOSTILE STORAGE. Each surface that keeps a choice in the
 //      browser -- the Spaces card's filter, the Reminders card's filter, the
@@ -42,6 +45,7 @@ import {
   setFlags,
   startStack,
 } from "./smokeStack.mjs";
+import { releasesTimelineCase, seedReleasesCheckout } from "./smokeReleases.mjs";
 
 const FIXTURE_HUB = "Tests/fixtures/hub";
 const SPACE = "test";
@@ -432,6 +436,11 @@ export async function runMatrix({ repoRoot, agentPort, webPort, python }) {
   try {
     await boardCase(browser, stack, check, "ado");
     for (const mod of MODULES) await matrixPass(browser, stack, check, mod);
+    // Team Agile is on and the Space answered With agents (the last pass): the
+    // Releases timeline, walked on a clone of the Space's own (smokeReleases.mjs).
+    const seeded = await seedReleasesCheckout(stack, SPACE);
+    check("releases: the Space's checkout set through PUT /api/config", seeded.status === "success", seeded.error ?? "");
+    await releasesTimelineCase({ browser, stack, check });
     await boardCase(browser, stack, check, "github");
 
     const off = await setFlags(stack.base, allOff());

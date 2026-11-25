@@ -70,7 +70,8 @@ _OPEN = "OPEN"
 # key -> (when, the answer). A key is ("labels", repo), ("issues", repo, state,
 # body), ("milestones", repo) -- the Releases tab's read (milestones.py) --
 # ("dates", repo, hashes, numbers) -- the standup's commit dates and issue
-# timelines (``dates``) -- or ("viewer",).
+# timelines (``dates``) -- ("titles", repo, numbers) -- the Releases panel's
+# issue titles (releases.py) -- or ("viewer",).
 _reads: dict[tuple, tuple[float, object]] = {}
 
 

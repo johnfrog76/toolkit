@@ -212,6 +212,8 @@ export const RITUALS = consts.rituals as {
   milestonesRoute: string;
   /** The Releases timeline's read: the Space's tags, notes and milestones within each. */
   releasesRoute: string;
+  /** One release's issue titles, from the tracker in one batched read: the panel's. */
+  releaseTitlesRoute: string;
   /** The org chart's read: the tree in use, with each position's prompt title and reading-room ref. */
   orgRoute: string;
   /** "me": the one answer to who takes an item that is not a size (D-AR10) --

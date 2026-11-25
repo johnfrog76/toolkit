@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import {
   Body1,
@@ -21,10 +21,11 @@ import {
 } from "@fluentui/react-icons";
 import { useGetEnvQuery } from "../../shell/api";
 import { EmptyState } from "../../shared/EmptyState";
+import { InlineMarkdown } from "../../shared/InlineMarkdown";
 import { PanelFrame } from "../../shared/PanelFrame";
 import { milestoneProgress } from "../ado/milestones";
 import type { Release, ReleaseMilestone } from "./api.solitaireAgile";
-import { useGetRitualReleasesQuery } from "./api.solitaireAgile";
+import { useGetRitualReleaseTitlesQuery, useGetRitualReleasesQuery } from "./api.solitaireAgile";
 import { dayWords } from "./award";
 import { MilestonesPage } from "./MilestonesPage";
 
@@ -36,7 +37,11 @@ import { MilestonesPage } from "./MilestonesPage";
 // stop or a flag opens the side panel: the release's dates, its milestones, its
 // notes, its pull requests and issues. The track is one tab stop; Left and Right
 // step between releases (Home and End to the ends), focus following, and an
-// open panel follows the step. Escape closes the panel.
+// open panel follows the step. Escape closes the panel. The track scrolls the
+// selected stop wholly into view on a stop's edge (scrollToShow), so no stop is
+// cut at its left edge. The panel's issues carry their titles once a second,
+// batched read of the tracker answers (GET /api/ritual/releases/titles); until
+// then, and with no tracker, they are numbers.
 //
 // The flat GitHub milestones list and its award stay under the timeline until the
 // award moves onto it: MilestonesPage, headed as the page's second level.
@@ -147,6 +152,9 @@ const useStyles = makeStyles({
     border: `1px solid ${tokens.colorNeutralStroke1}`,
   },
   stopMeta: { color: tokens.colorNeutralForeground3 },
+  // The room after the last stop that lets the track's far end sit on a stop's
+  // edge too (trackSpacer); never wide enough to make a track that fit overflow.
+  spacer: { flexShrink: 0 },
   panel: {
     display: "flex",
     flexDirection: "column",
@@ -217,6 +225,41 @@ export function milestoneWords(m: ReleaseMilestone): string {
   return total ? `open, ${m.closed} of ${total} closed` : "open, no issues yet";
 }
 
+/** A stop's left and right edges, in the track's own coordinates. */
+export interface StopEdges {
+  left: number;
+  right: number;
+}
+
+/**
+ * Where the track scrolls so the stop at `index` is wholly in view, on a stop's
+ * left edge -- so no stop is cut at the track's left -- or null when it is in
+ * view already. A stop off to the left goes to the left edge; one off to the
+ * right brings the fewest stops in from the right that show it.
+ */
+export function scrollToShow(
+  stops: StopEdges[],
+  index: number,
+  scrollLeft: number,
+  width: number,
+): number | null {
+  const s = stops[index];
+  if (!s || width <= 0) return null;
+  if (s.left >= scrollLeft - 0.5 && s.right <= scrollLeft + width + 0.5) return null;
+  if (s.left < scrollLeft) return Math.max(0, s.left);
+  const need = s.right - width;
+  return Math.max(0, stops.find((x) => x.left >= need - 0.5)?.left ?? s.left);
+}
+
+/**
+ * The room after the last stop, so the track's farthest scroll is a stop's edge
+ * too: the part of the view a whole number of stops does not fill. A track that
+ * fits never overflows by it.
+ */
+export function trackSpacer(viewWidth: number, stopWidth: number): number {
+  return viewWidth > 0 && stopWidth > 0 ? viewWidth % stopWidth : 0;
+}
+
 function MilestoneFlag({
   m,
   onOpen,
@@ -242,19 +285,38 @@ function MilestoneFlag({
   );
 }
 
+/** The cap line: the read asked for the first `limit` of `asked` titles. */
+export function titlesCapWords(asked: number, limit: number): string {
+  return `Titles read for the first ${limit} of ${asked} issues.`;
+}
+
 function ReleasePanel({
   r,
   id,
+  space,
+  repo,
   selectedMilestone,
   onClose,
 }: {
   r: Release;
   id: string;
+  space: string;
+  repo: string;
   selectedMilestone: string;
   onClose: () => void;
 }) {
   const styles = useStyles();
   const headingId = useId();
+  const numbers = r.issues.map((i) => i.number);
+  // One batched tracker read for this release's titles; none for a release with
+  // no issue. A failed read, or no tracker, leaves the numbers as they are.
+  const { data: read } = useGetRitualReleaseTitlesQuery(
+    { space, numbers },
+    { skip: numbers.length === 0 },
+  );
+  const titled = read?.tracker.ok ? read : undefined;
+  const titleOf = new Map((titled?.titles ?? []).map((t) => [t.number, t.title]));
+  const issuesUrl = repo ? `https://github.com/${repo}/issues` : undefined;
   const span = r.inProgress
     ? r.previous
       ? `From ${r.previous} (${dayWords(r.since)}) to now`
@@ -344,7 +406,9 @@ function ReleasePanel({
               <ul className={styles.list}>
                 {g.entries.map((e, i) => (
                   <li key={i}>
-                    <Body1>{e}</Body1>
+                    <Body1>
+                      <InlineMarkdown issuesUrl={issuesUrl}>{e}</InlineMarkdown>
+                    </Body1>
                   </li>
                 ))}
               </ul>
@@ -378,16 +442,21 @@ function ReleasePanel({
           <Subtitle2 as="h3" className={styles.sectionHeading}>
             Issues
           </Subtitle2>
-          <Body1>
-            {r.issues.map((i, n) => (
-              <span key={i.number}>
-                {n > 0 ? ", " : ""}
+          <ul className={styles.list}>
+            {r.issues.map((i) => (
+              <li key={i.number} data-testid="release-issue">
                 <Link href={i.url} target="_blank" rel="noopener noreferrer">
                   #{i.number}
                 </Link>
-              </span>
+                {titleOf.has(i.number) ? ` ${titleOf.get(i.number)}` : ""}
+              </li>
             ))}
-          </Body1>
+          </ul>
+          {titled && titled.asked > titled.limit ? (
+            <Caption1 className={styles.plain} data-testid="release-titles-cap">
+              {titlesCapWords(titled.asked, titled.limit)}
+            </Caption1>
+          ) : null}
         </section>
       )}
     </aside>
@@ -404,14 +473,45 @@ export function ReleasesTimeline() {
   const [open, setOpen] = useState(false);
   const [milestone, setMilestone] = useState("");
   const stops = useRef<(HTMLButtonElement | null)[]>([]);
+  const stopBoxes = useRef<(HTMLDivElement | null)[]>([]);
+  const scroller = useRef<HTMLDivElement | null>(null);
+  const [spacer, setSpacer] = useState(0);
   const panelId = useId();
+
+  // The track's far end on a stop's edge: measured, and again when the view resizes.
+  useLayoutEffect(() => {
+    const view = scroller.current;
+    const measure = () => {
+      const first = stopBoxes.current[0];
+      setSpacer(trackSpacer(view?.clientWidth ?? 0, first?.offsetWidth ?? 0));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined" || !view) return;
+    const watch = new ResizeObserver(measure);
+    watch.observe(view);
+    return () => watch.disconnect();
+  }, [releases.length, open]);
+
+  // The selected stop wholly in view, on a stop's edge.
+  useEffect(() => {
+    const view = scroller.current;
+    if (!view) return;
+    const origin = view.getBoundingClientRect().left - view.scrollLeft;
+    const edges = stopBoxes.current.map((el) => {
+      const box = el?.getBoundingClientRect();
+      return { left: (box?.left ?? 0) - origin, right: (box?.right ?? 0) - origin };
+    });
+    const to = scrollToShow(edges, selected, view.scrollLeft, view.clientWidth);
+    if (to !== null) view.scrollLeft = to;
+  }, [selected, open, spacer, releases.length]);
 
   const step = useCallback(
     (to: number) => {
       const next = Math.max(0, Math.min(releases.length - 1, to));
       setSelected(next);
       setMilestone("");
-      stops.current[next]?.focus();
+      // The track scrolls itself (scrollToShow); focus must not scroll it first.
+      stops.current[next]?.focus({ preventScroll: true });
     },
     [releases.length],
   );
@@ -473,7 +573,7 @@ export function ReleasesTimeline() {
         </Caption1>
       ) : null}
       <div className={mergeClasses(styles.layout, open && current && styles.layoutOpen)}>
-        <div className={styles.scroller}>
+        <div className={styles.scroller} ref={scroller}>
           <div
             className={styles.track}
             role="group"
@@ -485,6 +585,9 @@ export function ReleasesTimeline() {
               return (
                 <div
                   key={r.tag || "in-progress"}
+                  ref={(el) => {
+                    stopBoxes.current[i] = el;
+                  }}
                   className={styles.stop}
                   data-testid="release-stop"
                 >
@@ -497,7 +600,7 @@ export function ReleasesTimeline() {
                           setSelected(i);
                           setMilestone(`${picked.repo}-${picked.number}`);
                           setOpen(true);
-                          stops.current[i]?.focus();
+                          stops.current[i]?.focus({ preventScroll: true });
                         }}
                       />
                     ))}
@@ -550,10 +653,20 @@ export function ReleasesTimeline() {
                 </div>
               );
             })}
+            {spacer > 0 ? (
+              <span className={styles.spacer} style={{ width: spacer }} aria-hidden />
+            ) : null}
           </div>
         </div>
         {open && current ? (
-          <ReleasePanel r={current} id={panelId} selectedMilestone={milestone} onClose={close} />
+          <ReleasePanel
+            r={current}
+            id={panelId}
+            space={space}
+            repo={data?.repo ?? ""}
+            selectedMilestone={milestone}
+            onClose={close}
+          />
         ) : null}
       </div>
     </PanelFrame>

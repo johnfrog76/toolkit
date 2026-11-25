@@ -512,8 +512,9 @@ export const { useGetRitualMilestonesQuery } = milestonesEndpoints;
 // -- Releases (the timeline) ---------------------------------------------
 //
 // The Space's releases, read from its checkout on the agent's machine: the
-// release in progress (the last tag to HEAD, its notes the changelog.d/ entries
-// waiting) first, then each tag newest first with its CHANGELOG.md section. The
+// release in progress (the last tag to the tip of the Space's default branch,
+// its notes the changelog.d/ entries waiting there) first, then each tag merged
+// into that branch, newest first, with its CHANGELOG.md section. The
 // GitHub milestones reached within each ride along when the tracker answered
 // (docs/modules/solitaire-agile.md, "Releases: the timeline"). A READ.
 
@@ -554,8 +555,10 @@ export interface ReleasesResponse {
   ceremony: "releases";
   space: string;
   repo: string;
-  /** false: the checkout was not read; `reason` says why, and there are no releases. */
-  source: { ok: boolean; reason: string };
+  /** false: the checkout was not read; `reason` says why, and there are no releases.
+   *  `ref` is what the release in progress was read to: `origin/<branch>`, the
+   *  local `<branch>`, or `HEAD` when the clone has neither. */
+  source: { ok: boolean; reason: string; ref?: string };
   /** false: no tracker answered; the releases are there, with no milestones. */
   tracker: { ok: boolean; reason: string };
   releases: Release[];
@@ -579,6 +582,50 @@ export const releasesEndpoints = api.injectEndpoints({
 });
 
 export const { useGetRitualReleasesQuery } = releasesEndpoints;
+
+/** The titles of one release's issues, the tracker's: the panel's second read. */
+export interface ReleaseTitlesResponse {
+  space: string;
+  repo: string;
+  /** false: no title was read; the panel keeps the numbers and draws nothing more. */
+  tracker: { ok: boolean; reason: string };
+  /** How many numbers were asked, and how many one read takes. */
+  asked: number;
+  limit: number;
+  /** Ascending; a number GitHub could not resolve is not here. */
+  titles: { number: number; title: string }[];
+}
+
+export const RELEASE_TITLES_QUERY = underBase(RITUALS.releaseTitlesRoute);
+
+/** The titles query for one release's issues; "" asks about the Space you are in. */
+export function releaseTitlesQuery({
+  space,
+  numbers,
+}: {
+  space: string;
+  numbers: number[];
+}): string {
+  const q = new URLSearchParams();
+  if (space) q.set("space", space);
+  q.set("numbers", [...numbers].sort((a, b) => a - b).join(","));
+  return `${RELEASE_TITLES_QUERY}?${q.toString()}`;
+}
+
+export const releaseTitlesEndpoints = api.injectEndpoints({
+  endpoints: (builder) => ({
+    // GET /api/ritual/releases/titles?space=<slug>&numbers=<n,n> -- one batched tracker read
+    getRitualReleaseTitles: builder.query<
+      ReleaseTitlesResponse,
+      { space: string; numbers: number[] }
+    >({
+      query: releaseTitlesQuery,
+      keepUnusedDataFor: CACHE_TTL,
+    }),
+  }),
+});
+
+export const { useGetRitualReleaseTitlesQuery } = releaseTitlesEndpoints;
 
 // -- The org chart (the Org tab) ------------------------------------------
 //

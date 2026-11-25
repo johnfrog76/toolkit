@@ -520,6 +520,11 @@ def rituals_releases_route() -> str:
     return consts()["rituals"]["releasesRoute"]
 
 
+def rituals_release_titles_route() -> str:
+    """One release's issue titles, with the /api prefix: ``/api/ritual/releases/titles``."""
+    return consts()["rituals"]["releaseTitlesRoute"]
+
+
 def changelog_file() -> str:
     """``CHANGELOG.md`` -- a repository's release notes, at its root."""
     return consts()["changelog"]["file"]

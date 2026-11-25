@@ -4,10 +4,12 @@ import {
   ATTEND_QUERY,
   MILESTONES_QUERY,
   RELEASES_QUERY,
+  RELEASE_TITLES_QUERY,
   REMIND_QUERY,
   STANDUP_QUERY,
   TRIAGE_QUERY,
   milestonesQuery,
+  releaseTitlesQuery,
   releasesQuery,
   standupQuery,
   triageQuery,
@@ -67,5 +69,20 @@ describe("the releases query", () => {
   it("asks about a Space by slug, and the one you are in with none", () => {
     expect(releasesQuery("toolkit")).toBe(`${RELEASES_QUERY}?space=toolkit`);
     expect(releasesQuery("")).toBe(RELEASES_QUERY);
+  });
+});
+
+describe("the release titles query", () => {
+  it("is the contract's releaseTitlesRoute under the slice's base", () => {
+    expect(`${API_BASE}/${RELEASE_TITLES_QUERY}`).toBe(RITUALS.releaseTitlesRoute);
+  });
+
+  it("asks for the numbers ascending, as one comma list, and the Space by slug", () => {
+    expect(releaseTitlesQuery({ space: "toolkit", numbers: [12, 8] })).toBe(
+      `${RELEASE_TITLES_QUERY}?space=toolkit&numbers=8%2C12`,
+    );
+    expect(releaseTitlesQuery({ space: "", numbers: [4] })).toBe(
+      `${RELEASE_TITLES_QUERY}?numbers=4`,
+    );
   });
 });

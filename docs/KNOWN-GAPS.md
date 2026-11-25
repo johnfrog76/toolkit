@@ -148,15 +148,23 @@ the file until a person deletes it.
 
 ### The Releases timeline is a first version
 
-**What you see:** Team Agile's Releases timeline reads the Space's checkout as it is checked out: the
-release in progress runs to that clone's `HEAD`, whatever branch it is on, and a tag on another branch
-still counts. Pre-release tags are left off rather than drawn as checkpoints, later plans are not drawn,
-an issue in the side panel is its number with no title, and the flat GitHub milestones list and its award
-are still drawn under the timeline.
+**What you see:** Team Agile's Releases timeline leaves pre-release tags off rather than drawing them as
+checkpoints on the way to their release, draws no later plan, and still draws the flat GitHub milestones
+list and its award under the timeline.
 
 **Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
 
 **Issue:** [#326](https://github.com/johnfrog76/toolkit/issues/326)
+
+### The Releases timeline reads one repository
+
+**What you see:** On a Space that works in several repositories, Team Agile's Releases timeline reads the
+tags, notes and commits of the first one only -- the one whose checkout `spaceCheckouts.<slug>.path` names
+-- so a release cut in another of the Space's repositories is not on it.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#321](https://github.com/johnfrog76/toolkit/issues/321)
 
 ### A webhook set after the agent started is not seen
 
