@@ -192,7 +192,6 @@ export function IssueDetailPage() {
             }
             extra={readable ? <PublicLine show={onStage} /> : undefined}
             url={readable ? data.url : undefined}
-            what="issue link"
             actions={
               readable ? (
                 <>

@@ -27,9 +27,7 @@ const runCommand = jest.fn();
 const suggestReply = jest.fn();
 const refetch = jest.fn();
 const answer: { data?: DetailResponse; isLoading: boolean } = { isLoading: false };
-const card: { data?: { path: string } } = {};
 jest.mock("./api.ado", () => ({
-  useGetPromptDetailQuery: () => ({ ...card }),
   useGetPrCommentDetailQuery: () => ({ ...answer, isError: false, isFetching: false, refetch }),
   useRunCommandMutation: () => [runCommand],
   useSuggestReplyMutation: () => [suggestReply],
@@ -232,19 +230,5 @@ describe("the page heading", () => {
   it("the card's title is the level-one heading", () => {
     mount();
     expect(screen.getByRole("heading", { level: 1, name: "The card" })).toBeTruthy();
-  });
-
-  it("carries the card's File line, from the card's own address", () => {
-    card.data = { path: "/hub/org/current/Task1-card.prompt.md" };
-    mount();
-    expect(screen.getByTestId("file-path").textContent).toContain(
-      "/hub/org/current/Task1-card.prompt.md",
-    );
-    card.data = undefined;
-  });
-
-  it("has no File line when the card's address is not known", () => {
-    mount();
-    expect(screen.queryByTestId("file-path")).toBeNull();
   });
 });

@@ -126,7 +126,6 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
               ) : undefined
             }
             url={readable ? data.url : undefined}
-            what="document link"
             actions={
               readable && data.thread ? (
                 <Button

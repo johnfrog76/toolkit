@@ -116,12 +116,11 @@ Props:
 | `extra`    | `ReactNode`                        | Anything custom under the meta line.                                                                |
 | `path`     | `string`                           | The record's absolute path on this machine, when it is a local file.                                |
 | `url`      | `string`                           | Its address when it is not; read only when there is no `path`. With neither, there is no File line. |
-| `what`     | `string`                           | Names the line on its copy button: `issue link`, `document link`. Default `file path`.              |
 | `actions`  | `ReactNode`                        | Controls before refresh.                                                                            |
 | `refresh`  | `{ onClick, isFetching?, title? }` | The house refresh button, after `actions`.                                                          |
 | `external` | `ReactNode`                        | The link out, always the last control.                                                              |
 
-**Used by:** every record page under `src/modules/`. **Pattern:** `FilePath` for the line, `BackButton`
+**Used by:** every record page under `src/modules/`. **Pattern:** `FilePath` for the line (a fixed label with the copy icon and the address in its tooltip), `BackButton`
 and `RefreshButton` for the controls. **Test:** `DetailHeader.test.tsx`.
 
 ## `ListPanel`

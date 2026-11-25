@@ -21,7 +21,37 @@ const NOT_A_RECORD: Record<string, string> = {
   "solitaireAgile/TriagePage.tsx": "the tracker's queue, a list",
   "solitaireAgile/OrgPage.tsx": "the org's tree, a view over many seats",
   "solitaireAgile/MilestonesPage.tsx": "the releases, a list",
+  "deck/engine/PresenterNotes.tsx":
+    "the presenter's notes window, part of the player; not a page of a record",
 };
+
+/** Panels and landing pages that fill a PanelFrame's headerLeft with a panel's own title. */
+const CARD = "a card or list panel's own title, or a landing page; not one record";
+const PANEL_HEADERS: Record<string, string> = Object.fromEntries(
+  [
+    "ado/ModulesCard.tsx",
+    "ado/DocsLanding.tsx",
+    "ado/CreatePrompt.tsx",
+    "ado/Dashboard.tsx",
+    "ado/ConnectAdoCard.tsx",
+    "ado/FacePicker.tsx",
+    "ado/MilestonesCard.tsx",
+    "ado/PRCommentsList.tsx",
+    "ado/EngagementSummary.tsx",
+    "ado/BurnCard.tsx",
+    "ado/WorkBreakdown.tsx",
+    "ado/IssueReportCard.tsx",
+    "ado/MyPRs.tsx",
+    "ado/SprintVelocity.tsx",
+    "ado/EnvCard.tsx",
+    "ado/DeploysCard.tsx",
+    "ado/DesignList.tsx",
+    "lounge/WordRing.tsx",
+    "lounge/TicTacToe.tsx",
+    "lounge/GoBoard.tsx",
+    "growth/SkillsSnapshot.tsx",
+  ].map((f) => [f, CARD]),
+);
 
 /** Every record page, so removing the component from one is caught too. */
 const RECORD_PAGES = [
@@ -41,22 +71,29 @@ const RECORD_PAGES = [
   "studio/PromptPage.tsx",
 ];
 
-function sources(): { file: string; text: string }[] {
-  const out: { file: string; text: string }[] = [];
-  for (const mod of fs.readdirSync(MODULES)) {
-    const dir = path.join(MODULES, mod);
-    if (!fs.statSync(dir).isDirectory()) continue;
-    for (const name of fs.readdirSync(dir)) {
-      if (!/\.tsx$/.test(name) || /\.test\.tsx$/.test(name)) continue;
-      out.push({ file: `${mod}/${name}`, text: fs.readFileSync(path.join(dir, name), "utf8") });
+function walk(dir: string, rel: string, out: { file: string; text: string }[]) {
+  for (const name of fs.readdirSync(dir)) {
+    const full = path.join(dir, name);
+    if (fs.statSync(full).isDirectory()) {
+      walk(full, `${rel}${name}/`, out);
+    } else if (/\.tsx$/.test(name) && !/\.test\.tsx$/.test(name)) {
+      out.push({ file: `${rel}${name}`, text: fs.readFileSync(full, "utf8") });
     }
   }
+}
+
+function sources(): { file: string; text: string }[] {
+  const out: { file: string; text: string }[] = [];
+  walk(MODULES, "", out);
   return out;
 }
 
 const usesDetailHeader = (text: string) =>
   /^import\s[^;]*\bDetailHeader\b[^;]*from\s+"\.\.\/\.\.\/shared\/DetailHeader"/m.test(text);
-const ownsH1 = (text: string) => /\bas="h1"/.test(text);
+/** An h1 of a file's own, in any of the three shapes JSX has for one. */
+const ownsH1 = (text: string) => /<h1[\s>]|\bas=(?:"h1"|\{\s*["'`]h1["'`]\s*\})/.test(text);
+/** A PanelFrame header filled by hand. */
+const fillsHeaderLeft = (text: string) => /\bheaderLeft=/.test(text);
 const buildsOwnBackButton = (text: string) =>
   /^import\s[^;]*\bBackButton\b[^;]*from\s+"\.\.\/\.\.\/shared\/BackButton"/m.test(text);
 
@@ -74,6 +111,28 @@ describe("every record page draws its header with DetailHeader", () => {
       .filter((s) => ownsH1(s.text) && !usesDetailHeader(s.text) && !(s.file in NOT_A_RECORD))
       .map((s) => s.file);
     expect(offenders).toEqual([]);
+  });
+
+  it("no module file fills a PanelFrame's headerLeft without DetailHeader unless it is named", () => {
+    const offenders = all
+      .filter(
+        (s) =>
+          fillsHeaderLeft(s.text) &&
+          !usesDetailHeader(s.text) &&
+          !(s.file in NOT_A_RECORD) &&
+          !(s.file in PANEL_HEADERS),
+      )
+      .map((s) => s.file);
+    expect(offenders).toEqual([]);
+  });
+
+  it("every panel named as not a record still fills headerLeft by hand", () => {
+    for (const file of Object.keys(PANEL_HEADERS)) {
+      const hit = all.find((s) => s.file === file);
+      expect(hit).toBeDefined();
+      expect(fillsHeaderLeft(hit!.text)).toBe(true);
+      expect(usesDetailHeader(hit!.text)).toBe(false);
+    }
   });
 
   it("no record page wires its own back button", () => {
@@ -96,6 +155,23 @@ describe("every record page draws its header with DetailHeader", () => {
       true,
     );
     expect(usesDetailHeader("// DetailHeader\n")).toBe(false);
+    expect(usesDetailHeader('import { DetailHeader } from "../../shared/DetailHeader";')).toBe(
+      true,
+    );
+  });
+
+  it("the h1 matcher catches each shape, and nothing else", () => {
     expect(ownsH1('<Subtitle2 as="h1">x</Subtitle2>')).toBe(true);
+    expect(ownsH1("<Subtitle2 as={'h1'}>x</Subtitle2>")).toBe(true);
+    expect(ownsH1('<Subtitle2 as={"h1"}>x</Subtitle2>')).toBe(true);
+    expect(ownsH1("<h1>x</h1>")).toBe(true);
+    expect(ownsH1("<h1\n  className={c}\n>x</h1>")).toBe(true);
+    expect(ownsH1('<Subtitle2 as="h2">x</Subtitle2>')).toBe(false);
+    expect(ownsH1("<h10>x</h10>")).toBe(false);
+  });
+
+  it("the header matcher catches headerLeft passed by hand", () => {
+    expect(fillsHeaderLeft("<PanelFrame headerLeft={<b />}>")).toBe(true);
+    expect(fillsHeaderLeft("<PanelFrame headerRight={<b />}>")).toBe(false);
   });
 });

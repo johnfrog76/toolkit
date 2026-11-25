@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { fileLineValue } from "../../shared/fileLineValue.testHelper";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { DocsDocPage } from "./DocsDocPage";
 
@@ -39,15 +40,14 @@ const open = () =>
   );
 
 describe("the docs page header", () => {
-  it("shows the title, the repository and path, and the File line you can copy", () => {
+  it("shows the title, the repository and path, and the File line you can copy", async () => {
     open();
     expect(screen.getByRole("heading", { level: 1, name: "Configuration" })).toBeTruthy();
     expect(screen.getByText("owner/repo")).toBeTruthy();
-    const line = screen.getByTestId("file-path");
-    expect(line.textContent).toContain(
+    expect(await fileLineValue()).toBe(
       "https://github.com/owner/repo/blob/main/docs/CONFIGURATION.md",
     );
-    fireEvent.click(screen.getByRole("button", { name: "Copy the document link" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy the file link" }));
     expect(copyText).toHaveBeenCalledWith(
       "https://github.com/owner/repo/blob/main/docs/CONFIGURATION.md",
     );

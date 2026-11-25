@@ -111,7 +111,6 @@ export function PromptPage() {
               ) : undefined
             }
             path={readable ? data.file_path : undefined}
-            what={readable && data.group === "space" ? "file link" : "file path"}
             refresh={readable ? { onClick: refetch, isFetching } : undefined}
             actions={
               readable ? (

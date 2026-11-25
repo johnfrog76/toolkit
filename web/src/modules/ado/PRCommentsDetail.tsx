@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams } from "react-router";
 import ReactMarkdown from "react-markdown";
 import { markdownPlugins } from "../../shared/markdownPlugins";
 import {
@@ -23,7 +23,6 @@ import { HairlineDivider } from "../../shared/HairlineDivider";
 import { timeAgo, formatDate } from "../../utility/dates";
 import { DetailHeader } from "../../shared/DetailHeader";
 import {
-  ArrowLeftRegular,
   CheckmarkCircleRegular,
   CircleRegular,
   BotRegular,
@@ -35,7 +34,6 @@ import {
 
 import {
   useGetPrCommentDetailQuery,
-  useGetPromptDetailQuery,
   useRunCommandMutation,
   useSuggestReplyMutation,
 } from "./api.ado";
@@ -51,23 +49,6 @@ const useStyles = makeStyles({
     display: "flex",
     flexDirection: "column",
     gap: tokens.spacingVerticalL,
-  },
-  topBar: {
-    display: "flex",
-    alignItems: "center",
-    gap: tokens.spacingHorizontalM,
-    flexWrap: "wrap" as const,
-  },
-  titleArea: {
-    flex: 1,
-    minWidth: 0,
-  },
-  progressRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: tokens.spacingHorizontalS,
-    marginTop: tokens.spacingVerticalXS,
-    flexWrap: "wrap" as const,
   },
   commentCard: {
     padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalM}`,
@@ -258,7 +239,6 @@ export function PRCommentsDetail({
 }: { filename?: string; hideGuide?: boolean } = {}) {
   const params = useParams<{ filename: string }>();
   const filename = filenameProp ?? params.filename;
-  const navigate = useNavigate();
   const styles = useStyles();
 
   const {
@@ -269,9 +249,6 @@ export function PRCommentsDetail({
     isFetching,
     refetch,
   } = useGetPrCommentDetailQuery(filename ?? "", { skip: !filename });
-
-  // The card is the file this round is read from; its detail carries the address.
-  const { data: cardDetail } = useGetPromptDetailQuery(filename ?? "", { skip: !filename });
 
   const [runCommand] = useRunCommandMutation();
   const [suggestReply] = useSuggestReplyMutation();
@@ -442,9 +419,7 @@ export function PRCommentsDetail({
   if (pageError) {
     return (
       <div>
-        <Button appearance="subtle" icon={<ArrowLeftRegular />} onClick={() => navigate("/")}>
-          Back
-        </Button>
+        <DetailHeader />
         <div className={styles.pageErrorBanner} style={{ marginTop: "1rem" }}>
           <Body1>{pageError}</Body1>
         </div>
@@ -475,7 +450,6 @@ export function PRCommentsDetail({
             {detail.round_num > 1 && <Caption1>Round {detail.round_num}</Caption1>}
           </>
         }
-        path={cardDetail?.path}
         refresh={{ onClick: () => refetch(), isFetching }}
       />
 

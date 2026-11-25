@@ -69,18 +69,25 @@ describe("DetailHeader", () => {
     }
   });
 
-  it("File line, case one: an absolute path, copied as it is", () => {
+  it("File line, case one: an absolute path, the label in view and the path in the tooltip", async () => {
     draw({ title: "T", path: "/hub/org/card.md", url: "https://example.test/c" });
-    expect(screen.getByText("/hub/org/card.md")).toBeTruthy();
-    expect(screen.queryByText("https://example.test/c")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Copy the file path" }));
+    const button = screen.getByRole("button", { name: "Copy the file path" });
+    expect(button.textContent).toBe("Copy the file path");
+    fireEvent.focus(button);
+    expect(await screen.findByRole("tooltip")).toHaveProperty("textContent", "/hub/org/card.md");
+    fireEvent.click(button);
     expect(copyText).toHaveBeenCalledWith("/hub/org/card.md");
   });
 
-  it("File line, case two: no path, so the URL, named by what", () => {
-    draw({ title: "T", url: "https://example.test/c", what: "document link" });
-    expect(screen.getByText("https://example.test/c")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Copy the document link" }));
+  it("File line, case two: no path, so the URL, labelled as a link", async () => {
+    draw({ title: "T", url: "https://example.test/c" });
+    const button = screen.getByRole("button", { name: "Copy the file link" });
+    fireEvent.focus(button);
+    expect(await screen.findByRole("tooltip")).toHaveProperty(
+      "textContent",
+      "https://example.test/c",
+    );
+    fireEvent.click(button);
     expect(copyText).toHaveBeenCalledWith("https://example.test/c");
   });
 
@@ -90,8 +97,13 @@ describe("DetailHeader", () => {
     expect(screen.queryByRole("button", { name: /^Copy the/ })).toBeNull();
   });
 
-  it("an empty meta slot draws no meta line", () => {
-    const { container } = draw({ title: "T" });
-    expect(container.querySelectorAll("h1 + div")).toHaveLength(0);
+  it("an empty meta slot draws no meta element; a given one does", () => {
+    draw({ title: "T" });
+    expect(screen.queryByTestId("detail-meta")).toBeNull();
+  });
+
+  it("a meta slot draws its element", () => {
+    draw({ title: "T", meta: <span>m</span> });
+    expect(screen.getByTestId("detail-meta").textContent).toBe("m");
   });
 });

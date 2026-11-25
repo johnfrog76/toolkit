@@ -13,8 +13,8 @@ import { RefreshButton } from "./RefreshButton";
  *   right  `actions`, then refresh, then `external` (the link out) last
  *
  * The File line has one rule: the record's absolute path on this machine when it
- * is a local file (`path`); otherwise its address (`url`), named by `what`
- * ("issue link", "document link"); with neither, no line. Hand the whole thing
+ * is a local file (`path`); otherwise its address (`url`); with neither, no line.
+ * The line is compact (FilePath): a label, the address in its tooltip. Hand the whole thing
  * to PanelFrame's `headerLeft` -- it draws its own right side, so a page passes
  * no `headerRight`.
  *
@@ -71,8 +71,6 @@ export interface DetailHeaderProps {
   path?: string;
   /** Its address when it is not: a URL. Used only when there is no `path`. */
   url?: string;
-  /** What the line is, for the copy button: "issue link", "document link". Unset, "file path". */
-  what?: string;
   /** Buttons that come before refresh. */
   actions?: ReactNode;
   /** The page's refetch; draws the house refresh button. */
@@ -87,7 +85,6 @@ export function DetailHeader({
   extra,
   path,
   url,
-  what,
   actions,
   refresh,
   external,
@@ -102,9 +99,13 @@ export function DetailHeader({
         {title != null && (
           <div className={styles.titleBlock}>
             <Subtitle2 as="h1">{title}</Subtitle2>
-            {meta != null && <div className={styles.meta}>{meta}</div>}
+            {meta != null && (
+              <div className={styles.meta} data-testid="detail-meta">
+                {meta}
+              </div>
+            )}
             {extra}
-            {address ? <FilePath path={address} what={what} /> : null}
+            {address ? <FilePath path={address} /> : null}
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { fileLineValue } from "../../shared/fileLineValue.testHelper";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { ManagerSessionPage } from "./ManagerSessionPage";
 
@@ -44,12 +45,14 @@ function draw(extra: Record<string, unknown>) {
 }
 
 describe("the session page header", () => {
-  it("shows the File line with the session's absolute path", () => {
+  afterEach(() => {
+    detail = {};
+  });
+
+  it("shows the File line with the session's absolute path", async () => {
     draw({ path: "/hub/manager/current/2026-03-10.md" });
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
-    expect(screen.getByTestId("file-path").textContent).toContain(
-      "/hub/manager/current/2026-03-10.md",
-    );
+    expect(await fileLineValue()).toContain("/hub/manager/current/2026-03-10.md");
   });
 
   it("shows no File line when the agent sends no path", () => {

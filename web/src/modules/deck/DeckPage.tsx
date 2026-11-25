@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { Badge, Body1, Caption1, makeStyles, tokens } from "@fluentui/react-components";
 import { SlideTextRegular } from "@fluentui/react-icons";
 import { DetailHeader } from "../../shared/DetailHeader";
+import { FilePath } from "../../shared/FilePath";
 import { CardActions, ROW } from "../../shared/CardActions";
 import { EmptyState } from "../../shared/EmptyState";
 import { PanelFrame } from "../../shared/PanelFrame";
@@ -95,8 +96,6 @@ export function DeckPage() {
                 </>
               ) : undefined
             }
-            path={deck ? deckFilePath(deck.id) : undefined}
-            what="deck file's path"
             actions={
               deck ? (
                 <CardActions
@@ -164,6 +163,12 @@ export function DeckPage() {
               </dt>
               <dd className={styles.value}>
                 <Body1>about {facts.duration}</Body1>
+              </dd>
+              <dt className={styles.term}>
+                <Caption1>Played copy</Caption1>
+              </dt>
+              <dd className={styles.value}>
+                <FilePath path={deckFilePath(deck.id)} />
               </dd>
             </dl>
           </div>
