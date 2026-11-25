@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 import { useLocation, useParams } from "react-router";
-import { Button, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
+import { Button, Caption1, makeStyles, tokens } from "@fluentui/react-components";
 import { BookOpenRegular, OpenRegular } from "@fluentui/react-icons";
 import { useGetDocQuery } from "./api.ado";
 import type { DocDetail } from "./api.ado";
 import { repoLinkBase } from "./docRooms";
-import { BackButton } from "../../shared/BackButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { EmptyState } from "../../shared/EmptyState";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { PanelFrame } from "../../shared/PanelFrame";
@@ -23,20 +23,24 @@ import { RefreshButton } from "../../shared/RefreshButton";
 // the one it has (the query's last answer), then swaps the text in place.
 const useStyles = makeStyles({
   page: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalM, width: "100%" },
-  titleBlock: {
-    display: "flex",
-    flexDirection: "column",
-    rowGap: tokens.spacingVerticalXS,
-    minWidth: 0,
-  },
-  metaRow: {
-    display: "flex",
-    columnGap: tokens.spacingHorizontalS,
-    flexWrap: "wrap",
-    alignItems: "center",
-    color: tokens.colorNeutralForeground3,
-  },
 });
+
+/** The link out to github.com, the header's last control. */
+export function DocOpenButton({ doc }: { doc: DocDetail }) {
+  return doc.url ? (
+    <Button
+      size="small"
+      appearance="subtle"
+      icon={<OpenRegular />}
+      title="Open on GitHub"
+      aria-label="Open on GitHub"
+      as="a"
+      href={doc.url}
+      target="_blank"
+      rel="noopener noreferrer"
+    />
+  ) : null;
+}
 
 /** The header's right side: refresh, then github.com last (the house order). */
 export function DocControls({
@@ -51,19 +55,7 @@ export function DocControls({
   return (
     <>
       <RefreshButton onClick={refetch} isFetching={isFetching} />
-      {doc.url ? (
-        <Button
-          size="small"
-          appearance="subtle"
-          icon={<OpenRegular />}
-          title="Open on GitHub"
-          aria-label="Open on GitHub"
-          as="a"
-          href={doc.url}
-          target="_blank"
-          rel="noopener noreferrer"
-        />
-      ) : null}
+      <DocOpenButton doc={doc} />
     </>
   );
 }
@@ -121,23 +113,20 @@ export function DocsDocPage() {
         loadingLabel="Reading the document..."
         empty={readable ? undefined : docEmpty(path, data, error)}
         headerLeft={
-          <>
-            <BackButton />
-            {readable && (
-              <div className={styles.titleBlock}>
-                <Subtitle2 as="h1">{data.title}</Subtitle2>
-                <div className={styles.metaRow}>
+          <DetailHeader
+            title={readable ? data.title : undefined}
+            meta={
+              readable ? (
+                <>
                   <Caption1>{data.repo}</Caption1>
                   <Caption1>{data.path}</Caption1>
-                </div>
-              </div>
-            )}
-          </>
-        }
-        headerRight={
-          readable ? (
-            <DocControls doc={data} refetch={refetch} isFetching={isFetching} />
-          ) : undefined
+                </>
+              ) : undefined
+            }
+            url={readable ? data.url : undefined}
+            refresh={readable ? { onClick: refetch, isFetching } : undefined}
+            external={readable ? <DocOpenButton doc={data} /> : undefined}
+          />
         }
       >
         {readable && (

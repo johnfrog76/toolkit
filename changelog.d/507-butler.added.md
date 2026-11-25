@@ -1,0 +1,1 @@
+- A sixth role ships in `agentic/org/`, the butler: once a week it gives every design note and spec with no id its own with `StampDesign`, brings the seat it reports to the designs whose work has shipped, with the evidence, and archives each one that seat says yes to with `MoveDesign`. The sample hub's `org.json` seats it under the VP of product.
