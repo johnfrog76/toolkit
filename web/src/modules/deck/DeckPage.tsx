@@ -1,11 +1,10 @@
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router";
-import { Badge, Body1, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
+import { Badge, Body1, Caption1, makeStyles, tokens } from "@fluentui/react-components";
 import { SlideTextRegular } from "@fluentui/react-icons";
-import { BackButton } from "../../shared/BackButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { CardActions, ROW } from "../../shared/CardActions";
 import { EmptyState } from "../../shared/EmptyState";
-import { FilePath } from "../../shared/FilePath";
 import { PanelFrame } from "../../shared/PanelFrame";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { DECKS } from "./decks/index";
@@ -25,20 +24,6 @@ import { useDeckArchive } from "./useDeckArchive";
 
 const useStyles = makeStyles({
   page: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalM, width: "100%" },
-  titleBlock: {
-    display: "flex",
-    flexDirection: "column",
-    rowGap: tokens.spacingVerticalXS,
-    minWidth: 0,
-  },
-  metaRow: {
-    display: "flex",
-    columnGap: tokens.spacingHorizontalS,
-    rowGap: tokens.spacingVerticalXXS,
-    flexWrap: "wrap",
-    alignItems: "center",
-    color: tokens.colorNeutralForeground3,
-  },
   body: {
     display: "flex",
     flexDirection: "column",
@@ -91,12 +76,11 @@ export function DeckPage() {
       <PanelFrame
         empty={empty}
         headerLeft={
-          <>
-            <BackButton />
-            {deck && (
-              <div className={styles.titleBlock}>
-                <Subtitle2 as="h1">{deck.title}</Subtitle2>
-                <div className={styles.metaRow}>
+          <DetailHeader
+            title={deck?.title}
+            meta={
+              deck ? (
+                <>
                   <Badge appearance="tint" color="brand" size="small">
                     deck
                   </Badge>
@@ -108,26 +92,30 @@ export function DeckPage() {
                       archived on this machine
                     </Badge>
                   ) : null}
-                </div>
-              </div>
-            )}
-          </>
-        }
-        headerRight={
-          deck ? (
-            <CardActions
-              primaryAction={DECK_MOVES.play.action({
-                onClick: () => navigate(deckPlayPath(deck.id)),
-              })}
-              menuLabel={`Actions for ${deck.title}`}
-              busy={busy}
-              secondaryActions={[
-                away
-                  ? DECK_MOVES.unarchive.action({ onClick: () => void setArchived(deck.id, false) })
-                  : ROW.archive.action({ onClick: () => void setArchived(deck.id, true) }),
-              ]}
-            />
-          ) : undefined
+                </>
+              ) : undefined
+            }
+            path={deck ? deckFilePath(deck.id) : undefined}
+            what="deck file's path"
+            actions={
+              deck ? (
+                <CardActions
+                  primaryAction={DECK_MOVES.play.action({
+                    onClick: () => navigate(deckPlayPath(deck.id)),
+                  })}
+                  menuLabel={`Actions for ${deck.title}`}
+                  busy={busy}
+                  secondaryActions={[
+                    away
+                      ? DECK_MOVES.unarchive.action({
+                          onClick: () => void setArchived(deck.id, false),
+                        })
+                      : ROW.archive.action({ onClick: () => void setArchived(deck.id, true) }),
+                  ]}
+                />
+              ) : undefined
+            }
+          />
         }
       >
         {deck && facts && (
@@ -176,12 +164,6 @@ export function DeckPage() {
               </dt>
               <dd className={styles.value}>
                 <Body1>about {facts.duration}</Body1>
-              </dd>
-              <dt className={styles.term}>
-                <Caption1>Played copy</Caption1>
-              </dt>
-              <dd className={styles.value}>
-                <FilePath path={deckFilePath(deck.id)} what="deck file's path" />
               </dd>
             </dl>
           </div>

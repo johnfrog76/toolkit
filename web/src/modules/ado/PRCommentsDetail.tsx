@@ -4,7 +4,6 @@ import ReactMarkdown from "react-markdown";
 import { markdownPlugins } from "../../shared/markdownPlugins";
 import {
   Card,
-  Title2,
   Title3,
   Body1,
   Body2,
@@ -22,7 +21,7 @@ import {
 } from "@fluentui/react-components";
 import { HairlineDivider } from "../../shared/HairlineDivider";
 import { timeAgo, formatDate } from "../../utility/dates";
-import { RefreshButton } from "../../shared/RefreshButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import {
   ArrowLeftRegular,
   CheckmarkCircleRegular,
@@ -36,6 +35,7 @@ import {
 
 import {
   useGetPrCommentDetailQuery,
+  useGetPromptDetailQuery,
   useRunCommandMutation,
   useSuggestReplyMutation,
 } from "./api.ado";
@@ -270,6 +270,9 @@ export function PRCommentsDetail({
     refetch,
   } = useGetPrCommentDetailQuery(filename ?? "", { skip: !filename });
 
+  // The card is the file this round is read from; its detail carries the address.
+  const { data: cardDetail } = useGetPromptDetailQuery(filename ?? "", { skip: !filename });
+
   const [runCommand] = useRunCommandMutation();
   const [suggestReply] = useSuggestReplyMutation();
   const { data: env } = useGetEnvQuery();
@@ -457,14 +460,11 @@ export function PRCommentsDetail({
 
   return (
     <div className={styles.page}>
-      {/* ── Top bar ── */}
-      <div className={styles.topBar}>
-        <Button appearance="subtle" icon={<ArrowLeftRegular />} onClick={() => navigate("/")}>
-          Back
-        </Button>
-        <div className={styles.titleArea}>
-          <Title2 as="h1">{detail.title || detail.file}</Title2>
-          <div className={styles.progressRow}>
+      {/* ── Header ── */}
+      <DetailHeader
+        title={detail.title || detail.file}
+        meta={
+          <>
             <Badge appearance="filled" color={openCount > 0 ? "danger" : "success"} size="medium">
               {openCount} open
             </Badge>
@@ -473,10 +473,11 @@ export function PRCommentsDetail({
             </Badge>
             <Caption1>PR {detail.pr_id}</Caption1>
             {detail.round_num > 1 && <Caption1>Round {detail.round_num}</Caption1>}
-          </div>
-        </div>
-        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
-      </div>
+          </>
+        }
+        path={cardDetail?.path}
+        refresh={{ onClick: () => refetch(), isFetching }}
+      />
 
       <HairlineDivider />
 

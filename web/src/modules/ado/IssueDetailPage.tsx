@@ -1,14 +1,6 @@
 import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
-import {
-  Badge,
-  Button,
-  Caption1,
-  Select,
-  Subtitle2,
-  makeStyles,
-  tokens,
-} from "@fluentui/react-components";
+import { Badge, Button, Caption1, Select, makeStyles, tokens } from "@fluentui/react-components";
 import {
   CheckmarkCircleRegular,
   DocumentAddRegular,
@@ -22,13 +14,11 @@ import type { CommandResponse, IssueDetail } from "./api.ado";
 import { commandResultMessage } from "./cliBridge";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { trackerName } from "./TrackerBadge";
-import { BackButton } from "../../shared/BackButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { EmptyState } from "../../shared/EmptyState";
-import { FilePath } from "../../shared/FilePath";
 import { PublicLine, useActiveSpaceIsPublic } from "../../shared/visibility";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { PanelFrame } from "../../shared/PanelFrame";
-import { RefreshButton } from "../../shared/RefreshButton";
 import { ActionDialog } from "./ActionDialog";
 import type { ActionDialogTab } from "./ActionDialog";
 
@@ -46,20 +36,6 @@ const useStyles = makeStyles({
     flexDirection: "column",
     gap: tokens.spacingVerticalM,
     width: "100%",
-  },
-  titleBlock: {
-    display: "flex",
-    flexDirection: "column",
-    rowGap: tokens.spacingVerticalXS,
-    minWidth: 0,
-  },
-  metaRow: {
-    display: "flex",
-    columnGap: tokens.spacingHorizontalS,
-    rowGap: tokens.spacingVerticalXXS,
-    flexWrap: "wrap",
-    alignItems: "center",
-    color: tokens.colorNeutralForeground3,
   },
 });
 
@@ -164,14 +140,11 @@ export function IssueDetailPage() {
         loadingLabel="Loading issue..."
         empty={empty}
         headerLeft={
-          <>
-            <BackButton />
-            {readable && (
-              <div className={styles.titleBlock}>
-                <Subtitle2 as="h1">
-                  #{data.number} {data.title}
-                </Subtitle2>
-                <div className={styles.metaRow}>
+          <DetailHeader
+            title={readable ? `#${data.number} ${data.title}` : undefined}
+            meta={
+              readable ? (
+                <>
                   <Badge
                     color={data.state === "open" ? "success" : "informative"}
                     appearance="tint"
@@ -214,82 +187,85 @@ export function IssueDetailPage() {
                     {data.author} opened {data.created}
                     {data.closed ? ` -- closed ${data.closed}` : ""}
                   </Caption1>
-                </div>
-                {/* The record's address, as every detail page carries its file's:
-                    what goes into a chat with an agent. */}
-                <FilePath path={data.url} what="issue link" />
-                <PublicLine show={onStage} />
-              </div>
-            )}
-          </>
-        }
-        headerRight={
-          readable ? (
-            <>
-              {/* The triage half: sev changed in place, through the
+                </>
+              ) : undefined
+            }
+            extra={readable ? <PublicLine show={onStage} /> : undefined}
+            url={readable ? data.url : undefined}
+            what="issue link"
+            actions={
+              readable ? (
+                <>
+                  {/* The triage half: sev changed in place, through the
                   same verb the CLI types. */}
-              <Select
-                size="small"
-                aria-label="Severity"
-                value={sev ?? ""}
-                disabled={editing}
-                onChange={async (_e, d) => {
-                  if (d.value === (sev ?? "")) return;
-                  // The mutation invalidates this issue's tag; the store
-                  // refetches, no refetch() by hand.
-                  await editWorkItem({
-                    id: data.number,
-                    addTag: d.value || undefined,
-                    removeTag: sev,
-                  });
-                }}
-              >
-                <option value="">no sev</option>
-                <option value="sev1">sev1</option>
-                <option value="sev2">sev2</option>
-                <option value="sev3">sev3</option>
-              </Select>
-              {/* Compact, as the 1:1 page's header is: icons with a title, and
+                  <Select
+                    size="small"
+                    aria-label="Severity"
+                    value={sev ?? ""}
+                    disabled={editing}
+                    onChange={async (_e, d) => {
+                      if (d.value === (sev ?? "")) return;
+                      // The mutation invalidates this issue's tag; the store
+                      // refetches, no refetch() by hand.
+                      await editWorkItem({
+                        id: data.number,
+                        addTag: d.value || undefined,
+                        removeTag: sev,
+                      });
+                    }}
+                  >
+                    <option value="">no sev</option>
+                    <option value="sev1">sev1</option>
+                    <option value="sev2">sev2</option>
+                    <option value="sev3">sev3</option>
+                  </Select>
+                  {/* Compact, as the 1:1 page's header is: icons with a title, and
                   words only on the step a reader came here to take. */}
-              <Button
-                size="small"
-                appearance="subtle"
-                icon={<CheckmarkCircleRegular />}
-                title="Close issue"
-                onClick={() => setDialog({ open: true, tab: "resolve" })}
-              />
-              {/* The same Pin / Unpin the row's menu holds, through
+                  <Button
+                    size="small"
+                    appearance="subtle"
+                    icon={<CheckmarkCircleRegular />}
+                    title="Close issue"
+                    onClick={() => setDialog({ open: true, tab: "resolve" })}
+                  />
+                  {/* The same Pin / Unpin the row's menu holds, through
                   EditItem; the mutation invalidates this issue and the list. */}
-              <Button
-                size="small"
-                appearance="subtle"
-                icon={data.pinned ? <PinOffRegular /> : <PinRegular />}
-                title={data.pinned ? "Unpin" : `Pin on ${tracker}`}
-                aria-label={data.pinned ? "Unpin" : `Pin on ${tracker}`}
-                disabled={editing}
-                onClick={() => void togglePin(data)}
-              />
-              <Button
-                size="small"
-                appearance="subtle"
-                icon={<OpenRegular />}
-                title={`Open on ${tracker}`}
-                as="a"
-                href={data.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              />
-              <Button
-                size="small"
-                appearance="subtle"
-                icon={<DocumentAddRegular />}
-                onClick={() => setDialog({ open: true, tab: "create" })}
-              >
-                Make a card
-              </Button>
-              <RefreshButton onClick={refetch} isFetching={isFetching} />
-            </>
-          ) : undefined
+                  <Button
+                    size="small"
+                    appearance="subtle"
+                    icon={data.pinned ? <PinOffRegular /> : <PinRegular />}
+                    title={data.pinned ? "Unpin" : `Pin on ${tracker}`}
+                    aria-label={data.pinned ? "Unpin" : `Pin on ${tracker}`}
+                    disabled={editing}
+                    onClick={() => void togglePin(data)}
+                  />
+                  <Button
+                    size="small"
+                    appearance="subtle"
+                    icon={<DocumentAddRegular />}
+                    onClick={() => setDialog({ open: true, tab: "create" })}
+                  >
+                    Make a card
+                  </Button>
+                </>
+              ) : undefined
+            }
+            refresh={readable ? { onClick: refetch, isFetching } : undefined}
+            external={
+              readable ? (
+                <Button
+                  size="small"
+                  appearance="subtle"
+                  icon={<OpenRegular />}
+                  title={`Open on ${tracker}`}
+                  as="a"
+                  href={data.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                />
+              ) : undefined
+            }
+          />
         }
       >
         {readable && (

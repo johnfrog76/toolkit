@@ -1,15 +1,13 @@
 import { useState } from "react";
 import { useParams } from "react-router";
-import { Badge, Caption1, Link, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
+import { Badge, Caption1, Link, makeStyles, tokens } from "@fluentui/react-components";
 import { SparkleRegular } from "@fluentui/react-icons";
-import { BackButton } from "../../shared/BackButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { CardActions, ROW } from "../../shared/CardActions";
 import { copyText } from "../../shared/copyText";
 import { EmptyState } from "../../shared/EmptyState";
-import { FilePath } from "../../shared/FilePath";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { PanelFrame } from "../../shared/PanelFrame";
-import { RefreshButton } from "../../shared/RefreshButton";
 import { useGetPromptQuery } from "./api.studio";
 import { promptReference } from "./PromptsCard";
 import { groupLabel, senderLabel, workflowLabel } from "./prompts";
@@ -25,20 +23,6 @@ import { groupLabel, senderLabel, workflowLabel } from "./prompts";
 // copy of yours runs instead of ToolKit's.
 const useStyles = makeStyles({
   page: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalM, width: "100%" },
-  titleBlock: {
-    display: "flex",
-    flexDirection: "column",
-    rowGap: tokens.spacingVerticalXS,
-    minWidth: 0,
-  },
-  metaRow: {
-    display: "flex",
-    columnGap: tokens.spacingHorizontalS,
-    rowGap: tokens.spacingVerticalXXS,
-    flexWrap: "wrap",
-    alignItems: "center",
-    color: tokens.colorNeutralForeground3,
-  },
   copied: { color: tokens.colorPaletteGreenForeground1 },
 });
 
@@ -81,12 +65,11 @@ export function PromptPage() {
         loadingLabel="Reading the prompt..."
         empty={empty}
         headerLeft={
-          <>
-            <BackButton />
-            {readable && (
-              <div className={styles.titleBlock}>
-                <Subtitle2 as="h1">{data.title || data.name}</Subtitle2>
-                <div className={styles.metaRow}>
+          <DetailHeader
+            title={readable ? data.title || data.name : undefined}
+            meta={
+              readable ? (
+                <>
                   <Badge
                     appearance="tint"
                     size="small"
@@ -124,38 +107,41 @@ export function PromptPage() {
                   {data.overrides ? (
                     <Caption1>runs instead of ToolKit&apos;s on this machine</Caption1>
                   ) : null}
-                </div>
-              </div>
-            )}
-          </>
-        }
-        headerRight={
-          readable ? (
-            <>
-              {copied ? <Caption1 className={styles.copied}>Copied the {copied}</Caption1> : null}
-              <CardActions
-                primaryAction={ROW.copy.action({ detail: "prompt", onClick: () => void copy() })}
-                menuLabel={`Actions for ${data.name}`}
-                secondaryActions={[
-                  ROW.copy.action({
-                    detail: "reference",
-                    onClick: () => {
-                      void copyText(promptReference(data)).then(() => setCopied("reference"));
-                    },
-                  }),
-                ]}
-              />
-              <RefreshButton onClick={refetch} isFetching={isFetching} />
-            </>
-          ) : undefined
+                </>
+              ) : undefined
+            }
+            path={readable ? data.file_path : undefined}
+            what={readable && data.group === "space" ? "file link" : "file path"}
+            refresh={readable ? { onClick: refetch, isFetching } : undefined}
+            actions={
+              readable ? (
+                <>
+                  {copied ? (
+                    <Caption1 className={styles.copied}>Copied the {copied}</Caption1>
+                  ) : null}
+                  <CardActions
+                    primaryAction={ROW.copy.action({
+                      detail: "prompt",
+                      onClick: () => void copy(),
+                    })}
+                    menuLabel={`Actions for ${data.name}`}
+                    secondaryActions={[
+                      ROW.copy.action({
+                        detail: "reference",
+                        onClick: () => {
+                          void copyText(promptReference(data)).then(() => setCopied("reference"));
+                        },
+                      }),
+                    ]}
+                  />
+                </>
+              ) : undefined
+            }
+          />
         }
       >
         {readable && (
           <>
-            <FilePath
-              path={data.file_path}
-              what={data.group === "space" ? "file link" : "file path"}
-            />
             <MarkdownViewer
               content={data.body}
               titleAbove={data.title || data.name}
