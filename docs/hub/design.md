@@ -222,16 +222,26 @@ before anything is moved, stamped or printed as done, `-WhatIf` included:
 | an `**Outcome:**` whose word is neither `shipped` nor `dropped` (`Shipped 2026-11-20`, `maybe`, nothing) | either archive -- the line reads as no outcome while the Journey would name one; make it one of the two words or take it out |
 | `**Outcome:** dropped` on the spec or the note | `-To Complete` (it would read Archived while the Journey says built) |
 | `> Docs: <path>` naming another path than `-Doc` | `-To Complete` |
-| a spec already in `spec/archive/`, the note still in `design/` | `-To Archive`, with or without `-Dropped` -- the spec's move already recorded what became of the design; move the note into `design/archive/` by hand to finish it |
+| a spec already in `spec/archive/`, the note still in `design/` | `-To Archive` (and `-To Archive -Dropped` when the spec was completed) -- the spec's move already recorded what became of the design; the hint names the move that finishes it, below |
+| that shape, and a `-Doc` other than the spec's `> Docs:` line, or any `-Doc` when the spec has none | `-To Complete` -- finishing the completion changes nothing in the spec |
 
 A line that agrees with the move -- the outcome word ignoring case, the same `-Doc` path -- is kept and not
 written twice, and the move's output says `keep` for it. After any move, the word in the file, the word
 printed and the word in the note's Journey are the same.
 
-**The one hand move.** The last row is the one case where a design file is moved by hand: an exception to
-"a design leaves a folder only through the move verb", until `MoveDesign` gains a move that finishes the
-completion its spec's move started ([#582](https://github.com/johnfrog76/toolkit/issues/582)).
-Known gap: [A completed design's live note is moved by hand](../KNOWN-GAPS.md#a-completed-designs-live-note-is-moved-by-hand).
+**Finishing the move a spec already made.** A design can be left half moved: its spec in `spec/archive/`,
+its note still in `design/`. The note then follows its spec, through the verb like every other move:
+
+- **A completed spec:** `{cliPrefix}MoveDesign <id> -To Complete`, with no `-Doc`, since the spec's own
+  `> Docs:` line already names the document. A `-Doc` that is the same path is accepted and changes nothing.
+- **A spec archived `dropped`:** `{cliPrefix}MoveDesign <id> -To Archive -Dropped -Reason <text>`, which
+  also stamps `**Outcome:** dropped` on the note.
+
+Either way the note moves to `design/archive/` and is stamped `**Closed:**` with the date the spec carries,
+not today's; a spec with no `**Closed:**` line leaves the note stamped today, said in one `Note:` line.
+The Journey line says the note followed its spec (`- <today> Complete: this note followed its spec,
+completed <date>. The docs are <path>. ...`), the spec is not touched, and the design then reads with no
+mismatch. `-WhatIf` prints the same move, stamp and Journey line and writes nothing.
 
 ## Marking a live design finished
 
@@ -291,12 +301,13 @@ held, with the verb's own sentence. A line under ready is one that can be run as
 | either, with open cards in a Space's `current/` naming its id | ready, with a note | the call, then the open cards by name. The mark is the decision; the move does not wait for them |
 | a Space-folder spec (`-Hub -Space`) whose Space's repository has no clone here | ready, with a note | the call, then `MoveDesign`'s own `Note:` sentence: the path is taken as written, not checked |
 | a live spec whose note is already in `design/archive/` | ready, with a note | the call, then that the completion journals onto the archived note |
+| a note left in `design/` after its spec was completed (Complete) | ready, with a note | `MoveDesign <id> -To Complete [flags]`, with no `-Doc`, then that the move finishes the completion and changes nothing in the spec |
 | a ready design whose call `MoveDesign` would refuse (the Docs path missing where it can be checked, a file of that name already archived) | held | `MoveDesign would refuse it:` and the verb's own sentence |
 | a live note marked `dropped` | held | that dropping is a decision with its reason, and the `-To Archive -Dropped -Reason` call to make it |
 | a live note whose `**Outcome:**` is neither word (`maybe`, `shipped 2026-11-20`) | held | that the line is no mark, and the line that would be |
 | a live spec with a Docs line, and a note or spec marked `dropped` | held | that the two marks disagree |
 | a live spec with no Docs line, and an `**Outcome:**` line on the note or the spec | held | that a Spec is marked finished by a Docs line in the spec |
-| a note left in `design/` after its spec was archived (Complete or Archived) | held | the state, both paths, and [the one hand move](../KNOWN-GAPS.md#a-completed-designs-live-note-is-moved-by-hand) that finishes it |
+| a note left in `design/` after its spec was archived `dropped` (Archived) | held | the state, both paths, and the `-To Archive -Dropped -Reason` call that finishes the drop |
 | a live design with no mark, or any archived design | not listed | |
 
 Every call names the design by its full id and carries the same scope flags `-Ready` was given.
@@ -311,7 +322,9 @@ Every call names the design by its full id and carries the same scope flags `-Re
 
 `args` is the call's arguments after the verb, one element each, so a caller need not parse `call`. The
 `Design lifecycle` row's `N ready` counts what the rule says; `-Ready` may hold one of those when
-`MoveDesign` would refuse its call, so its own count can be lower.
+`MoveDesign` would refuse its call, so its own count can be lower, and it also lists a note left behind
+after its spec completed, which the rule does not call ready (the design is already Complete), so its
+count can be higher.
 
 ## Examples
 

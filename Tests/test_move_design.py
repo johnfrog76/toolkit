@@ -614,8 +614,148 @@ class TheMoveDesignVerb(unittest.TestCase):
             out = self.assert_refused(
                 args, "'Board ideas' is Complete: its spec is already spec/archive/board-ideas.spec.md"
             )
-            self.assertIn("design/archive/", out)
+            self.assertIn("tkMoveDesign board-ideas -To Complete", out)
+            self.assertNotIn("by hand", out)
+            self.assertNotIn("git mv", out)
             self.assertNotIn("shipped as written", out)
+
+    # -- Finishing a completion its spec's move started ---------------------------------
+
+    LEFT_SPEC = (
+        f"---\nid: {ID_A}\n---\n\n# Board ideas (spec)\n\n{DOCS} docs/board.md\n\nContract.\n\n{CLOSED} 2026-10-05\n"
+    )
+
+    def left_behind(self, spec_text: str | None = None) -> Path:
+        """board-ideas half completed: its spec in spec/archive/, its note still in design/."""
+        path = self.repo / "spec/archive/board-ideas.spec.md"
+        self.write(path, spec_text if spec_text is not None else self.LEFT_SPEC)
+        self.commit(self.repo)
+        return path
+
+    def tree_row(self, id_: str) -> str:
+        """The reader's State and Mismatch for one design, as `STATE=<s> MISMATCH=<b>`."""
+        out = self.run_verbs(
+            ". (Join-Path (Get-P20ModuleState).PackageRoot 'Scripts/Read-DesignTree.ps1'); "
+            "$t = Read-P20DesignTree -DesignDir (Join-Path (Get-Location) 'design') "
+            "-SpecDir (Join-Path (Get-Location) 'spec') -Base (Get-Location).Path; "
+            f"$d = @($t.Designs | Where-Object {{ $_.Id -eq '{id_}' }})[0]; "
+            "'STATE=' + $d.State + ' MISMATCH=' + $d.Mismatch"
+        )
+        m = re.search(r"STATE=\S+ MISMATCH=\S+", out)
+        self.assertIsNotNone(m, out)
+        return m.group(0)
+
+    def test_to_complete_finishes_a_completion_its_spec_started(self):
+        spec_path = self.left_behind()
+        spec_before = spec_path.read_bytes()
+        self.assertEqual(self.tree_row(ID_A), "STATE=Complete MISMATCH=True")
+        before = self.snapshot(self.repo)
+        dry = self.move("board-ideas -To Complete -WhatIf")
+        self.assertIn("X=0", dry)
+        self.assertEqual(self.snapshot(self.repo), before, "-WhatIf wrote something")
+        self.assertEqual(_staged(self.repo), [])
+        out = self.move("board-ideas -To Complete")
+        self.assertIn("X=0", out)
+        self.assertNotIn("Error:", out)
+        # -WhatIf printed exactly what the real run did, each line as `Would <verb>`.
+        said = [line for line in out.splitlines() if re.match(r"^(Move|Keep|Stamp|Append|Write) ", line)]
+        would = [line for line in dry.splitlines() if line.startswith("Would ")]
+        self.assertTrue(said, out)
+        self.assertEqual(would, ["Would " + line[0].lower() + line[1:] for line in said])
+        self.assertIn("Move design/board-ideas.md -> design/archive/board-ideas.md", said)
+        # The note followed its spec: moved, closed on the spec's date, the Journey says so.
+        self.assertFalse((self.repo / "design/board-ideas.md").exists())
+        note = self.read(self.repo / "design/archive/board-ideas.md")
+        self.assertRegex(note, rf"{re.escape(CLOSED)} 2026-10-05\n$")
+        self.assertNotIn(OUTCOME, note)
+        self.assertRegex(
+            note,
+            r"- 2026-10-01 Design: written as design/board-ideas\.md in o/r\. Thread: \S+\n- "
+            + TODAY_RX
+            + r" Complete: this note followed its spec, completed 2026-10-05\. The docs are docs/board\.md\. "
+            r"This note is now design/archive/board-ideas\.md and the spec is spec/archive/board-ideas\.spec\.md, "
+            r"in o/r\.\n",
+        )
+        # The spec is not touched, and only the note's move is staged.
+        self.assertEqual(spec_path.read_bytes(), spec_before)
+        self.assertEqual(_staged(self.repo), ["A  design/archive/board-ideas.md", "D  design/board-ideas.md"])
+        self.assertEqual(_git(self.repo, "rev-list", "--count", "HEAD").strip(), "2")
+        self.assertEqual(self.tree_row(ID_A), "STATE=Complete MISMATCH=False")
+
+    def test_finishing_takes_the_specs_own_doc_and_refuses_another(self):
+        self.left_behind()
+        for what_if in ("", " -WhatIf"):
+            out = self.assert_refused(
+                f"board-ideas -To Complete -Doc docs/other.md{what_if}",
+                f"spec/archive/board-ideas.spec.md already carries '{DOCS} docs/board.md', "
+                "and -Doc names docs/other.md",
+            )
+            self.assertIn("tkMoveDesign board-ideas -To Complete", out)
+            self.assertNotIn("Would ", out)
+        spec_before = (self.repo / "spec/archive/board-ideas.spec.md").read_bytes()
+        out = self.move("board-ideas -To Complete -Doc ./docs/board.md")
+        self.assertIn("X=0", out)
+        self.assertEqual((self.repo / "spec/archive/board-ideas.spec.md").read_bytes(), spec_before)
+        self.assertTrue((self.repo / "design/archive/board-ideas.md").exists())
+
+    def test_finishing_a_spec_with_no_docs_line_or_closed_date(self):
+        # The spec was moved with neither line: the note follows, dated today and said so,
+        # and a -Doc it cannot write into the archived spec is refused.
+        spec_path = self.left_behind(f"---\nid: {ID_A}\n---\n\n# Board ideas (spec)\n")
+        self.assert_refused(
+            "board-ideas -To Complete -Doc docs/board.md",
+            f"spec/archive/board-ideas.spec.md carries no '{DOCS}' line, and finishing its completion",
+        )
+        spec_before = spec_path.read_bytes()
+        out = self.move("board-ideas -To Complete")
+        self.assertIn("X=0", out)
+        self.assertIn("Note: spec/archive/board-ideas.spec.md carries no " + CLOSED, out)
+        note = self.read(self.repo / "design/archive/board-ideas.md")
+        self.assertRegex(note, rf"{re.escape(CLOSED)} {TODAY_RX}\n$")
+        self.assertRegex(note, TODAY_RX + r" Complete: this note followed its spec\. This note is now ")
+        self.assertEqual(spec_path.read_bytes(), spec_before)
+
+    def test_finishing_refuses_a_note_that_says_dropped(self):
+        self.left_behind()
+        self.write(self.repo / "design/board-ideas.md", self.NOTE + f"{OUTCOME} dropped\n")
+        self.commit(self.repo)
+        self.assert_refused(
+            "board-ideas -To Complete",
+            f"design/board-ideas.md already carries '{OUTCOME} dropped', and -To Complete would record it built",
+        )
+
+    def test_a_dropped_spec_left_behind_is_finished_by_archive_dropped(self):
+        spec_path = self.left_behind(
+            f"---\nid: {ID_A}\n---\n\n# Board ideas (spec)\n\nContract.\n\n{CLOSED} 2026-10-06\n{OUTCOME} dropped\n"
+        )
+        spec_before = spec_path.read_bytes()
+        self.assertEqual(self.tree_row(ID_A), "STATE=Archived MISMATCH=True")
+        out = self.assert_refused("board-ideas -To Archive", "'Board ideas' is Archived: its spec is already")
+        self.assertIn('tkMoveDesign board-ideas -To Archive -Dropped -Reason "..."', out)
+        self.assertNotIn("by hand", out)
+        out = self.assert_refused(
+            "board-ideas -To Complete",
+            f"spec/archive/board-ideas.spec.md already carries '{OUTCOME} dropped', "
+            "and -To Complete would record it built",
+        )
+        before = self.snapshot(self.repo)
+        dry = self.move('board-ideas -To Archive -Dropped -Reason "Not needed." -WhatIf')
+        self.assertIn("X=0", dry)
+        self.assertEqual(self.snapshot(self.repo), before)
+        out = self.move('board-ideas -To Archive -Dropped -Reason "Not needed."')
+        self.assertIn("X=0", out)
+        said = [line for line in out.splitlines() if re.match(r"^(Move|Keep|Stamp|Append) ", line)]
+        would = [line for line in dry.splitlines() if line.startswith("Would ")]
+        self.assertEqual(would, ["Would " + line[0].lower() + line[1:] for line in said])
+        note = self.read(self.repo / "design/archive/board-ideas.md")
+        self.assertRegex(note, rf"{re.escape(CLOSED)} 2026-10-06\n{re.escape(OUTCOME)} dropped\n$")
+        self.assertRegex(
+            note,
+            TODAY_RX + r" Dropped: this note followed its spec, dropped 2026-10-06\. Not needed\. This note is now "
+            r"design/archive/board-ideas\.md and the spec is spec/archive/board-ideas\.spec\.md, in o/r\.\n",
+        )
+        self.assertEqual(spec_path.read_bytes(), spec_before)
+        self.assertEqual(self.tree_row(ID_A), "STATE=Archived MISMATCH=False")
 
     # -- Naming the design ------------------------------------------------------------
 
@@ -907,6 +1047,11 @@ class TheMoveDesignVerb(unittest.TestCase):
         self.write(r / "spec/archive/m12-done.spec.md", spec(12, "Done (spec)", f"{DOCS} docs/board.md\n\n"))
         self.write(r / "design/m13-left.md", note(13, "Left behind", f"\n{OUTCOME} shipped\n"))
         self.write(r / "spec/archive/m13-left.spec.md", spec(13, "Left (spec)", f"{CLOSED} 2026-10-02\n\n"))
+        self.write(r / "design/m14-left-dropped.md", note(14, "Left behind a drop"))
+        self.write(
+            r / "spec/archive/m14-left-dropped.spec.md",
+            spec(14, "Left dropped (spec)", f"{CLOSED} 2026-10-03\n{OUTCOME} dropped\n\n"),
+        )
         self.write(
             r / "spec/m15-titled.spec.md",
             f"---\nid: {rid(15)}\n---\n\n## Title\n\nTitled the second way\n\n{DOCS} docs/board.md\n",
@@ -919,8 +1064,16 @@ class TheMoveDesignVerb(unittest.TestCase):
         )
         self.commit(self.hub)
 
-    READY_IDS = {1: "Archive", 2: "Archive", 7: "Complete", 17: "Complete", 11: "Complete", 15: "Complete"}
-    HELD_IDS = {3, 4, 6, 8, 10, 13}
+    READY_IDS = {
+        1: "Archive",
+        2: "Archive",
+        7: "Complete",
+        17: "Complete",
+        11: "Complete",
+        15: "Complete",
+        13: "Finish",
+    }
+    HELD_IDS = {3, 4, 6, 8, 10, 14}
 
     def ready_json(self, flags: str = "", at: Path | None = None, local: dict | None = None) -> dict:
         out = self.run_verbs(f"tkMoveDesign -Ready -AsJson {flags}; 'X=' + $LASTEXITCODE", at, local)
@@ -952,14 +1105,18 @@ class TheMoveDesignVerb(unittest.TestCase):
         held = {d["id"]: d for d in data["held"]}
         self.assertEqual(set(ready), {self.rid(n) for n in self.READY_IDS})
         self.assertEqual(set(held), {self.rid(n) for n in self.HELD_IDS})
-        self.assertEqual(data["counts"], {"ready": 6, "held": 6})
+        self.assertEqual(data["counts"], {"ready": 7, "held": 6})
         for n, to in self.READY_IDS.items():
             row = ready[self.rid(n)]
             self.assertEqual(set(row), {"id", "title", "state", "call", "args", "notes"})
-            self.assertEqual(row["state"], "Design" if to == "Archive" else "Spec")
+            self.assertEqual(row["state"], {"Archive": "Design", "Complete": "Spec", "Finish": "Complete"}[to])
             if to == "Archive":
                 self.assertEqual(row["call"], f"tkMoveDesign {self.rid(n)} -To Archive")
                 self.assertEqual(row["args"], [self.rid(n), "-To", "Archive"])
+            elif to == "Finish":
+                # A note left behind after its spec completed: the move that finishes it, no -Doc.
+                self.assertEqual(row["call"], f"tkMoveDesign {self.rid(n)} -To Complete")
+                self.assertEqual(row["args"], [self.rid(n), "-To", "Complete"])
             else:
                 self.assertEqual(row["call"], f'tkMoveDesign {self.rid(n)} -To Complete -Doc "docs/board.md"')
                 self.assertEqual(row["args"], [self.rid(n), "-To", "Complete", "-Doc", "docs/board.md"])
@@ -983,11 +1140,14 @@ class TheMoveDesignVerb(unittest.TestCase):
         self.assertEqual(
             reasons[10], "MoveDesign would refuse it: -Doc docs/nope.md does not exist in this repository."
         )
-        self.assertIn("It is Complete: its spec is already spec/archive/m13-left.spec.md", reasons[13])
-        self.assertIn("by hand", reasons[13])
-        self.assertNotIn("#", reasons[13].replace("## Journey", ""), "no issue number in the output")
+        self.assertIn("its note is still design/m13-left.md", ready[self.rid(13)]["notes"][0])
+        self.assertIn("It is Archived: its spec is already spec/archive/m14-left-dropped.spec.md", reasons[14])
+        self.assertIn(f'tkMoveDesign {self.rid(14)} -To Archive -Dropped -Reason "..."', reasons[14])
+        for why in reasons.values():
+            self.assertNotIn("by hand", why)
+            self.assertNotIn("#", why.replace("## Journey", ""), "no issue number in the output")
         self.assertEqual({held[self.rid(n)]["state"] for n in (3, 4)}, {"Design"})
-        self.assertEqual(held[self.rid(13)]["state"], "Complete")
+        self.assertEqual(held[self.rid(14)]["state"], "Archived")
 
         # The text says the same, ready first, then held, then one count line.
         text = self.move("-Ready")
@@ -998,11 +1158,11 @@ class TheMoveDesignVerb(unittest.TestCase):
                 self.assertIn(f"    Note: {note}", text)
         for row in data["held"]:
             self.assertIn(f"  {row['title']} ({row['state']}, {row['id']})\n    {row['reason']}\n", text)
-        self.assertLess(text.index("Ready (6)"), text.index("Held (6)"))
-        self.assertIn("6 ready, 6 held in this repository. Nothing was moved.", text)
+        self.assertLess(text.index("Ready (7)"), text.index("Held (6)"))
+        self.assertIn("7 ready, 6 held in this repository. Nothing was moved.", text)
         self.assertNotIn("Error:", text)
         # Nothing moved, nothing written, nothing staged -- with -WhatIf too.
-        self.assertIn("6 ready, 6 held", self.move("-Ready -WhatIf"))
+        self.assertIn("7 ready, 6 held", self.move("-Ready -WhatIf"))
         self.assertEqual(self.snapshot(self.repo), before_repo)
         self.assertEqual(self.snapshot(self.hub), before_hub)
         self.assertEqual(_staged(self.repo), [])
@@ -1023,6 +1183,8 @@ class TheMoveDesignVerb(unittest.TestCase):
             self.assertTrue((r / f"spec/archive/{name}.spec.md").exists(), name)
             self.assertFalse((r / f"spec/{name}.spec.md").exists(), name)
         self.assertTrue((r / "design/archive/m07-docs.md").exists())
+        self.assertTrue((r / "design/archive/m13-left.md").exists())
+        self.assertFalse((r / "design/m13-left.md").exists())
         # The read now lists only what is held.
         after = self.ready_json()
         self.assertEqual(after["ready"], [])
@@ -1035,7 +1197,7 @@ class TheMoveDesignVerb(unittest.TestCase):
             6: "-To Archive",
             8: '-To Complete -Doc "docs/board.md"',
             10: '-To Complete -Doc "docs/nope.md"',
-            13: "-To Archive",
+            14: "-To Archive",
         }
         for n, move in implied.items():
             self.assertIn("X=2", self.move(f"{self.rid(n)} {move}"), n)

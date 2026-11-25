@@ -22,6 +22,12 @@
                     design/archive/ in one go, stamps **Closed:** on both and
                     writes `> Docs: <path>` into the spec. -Doc is the gate:
                     a spec is not complete until the durable part has a home.
+                    On a note still in design/ whose spec is already in
+                    spec/archive/, it finishes that completion instead: the
+                    note follows the spec, closed on the spec's own date, and
+                    the spec is not touched (no -Doc needed; one that differs
+                    from the spec's Docs line is refused). A spec archived as
+                    dropped is followed the same way by -To Archive -Dropped.
 
     Every move appends one dated, self-contained line to the NOTE's `## Journey`
     (D-DL18): what date, what repository, what file path -- the path after the
@@ -79,7 +85,8 @@
 
 .PARAMETER Ready
     A read that moves nothing: list the designs the tree says are ready (a
-    live note marked **Outcome:** shipped, a live spec carrying > Docs:),
+    live note marked **Outcome:** shipped, a live spec carrying > Docs:,
+    a note left in design/ after its spec completed),
     each with the exact call that moves it -- checked through this verb's own
     -WhatIf, so a call MoveDesign would refuse is never listed as ready --
     and the designs that carry a mark but are held, each with why. Takes the
@@ -148,7 +155,8 @@ if ($Help) {
     Write-Host ""
     Write-Host "  Spec scaffolds the spec beside the note; Archive moves the note to design/archive/ (shipped,"
     Write-Host "  or dropped with -Dropped -Reason, which on a Spec archives the spec and the note together); Complete archives the spec and the note together and"
-    Write-Host "  needs -Doc <path>. Every move writes one line into the note's ## Journey. In a repo it"
+    Write-Host "  needs -Doc <path> -- on a note whose spec is already archived it needs none: the note follows its spec."
+    Write-Host "  Every move writes one line into the note's ## Journey. In a repo it"
     Write-Host "  stages and never commits; -Space <slug> stages in that Space's checkout on this machine"
     Write-Host "  (spaceCheckouts.<slug>.path); -Hub works on the hub's folders and follows storeSync."
     Write-Host "  -Ready moves nothing: it lists the designs marked finished, each with the call that moves it,"
@@ -395,13 +403,17 @@ if ($Ready) {
         $state = [string]$d.State
         $noteMark = & $outcomeOf $d.Note
         $specMark = & $outcomeOf $d.Spec
-        if ($d.Ready) {
+        # A note left in design/ after its spec completed: -To Complete, with no
+        # -Doc, finishes what the spec's move started.
+        $leftBehind = ($d.Mismatch -and $d.Note -and -not $d.Note.Archived -and $d.Spec -and $d.Spec.Archived)
+        $finish = ($leftBehind -and $state -eq $stateComplete)
+        if ($d.Ready -or $finish) {
             $moveTo = 'Archive'
-            if ($state -eq $stateSpec) { $moveTo = 'Complete' }
+            if ($state -eq $stateSpec -or $finish) { $moveTo = 'Complete' }
             $callArgs = @($d.Id, '-To', $moveTo)
             $shown = "$($d.Id) -To $moveTo"
             $dry = @{ Name = $d.Id; To = $moveTo; WhatIf = $true }
-            if ($moveTo -eq 'Complete') {
+            if ($moveTo -eq 'Complete' -and -not $finish) {
                 $callArgs += '-Doc'; $callArgs += [string]$d.Docs
                 $shown += " -Doc $(& $quote ([string]$d.Docs))"
                 $dry.Doc = [string]$d.Docs
@@ -430,6 +442,9 @@ if ($Ready) {
             if ($d.Mismatch -and $d.Note -and $d.Note.Archived) {
                 $notes += "Its note is already $($d.Note.Path); the completion journals onto it there."
             }
+            if ($finish) {
+                $notes += "Its spec is already $($d.Spec.Path) and its note is still $($d.Note.Path): the move finishes the completion and changes nothing in the spec."
+            }
             $cards = @(& $cardsFor $d.Id)
             if ($cards.Count -gt 0) {
                 $noun = 'card'
@@ -445,8 +460,9 @@ if ($Ready) {
         # Not ready: held when a live file carries a mark the rule does not
         # act on, or the files disagree about where the design is.
         $heldWhy = ''
-        if ($d.Mismatch -and $d.Note -and -not $d.Note.Archived -and $d.Spec -and $d.Spec.Archived) {
-            $heldWhy = "It is $state`: its spec is already $($d.Spec.Path), and its note is still $($d.Note.Path). MoveDesign does not archive the note again; move it into design/$archiveName/ by hand and say why in its ## Journey."
+        if ($leftBehind) {
+            # Only a drop is left here: a completion was listed as ready above.
+            $heldWhy = "It is $state`: its spec is already $($d.Spec.Path), dropped, and its note is still $($d.Note.Path). Finishing the drop takes its reason: ${prefix}MoveDesign $($d.Id) -To Archive -Dropped -Reason `"...`"$(if ($scopeArgs.Count) { ' ' + ($scopeArgs -join ' ') })."
         }
         elseif ($state -eq $stateDesign -and $noteMark.Has) {
             if ($noteMark.Word -eq $droppedWord) {
@@ -595,15 +611,17 @@ function Test-P20WrittenOutcome {
     # The word as the file writes it when it already carries an outcome line
     # that agrees with $Word ('' when it carries none); refuses (exit 2) when one says anything else -- the other word, a
     # value that is neither (it reads as no outcome), or nothing.
-    param([string]$RelPath, [string]$Word, [string]$Move, [string]$Hint)
+    # -WholeHint, when given, is the hint as written: there is no move that matches.
+    param([string]$RelPath, [string]$Word, [string]$Move, [string]$Hint, [string]$WholeHint = '')
     $agrees = ''
     $rx = '(?m)^' + [regex]::Escape($outcomeStamp) + '[ \t]*([^\r\n]*?)[ \t]*\r?$'
     foreach ($w in (Get-P20WrittenLines -RelPath $RelPath -Pattern $rx)) {
         $value = $w.Value.ToLowerInvariant()
         if ($value -eq $Word) { $agrees = $w.Value; continue }
         if ($outcomes -contains $value) {
-            Write-CliError -Message "$RelPath already carries '$($w.Line)', and $Move would record it $Word." `
-                -Hint "Edit that line, or run the move that matches it: $Hint"
+            $said = "Edit that line, or run the move that matches it: $Hint"
+            if ($WholeHint) { $said = $WholeHint }
+            Write-CliError -Message "$RelPath already carries '$($w.Line)', and $Move would record it $Word." -Hint $said
         }
         else {
             Write-CliError -Message "$RelPath already carries '$($w.Line)', which reads as no outcome, and $Move would record it $Word." `
@@ -816,6 +834,58 @@ function Say {
     else { Write-Host ($Verb.Substring(0, 1).ToUpperInvariant() + $Verb.Substring(1) + ' ' + $Rest) }
 }
 
+# -- Finishing the move a spec already made ---------------------------------------
+# A spec in spec/archive/ with its note still in design/: the spec's move already
+# recorded what became of the design, so the note follows it -- to design/archive/,
+# closed on the spec's own date, with the spec's outcome -- and the spec itself is
+# not touched. -To Complete finishes a completion; -To Archive -Dropped a drop.
+function Complete-P20FollowSpec {
+    param([string]$Word)
+    $noteDest = "$(& $rel ((Split-Path -Leaf $designDir)))/$archiveName/$($note.Name)"
+    if (Test-Path -LiteralPath (& $full $noteDest)) {
+        Write-CliError -Message "$noteDest already exists. Not overwriting it."
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    $closedStamp = [string]$consts.stamps.closed
+    $noteText = (Read-CardText -Path (& $full $note.Path)) -replace "`r`n", "`n"
+    $noteClosed = Get-P20StampValue -Text $noteText -Stamp $closedStamp
+    $day = [string]$design.Closed
+    $keeps = ''
+    if ($Word) {
+        $keeps = Test-P20WrittenOutcome -RelPath $note.Path -Word $Word -Move '-To Archive -Dropped' -Hint '' `
+            -WholeHint "Its spec $($spec.Path) was dropped: edit the note's line to '$outcomeStamp $Word', or take it out, then move it."
+    }
+    $label = $stateComplete
+    $followed = 'this note followed its spec'
+    if ($Word) { $label = $Word.Substring(0, 1).ToUpperInvariant() + $Word.Substring(1) }
+    if ($day) {
+        if ($Word) { $followed += ", $Word $day" } else { $followed += ", completed $day" }
+    }
+    else {
+        Write-Host "Note: $($spec.Path) carries no $closedStamp date, so the note is stamped with today's." -ForegroundColor Yellow
+        $day = $today
+    }
+    $line = "- $today $label`: $followed."
+    if (-not $Word -and $design.Docs) { $line += " The docs are $($design.Docs)." }
+    $line += "$reasonTail This note is now $noteDest and the spec is $($spec.Path), in $repoName."
+    $stampSaid = "$noteDest with $closedStamp $day"
+    if ($noteClosed) { $stampSaid = "$noteDest keeping its $closedStamp $noteClosed" }
+    if ($Word -and $keeps) { $stampSaid += " and keep its $outcomeStamp $keeps" }
+    elseif ($Word) { $stampSaid += " and $outcomeStamp $Word" }
+    Say 'move' "$($note.Path) -> $noteDest"
+    Say 'stamp' $stampSaid
+    Say 'append' "to $noteDest`: $line"
+    if (-not $WhatIf) {
+        Move-P20DesignFile -FromRel $note.Path -ToRel $noteDest
+        $dest = & $full $noteDest
+        Add-ClosedDate -Path $dest -Date $day
+        if ($Word) { Add-P20OutcomeLine -Path $dest -Word $Word }
+        Add-P20JourneyLine -Path $dest -NoteRel $note.Path -Line $line -Thread $design.Thread
+        if ($Word) { Complete-P20Staging -Summary "$title archived ($Word), following its spec" }
+        else { Complete-P20Staging -Summary "$title complete, following its spec" }
+    }
+}
+
 # -- The move ------------------------------------------------------------------------
 switch ($To) {
     'Spec' {
@@ -937,10 +1007,20 @@ switch ($To) {
             $destRel = "$(& $rel ((Split-Path -Leaf $designDir)))/$archiveName/$($note.Name)"
             if ($spec -and $spec.Archived) {
                 # The spec already went to its archive (a completion or a drop
-                # that left the note behind): archiving the note alone would
-                # record a second outcome the spec's move never made.
+                # that left the note behind): archiving the note with an outcome
+                # of its own would record one the spec's move never made. A drop
+                # is finished here, following the spec; a completion by -To Complete.
+                $specDropped = ($design.State -ne $stateComplete)
+                if ($specDropped -and $Dropped) {
+                    Complete-P20FollowSpec -Word ([string]$outcomes[1])
+                    break
+                }
+                $finishHint = "${prefix}MoveDesign $Name -To Complete finishes it: the note follows its spec to design/$archiveName/, closed on the spec's date, and the spec is not touched."
+                if ($specDropped) {
+                    $finishHint = "${prefix}MoveDesign $Name -To Archive -Dropped -Reason `"...`" finishes it: the note follows its spec to design/$archiveName/, closed on the spec's date, and the spec is not touched."
+                }
                 Write-CliError -Message "'$title' is $($design.State): its spec is already $($spec.Path), so the note is not archived again with an outcome of its own." `
-                    -Hint "Finish the move the spec made: move $($note.Path) into $destRel by hand$(if ($inRepo) { " (git mv -- $($note.Path) $destRel)" }), and say why in its ## Journey."
+                    -Hint $finishHint
                 exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
             }
             if (Test-Path -LiteralPath (& $full $destRel)) {
@@ -973,6 +1053,30 @@ switch ($To) {
         }
     }
     'Complete' {
+        if ($note -and -not $note.Archived -and $spec -and $spec.Archived) {
+            # The spec completed and the note stayed: finish the completion. The
+            # spec is not touched, so -Doc can only agree with its Docs line.
+            Assert-P20NotDropped -RelPath $spec.Path
+            Assert-P20NotDropped -RelPath $note.Path
+            if (-not [string]::IsNullOrWhiteSpace($Doc)) {
+                $samePath = { param([string]$P) return ((& $rel $P.Trim()) -replace '^(\./)+', '').TrimStart('/') }
+                $asked = & $samePath $Doc
+                $written = Get-P20WrittenLines -RelPath $spec.Path -Pattern ([string]$consts.design.docsRegex)
+                if ($written.Count -eq 0) {
+                    Write-CliError -Message "$($spec.Path) carries no '$docsLine' line, and finishing its completion changes nothing in the spec, so -Doc $asked has nowhere to go." `
+                        -Hint "${prefix}MoveDesign $Name -To Complete"
+                    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+                }
+                foreach ($w in $written) {
+                    if ((& $samePath $w.Value) -ceq $asked) { continue }
+                    Write-CliError -Message "$($spec.Path) already carries '$($w.Line)', and -Doc names $asked." `
+                        -Hint "${prefix}MoveDesign $Name -To Complete finishes it with the spec's own Docs line."
+                    exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+                }
+            }
+            Complete-P20FollowSpec -Word ''
+            break
+        }
         if (-not $spec -or $spec.Archived -or $design.State -ne $stateSpec) {
             Write-CliError -Message "'$title' is $($design.State), not $stateSpec`: only a design whose spec is live completes." `
                 -Hint 'A note alone archives with -To Archive; a Complete design is already in both archives.'

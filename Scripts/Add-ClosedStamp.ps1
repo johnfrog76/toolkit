@@ -44,8 +44,14 @@ function Add-ClosedDate {
         Never throws. The contract of the verb that calls this is "the file is
         no longer in current/" -- the stamp is valuable but it is not the
         promise, so a failure here is reported and the move still succeeds.
+
+        -Date (yyyy-MM-dd) stamps a day other than today: a file that follows
+        another one into an archive carries the date that one closed on.
     #>
-    param([Parameter(Mandatory = $true)][string]$Path)
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Date = ''
+    )
 
     try {
         # -Encoding UTF8 on the way in as well as the way out: without it,
@@ -66,7 +72,9 @@ function Add-ClosedDate {
         if ($content -match "`r`n") { $eol = "`r`n" }
 
         if ($content -and -not $content.EndsWith("`n")) { $content += $eol }
-        $content += $stamp + ' ' + (Get-Date -Format 'yyyy-MM-dd') + $eol
+        $day = $Date
+        if (-not $day) { $day = Get-Date -Format 'yyyy-MM-dd' }
+        $content += $stamp + ' ' + $day + $eol
         Write-CardText -Path $Path -Content $content
     }
     catch {
