@@ -1,5 +1,12 @@
 import { render, screen } from "@testing-library/react";
-import { FrontMatterDetails, leftoverFrontMatter, unquoted } from "./FrontMatterDetails";
+import { readFileSync } from "fs";
+import { join } from "path";
+import {
+  FrontMatterDetails,
+  frontMatterValue,
+  leftoverFrontMatter,
+  unquoted,
+} from "./FrontMatterDetails";
 import { frontMatterOf } from "./prepareMarkdown";
 
 describe("leftoverFrontMatter", () => {
@@ -37,5 +44,41 @@ describe("FrontMatterDetails", () => {
     expect(screen.getByTestId("front-matter-details").hasAttribute("open")).toBe(false);
     rerender(<FrontMatterDetails pairs={[]} />);
     expect(screen.queryByTestId("front-matter-details")).toBeNull();
+  });
+});
+
+describe("a list and an escaped quote read as a person writes them", () => {
+  it("reads the real tools line of agentic/new-bug.prompt.md as a plain list", () => {
+    const text = readFileSync(join(__dirname, "../../../agentic/new-bug.prompt.md"), "utf8");
+    const { frontMatter } = frontMatterOf(text);
+    const tools = leftoverFrontMatter(frontMatter, ["description"]).find(([k]) => k === "tools");
+    expect(tools?.[1]).toBe("read_file, list_dir, run_in_terminal, grep_search");
+  });
+  it("reads a flow sequence of bare and quoted items, and a review's orgs", () => {
+    expect(unquoted('[a, "b"]')).toBe("a, b");
+    expect(unquoted("[test]")).toBe("test");
+    expect(unquoted("[]")).toBe("");
+    expect(unquoted('["a, b", c]')).toBe("a, b, c");
+  });
+  it("unescapes a quote inside a quoted value", () => {
+    expect(unquoted('"He said \\"hi\\""')).toBe('He said "hi"');
+    expect(unquoted("'it''s'")).toBe("it's");
+  });
+  it("finds a key without regard to case", () => {
+    expect(frontMatterValue([["Description", '"Upper"']], "description")).toBe("Upper");
+    expect(frontMatterValue([], "description")).toBe("");
+  });
+  it("draws two rows with one key without a duplicate-key warning", () => {
+    const warn = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    render(
+      <FrontMatterDetails
+        pairs={[
+          ["agent", "a"],
+          ["agent", "b"],
+        ]}
+      />,
+    );
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

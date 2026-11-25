@@ -27,10 +27,49 @@ const useStyles = makeStyles({
 
 export const FRONT_MATTER_LABEL = "Details";
 
-/** A YAML scalar as a reader sees it: one pair of quotes around it taken off. */
+/** One YAML scalar as a reader sees it: a pair of quotes taken off, `\"` (or `''`) inside it unescaped. */
+function scalar(value: string): string {
+  const v = value.trim();
+  const m = /^(["'])(.*)\1$/s.exec(v);
+  if (!m) return v;
+  return m[1] === '"' ? m[2].replace(/\\(["\\])/g, "$1") : m[2].replace(/''/g, "'");
+}
+
+/** The items of a flow sequence's inside, split on the commas outside quotes. */
+function flowItems(inner: string): string[] {
+  const items: string[] = [];
+  let quote = "";
+  let cur = "";
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i];
+    if (quote) {
+      cur += c;
+      if (c === "\\" && quote === '"') cur += inner[++i] ?? "";
+      else if (c === quote) quote = "";
+    } else if (c === '"' || c === "'") {
+      quote = c;
+      cur += c;
+    } else if (c === ",") {
+      items.push(cur);
+      cur = "";
+    } else cur += c;
+  }
+  items.push(cur);
+  return items.map(scalar).filter((x) => x !== "");
+}
+
+/** A front matter value as a reader sees it: a scalar without its quotes, and a
+ *  flow list `[a, "b"]` as the plain list `a, b`. */
 export function unquoted(value: string): string {
-  const m = /^(["'])(.*)\1$/.exec(value.trim());
-  return m ? m[2] : value.trim();
+  const v = value.trim();
+  if (v.startsWith("[") && v.endsWith("]")) return flowItems(v.slice(1, -1)).join(", ");
+  return scalar(v);
+}
+
+/** One key's value as a reader sees it, the key matched without regard to case; "" when absent. */
+export function frontMatterValue(pairs: [string, string][], key: string): string {
+  const hit = pairs.find(([k]) => k.toLowerCase() === key.toLowerCase());
+  return hit ? unquoted(hit[1]) : "";
 }
 
 /** The pairs a header does not draw: `drawn` are the keys it does. */
@@ -50,8 +89,8 @@ export function FrontMatterDetails({ pairs }: { pairs: [string, string][] }) {
     <details className={styles.root} data-testid="front-matter-details">
       <summary>{FRONT_MATTER_LABEL}</summary>
       <dl className={styles.list}>
-        {pairs.map(([key, value]) => (
-          <div key={key}>
+        {pairs.map(([key, value], i) => (
+          <div key={`${i}:${key}`}>
             <dt>{key}</dt>
             <dd>{value}</dd>
           </div>

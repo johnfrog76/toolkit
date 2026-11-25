@@ -988,6 +988,19 @@ describe("a prompt's reading room", () => {
     expect(screen.getByTestId("viewer").textContent).toBe("First prose.\n");
   });
 
+  it("a Description key in any case feeds the header, and is not left in the Details row", () => {
+    oneAnswer = {
+      data: {
+        ...PR_SHIP,
+        description: "",
+        body: '---\nDescription: "From the key"\n---\n\nProse.\n',
+      },
+    };
+    mount(promptPath("pr-ship"));
+    expect(screen.getByTestId("detail-description").textContent).toBe("From the key");
+    expect(screen.queryByTestId("front-matter-details")).toBeNull();
+  });
+
   it("a prompt with no front matter renders its text whole, with no details row", () => {
     oneAnswer = { data: { ...BENCH, description: "", body: "# Bench\n\nJust prose.\n" } };
     mount(promptPath("yours/bench-billing"));

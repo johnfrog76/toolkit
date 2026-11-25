@@ -6,7 +6,11 @@ import { DetailHeader } from "../../shared/DetailHeader";
 import { CardActions, ROW } from "../../shared/CardActions";
 import { copyText } from "../../shared/copyText";
 import { EmptyState } from "../../shared/EmptyState";
-import { FrontMatterDetails, leftoverFrontMatter, unquoted } from "../../shared/FrontMatterDetails";
+import {
+  FrontMatterDetails,
+  frontMatterValue,
+  leftoverFrontMatter,
+} from "../../shared/FrontMatterDetails";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { frontMatterOf } from "../../shared/prepareMarkdown";
 import { PanelFrame } from "../../shared/PanelFrame";
@@ -49,8 +53,7 @@ export function PromptPage() {
 
   // The file's front matter feeds the header; the body is its prose alone.
   const parts = useMemo(() => frontMatterOf(data?.body ?? ""), [data?.body]);
-  const description =
-    data?.description || unquoted(parts.frontMatter.find(([k]) => k === "description")?.[1] ?? "");
+  const description = data?.description || frontMatterValue(parts.frontMatter, "description");
 
   const missing = error && "status" in error && error.status === 404;
   const detail =
