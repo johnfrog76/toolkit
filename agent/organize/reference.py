@@ -32,7 +32,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..ado.design import match_words, search_words
-from ..core.config import hub_folders, hub_root
+from ..core.config import file_in_folder, hub_folders, hub_root
 from ..core.consts import folder_current, stamp_source
 from .reminders import _require_organize
 
@@ -161,9 +161,10 @@ def get_reference(q: str = "") -> ReferenceList:
 @api.get("/reference/{name}", response_model=ReferenceText)
 def get_reference_document(name: str) -> ReferenceText:
     # The name is the rule's, checked before the disk is: no slash, no dots-only
-    # segment, only .md. A refused name is a 404, like one that is not there.
-    path = reference_dir() / name
-    if not _NAME.match(name) or ".." in name or not path.is_file():
+    # segment, only .md. A refused name is a 404, like one that is not there. The
+    # file is then an entry of the folder's own listing, matched by exact name.
+    path = file_in_folder(reference_dir(), name) if _NAME.match(name) and ".." not in name else None
+    if path is None:
         raise HTTPException(status_code=404, detail=f"no reference document {name}")
     doc, text = read_document(path)
     return ReferenceText(**doc.model_dump(), body=text, path=str(path))

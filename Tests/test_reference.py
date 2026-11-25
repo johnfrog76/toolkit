@@ -159,6 +159,37 @@ class TheRead(_Hub):
                 self.assertEqual(self.client.get(f"/api/reference/{name}").status_code, 404)
 
 
+class ByTheFolderListing(_Hub):
+    """A document is an entry of reference/current/'s own listing, by exact name."""
+
+    NAME = "days-off-2027.md"
+
+    def test_every_other_shape_is_404(self):
+        folder = self.hub / "reference" / "current"
+        (folder / "a-dir.md").mkdir()
+        rows = {
+            "a name that climbs": "%2E%2E",
+            "a backslash in the name": f"..%5C{self.NAME}",
+            "an encoded forward slash": f"..%2F{self.NAME}",
+            "a colon in the name": f"D:{self.NAME}",
+            "the name in other letter case": self.NAME.upper(),
+            "a directory's name": "a-dir.md",
+        }
+        for shape, name in rows.items():
+            with self.subTest(shape=shape):
+                self.assertEqual(self.client.get(f"/api/reference/{name}").status_code, 404)
+        self.assertEqual(self.client.get(f"/api/reference/{self.NAME}").status_code, 200)
+
+    def test_a_link_in_the_folder_is_not_a_document(self):
+        outside = Path(self.tmp.name) / "outside.md"
+        outside.write_text("# Outside\n", encoding="utf-8")
+        try:
+            os.symlink(outside, self.hub / "reference" / "current" / "link.md")
+        except (OSError, NotImplementedError) as e:
+            self.skipTest(f"this host cannot create a symbolic link ({type(e).__name__})")
+        self.assertEqual(self.client.get("/api/reference/link.md").status_code, 404)
+
+
 class TheGate(_Hub):
     def test_a_hub_with_no_reference_folder_answers_empty_not_an_error(self):
         shutil.rmtree(self.hub / "reference")

@@ -238,6 +238,8 @@ async def get_asset(space: str, key: str, file: str):
     inside that Space's ``assets/`` exactly one folder deep -- so no spelling of
     ``..`` reaches anything else -- and served only for an image type, with the
     content type from its extension. 404 for anything that is not that."""
+    # Two segments under assets/, so this keeps its resolve-then-contain check
+    # rather than a listing match: the real path, links followed, must lie inside.
     assets = _space_assets_dir(space)
     if assets is None:
         raise HTTPException(status_code=404, detail=f"No Space '{space}'")
