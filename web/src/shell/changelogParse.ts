@@ -7,6 +7,8 @@
  * `## [Unreleased]` is not a release and is left out.
  */
 
+import { CHANGELOG } from "./consts";
+
 export interface ChangelogGroup {
   /** The group's own heading, as written: Added, Changed, Fixed, Removed. */
   heading: string;
@@ -21,7 +23,9 @@ export interface ChangelogRelease {
   groups: ChangelogGroup[];
 }
 
-const RELEASE_HEADING = /^##\s+\[([^\]]+)\](?:\s+-\s+(\S+))?\s*$/;
+// The section heading is the contract's (consts.json changelog.releaseHeadingRegex):
+// the agent reads a Space's changelog by the same one.
+const RELEASE_HEADING = new RegExp(CHANGELOG.releaseHeadingRegex);
 const UNRELEASED = /^unreleased$/i;
 const GROUP_HEADING = /^###\s+(.+?)\s*$/;
 const ANY_HEADING = /^#{1,6}\s/;

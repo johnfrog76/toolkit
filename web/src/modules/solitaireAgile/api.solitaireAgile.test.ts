@@ -3,10 +3,12 @@ import { RITUALS } from "../../shell/consts";
 import {
   ATTEND_QUERY,
   MILESTONES_QUERY,
+  RELEASES_QUERY,
   REMIND_QUERY,
   STANDUP_QUERY,
   TRIAGE_QUERY,
   milestonesQuery,
+  releasesQuery,
   standupQuery,
   triageQuery,
 } from "./api.solitaireAgile";
@@ -54,5 +56,16 @@ describe("the milestones query", () => {
   it("asks about a Space by slug, and the one you are in with none", () => {
     expect(milestonesQuery("toolkit")).toBe(`${MILESTONES_QUERY}?space=toolkit`);
     expect(milestonesQuery("")).toBe(MILESTONES_QUERY);
+  });
+});
+
+describe("the releases query", () => {
+  it("is the contract's releasesRoute under the slice's base", () => {
+    expect(`${API_BASE}/${RELEASES_QUERY}`).toBe(RITUALS.releasesRoute);
+  });
+
+  it("asks about a Space by slug, and the one you are in with none", () => {
+    expect(releasesQuery("toolkit")).toBe(`${RELEASES_QUERY}?space=toolkit`);
+    expect(releasesQuery("")).toBe(RELEASES_QUERY);
   });
 });

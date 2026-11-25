@@ -181,6 +181,7 @@ EXPECTED = {
     ("rituals", "route"): "/api/ritual/standup",
     ("rituals", "triageRoute"): "/api/ritual/triage",
     ("rituals", "milestonesRoute"): "/api/ritual/milestones",
+    ("rituals", "releasesRoute"): "/api/ritual/releases",
     ("rituals", "orgRoute"): "/api/ritual/org",
     ("rituals", "assignMe"): "me",
     ("rituals", "ceremoniesFile"): "Config/ceremonies.json",
@@ -432,6 +433,12 @@ EXPECTED = {
     # The Azure DevOps sign-in: the one command all three halves name, and /env's field for the strip.
     ("signIn", "azCommand"): "az login --allow-no-subscriptions",
     ("signIn", "envField"): "azSignIn",
+    # A repository's release notes: the Releases timeline reads a Space's checkout by them.
+    ("changelog", "file"): "CHANGELOG.md",
+    ("changelog", "folder"): "changelog.d",
+    ("changelog", "fragmentRegex"): r"^([A-Za-z0-9][A-Za-z0-9_-]*)\.([A-Za-z]+)\.md$",
+    ("changelog", "releaseHeadingRegex"): r"^##\s+\[([^\]]+)\](?:\s+-\s+(\S+))?\s*$",
+    ("changelog", "kinds"): {"added": "Added", "changed": "Changed", "removed": "Removed", "fixed": "Fixed"},
     # The statuses a reply may set, per tracker.
     ("replyStatuses", "ado"): ["fixed", "active", "pending", "byDesign", "wontFix", "closed"],
     ("replyStatuses", "github"): ["fixed", "closed", "active"],
@@ -493,6 +500,7 @@ class TheFileParses(unittest.TestCase):
             "org",
             "models",
             "agent",
+            "changelog",
         ):
             self.assertIn(group, raw)
 
@@ -614,6 +622,12 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.rituals_route(), EXPECTED[("rituals", "route")])
         self.assertEqual(C.rituals_triage_route(), EXPECTED[("rituals", "triageRoute")])
         self.assertEqual(C.rituals_milestones_route(), EXPECTED[("rituals", "milestonesRoute")])
+        self.assertEqual(C.rituals_releases_route(), EXPECTED[("rituals", "releasesRoute")])
+        self.assertEqual(C.changelog_file(), EXPECTED[("changelog", "file")])
+        self.assertEqual(C.changelog_folder(), EXPECTED[("changelog", "folder")])
+        self.assertEqual(C.changelog_fragment_regex(), EXPECTED[("changelog", "fragmentRegex")])
+        self.assertEqual(C.changelog_release_heading_regex(), EXPECTED[("changelog", "releaseHeadingRegex")])
+        self.assertEqual(C.changelog_kinds(), EXPECTED[("changelog", "kinds")])
         self.assertEqual(C.rituals_org_route(), EXPECTED[("rituals", "orgRoute")])
         self.assertEqual(C.rituals_ceremonies_file(), EXPECTED[("rituals", "ceremoniesFile")])
         self.assertEqual(C.rituals_vocabulary_file(), EXPECTED[("rituals", "vocabularyFile")])

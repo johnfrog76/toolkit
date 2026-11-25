@@ -134,6 +134,18 @@ the file until a person deletes it.
 
 **Issue:** [#301](https://github.com/johnfrog76/toolkit/issues/301)
 
+### The Releases timeline is a first version
+
+**What you see:** Team Agile's Releases timeline reads the Space's checkout as it is checked out: the
+release in progress runs to that clone's `HEAD`, whatever branch it is on, and a tag on another branch
+still counts. Pre-release tags are left off rather than drawn as checkpoints, later plans are not drawn,
+an issue in the side panel is its number with no title, and the flat GitHub milestones list and its award
+are still drawn under the timeline.
+
+**Where you meet it:** [Team Agile](modules/solitaire-agile.md#known-gaps), "Known gaps"
+
+**Issue:** [#326](https://github.com/johnfrog76/toolkit/issues/326)
+
 ### A webhook set after the agent started is not seen
 
 **What you see:** `SendTeams` posts through the running agent, and the agent reads `TEAMS_WEBHOOK_*` from

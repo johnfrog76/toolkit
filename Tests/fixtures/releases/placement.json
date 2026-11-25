@@ -1,0 +1,48 @@
+{
+  "_": "Where a GitHub milestone belongs on the Releases timeline (docs/modules/solitaire-agile.md, \"Releases: the timeline\"): ONE rule, agent/solitaire/releases.py place_milestones, asserted from Tests/test_ritual_releases.py, and the table a future verb answers to. `tags` are newest first, each [tag, its day]. A milestone's reached day is GitHub's close, else its last change, and only when it is reached (every issue closed, and at least one). Reached on day d, it is the oldest tag dated d or later's -- reached between two tags is the later one's, and the day of a tag counts in it. Reached after the last tag, or not reached at all, it is the release in progress's, keyed \"\". Each release keeps the tracker's order.",
+  "cases": [
+    {
+      "name": "between two tags is the later one's; the day of a tag counts in it",
+      "tags": [["v0.3.0", "2026-10-12"], ["v0.2.0", "2026-10-01"], ["v0.1.0", "2026-09-10"]],
+      "milestones": [
+        { "title": "First list", "reached": true, "closed_at": "2026-09-08", "updated_at": "2026-09-08" },
+        { "title": "Sorting", "reached": true, "closed_at": "", "updated_at": "2026-10-01" },
+        { "title": "Search", "reached": true, "closed_at": "2026-10-05", "updated_at": "2026-10-06" },
+        { "title": "Export", "reached": false, "closed_at": "", "updated_at": "2026-10-20" },
+        { "title": "Polish", "reached": true, "closed_at": "2026-10-22", "updated_at": "2026-10-22" },
+        { "title": "Parking lot", "reached": false, "closed_at": "", "updated_at": "2026-09-01" }
+      ],
+      "expected": {
+        "": ["Export", "Polish", "Parking lot"],
+        "v0.3.0": ["Search"],
+        "v0.2.0": ["Sorting"],
+        "v0.1.0": ["First list"]
+      }
+    },
+    {
+      "name": "no tag yet: every milestone is the release in progress's",
+      "tags": [],
+      "milestones": [
+        { "title": "Reached", "reached": true, "closed_at": "2026-09-08", "updated_at": "2026-09-08" },
+        { "title": "Open", "reached": false, "closed_at": "", "updated_at": "2026-09-09" }
+      ],
+      "expected": { "": ["Reached", "Open"] }
+    },
+    {
+      "name": "closed on GitHub with an issue reopened is not reached, so it is still aimed at",
+      "tags": [["v1.0.0", "2026-11-01"]],
+      "milestones": [
+        { "title": "Reopened", "reached": false, "closed_at": "2026-10-01", "updated_at": "2026-10-03" }
+      ],
+      "expected": { "": ["Reopened"], "v1.0.0": [] }
+    },
+    {
+      "name": "reached before the first tag is the first tag's",
+      "tags": [["v1.0.0", "2026-11-01"]],
+      "milestones": [
+        { "title": "Early", "reached": true, "closed_at": "2026-01-01", "updated_at": "2026-01-01" }
+      ],
+      "expected": { "": [], "v1.0.0": ["Early"] }
+    }
+  ]
+}

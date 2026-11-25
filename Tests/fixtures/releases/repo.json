@@ -1,0 +1,63 @@
+{
+  "_": "A Space's repository for the Releases timeline (Tests/test_ritual_releases.py builds it as a git repository in a temporary folder; nothing here is a real project). `commits` are made in order, each on its own day at noon UTC, `tags` naming the release tags (a -rc tag is a checkpoint and is not a release); the last commit carries `files`: the changelog and the entries waiting in changelog.d/. `milestones` are gh's own rows for the repository. `expected` is what GET /api/ritual/releases serves, release by release, newest first, the one in progress first.",
+  "repo": "acme/widgets",
+  "commits": [
+    { "day": "2026-09-01", "subject": "Start the widgets", "body": "" },
+    { "day": "2026-09-10", "subject": "Add the widget list (#3)", "body": "Refs #1", "tags": ["v0.1.0"] },
+    { "day": "2026-09-20", "subject": "Sort the list by name (#5)", "body": "Closes #4" },
+    { "day": "2026-10-01", "subject": "Fix the empty list's sentence (#7)", "body": "Fixes #6\nRefs #2", "tags": ["v0.2.0"] },
+    { "day": "2026-10-02", "subject": "Add a search box (#9)", "body": "Refs #8", "tags": ["v0.3.0-rc.1"] },
+    { "day": "2026-10-12", "subject": "Search by tag (#11)", "body": "Refs #10", "tags": ["v0.3.0"] },
+    { "day": "2026-10-20", "subject": "Export the list (#13)", "body": "Refs #12" },
+    { "day": "2026-10-25", "subject": "Say how the export reads (#14)", "body": "", "files": true }
+  ],
+  "files": {
+    "CHANGELOG.md": "# Changelog\n\n## [Unreleased]\n\n## [0.3.0] - 2026-10-12\n\n### Added\n\n- Search the list by name or by tag.\n\n## [0.2.0] - 2026-10-01\n\n### Changed\n\n- The list is sorted by name.\n\n### Fixed\n\n- An empty list says so, instead of\n  showing nothing.\n\n## [0.1.0] - 2026-09-10\n\n### Added\n\n- The widget list.\n",
+    "changelog.d/README.md": "# changelog.d\n\nThe folder's own page, never an entry.\n",
+    "changelog.d/13.added.md": "- Export the list as a file.\n",
+    "changelog.d/14.changed.md": "- The export's columns are named.\n",
+    "changelog.d/12-fix.Fixed.md": "- An export of an empty list is an empty file.\n",
+    "changelog.d/notes.txt": "not an entry\n"
+  },
+  "milestones": [
+    { "number": 1, "title": "First list", "state": "closed", "open_issues": 0, "closed_issues": 2, "html_url": "https://github.com/acme/widgets/milestone/1", "due_on": null, "created_at": "2026-09-01T12:00:00Z", "updated_at": "2026-09-08T12:00:00Z", "closed_at": "2026-09-08T12:00:00Z" },
+    { "number": 2, "title": "Sorting", "state": "open", "open_issues": 0, "closed_issues": 3, "html_url": "https://github.com/acme/widgets/milestone/2", "due_on": null, "created_at": "2026-09-11T12:00:00Z", "updated_at": "2026-10-01T09:00:00Z", "closed_at": null },
+    { "number": 3, "title": "Search", "state": "closed", "open_issues": 0, "closed_issues": 4, "html_url": "https://github.com/acme/widgets/milestone/3", "due_on": "2026-10-10T07:00:00Z", "created_at": "2026-10-01T12:00:00Z", "updated_at": "2026-10-06T12:00:00Z", "closed_at": "2026-10-05T12:00:00Z" },
+    { "number": 4, "title": "Export", "state": "open", "open_issues": 2, "closed_issues": 1, "html_url": "https://github.com/acme/widgets/milestone/4", "due_on": null, "created_at": "2026-10-13T12:00:00Z", "updated_at": "2026-10-20T12:00:00Z", "closed_at": null },
+    { "number": 5, "title": "Polish", "state": "closed", "open_issues": 0, "closed_issues": 1, "html_url": "https://github.com/acme/widgets/milestone/5", "due_on": null, "created_at": "2026-10-13T12:00:00Z", "updated_at": "2026-10-22T12:00:00Z", "closed_at": "2026-10-22T12:00:00Z" },
+    { "number": 6, "title": "Parking lot", "state": "open", "open_issues": 0, "closed_issues": 0, "html_url": "https://github.com/acme/widgets/milestone/6", "due_on": null, "created_at": "2026-09-01T12:00:00Z", "updated_at": "2026-09-01T12:00:00Z", "closed_at": null }
+  ],
+  "expected": [
+    {
+      "tag": "", "version": "Unreleased", "inProgress": true, "date": "", "since": "2026-10-12", "previous": "v0.3.0", "commits": 2,
+      "url": "https://github.com/acme/widgets/compare/v0.3.0...HEAD",
+      "notes": [
+        { "heading": "Added", "entries": ["Export the list as a file."] },
+        { "heading": "Changed", "entries": ["The export's columns are named."] },
+        { "heading": "Fixed", "entries": ["An export of an empty list is an empty file."] }
+      ],
+      "pulls": [13, 14], "issues": [12], "milestones": ["Export", "Polish", "Parking lot"]
+    },
+    {
+      "tag": "v0.3.0", "version": "0.3.0", "inProgress": false, "date": "2026-10-12", "since": "2026-10-01", "previous": "v0.2.0", "commits": 2,
+      "url": "https://github.com/acme/widgets/releases/tag/v0.3.0",
+      "notes": [{ "heading": "Added", "entries": ["Search the list by name or by tag."] }],
+      "pulls": [9, 11], "issues": [8, 10], "milestones": ["Search"]
+    },
+    {
+      "tag": "v0.2.0", "version": "0.2.0", "inProgress": false, "date": "2026-10-01", "since": "2026-09-10", "previous": "v0.1.0", "commits": 2,
+      "url": "https://github.com/acme/widgets/releases/tag/v0.2.0",
+      "notes": [
+        { "heading": "Changed", "entries": ["The list is sorted by name."] },
+        { "heading": "Fixed", "entries": ["An empty list says so, instead of showing nothing."] }
+      ],
+      "pulls": [5, 7], "issues": [2, 4, 6], "milestones": ["Sorting"]
+    },
+    {
+      "tag": "v0.1.0", "version": "0.1.0", "inProgress": false, "date": "2026-09-10", "since": "", "previous": "", "commits": 2,
+      "url": "https://github.com/acme/widgets/releases/tag/v0.1.0",
+      "notes": [{ "heading": "Added", "entries": ["The widget list."] }],
+      "pulls": [3], "issues": [1], "milestones": ["First list"]
+    }
+  ]
+}

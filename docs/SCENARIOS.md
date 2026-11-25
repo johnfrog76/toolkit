@@ -534,16 +534,23 @@ is a page under Team Agile's one nav entry"; `RitualPage.test.tsx`).
 Nothing moves between issues: the title is one line, the deep-water row is always laid out, and the
 status line is a fixed three lines.
 
-### Team Agile's releases (on; `web/src/modules/solitaireAgile/MilestonesPage.test.tsx`)
+### Team Agile's releases (on; `web/src/modules/solitaireAgile/ReleasesPage.test.tsx` and `MilestonesPage.test.tsx`)
 
 The strip reads **Standup | Triage | Releases | Org**; Releases is `/solitaire-agile/releases`, under the ONE
 Team Agile entry, with the chrome, and absent with the flag off (`scenarios.test.tsx`, "Releases: a page
-under Team Agile's one entry"). The old `/solitaire-agile/milestones` address redirects to it. Until
-tag-based releases are built the rows are GitHub milestones, and the panel says so.
+under Team Agile's one entry"). The old `/solitaire-agile/milestones` address redirects to it. The page is
+the timeline (`ReleasesPage.test.tsx`), its one `h1` `Releases`, and under it the GitHub milestones list.
 
-| `GET /api/ritual/milestones` answers | The page shows |
+| `GET /api/ritual/releases` answers | The timeline shows |
 | --- | --- |
-| milestones, none reached and not yet awarded | the heading `Releases` and a subtitle naming GitHub milestones; one row each, in flight first: the title, `GitHub milestone`, its state (`open`, `awarded`, `no issues yet`), a bar of closed over total with `5 of 8 closed` under it, `due <day>` where there is one, `closed on the tracker` where GitHub closed it, and its GitHub link; no dialog, no confetti |
+| releases, the tracker read | one stop a release, `In progress` first (an open node on a dashed rail), then each tag newest first: its tag, its day, its count of entries; a gold flag over a stop for each GitHub milestone reached in it, outlined over `In progress` for one still aimed at; a click on a stop or flag opens the side panel -- the tag as an `h2`, its window and commits, the GitHub Release (`Compare on GitHub` in progress), its milestones, its notes (`Notes so far` in progress), its pull requests and issues; Left and Right step, focus and the panel following |
+| releases, no tracker (`tracker.ok` false) | every stop, no flag, and `GitHub milestones not read: <reason>` in plain text |
+| no checkout (`source.ok` false) | `No releases read`, with the setting's sentence, drawn plainly; no stop |
+| nothing (the agent is away) | `Could not read the releases` -- an error |
+
+| `GET /api/ritual/milestones` answers | The list under it shows |
+| --- | --- |
+| milestones, none reached and not yet awarded | the heading `GitHub milestones` (an `h2`) and the subtitle `how far along each is`; one row each, in flight first: the title, `GitHub milestone`, its state (`open`, `awarded`, `no issues yet`), a bar of closed over total with `5 of 8 closed` under it, `due <day>` where there is one, `closed on the tracker` where GitHub closed it, and its GitHub link; no dialog, no confetti |
 | a reached milestone this browser has not awarded | the award dialog over the tab: `Congratulations: <title> reached!`, `12 issues closed, 1 October 2026 to 24 October 2026.`, a gold trophy, and confetti once over the whole app -- nothing rains under reduced motion. Close: the next one waiting, else the tab with it `awarded` |
 | the same, a later visit (the browser's mark set) | the tab, the milestone `awarded`, no dialog, no confetti |
 | a milestone with no issues | `no issues yet`, open or closed on GitHub; never reached, never awarded |

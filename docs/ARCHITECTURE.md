@@ -138,6 +138,10 @@ with no reachable GitHub tracker still answers 200 with the ritual and the reaso
 ([Team Agile](modules/solitaire-agile.md), "The file shape, and how a standup is read").
 `GET /api/ritual/milestones` is the Releases tab's read, the ado core's milestone reader and its one
 reached rule under the same gate, kept a minute, against `Tests/fixtures/rituals/milestones.json`.
+`GET /api/ritual/releases` is the Releases timeline's read, under the same gate: the Space's tags, their
+changelog sections and the `changelog.d/` entries waiting, read from its checkout on this machine
+(`spaceCheckouts.<slug>.path`) through `run_read`, and the GitHub milestones reached within each release
+when the tracker answers, against `Tests/fixtures/releases/`.
 `GET /api/ritual/org` is the org chart's read: the hub's `org.json` through `agent/solitaire/org.py`, a mirror of the CLI's reader held to
 `Tests/fixtures/org/table.json`, under the same gate, with each position's prompt title and reading-room ref from the Studio's prompt record.
 `GET /api/ritual/triage` (V1) is the same shape for triage, against `Tests/fixtures/rituals/triage.json`;

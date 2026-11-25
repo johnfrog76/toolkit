@@ -20,8 +20,9 @@ import { useGetRitualMilestonesQuery } from "./api.solitaireAgile";
 import type { AwardStage } from "./award";
 import { awardKey, awardStage, dayWords, markAwarded, pickAwards } from "./award";
 
-// The Releases tab (docs/modules/solitaire-agile.md, "Milestones: the tab and the
-// award"): Team Agile's third page, after Standup and Triage. One row per GitHub
+// The Releases tab's GitHub milestones list (docs/modules/solitaire-agile.md,
+// "Milestones: the tab and the award"), drawn under the timeline (ReleasesPage)
+// with a heading of the page's second level. One row per GitHub
 // milestone of the Space's tracker, each with a bar -- closed over total issues, the tracker's
 // own numbers through GET /api/ritual/milestones --, the due date where there is one,
 // and its state: open, reached, or awarded (this browser has shown its dialog).
@@ -208,9 +209,9 @@ export function MilestonesPage() {
         headerLeft={
           <>
             {icon}
-            <Subtitle2 as="h1">Releases</Subtitle2>
+            <Subtitle2 as="h2">{SOURCE_WORDS}s</Subtitle2>
             <Caption1 className={styles.subtitle} data-testid="releases-subtitle">
-              {SOURCE_WORDS}s, with how far along each is
+              how far along each is
             </Caption1>
           </>
         }

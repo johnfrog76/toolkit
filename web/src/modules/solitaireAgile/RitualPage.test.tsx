@@ -5,10 +5,10 @@ import { RitualPage } from "./RitualPage";
 // The Team Agile tab's Standup | Triage | Releases | Org strip: each tab an
 // address, the page under it the one that address names. The pages are
 // stand-ins here -- StandupPage.test.tsx, TriagePage.test.tsx,
-// MilestonesPage.test.tsx and OrgPage.test.tsx are about them.
+// ReleasesPage.test.tsx and OrgPage.test.tsx are about them.
 jest.mock("./StandupPage", () => ({ StandupPage: () => <p>the standup page</p> }));
 jest.mock("./TriagePage", () => ({ TriagePage: () => <p>the triage page</p> }));
-jest.mock("./MilestonesPage", () => ({ MilestonesPage: () => <p>the milestones page</p> }));
+jest.mock("./ReleasesPage", () => ({ ReleasesPage: () => <p>the releases page</p> }));
 jest.mock("./OrgPage", () => ({ OrgPage: () => <p>the org page</p> }));
 
 function at(path: string) {
@@ -48,11 +48,11 @@ describe("the Standup | Triage | Releases | Org strip", () => {
     expect(screen.getByRole("tab", { name: "Releases" }).getAttribute("aria-selected")).toBe(
       "true",
     );
-    expect(screen.getByText("the milestones page")).toBeTruthy();
+    expect(screen.getByText("the releases page")).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Triage" }));
     expect(screen.getByText("the triage page")).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Releases" }));
-    expect(screen.getByText("the milestones page")).toBeTruthy();
+    expect(screen.getByText("the releases page")).toBeTruthy();
   });
 
   it("Org is the fourth address, its page a chunk fetched when the tab is opened", async () => {
@@ -60,7 +60,7 @@ describe("the Standup | Triage | Releases | Org strip", () => {
     expect(screen.getByRole("tab", { name: "Org" }).getAttribute("aria-selected")).toBe("true");
     expect(await screen.findByText("the org page")).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Releases" }));
-    expect(screen.getByText("the milestones page")).toBeTruthy();
+    expect(screen.getByText("the releases page")).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Org" }));
     expect(await screen.findByText("the org page")).toBeTruthy();
   });

@@ -509,6 +509,77 @@ export const milestonesEndpoints = api.injectEndpoints({
 
 export const { useGetRitualMilestonesQuery } = milestonesEndpoints;
 
+// -- Releases (the timeline) ---------------------------------------------
+//
+// The Space's releases, read from its checkout on the agent's machine: the
+// release in progress (the last tag to HEAD, its notes the changelog.d/ entries
+// waiting) first, then each tag newest first with its CHANGELOG.md section. The
+// GitHub milestones reached within each ride along when the tracker answered
+// (docs/modules/solitaire-agile.md, "Releases: the timeline"). A READ.
+
+/** A pull request or an issue of a release, linked on the Space's repository. */
+export interface ReleaseRef {
+  number: number;
+  /** A pull request's squash subject; "" for an issue (its title is the tracker's). */
+  title: string;
+  url: string;
+}
+
+/** The core's milestone, with the day it was reached ("" while it is not). */
+export interface ReleaseMilestone extends Milestone {
+  reachedOn: string;
+}
+
+export interface Release {
+  /** "" for the release in progress. */
+  tag: string;
+  /** "1.7.0"; "Unreleased" in progress. */
+  version: string;
+  inProgress: boolean;
+  /** The tag's day; "" in progress. */
+  date: string;
+  /** The previous tag's day; "" for the first. */
+  since: string;
+  previous: string;
+  commits: number;
+  /** The GitHub Release; the compare view in progress. */
+  url: string;
+  notes: { heading: string; entries: string[] }[];
+  pulls: ReleaseRef[];
+  issues: ReleaseRef[];
+  milestones: ReleaseMilestone[];
+}
+
+export interface ReleasesResponse {
+  ceremony: "releases";
+  space: string;
+  repo: string;
+  /** false: the checkout was not read; `reason` says why, and there are no releases. */
+  source: { ok: boolean; reason: string };
+  /** false: no tracker answered; the releases are there, with no milestones. */
+  tracker: { ok: boolean; reason: string };
+  releases: Release[];
+}
+
+export const RELEASES_QUERY = underBase(RITUALS.releasesRoute);
+
+/** The query for one Space's releases; "" asks for the Space you are in. */
+export function releasesQuery(space: string): string {
+  return space ? `${RELEASES_QUERY}?space=${encodeURIComponent(space)}` : RELEASES_QUERY;
+}
+
+export const releasesEndpoints = api.injectEndpoints({
+  endpoints: (builder) => ({
+    // GET /api/ritual/releases?space=<slug> -- the tags, their notes, the milestones within
+    getRitualReleases: builder.query<ReleasesResponse, string>({
+      query: releasesQuery,
+      keepUnusedDataFor: CACHE_TTL,
+    }),
+  }),
+});
+
+export const { useGetRitualReleasesQuery } = releasesEndpoints;
+
 // -- The org chart (the Org tab) ------------------------------------------
 //
 // The hub's org.json, the tree in use, as GET /api/ritual/org serves it
