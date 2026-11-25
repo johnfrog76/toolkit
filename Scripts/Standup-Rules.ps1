@@ -63,6 +63,10 @@
                                the window, from Claude Code's session files --
                                {id, sessionId} pairs and nothing else. Nothing
                                calls it yet.
+      Get-P20StandupOrgSeats   the seats reader: a Space's seats in the org
+                               chart's tree in use, each a model object by
+                               lookup -- {seat, position, model} and nothing
+                               else. Nothing calls it yet.
 
     The agent's agent/solitaire/standup.py implements the same rule over the
     same files; Tests/fixtures/rituals/standup.json (issues),
@@ -1287,6 +1291,90 @@ function Read-P20StandupSessions {
     if (-not (Test-Path -LiteralPath $ProjectsRoot -PathType Container)) { return @() }
     $roots = @(Get-P20StandupWorktreeRoots -Checkout $Checkout)
     return @(Get-P20StandupSessionPairs -ProjectsRoot $ProjectsRoot -Since $Since -AsOf $AsOf -Roots $roots)
+}
+
+# -- The seats reader -----------------------------------------------------------
+#
+# Who the org chart seats in a Space: the seats of the chart's tree in use
+# (docs/hub/org.md) whose `space` is the Space's slug, each a model object
+# (Get-P20ModelObject). It reads no file of its own: the chart is the org
+# reader's answer (Scripts/Read-OrgChart.ps1, Read-P20OrgChart), validity
+# verdict and all. The agent's agent/solitaire/org_seats.py is the same rule
+# over the same table (Tests/fixtures/rituals/standup-sessions.json, its seats
+# section):
+#
+#   Resolve-P20SeatModelId       a seat's free-text model -> the id it names.
+#   ConvertTo-P20StandupOrgSeats (a chart, a slug) -> the seats. Pure.
+#   Get-P20StandupOrgSeats       the reader's result, the slug and whether
+#                                Team Agile is on -> the seats, or none.
+#
+# What leaves: @{ seat; position; model } per seat, in the chart's own order
+# (its positions in tree order, each position's seats in file order), and
+# nothing else. A seat's machine and person are read here and dropped.
+
+function Resolve-P20SeatModelId {
+    <#
+      The model id a seat's `model` names, by lookup and never by parsing the
+      text: an id the model map has a row for, matched exactly (Get-P20ModelInfo);
+      else a key of the map's `current` block, matched ignoring case as every
+      worker size is (Get-P20ModelForSize: `opus` is current.opus's id); else
+      the text as written, an id the map does not know. '' for no text.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Model, [string]$PackageRoot)
+    $text = "$Model".Trim()
+    if (-not $text) { return '' }
+    $lookArgs = @{}
+    if ($PackageRoot) { $lookArgs.PackageRoot = $PackageRoot }
+    if ((Get-P20ModelInfo -Id $text @lookArgs).known) { return $text }
+    $sized = Get-P20ModelForSize -Size $text @lookArgs
+    if ($sized) { return [string]$sized }
+    return $text
+}
+
+function ConvertTo-P20StandupOrgSeats {
+    <#
+      A Space's seats in an org chart response (Read-P20OrgChart's Chart, or the
+      same document after a JSON round trip): every seat whose `space` is -Space
+      exactly that names a model and no person, as
+      [ordered]@{ seat; position; model }, model the model object for the id
+      the seat names (Resolve-P20SeatModelId, Get-P20ModelObject) with a null
+      sessionId. A seat with no `space`, another Space's seat, a vacant seat (the
+      chart's own rule: a seat that names no model is vacant, and its position's
+      defaultModel does not fill it), a person's seat and a pool add nobody. In
+      the chart's order. Pure over the chart and the model map.
+    #>
+    param($Chart, [string]$Space, [string]$PackageRoot)
+    $out = @()
+    if ($null -eq $Chart -or -not $Space -or $null -eq $Chart.tree) { return $out }
+    $lookArgs = @{}
+    if ($PackageRoot) { $lookArgs.PackageRoot = $PackageRoot }
+    foreach ($position in @($Chart.tree.positions)) {
+        if ($null -eq $position) { continue }
+        foreach ($seat in @($position.seats)) {
+            if ($null -eq $seat) { continue }
+            if ([string]$seat.space -cne $Space) { continue }
+            if ([string]$seat.person) { continue }
+            $id = Resolve-P20SeatModelId -Model ([string]$seat.model) @lookArgs
+            if (-not $id) { continue }
+            $model = Get-P20ModelObject -Id $id -SessionId $null @lookArgs
+            if ($null -eq $model) { continue }
+            $out += [ordered]@{ seat = [string]$seat.id; position = [string]$position.id; model = $model }
+        }
+    }
+    return $out
+}
+
+function Get-P20StandupOrgSeats {
+    <#
+      The seats reader for a Space: -OrgRead is Read-P20OrgChart's result for
+      the hub, read once by the caller. Team Agile off (-TeamAgile $false), no
+      result, no org.json and a file that fails its checks (any Status but `ok`)
+      are no seats: the reader never refuses and never throws.
+    #>
+    param($OrgRead, [string]$Space, [bool]$TeamAgile = $true, [string]$PackageRoot)
+    if (-not $TeamAgile -or $null -eq $OrgRead -or [string]$OrgRead.Status -cne 'ok') { return @() }
+    try { return @(ConvertTo-P20StandupOrgSeats -Chart $OrgRead.Chart -Space $Space -PackageRoot $PackageRoot) }
+    catch { return @() }
 }
 
 function ConvertTo-P20StandupDay {

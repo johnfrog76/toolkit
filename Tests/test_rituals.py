@@ -1712,6 +1712,126 @@ class TheSessionReader(unittest.TestCase):
                 self.assertNotRegex(text, callers)
 
 
+def _seats_read(row: dict) -> tuple[list[dict], object]:
+    """A seats row through the org chart's own reader, then the seats reader."""
+    from agent.solitaire.org import KIND_MISSING, OrgResult, read_org_chart
+    from agent.solitaire.org_seats import standup_seats
+
+    if "org" in row:
+        result = read_org_chart(json.dumps(row["org"]), lambda _name: False)
+    else:
+        result = OrgResult("missing", KIND_MISSING, "There is no org.json in the hub.")
+    return standup_seats(result, row["space"], row.get("teamAgile", True)), result
+
+
+def _seats_expected(row: dict, rows: dict, current: dict) -> list[dict]:
+    """A row's expected seats with each model spelled out, the way the lookup rows
+    do it: a known id named and grouped by the shipped map's own row."""
+    out = []
+    for want in row["expected"]:
+        spec = want["model"]
+        if "current" in spec:
+            mid = current[spec["current"]]
+            known = True
+        else:
+            mid, known = spec["id"], spec.get("known", True)
+        if known:
+            assert mid in rows, f"{row['name']}: {mid} must have a row in the shipped map"
+            name, family = rows[mid]["name"], rows[mid]["family"]
+        else:
+            assert mid not in rows, f"{row['name']}: {mid} must have no row in the shipped map"
+            assert all(k.lower() != mid.lower() for k in current), f"{row['name']}: {mid} must be no current key"
+            name, family = mid, None
+        model = {"id": mid, "sessionId": None, "name": name, "family": family, "known": known}
+        out.append({"seat": want["seat"], "position": want["position"], "model": model})
+    return out
+
+
+def _seats_secrets(row: dict) -> list[str]:
+    """Every machine and person value a row's org holds."""
+    found = set()
+    for tree in (row.get("org") or {}).get("trees", []):
+        found.update(m for m in tree.get("machines", []) if isinstance(m, str))
+        for position in tree.get("positions", []):
+            for seat in position.get("seats") or []:
+                for key in ("machine", "person"):
+                    if isinstance(seat.get(key), str) and seat[key].strip():
+                        found.add(seat[key].strip())
+    return sorted(found)
+
+
+class TheSeatsReader(unittest.TestCase):
+    """standup-sessions.json's ``seats`` section -- the same rows tkTestToolkit
+    -Rituals asserts from the CLI's Get-P20StandupOrgSeats: an org.json through
+    the org chart's own reader, a Space slug and whether Team Agile is on in,
+    the Space's seats as model objects out."""
+
+    def test_the_table_has_its_rows(self):
+        self.assertGreaterEqual(len(SESSIONS_TABLE["seats"]), 13)
+        self.assertTrue(all(row.get("name") for row in SESSIONS_TABLE["seats"]))
+
+    def test_every_seats_row(self):
+        from agent.core.models import model_map, read_model_current
+
+        rows, current = model_map(), read_model_current()
+        for row in SESSIONS_TABLE["seats"]:
+            with self.subTest(row=row["name"]):
+                got, result = _seats_read(row)
+                if "invalid" in row:
+                    self.assertEqual((result.status, result.kind), ("invalid", row["invalid"]))
+                self.assertEqual(got, _seats_expected(row, rows, current))
+
+    def test_the_pure_rule_reads_the_chart_after_a_json_round_trip(self):
+        from agent.solitaire.org_seats import space_seats
+
+        for row in SESSIONS_TABLE["seats"]:
+            got, result = _seats_read(row)
+            if result.status == "ok" and row.get("teamAgile", True):
+                with self.subTest(row=row["name"]):
+                    self.assertEqual(space_seats(json.loads(json.dumps(result.chart)), row["space"]), got)
+
+    def test_no_machine_or_person_leaves_the_reader(self):
+        from agent.core.models import model_map, read_model_current
+
+        rows, current = model_map(), read_model_current()
+        held = 0
+        for row in SESSIONS_TABLE["seats"]:
+            with self.subTest(row=row["name"]):
+                got, _ = _seats_read(row)
+                for seat in got:
+                    self.assertEqual(sorted(seat), ["model", "position", "seat"])
+                    self.assertEqual(sorted(seat["model"]), ["family", "id", "known", "name", "sessionId"])
+                needles = _seats_secrets(row)
+                held += len(needles)
+                expected_text = json.dumps(_seats_expected(row, rows, current)).lower()
+                for needle in needles:
+                    self.assertNotIn(needle.lower(), expected_text, "a needle the expected seats hold proves nothing")
+                text = json.dumps(got).lower()
+                for needle in needles:
+                    self.assertNotIn(needle.lower(), text)
+        self.assertGreater(held, 0)
+
+    def test_a_chart_that_is_not_ok_or_a_reader_that_breaks_is_no_seats(self):
+        from agent.solitaire import org_seats
+        from agent.solitaire.org import OrgResult
+
+        self.assertEqual(org_seats.standup_seats(None, "alpha"), [])
+        self.assertEqual(org_seats.standup_seats(OrgResult("invalid", "cycle", "a loop"), "alpha"), [])
+        broken = OrgResult("ok", chart={"tree": {"positions": [{"id": "p", "seats": [{"space": "alpha"}]}]}})
+        with mock.patch.object(org_seats, "space_seats", side_effect=RuntimeError("boom")):
+            self.assertEqual(org_seats.standup_seats(broken, "alpha"), [])
+
+    def test_nothing_calls_it_yet(self):
+        """No route, no verb: no module of the agent imports the seats reader."""
+        for path in sorted((REPO_ROOT / "agent").rglob("*.py")):
+            if path.name == "org_seats.py" and path.parent.name == "solitaire":
+                continue
+            with self.subTest(path=path.relative_to(REPO_ROOT).as_posix()):
+                text = path.read_text(encoding="utf-8")
+                callers = r"org_seats|standup_seats|space_seats|seat_model_id"
+                self.assertNotRegex(text, callers)
+
+
 TEAM_TABLE = json.loads((FIXTURES / "standup-team.json").read_text(encoding="utf-8"))
 
 

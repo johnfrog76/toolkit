@@ -301,5 +301,155 @@
   "privacy": [
     { "name": "a pair carries id and sessionId and no other key", "rule": "keys", "allowed": [ "id", "sessionId" ] },
     { "name": "no path, project folder name, home folder or prompt text leaves the reader", "rule": "strings", "needles": [ "/Users/", "C:\\", "C:/", "\\Users\\", "alex", "Repos", "a prompt the reader must never keep" ] }
+  ],
+  "_seats": "The seats reader's section, read by Scripts/Standup-Rules.ps1 Get-P20StandupOrgSeats (tkTestToolkit -Rituals) and agent/solitaire/org_seats.py standup_seats (Tests/test_rituals.py). A row is a whole org.json (org; absent is no file), a Space slug (space) and teamAgile (true when absent). Each suite hands org to the org chart's OWN reader -- Read-P20OrgChart over a scratch hub, read_org_chart over the text -- and the reader's result to the seats reader, so the chart's validity verdict is the reader's and never re-checked; a row with invalid also asserts the reader's kind. expected is the seats, in the chart's order (its positions in tree order, each position's seats in file order), each {seat, position, model}, model the model object with a null sessionId. A model is stated the way the lookup rows state one, so the table does not move when a model row is added: {id} is an id the shipped map has a row for, named and grouped by that row, known; {current} is a key of the map's current block, the id it names today (both suites assert the id has a row); {id, known: false} is an id the map has no row for and no current key names ignoring case, named as written with no family. A seat's model is free text read by lookup: an id with a row, matched exactly; else a current key, matched ignoring case as a worker size is (Get-P20ModelForSize, current_model); else the text as written. Only a seat whose space is the slug exactly, that names a model and no person, is seated: a vacant seat (the chart's rule -- no model is vacant, and the position's defaultModel does not fill it), a person's seat, a pool, another Space's seat and an org-wide seat (no space) add nobody. Privacy, over every row: a seat carries seat, position and model and nothing else, a model the model object's five keys, and no machine or person value of the row's org (its trees' machines, its seats' machine and person) appears in the output, ignoring case -- and both suites first assert that no such value is part of the row's expected seats, so the check cannot pass by accident.",
+  "seats": [
+    {
+      "name": "a seat naming an id the map has a row for",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "claude-opus-5-5", "machine": "desk", "space": "alpha"}]}]}]},
+      "expected": [
+        {"seat": "alpha", "position": "team-lead", "model": {"id": "claude-opus-5-5"}}
+      ]
+    },
+    {
+      "name": "a seat naming a key of current is that key's id",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "fable", "machine": "desk", "space": "alpha"}]}]}]},
+      "expected": [
+        {"seat": "alpha", "position": "team-lead", "model": {"current": "fable"}}
+      ]
+    },
+    {
+      "name": "a current key is matched ignoring case, as a worker size is",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "Sonnet", "machine": "laptop", "space": "alpha"}]}]}]},
+      "expected": [
+        {"seat": "alpha", "position": "team-lead", "model": {"current": "sonnet"}}
+      ]
+    },
+    {
+      "name": "an id in other letter case is not that id: it is kept as written",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "Claude-Opus-5-5", "machine": "desk", "space": "alpha"}]}]}]},
+      "expected": [
+        {"seat": "alpha", "position": "team-lead", "model": {"id": "Claude-Opus-5-5", "known": false}}
+      ]
+    },
+    {
+      "name": "free text the map does not know is a model named as written",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "acme-coder-1-fixture", "machine": "desk", "space": "alpha"}]}]}]},
+      "expected": [
+        {"seat": "alpha", "position": "team-lead", "model": {"id": "acme-coder-1-fixture", "known": false}}
+      ]
+    },
+    {
+      "name": "text holding a family word that is no row and no key is not that family",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "sonnet for crew cards", "machine": "desk", "space": "alpha"}]}]}]},
+      "expected": [
+        {"seat": "alpha", "position": "team-lead", "model": {"id": "sonnet for crew cards", "known": false}}
+      ]
+    },
+    {
+      "name": "a seat naming no model is vacant: its position's defaultModel does not fill it",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "defaultModel": "opus", "seats": [{"id": "alpha", "machine": "desk", "space": "alpha"}]}]}]},
+      "expected": []
+    },
+    {
+      "name": "a vacant seat with no default adds nobody",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "machine": "desk", "space": "alpha"}]}]}]},
+      "expected": []
+    },
+    {
+      "name": "a person's seat adds nobody",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "person": "Tomas", "machine": "laptop", "space": "alpha"}]}]}]},
+      "expected": []
+    },
+    {
+      "name": "a seat naming a model and a person is the person's, and adds nobody",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "opus", "person": "Ines", "machine": "laptop", "space": "alpha"}]}]}]},
+      "expected": []
+    },
+    {
+      "name": "a pool adds nobody",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "beta", "model": "haiku", "machine": "desk", "space": "beta"}]}, {"id": "builder", "title": "Builder", "reportsTo": "team-lead", "defaultModel": "sonnet", "seats": []}, {"id": "intern", "title": "Intern", "reportsTo": "team-lead", "defaultModel": "haiku"}]}]},
+      "expected": []
+    },
+    {
+      "name": "another Space's seat adds nobody",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "beta", "model": "opus", "machine": "desk", "space": "beta"}]}]}]},
+      "expected": []
+    },
+    {
+      "name": "a seat with no space is org-wide and adds nobody",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "everywhere", "model": "opus", "machine": "desk"}]}]}]},
+      "expected": []
+    },
+    {
+      "name": "a Space is matched exactly, case and all",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "opus", "machine": "desk", "space": "Alpha"}]}]}]},
+      "expected": []
+    },
+    {
+      "name": "two seats of one position, in the file's order",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha-two", "model": "claude-haiku-5-5", "machine": "laptop", "space": "alpha"}, {"id": "beta", "model": "opus", "machine": "desk", "space": "beta"}, {"id": "alpha-one", "model": "grok-4", "machine": "desk", "space": "alpha"}]}]}]},
+      "expected": [
+        {"seat": "alpha-two", "position": "team-lead", "model": {"id": "claude-haiku-5-5"}},
+        {"seat": "alpha-one", "position": "team-lead", "model": {"id": "grok-4"}}
+      ]
+    },
+    {
+      "name": "positions in the chart's tree order, not the file's",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "reviewer", "title": "Reviewer", "reportsTo": "team-lead", "seats": [{"id": "alpha-review", "model": "haiku", "machine": "desk", "space": "alpha"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "fable", "machine": "desk", "space": "alpha"}]}]}]},
+      "expected": [
+        {"seat": "alpha", "position": "team-lead", "model": {"current": "fable"}},
+        {"seat": "alpha-review", "position": "reviewer", "model": {"current": "haiku"}}
+      ]
+    },
+    {
+      "name": "only the active tree's seats count",
+      "space": "alpha",
+      "org": {"activeTree": "main", "trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "opus", "machine": "desk", "space": "alpha"}]}]}, {"id": "spare", "machines": ["laptop"], "positions": [{"id": "owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "grok-4", "machine": "laptop", "space": "alpha"}]}]}]},
+      "expected": [
+        {"seat": "alpha", "position": "team-lead", "model": {"current": "opus"}}
+      ]
+    },
+    {
+      "name": "a seat naming what models.notModels says is not a model adds nobody",
+      "space": "alpha",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "<synthetic>", "machine": "desk", "space": "alpha"}]}]}]},
+      "expected": []
+    },
+    {
+      "name": "an org.json that fails its checks is no seats",
+      "space": "alpha",
+      "invalid": "several-roots",
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "opus", "machine": "desk", "space": "alpha"}]}, {"id": "second-root", "seats": [{"id": "alpha-too", "model": "fable", "machine": "laptop", "space": "alpha"}]}]}]},
+      "expected": []
+    },
+    {
+      "name": "no org.json is no seats",
+      "space": "alpha",
+      "expected": []
+    },
+    {
+      "name": "Team Agile off is no seats, whatever the file says",
+      "space": "alpha",
+      "teamAgile": false,
+      "org": {"trees": [{"id": "main", "name": "Laptop and desk", "machines": ["laptop", "desk"], "positions": [{"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "Rosa"}]}, {"id": "team-lead", "title": "Team lead", "reportsTo": "owner", "seats": [{"id": "alpha", "model": "opus", "machine": "desk", "space": "alpha"}]}]}]},
+      "expected": []
+    }
   ]
 }

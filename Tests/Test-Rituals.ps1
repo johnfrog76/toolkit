@@ -46,6 +46,10 @@
                      {id, sessionId} pairs and nothing else, the folder left
                      as it was; one git worktree list per read in a scratch
                      repository; nothing calls the reader yet.
+    2c''''. Seats    the same file's seats rows: an org.json through the org
+                     chart's own reader, a Space slug and Team Agile in, the
+                     Space's seats as model objects out, in the chart's order;
+                     no machine or person in the output; no caller yet.
     2c'. The team    Tests/fixtures/rituals/standup-team.json: every size
                      row (a stored teamSize read as the room), every seat row
                      (who is present: the ones with work first, then the idle),
@@ -1241,6 +1245,121 @@ foreach ($dir in @('Scripts', 'Prompt20Toolkit', 'Config', 'agent')) {
 $defaultCommands = ([System.IO.File]::ReadAllText((Join-Path $pkgRoot 'config.default.json')) | ConvertFrom-Json).commands
 $sessVerb = @($defaultCommands.PSObject.Properties | Where-Object { $_.Name -match 'Session' })
 Assert-True 'the session reader has no caller yet: no verb, no wrapper, no route' ($sessCallers.Count -eq 0 -and $sessVerb.Count -eq 0) (($sessCallers + @($sessVerb | ForEach-Object { $_.Name })) -join '; ')
+
+# -- 1c''''. The seats reader ----------------------------------------------
+# standup-sessions.json's seats section, the SAME rows Tests/test_rituals.py
+# asserts from agent/solitaire/org_seats.py: each row's org.json written to a
+# scratch hub and read by the org chart's own reader (Read-P20OrgChart), the
+# reader's result handed to Get-P20StandupOrgSeats. A known model is named and
+# grouped by the shipped map's own row, so a row added there moves nothing.
+Write-Host ""
+Write-Host "-- The seats reader --" -ForegroundColor Cyan
+. (Join-Path $pkgRoot 'Scripts/Read-OrgChart.ps1')
+$seatRows = @($sessionsTable.seats)
+Assert-True 'the sessions table has its seats rows, each named' ($seatRows.Count -ge 13 -and @($seatRows | Where-Object { -not [string]$_.name }).Count -eq 0) "$($seatRows.Count) rows"
+$seatText = {
+    # One seat as one comparable line; a list of them joined.
+    param($Seats)
+    return ((@($Seats) | ForEach-Object {
+                $m = $_.model
+                $keys = (@($m.PSObject.Properties | ForEach-Object { $_.Name })) -join ','
+                if ($m -is [System.Collections.IDictionary]) { $keys = (@($m.Keys) -join ',') }
+                "$($_.seat)|$($_.position)|$keys|$($m.id)|$(if ($null -eq $m.sessionId) { '<null>' } else { $m.sessionId })|$($m.name)|$(if ($null -eq $m.family) { '<null>' } else { $m.family })|$($m.known)"
+            }) -join "`n")
+}
+$seatScratch = Join-Path ([System.IO.Path]::GetTempPath()) ('p20-seats-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Path $seatScratch -Force | Out-Null
+$utf8Seats = New-Object System.Text.UTF8Encoding($false)
+try {
+    $seatHeld = 0
+    foreach ($trow in $seatRows) {
+        $hub = Join-Path $seatScratch ('hub-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+        New-Item -ItemType Directory -Path $hub -Force | Out-Null
+        if ($trow.PSObject.Properties['org']) {
+            [System.IO.File]::WriteAllText((Join-Path $hub (Get-P20OrgFileName)), ($trow.org | ConvertTo-Json -Depth 20), $utf8Seats)
+        }
+        $teamAgile = $true
+        if ($trow.PSObject.Properties['teamAgile']) { $teamAgile = [bool]$trow.teamAgile }
+        $orgRead = Read-P20OrgChart -PromptsRoot $hub -PackageRoot $pkgRoot
+        if ($trow.PSObject.Properties['invalid']) {
+            Assert-True "seats: $($trow.name) -- the org reader's verdict" ($orgRead.Status -ceq 'invalid' -and $orgRead.Kind -ceq [string]$trow.invalid) "$($orgRead.Status) $($orgRead.Kind)"
+        }
+        $got = @(Get-P20StandupOrgSeats -OrgRead $orgRead -Space ([string]$trow.space) -TeamAgile $teamAgile -PackageRoot $pkgRoot)
+
+        $want = @()
+        $specOk = $true
+        foreach ($w in @($trow.expected | Where-Object { $null -ne $_ })) {
+            $spec = $w.model
+            $known = $true
+            if ($spec.PSObject.Properties['current']) { $mid = [string]$shippedCurrent[[string]$spec.current] }
+            else {
+                $mid = [string]$spec.id
+                if ($spec.PSObject.Properties['known']) { $known = [bool]$spec.known }
+            }
+            if ($known) {
+                if (-not $mid -or -not $shippedMap.Contains($mid)) { $specOk = $false; continue }
+                $wm = [ordered]@{ id = $mid; sessionId = $null; name = [string]$shippedMap[$mid].name; family = [string]$shippedMap[$mid].family; known = $true }
+            }
+            else {
+                if ($shippedMap.Contains($mid) -or @($shippedCurrent.Keys | Where-Object { [string]$_ -ieq $mid }).Count -gt 0) { $specOk = $false; continue }
+                $wm = [ordered]@{ id = $mid; sessionId = $null; name = $mid; family = $null; known = $false }
+            }
+            $want += [ordered]@{ seat = [string]$w.seat; position = [string]$w.position; model = $wm }
+        }
+        Assert-True "seats: $($trow.name) -- a known model has a row in the shipped map, an unknown one none and no current key" $specOk
+        Assert-True "seats: $($trow.name)" ((& $seatText $got) -ceq (& $seatText $want) -and $got.Count -eq $want.Count) ("got " + ((& $seatText $got) -replace "`n", ' ; '))
+
+        # The pure rule reads the chart after a JSON round trip the same.
+        if ($orgRead.Status -ceq 'ok' -and $teamAgile) {
+            $round = ConvertTo-Json -InputObject $orgRead.Chart -Depth 20 | ConvertFrom-Json
+            $again = @(ConvertTo-P20StandupOrgSeats -Chart $round -Space ([string]$trow.space) -PackageRoot $pkgRoot)
+            Assert-True "seats: $($trow.name) -- the same after a JSON round trip" ((& $seatText $again) -ceq (& $seatText $got))
+        }
+
+        # privacy: a seat carries seat, position and model; no machine or person value leaves.
+        $badSeat = @($got | Where-Object { (@($_.Keys) -join ',') -cne 'seat,position,model' })
+        Assert-True "seats privacy: $($trow.name) -- a seat carries seat, position and model and nothing else" ($badSeat.Count -eq 0)
+        $needles = @()
+        if ($trow.PSObject.Properties['org']) {
+            foreach ($tree in @($trow.org.trees)) {
+                if ($tree.PSObject.Properties['machines']) { $needles += @($tree.machines | ForEach-Object { [string]$_ }) }
+                foreach ($position in @($tree.positions)) {
+                    if (-not $position.PSObject.Properties['seats']) { continue }
+                    foreach ($seat in @($position.seats)) {
+                        foreach ($k in @('machine', 'person')) { if ($seat.PSObject.Properties[$k] -and ([string]$seat.$k).Trim()) { $needles += ([string]$seat.$k).Trim() } }
+                    }
+                }
+            }
+        }
+        $seatHeld += $needles.Count
+        $wantJson = ConvertTo-Json -InputObject @($want) -Depth 6 -Compress
+        $gotJson = ConvertTo-Json -InputObject @($got) -Depth 6 -Compress
+        $proves = @($needles | Where-Object { $wantJson.IndexOf($_, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 })
+        Assert-True "seats privacy: $($trow.name) -- no needle is part of the expected seats, so the check has teeth" ($proves.Count -eq 0) ($proves -join ', ')
+        $leaks = @($needles | Where-Object { $gotJson.IndexOf($_, [System.StringComparison]::OrdinalIgnoreCase) -ge 0 } | Sort-Object -Unique)
+        Assert-True "seats privacy: $($trow.name) -- no machine or person in the output" ($leaks.Count -eq 0) ($leaks -join ', ')
+    }
+    Assert-True 'seats privacy: the rows hold machines and people to look for' ($seatHeld -gt 0)
+    Assert-True 'seats: no result is no seats' (@(Get-P20StandupOrgSeats -OrgRead $null -Space 'alpha').Count -eq 0)
+    Assert-True 'seats: no Space is no seats' (@(ConvertTo-P20StandupOrgSeats -Chart ([pscustomobject]@{ tree = [pscustomobject]@{ positions = @() } }) -Space '').Count -eq 0)
+}
+catch { Assert-True 'the seats reader cases ran to the end without a terminating error' $false $_.Exception.Message }
+finally { Remove-Item -LiteralPath $seatScratch -Recurse -Force -ErrorAction SilentlyContinue }
+
+# Nothing calls it yet: no verb, no wrapper, no bridge entry, no other script
+# names the seats reader -- only Scripts/Standup-Rules.ps1, which defines it,
+# and its twin agent/solitaire/org_seats.py, which names it.
+$seatNames = @('Get-P20StandupOrgSeats', 'ConvertTo-P20StandupOrgSeats', 'Resolve-P20SeatModelId')
+$seatCallers = @()
+foreach ($dir in @('Scripts', 'Prompt20Toolkit', 'Config', 'agent')) {
+    foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $pkgRoot $dir) -Recurse -File -Include '*.ps1', '*.psm1', '*.psd1', '*.json', '*.py' -ErrorAction SilentlyContinue)) {
+        if ($f.Name -eq 'Standup-Rules.ps1' -or ($f.Name -eq 'org_seats.py' -and $f.Directory.Name -eq 'solitaire')) { continue }
+        $body = [System.IO.File]::ReadAllText($f.FullName)
+        foreach ($n in $seatNames) { if ($body.Contains($n)) { $seatCallers += "$($f.Name): $n" } }
+    }
+}
+$seatVerb = @($defaultCommands.PSObject.Properties | Where-Object { $_.Name -match 'Seat' })
+Assert-True 'the seats reader has no caller yet: no verb, no wrapper, no route' ($seatCallers.Count -eq 0 -and $seatVerb.Count -eq 0) (($seatCallers + @($seatVerb | ForEach-Object { $_.Name })) -join '; ')
 
 # -- 1d'. The team size ----------------------------------------------------
 # Tests/fixtures/rituals/standup-team.json, every row and every case, the SAME
