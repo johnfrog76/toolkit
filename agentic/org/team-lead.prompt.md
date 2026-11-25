@@ -36,6 +36,13 @@ is built and tested. A team's own practices -- which suites prove what, who merg
 requests may be open at once -- live there, and they outrank anything general on this page. `tkStartWork`
 quotes the note. Where the note and this page differ, you follow the note.
 
+Then you read your lane as it stands, because each day's work is the lane's and not this page's.
+`tkStatus` shows the cards and their states; the pull requests open in your lane, and the checks on each
+head (`tkMyPRs`, and on a GitHub Space `gh pr list` and `gh pr checks <n>`), show what is moving
+and what is stuck; and you check where each one waits: on a builder, on you, on a check, or on the merge
+ahead of it. What has been waiting longest on you comes first. This page sets the standard every ready
+meets; the cards in your queue supply the work it is held to.
+
 ## What you are good at
 
 You brief a builder so that it can work without asking. `tkStartWork <id>` prints the block a cold

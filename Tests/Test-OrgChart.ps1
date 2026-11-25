@@ -395,7 +395,8 @@ try {
     # so each is found in the toolkit's agentic/org/. The owner is a person and the builder a pool:
     # neither names a role.
     $roles = [ordered]@{
-        'vp-product' = @('vp-of-product.prompt.md', 'owner'); 'vp-engineering' = @('vp-of-engineering.prompt.md', 'owner')
+        'vp-product' = @('vp-of-product.prompt.md', 'owner'); 'butler' = @('butler.prompt.md', 'vp-product')
+        'vp-engineering' = @('vp-of-engineering.prompt.md', 'owner')
         'pm' = @('pm.prompt.md', 'owner'); 'team-lead' = @('team-lead.prompt.md', 'pm'); 'intern' = @('intern.prompt.md', 'pm')
     }
     foreach ($positionId in $roles.Keys) {
@@ -410,7 +411,7 @@ try {
     Assert-Equal '  and only the owner and the builder pool name no role' 'owner,builder' ($unroled -join ',')
     $sampleRow = @(Get-P20OptionalSurfaces -Prefix 'tk' -PackageRoot $pkgRoot -Config ([pscustomobject]@{ PromptsRoot = (Join-Path $pkgRoot 'samples/hub'); ActiveSpace = 'github-demo'; Spaces = @() }) -Features $on) | Where-Object { $_.key -eq 'orgChart' } | Select-Object -First 1
     Assert-Equal '  the Org chart row over the sample: on, with its seats' 'on' $sampleRow.state $sampleRow.note
-    Assert-Equal '  and the note counts them' 'My team, 7 seats; tkOrgChart prints it' $sampleRow.note
+    Assert-Equal '  and the note counts them' 'My team, 8 seats; tkOrgChart prints it' $sampleRow.note
 }
 catch {
     $script:failed++
