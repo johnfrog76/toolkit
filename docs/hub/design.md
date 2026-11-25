@@ -225,6 +225,11 @@ A line that agrees with the move -- the outcome word ignoring case, the same `-D
 written twice, and the move's output says `keep` for it. After any move, the word in the file, the word
 printed and the word in the note's Journey are the same.
 
+**The one hand move.** The last row is the one case where a design file is moved by hand: an exception to
+"a design leaves a folder only through the move verb", until `MoveDesign` gains a move that finishes the
+completion its spec's move started ([#582](https://github.com/johnfrog76/toolkit/issues/582)).
+Known gap: [A completed design's live note is moved by hand](../KNOWN-GAPS.md#a-completed-designs-live-note-is-moved-by-hand).
+
 ## Examples
 
 `Tests/fixtures/hub/design/board-ideas.md` is a promoted, stamped note the agent's tests and the smoke run

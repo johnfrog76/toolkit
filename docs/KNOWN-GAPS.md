@@ -377,6 +377,19 @@ numbers from two repositories can collide.
 
 **Issue:** [#347](https://github.com/johnfrog76/toolkit/issues/347)
 
+### A completed design's live note is moved by hand
+
+**What you see:** A design whose spec is already in `spec/archive/` while its note is still in `design/`
+reads Complete, and the row says the note was left behind. `MoveDesign <id> -To Archive`, with or without
+`-Dropped`, refuses it: the spec's move already recorded what became of the design, and archiving the
+note alone would record a second outcome. The refusal's hint is to move the note into `design/archive/`
+by hand (`git mv` in a repository) and say why in its `## Journey`; no verb finishes the move, and the
+Design tab still offers the archive moves on that row, which then show the refusal.
+
+**Where you meet it:** [The hub's designs](hub/design.md#state----derived-never-stored), "State -- derived, never stored"
+
+**Issue:** [#582](https://github.com/johnfrog76/toolkit/issues/582)
+
 ## True by design
 
 Some things are true by design rather than by omission, and are not on that list. The deck narration
