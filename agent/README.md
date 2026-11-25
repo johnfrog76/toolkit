@@ -703,6 +703,13 @@ the file's absolute path on the machine the agent runs on, exactly what it resol
 web shows it with a copy button on every file page, so a person can hand the record to an assistant
 (`Tests/test_card_model.py`, `test_growth.py`, `test_manager.py` each pin it).
 
+**A route that opens a hub file by a name from the request takes it from the folder's own listing** --
+`file_in_folder()` in `core/config.py`, used by `GET /growth/{file}`, `GET` and `PUT /manager/{file}`, and
+`GET /pr-comments/{file}`. The name is compared with the folder's entries, exactly, letter case included, and
+only a regular file matches (not a directory or a link), so what is opened is always an entry of that folder.
+A name that is not there answers as it always has: 404, or 400 where the route refuses a name shaped like a
+path. `Tests/test_file_in_folder.py` is the rule's table; each route's suite asserts the same shapes.
+
 **`GET /env` serves `ado`** -- `{ enabled, explicit }`: whether Azure DevOps is part of what is SHOWN.
 `ado_enabled()` in `core/config.py` is the mirror of the CLI's `Scripts/Test-AdoEnabled.ps1` -- `features.ado`
 when someone has set it, else whether the active Space's status is `active` AND its tracker (`tracker()`,

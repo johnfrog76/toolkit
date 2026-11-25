@@ -923,6 +923,29 @@ def hub_folder(name: str) -> Path:
     return hub_root() / hub_folders().get(name, DEFAULT_HUB_FOLDERS.get(name, name))
 
 
+def file_in_folder(folder: Path, name: str) -> Path | None:
+    """The regular file in ``folder`` whose name is exactly ``name``, or None.
+
+    The name is compared with the entries of the folder's own listing and is
+    never joined onto the folder, so the path that comes back is always an
+    entry of that folder, whatever the requested name contains: a separator,
+    ``..``, a colon or an absolute path simply matches no entry. The match is
+    exact, letter case included, on every disk. Only a regular file is
+    returned -- not a directory and not a link, wherever it points. A folder
+    that is missing or cannot be read has no files, and nothing is raised.
+    """
+    if not name or not isinstance(name, str):
+        return None
+    try:
+        with os.scandir(folder) as entries:
+            for entry in entries:
+                if entry.name == name:
+                    return Path(entry.path) if entry.is_file(follow_symlinks=False) else None
+    except (OSError, ValueError):
+        return None
+    return None
+
+
 def agentic_extension_path() -> Path | None:
     """The machine's own folder of agentic prompts (``agenticExtensionPath``),
     resolved, or None when none is set or it does not exist.

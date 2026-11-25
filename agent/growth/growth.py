@@ -22,7 +22,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..core.config import hub_folder, load_config
+from ..core.config import file_in_folder, hub_folder, load_config
 from ..core.parsers import _heading_value
 
 api = APIRouter()
@@ -289,11 +289,13 @@ async def get_growth():
 
 @api.get("/growth/{filename}", response_model=GrowthDetailResponse)
 async def get_growth_detail(filename: str):
-    # growth/current/ and nothing else. A filename is a name, not a path.
+    # growth/current/ and nothing else. A name shaped like a path is answered
+    # 400; the file is taken from the folder's own listing, so whatever the
+    # name holds, what is read is an entry of growth/current/.
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
-    path = growth_dir() / filename
-    if not path.exists() or not path.is_file():
+    path = file_in_folder(growth_dir(), filename)
+    if path is None:
         raise HTTPException(status_code=404, detail=f"{filename} not found")
     item = parse_growth_file(path)
     if not item:

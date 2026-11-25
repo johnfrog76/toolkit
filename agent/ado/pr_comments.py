@@ -27,7 +27,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..core import log_writer, model
-from ..core.config import AGENTIC_DIR, PROMPT_SUFFIX, resolve_dirs
+from ..core.config import AGENTIC_DIR, PROMPT_SUFFIX, file_in_folder, resolve_dirs
 from ..core.consts import token_pr_review_heading
 
 api = APIRouter()
@@ -322,11 +322,10 @@ async def get_pr_comments(filename: str):
     if ".." in filename or "/" in filename or "\\" in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
     current_dir, archive_dir = resolve_dirs()
-    f = current_dir / filename
-    if not f.exists():
-        # Fall back to archive/ — a triaged review still has viewable comments.
-        f = archive_dir / filename
-    if not f.exists():
+    # The card is an entry of current/ or, failing that, archive/ -- a triaged
+    # review still has viewable comments -- matched in each folder's listing.
+    f = file_in_folder(current_dir, filename) or file_in_folder(archive_dir, filename)
+    if f is None:
         log_writer.write_log("WARN", "agent/pr-comments/detail", f"not found: {filename}")
         raise HTTPException(status_code=404, detail=f"{filename} not found")
     content = f.read_text(encoding="utf-8-sig", errors="replace")

@@ -151,6 +151,47 @@ class PrCommentsListTests(_PrCommentsCase):
         self.assertEqual(r.json(), {"count": 0, "items": []})
 
 
+class DetailByListing(_PrCommentsCase):
+    """The card is taken from current/'s, then archive/'s, own listing, by exact name."""
+
+    def setUp(self):
+        super().setUp()
+        self.base = Path(self._tmp.name)
+        shutil.copy(MULTI_ROUND, self.base / "outside.prompt.md")
+        (self.hub / "test" / "current" / "63-a-dir.prompt.md").mkdir()
+
+    def test_the_named_card_reads_from_current_then_archive(self):
+        self.assertEqual(self.client.get(f"/api/pr-comments/{CARD_NAME}").status_code, 200)
+        archive = self.hub / "test" / "archive"
+        archive.mkdir(exist_ok=True)
+        shutil.move(str(self.hub / "test" / "current" / CARD_NAME), archive / CARD_NAME)
+        self.assertEqual(self.client.get(f"/api/pr-comments/{CARD_NAME}").json()["round_num"], 2)
+
+    def test_every_other_shape_is_not_found(self):
+        rows = {
+            "a name that climbs": ("%2E%2E", 400),
+            "a backslash in the name": (f"..%5C{CARD_NAME}", 400),
+            "an encoded forward slash": (f"..%2F{CARD_NAME}", 404),
+            "a colon in the name": (f"D:{CARD_NAME}", 404),
+            "the name in other letter case": (CARD_NAME.upper(), 404),
+            # A directory with the name is not found, rather than a failed read.
+            "a directory's name": ("63-a-dir.prompt.md", 404),
+        }
+        for shape, (name, status) in rows.items():
+            with self.subTest(shape=shape):
+                r = self.client.get(f"/api/pr-comments/{name}")
+                self.assertEqual(r.status_code, status, r.text)
+                if status == 404 and "%2F" not in name:
+                    self.assertEqual(r.json()["detail"], f"{name} not found")
+
+    def test_a_link_in_the_folder_is_not_a_card(self):
+        try:
+            os.symlink(self.base / "outside.prompt.md", self.hub / "test" / "current" / "64-link.prompt.md")
+        except (OSError, NotImplementedError) as e:
+            self.skipTest(f"this host cannot create a symbolic link ({type(e).__name__})")
+        self.assertEqual(self.client.get("/api/pr-comments/64-link.prompt.md").status_code, 404)
+
+
 class SuggestTests(_PrCommentsCase):
     """``suggest`` declines before it builds anything when there is no key,
     and the prompt it sends is the file in agentic/, not an f-string. The
