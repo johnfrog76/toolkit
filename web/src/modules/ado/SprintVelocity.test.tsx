@@ -86,7 +86,7 @@ describe("SprintVelocity tiles", () => {
   });
 
   it("counts the days elapsed on the calendar, active days out of them", () => {
-    // 2026-03-02 is a Monday; the window to Sunday the 8th has elapsed in full.
+    // The whole window has elapsed, weekend included: seven calendar days, one of them active.
     render(<SprintVelocity snapshot={snapshot({})} />);
     expect(screen.getByText("1/7")).toBeTruthy();
   });
