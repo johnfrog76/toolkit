@@ -1493,8 +1493,9 @@ lets ts-jest compile exactly the markdown stack's ESM packages and React Router 
 
 A file that opens with front matter feeds its page's header instead (`frontMatterOf`, `FrontMatterDetails`;
 `COMPONENTS.md`, `DetailHeader`): the Studio prompt page, the design note and design document pages and a review lift it off, draw the
-`description` under the title, and keep the remaining keys (`argument-hint`, `agent`, `tools`, `id`) in a collapsed
-**Details** row, so the body starts with its own prose.
+`description` under the title (the two design pages), a short `id` or the `generated` date in the meta, and keep
+the remaining keys (`argument-hint`, `agent`, `tools`) in a collapsed **Details** row, so the body starts with
+its own prose.
 
 `MarkdownViewer` is the page a card is READ on:
 

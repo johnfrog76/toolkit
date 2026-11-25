@@ -3,7 +3,11 @@ import { useParams, useSearchParams } from "react-router";
 import { Caption1, Badge, Button, Spinner, makeStyles, tokens } from "@fluentui/react-components";
 import { CloudArrowUpRegular, SaveRegular } from "@fluentui/react-icons";
 import { DetailHeader } from "../../shared/DetailHeader";
-import { FrontMatterDetails, leftoverFrontMatter } from "../../shared/FrontMatterDetails";
+import {
+  FrontMatterDetails,
+  frontMatterValue,
+  leftoverFrontMatter,
+} from "../../shared/FrontMatterDetails";
 import { frontMatterOf } from "../../shared/prepareMarkdown";
 import { MarkdownBlock } from "../../shared/MarkdownBlock";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
@@ -17,7 +21,7 @@ import { DocumentSearchRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
 
 // What the page draws itself (the period line above the body); the rest is a collapsed row.
-const REVIEW_DRAWN_KEYS = ["title", "period"] as const;
+const REVIEW_DRAWN_KEYS = ["title", "period", "generated"] as const;
 
 const useStyles = makeStyles({
   page: {
@@ -77,6 +81,8 @@ export function ReviewPage() {
   // header; the body is the review itself. The period is drawn above the body.
   const parts = useMemo(() => frontMatterOf(reviewDetail?.content ?? ""), [reviewDetail?.content]);
 
+  const generated = frontMatterValue(parts.frontMatter, "generated");
+
   const commit = async (noPush: boolean) => {
     setCommitResult(null);
     const params = noPush ? ["-NoPush"] : [];
@@ -122,6 +128,9 @@ export function ReviewPage() {
                 <Badge color="brand" appearance="outline" size="small">
                   Review
                 </Badge>
+                {pendingFiles.length === 0 && generated ? (
+                  <Caption1>generated {generated}</Caption1>
+                ) : null}
                 {pendingFiles.length > 0 && (
                   <Badge color="warning" appearance="filled" size="medium">
                     {pendingFiles.length} file{pendingFiles.length !== 1 ? "s" : ""}

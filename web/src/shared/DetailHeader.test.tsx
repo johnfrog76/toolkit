@@ -69,6 +69,13 @@ describe("DetailHeader", () => {
     }
   });
 
+  it("keeps the whole description reachable as its title, for the phone width's clamp", () => {
+    draw({ title: "T", description: "A long sentence about it", path: "/hub/x.md" });
+    expect(screen.getByTestId("detail-description").getAttribute("title")).toBe(
+      "A long sentence about it",
+    );
+  });
+
   it("draws no description line when none is given", () => {
     draw({ title: "T", path: "/hub/x.md" });
     expect(screen.queryByTestId("detail-description")).toBeNull();

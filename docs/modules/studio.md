@@ -401,7 +401,10 @@ has no such page yet. The tier gate is unchanged: a machine below Tier 1 reads n
 
 **A note's reading room** is the house's reading page: the back arrow and the title, the `design note`
 badge, the Space it is for and its sentence, and ONE `MarkdownViewer`. The frontmatter feeds the header and is not drawn in the body: its `description` is
-the line under the title, and any other key (`id`) is in a collapsed **Details** row.
+the line under the title, its `id` is the short id in the header's meta (the full value in a tooltip), and any
+other key is in a collapsed **Details** row. The body's own `# Title` is dropped when it is the page's title
+(only a leading one: after prose or another heading it is a section), and any other body `# ` heading is drawn
+as a level-2 heading, so the page has one `h1`.
 Its links go through the one resolver, `shared/docLinks.ts`, with a base of its own (`noteLinks.ts`): a
 relative link to a sibling note opens that note's room; anything else is left as written, because a hub
 note has no github.com page to fall back on.
@@ -457,7 +460,8 @@ Suggest route), its add-on when not core, the ways of working it is for, what it
 (linked to its history on GitHub when the agent has one; the Space's carry neither), `runs instead of
 ToolKit's on this machine` for a copy of yours in `agenticExtensionPath` under a shipped name, the file's address with its copy button (`FilePath` -- for the Space's, the
 file's address on GitHub), and ONE `MarkdownViewer` over the file's prose. The frontmatter feeds the header: its `description` is the line
-under the title and `argument-hint`, `agent` and `tools` are a collapsed **Details** row, never raw rows above the body. The list says read it (Open); the page says use it: its header's one exposed action is **Copy
+under the title (clamped to three lines at phone width, the whole text in its tooltip) and `argument-hint`,
+`agent` and `tools` are a collapsed **Details** row, never raw rows above the body; a list reads as `a, b`. The list says read it (Open); the page says use it: its header's one exposed action is **Copy
 prompt**, and its `...` holds **Copy reference**, as in a detail page's shape (`CardActions`, then Refresh). It is read-only: a prompt is changed in its file. A name the agent does not know says so in the
 agent's words.
 

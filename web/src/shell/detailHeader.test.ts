@@ -21,6 +21,8 @@ const NOT_A_RECORD: Record<string, string> = {
   "solitaireAgile/TriagePage.tsx": "the tracker's queue, a list",
   "solitaireAgile/OrgPage.tsx": "the org's tree, a view over many seats",
   "solitaireAgile/MilestonesPage.tsx": "the releases, a list",
+  "ado/DocsLanding.tsx":
+    "the Docs tab, a landing page: its title is the page's h1, with the README under it",
   "deck/engine/PresenterNotes.tsx":
     "the presenter's notes window, part of the player; not a page of a record",
 };

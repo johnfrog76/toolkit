@@ -126,10 +126,17 @@ and `RefreshButton` for the controls. **Test:** `DetailHeader.test.tsx`.
 
 **A file's front matter feeds the header, never the body.** A page whose file can open with front matter
 lifts it off with `frontMatterOf` (`shared/prepareMarkdown.ts`), hands the body to `MarkdownViewer`, draws
-the keys the header carries (the `description` in the `description` slot, the tags in `meta`), and gives the
+the keys the header carries (the `description` in the `description` slot, clamped to three lines at phone width with its whole text in
+the tooltip; the tags and any short id or date in `meta`), and gives the
 rest to `FrontMatterDetails` in the `extra` slot: a collapsed **Details** row, drawn only when something is
-left. The prompt page, the design note and design document pages and a review do this; a page that does
+left. The prompt page, the design note and design document pages and a review do this (a design page's `id`
+and a review's `generated` date are meta captions); a page that does
 not (the docs viewer) keeps `MarkdownViewer`'s own quiet line of front matter.
+
+**One `h1` per page.** A page that passes `titleAbove` to `MarkdownViewer` owns the `h1`: the body's leading
+`# Title` is dropped when it says the same (spaces and case ignored; only a title that opens the body, after
+at most blockquotes and comments), and any other body `# ` heading is drawn as a level-2 heading. The Docs
+tab's own title is its `h1` for the same reason.
 
 **"On this page"** is `MarkdownViewer`'s, so every page that renders its body through it has it: a list of
 the h2/h3 headings (drawn at three or more), the zoom above it, a fold above the text under 1100px. A page

@@ -20,6 +20,9 @@ import { RefreshButton } from "./RefreshButton";
  *
  * Before the record has loaded, give no `title`: the back button stands alone.
  */
+/** Lines a header's description keeps at phone width. */
+const DESCRIPTION_LINES_PHONE = 3;
+
 const useStyles = makeStyles({
   row: {
     display: "flex",
@@ -65,6 +68,14 @@ const useStyles = makeStyles({
     margin: 0,
     color: tokens.colorNeutralForeground2,
     overflowWrap: "anywhere",
+    // Whole at desktop width. On a phone it is clamped to a few lines the way
+    // a card item's description is (CardItem), the full text in its title.
+    "@media (max-width: 600px)": {
+      display: "-webkit-box",
+      WebkitBoxOrient: "vertical",
+      WebkitLineClamp: String(DESCRIPTION_LINES_PHONE),
+      overflow: "hidden",
+    },
   },
   right: {
     display: "flex",
@@ -122,7 +133,12 @@ export function DetailHeader({
               {title}
             </Subtitle2>
             {present(description) && (
-              <Body1 as="p" className={styles.description} data-testid="detail-description">
+              <Body1
+                as="p"
+                className={styles.description}
+                data-testid="detail-description"
+                title={typeof description === "string" ? description : undefined}
+              >
                 {description}
               </Body1>
             )}

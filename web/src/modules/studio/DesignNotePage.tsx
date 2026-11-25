@@ -9,7 +9,11 @@ import { STUDIO } from "../../shell/consts";
 import { DetailHeader } from "../../shared/DetailHeader";
 import { EmptyState } from "../../shared/EmptyState";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
-import { FrontMatterDetails, leftoverFrontMatter } from "../../shared/FrontMatterDetails";
+import {
+  FrontMatterDetails,
+  frontMatterValue,
+  leftoverFrontMatter,
+} from "../../shared/FrontMatterDetails";
 import { frontMatterOf } from "../../shared/prepareMarkdown";
 import { PanelFrame } from "../../shared/PanelFrame";
 import { useGetEnvQuery } from "../../shell/api";
@@ -57,7 +61,7 @@ export function promoteBlocked(
 }
 
 // What the header draws from the front matter itself; the rest is a collapsed row.
-const NOTE_DRAWN_KEYS = ["title", "description", "space"] as const;
+const NOTE_DRAWN_KEYS = ["title", "description", "space", "id"] as const;
 
 const useStyles = makeStyles({
   page: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalM, width: "100%" },
@@ -87,6 +91,7 @@ export function DesignNotePage() {
   );
   // The front matter feeds the header (its description, its Space); the body is the prose.
   const parts = useMemo(() => frontMatterOf(data?.body ?? ""), [data?.body]);
+  const noteId = frontMatterValue(parts.frontMatter, "id");
   const content = useMemo(
     () => (readable ? documentWithThread(parts.body, threadReadable ? thread : undefined) : ""),
     [readable, parts.body, threadReadable, thread],
@@ -139,6 +144,7 @@ export function DesignNotePage() {
         headerLeft={
           <DetailHeader
             title={readable ? data.title : undefined}
+            description={readable ? data.description : undefined}
             meta={
               readable ? (
                 <>
@@ -155,8 +161,8 @@ export function DesignNotePage() {
                     </Badge>
                   ) : null}
                   {data.path ? <Caption1>{data.path}</Caption1> : null}
+                  {noteId ? <Caption1 title={noteId}>{noteId.slice(0, 8)}</Caption1> : null}
                   {data.space ? <Caption1>for {spaceName(data.space)}</Caption1> : null}
-                  {data.description ? <Caption1>{data.description}</Caption1> : null}
                 </>
               ) : undefined
             }

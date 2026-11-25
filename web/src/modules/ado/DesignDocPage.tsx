@@ -100,6 +100,7 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
         headerLeft={
           <DetailHeader
             title={readable ? data.title : undefined}
+            description={readable ? data.description : undefined}
             meta={
               readable ? (
                 <>
@@ -131,7 +132,6 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
                   ) : null}
                   {data.id ? <Caption1 title={data.id}>{data.id.slice(0, 8)}</Caption1> : null}
                   <Caption1>{data.repo}</Caption1>
-                  {data.description ? <Caption1>{data.description}</Caption1> : null}
                 </>
               ) : undefined
             }
