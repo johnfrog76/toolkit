@@ -393,22 +393,14 @@ function Add-P20OutcomeLine {
 
 function Add-P20DocsLine {
     # `> Docs: <path>` under the spec's title, a blank line either side -- the
-    # place the thread line sits; left alone when the spec already has one.
+    # place the thread line sits -- else first in the body after the
+    # frontmatter, never above it; left alone when the spec already has one.
+    # The placement is Add-P20DocsLineText's (Read-DesignTree.ps1), beside the
+    # title rule it reads; the file keeps its endings through Write-CardText.
     param([string]$Path, [string]$DocPath)
-    $current = ([System.IO.File]::ReadAllText($Path)) -replace "`r`n", "`n"
-    if ($current -match ('(?m)^' + [regex]::Escape($docsLine))) { return }
-    $lines = [System.Collections.Generic.List[string]]::new()
-    foreach ($l in ($current -split "`n")) { $lines.Add($l) }
-    $at = -1
-    $inFront = ($lines.Count -gt 0 -and $lines[0].Trim() -eq '---')
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($inFront) { if ($i -gt 0 -and $lines[$i].Trim() -eq '---') { $inFront = $false }; continue }
-        if ($lines[$i] -match '^# ') { $at = $i; break }
-    }
-    $insert = @('', "$docsLine $DocPath")
-    if ($at + 1 -lt $lines.Count -and $lines[$at + 1].Trim() -ne '') { $insert += '' }
-    $lines.InsertRange($at + 1, [string[]]$insert)
-    Write-CardText -Path $Path -Content ($lines -join "`n")
+    $current = [System.IO.File]::ReadAllText($Path)
+    if (($current -replace "`r`n", "`n") -match ('(?m)^' + [regex]::Escape($docsLine))) { return }
+    Write-CardText -Path $Path -Content (Add-P20DocsLineText -Text $current -DocsLine "$docsLine $DocPath")
 }
 
 function Add-P20BlankBeforeStamp {

@@ -37,6 +37,7 @@ ID_B = "bbbbbbbb-0000-4000-8000-000000000002"
 ID_C = "cccccccc-0000-4000-8000-000000000003"
 ID_D = "dddddddd-0000-4000-8000-000000000004"
 ID_E = "eeeeeeee-0000-4000-8000-000000000005"
+ID_F = "ffffffff-0000-4000-8000-000000000006"
 TODAY_RX = r"\d{4}-\d{2}-\d{2}"
 
 
@@ -338,6 +339,93 @@ class TheMoveDesignVerb(unittest.TestCase):
         self.assertIn("X=0", out)
         self.assertTrue((self.repo / "spec/archive/lonely.spec.md").exists())
         self.assertIn(f"{DOCS} docs/board.md", self.read(self.repo / "spec/archive/lonely.spec.md"))
+
+    # -- The Docs line: under the title the title rule finds, never above the frontmatter --
+
+    TITLED_NOTE = f"---\nid: {ID_F}\n---\n\n# Titled\n"
+
+    def complete_spec(self, spec_text: str) -> bytes:
+        """A stamped note and its spec (the spec's text as given), completed: the archived spec's bytes."""
+        self.write(self.repo / "design/titled.md", self.TITLED_NOTE)
+        self.write(self.repo / "spec/titled.spec.md", spec_text)
+        self.commit(self.repo)
+        out = self.move("ffffffff -To Complete -Doc docs/board.md")
+        self.assertIn("X=0", out)
+        self.assertNotIn("Error:", out)
+        return (self.repo / "spec/archive/titled.spec.md").read_bytes()
+
+    def read_id(self, path: Path) -> str:
+        """The id the CLI's reader takes from the file, '' for none."""
+        scripts = str(self.pkg / "Scripts").replace("'", "''")
+        file = str(path).replace("'", "''")
+        out = self.run_verbs(
+            f". (Join-Path '{scripts}' 'Read-DesignTree.ps1'); "
+            f"'ID=' + (Get-P20FileId -Text ([System.IO.File]::ReadAllText('{file}')))"
+        )
+        m = re.search(r"ID=(\S*)", out)
+        return m.group(1) if m else ""
+
+    def test_a_spec_titled_by_a_second_level_heading_keeps_its_frontmatter_and_its_id(self):
+        raw = self.complete_spec(f"---\nid: {ID_F}\n---\n\n## Title\nThe titled spec\n\n## Contract\n\nWords.\n")
+        text = raw.decode("utf-8")
+        self.assertTrue(text.startswith(f"---\nid: {ID_F}\n---\n"), text)
+        self.assertEqual(text.count(DOCS), 1, text)
+        self.assertTrue(
+            text.startswith(
+                f"---\nid: {ID_F}\n---\n\n## Title\nThe titled spec\n\n{DOCS} docs/board.md\n\n## Contract\n"
+            ),
+            text,
+        )
+        self.assertEqual(self.read_id(self.repo / "spec/archive/titled.spec.md"), ID_F)
+
+    def test_a_crlf_spec_titled_by_a_second_level_heading_stays_crlf(self):
+        raw = self.complete_spec(f"---\r\nid: {ID_F}\r\n---\r\n\r\n## Title\r\nThe titled spec\r\n\r\nWords.\r\n")
+        self.assertNotIn(b"\n", raw.replace(b"\r\n", b""), "a bare LF line in a CRLF spec")
+        self.assertTrue(
+            raw.startswith(
+                f"---\r\nid: {ID_F}\r\n---\r\n\r\n## Title\r\nThe titled spec\r\n\r\n{DOCS} docs/board.md\r\n\r\n"
+                "Words.\r\n".encode()
+            ),
+            raw,
+        )
+        self.assertEqual(self.read_id(self.repo / "spec/archive/titled.spec.md"), ID_F)
+
+    def test_a_spec_with_frontmatter_and_no_title_gets_the_line_as_its_first_body_line(self):
+        raw = self.complete_spec(f"---\nid: {ID_F}\n---\n\n## Contract\n\nWords.\n")
+        text = raw.decode("utf-8")
+        self.assertTrue(text.startswith(f"---\nid: {ID_F}\n---\n\n{DOCS} docs/board.md\n\n## Contract\n"), text)
+        self.assertEqual(self.read_id(self.repo / "spec/archive/titled.spec.md"), ID_F)
+
+    def test_the_docs_line_placement_table(self):
+        """The placement rule row by row, text in and text out, over the writer's own text half."""
+        rows = [
+            # A '# ' title: under it, as before.
+            ("---\nid: x\n---\n\n# T\n\nWords.\n", "---\nid: x\n---\n\n# T\n\nD\n\nWords.\n"),
+            ("---\nid: x\n---\n\n# T\nWords.\n", "---\nid: x\n---\n\n# T\n\nD\n\nWords.\n"),
+            # A '## Title' section: under the title line, so the title still reads.
+            ("---\nid: x\n---\n\n## Title\nT\n\n## C\n", "---\nid: x\n---\n\n## Title\nT\n\nD\n\n## C\n"),
+            ("## Title\n\nT\n## C\n", "## Title\n\nT\n\nD\n\n## C\n"),
+            # Frontmatter and no title the rule reads: the body's first line.
+            ("---\nid: x\n---\n\n## C\n", "---\nid: x\n---\n\nD\n\n## C\n"),
+            ("---\nid: x\n---\n## C\n\n# Deep\n", "---\nid: x\n---\n\nD\n\n## C\n\n# Deep\n"),
+            ("---\nid: x\n---\n\n## Title\n\n## C\n", "---\nid: x\n---\n\nD\n\n## Title\n\n## C\n"),
+            ("---\nid: x\n---\n", "---\nid: x\n---\n\nD\n"),
+            # No frontmatter, no heading: the top, as before.
+            ("Just words.\n", "\nD\n\nJust words.\n"),
+            # The line is there already: nothing changes.
+            ("---\nid: x\n---\n\n> Docs: a.md\n", "---\nid: x\n---\n\n> Docs: a.md\n"),
+        ]
+        payload = json.dumps([r[0] for r in rows]).replace("'", "''")
+        scripts = str(self.pkg / "Scripts").replace("'", "''")
+        out = self.run_verbs(
+            f". (Join-Path '{scripts}' 'Read-DesignTree.ps1'); "
+            f"$rows = '{payload}' | ConvertFrom-Json; "
+            "$res = @(foreach ($r in $rows) { Add-P20DocsLineText -Text $r -DocsLine 'D' }); "
+            "'JSON=' + (ConvertTo-Json -InputObject $res -Compress)"
+        )
+        got = json.loads(out[out.index("JSON=") + 5 :].strip().splitlines()[0])
+        for (given, want), have in zip(rows, got, strict=True):
+            self.assertEqual(have, want, given)
 
     def test_to_complete_refusals(self):
         self.assert_refused("the-pair -To Complete", "-Doc <path> names the document it landed in")
