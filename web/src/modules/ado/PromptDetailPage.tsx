@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router";
 import {
-  Subtitle2,
   Caption1,
   Badge,
   ProgressBar,
@@ -9,14 +8,13 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import { BackButton } from "../../shared/BackButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { PanelFrame } from "../../shared/PanelFrame";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { useGetPromptDetailQuery } from "./api.ado";
 import { STATUS } from "../../shell/consts";
 import { DocumentTextRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
-import { FilePath } from "../../shared/FilePath";
 import { CardPictures, imageLine } from "./CardCover";
 import { AttachActions, AttachZone } from "./AttachCover";
 import { STAMPS } from "../../shell/consts";
@@ -28,12 +26,6 @@ const useStyles = makeStyles({
     flexDirection: "column",
     gap: tokens.spacingVerticalM,
     width: "100%",
-  },
-  titleBlock: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "2px",
-    minWidth: 0,
   },
   progressRow: {
     display: "flex",
@@ -84,55 +76,49 @@ export function PromptDetailPage() {
           ) : undefined
         }
         headerLeft={
-          <>
-            <BackButton />
-            {data && (
-              <div className={styles.titleBlock}>
-                {/* The page's h1: the card's own is dropped below when it says the same. */}
-                <Subtitle2 as="h1">{data.title || data.filename}</Subtitle2>
-                {/* The file's address, not only its name: this is what goes into a chat. */}
-                <FilePath path={data.path} />
-                {/* The design it was worked against: its line, resolved by the agent. */}
-                <DesignChip design={data.design} />
-              </div>
-            )}
-          </>
-        }
-        headerRight={
-          data ? (
-            <>
-              {data.total > 0 && (
-                <div className={styles.progressRow}>
-                  <ProgressBar
-                    className={styles.progressBar}
-                    aria-label={`${data.checked} of ${data.total} checklist items completed`}
-                    value={data.checked / data.total}
-                    thickness="large"
-                    color={data.checked === data.total ? "success" : "brand"}
+          <DetailHeader
+            title={data ? data.title || data.filename : undefined}
+            path={data?.path}
+            extra={data ? <DesignChip design={data.design} /> : undefined}
+            actions={
+              data ? (
+                <>
+                  {data.total > 0 && (
+                    <div className={styles.progressRow}>
+                      <ProgressBar
+                        className={styles.progressBar}
+                        aria-label={`${data.checked} of ${data.total} checklist items completed`}
+                        value={data.checked / data.total}
+                        thickness="large"
+                        color={data.checked === data.total ? "success" : "brand"}
+                      />
+                      <Tooltip
+                        content={`${data.checked} of ${data.total} checklist items completed`}
+                        relationship="description"
+                      >
+                        <Caption1 style={{ cursor: "default" }}>{data.progress}</Caption1>
+                      </Tooltip>
+                    </div>
+                  )}
+                  <Badge color={statusColor(data.status)} appearance="tint" size="small">
+                    {data.status}
+                  </Badge>
+                  {data.sprint !== "--" && (
+                    <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                      {data.sprint}
+                    </Caption1>
+                  )}
+                  {/* With a cover: Replace cover, Add before, Delete the cover (C2). */}
+                  <AttachActions
+                    filename={data.filename}
+                    content={data.content}
+                    onDone={() => void refetch()}
+                    onAsk={setAsking}
                   />
-                  <Tooltip
-                    content={`${data.checked} of ${data.total} checklist items completed`}
-                    relationship="description"
-                  >
-                    <Caption1 style={{ cursor: "default" }}>{data.progress}</Caption1>
-                  </Tooltip>
-                </div>
-              )}
-              <Badge color={statusColor(data.status)} appearance="tint" size="small">
-                {data.status}
-              </Badge>
-              {data.sprint !== "--" && (
-                <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>{data.sprint}</Caption1>
-              )}
-              {/* With a cover: Replace cover, Add before, Delete the cover (C2). */}
-              <AttachActions
-                filename={data.filename}
-                content={data.content}
-                onDone={() => void refetch()}
-                onAsk={setAsking}
-              />
-            </>
-          ) : undefined
+                </>
+              ) : undefined
+            }
+          />
         }
       >
         {/* No cover yet: the drop zone IS the cover's box, under the header, the

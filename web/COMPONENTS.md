@@ -95,6 +95,34 @@ slot-based frame that sets no height and has no margin; a panel is spaced by the
 **Test:** [`PanelFrame.footer.test.tsx`](src/shared/PanelFrame.footer.test.tsx) (the foot's slots and
 that the foot holds the bottom), and `panelStructure.test.ts` for who may import it.
 
+## `DetailHeader`
+
+**What it is for:** the header of every page that shows one record, and of every markdown viewer: back,
+the title (the page's one `h1`), a meta line, an extra slot under it, the File line, and the controls
+on the right in the house order. A page that draws its own cannot keep the others' order; this is the
+one that does.
+
+**Use it** as `PanelFrame`'s `headerLeft` on a record page (a card, an issue, a document, a session, a
+reference file) and pass no `headerRight`: it draws its own right side. **Do not use it** on a list, a
+form or a ritual view that is not one record; `src/shell/detailHeader.test.ts` names those pages and
+fails on a module page that owns an `h1` without it.
+
+Props:
+
+| Prop       | Type                               | Notes                                                                                               |
+| ---------- | ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `title`    | `ReactNode`                        | The `h1`. Leave it out while there is no record; the back button then stands alone.                 |
+| `meta`     | `ReactNode`                        | Badges and captions beside each other under the title.                                              |
+| `extra`    | `ReactNode`                        | Anything custom under the meta line.                                                                |
+| `path`     | `string`                           | The record's absolute path on this machine, when it is a local file.                                |
+| `url`      | `string`                           | Its address when it is not; read only when there is no `path`. With neither, there is no File line. |
+| `actions`  | `ReactNode`                        | Controls before refresh.                                                                            |
+| `refresh`  | `{ onClick, isFetching?, title? }` | The house refresh button, after `actions`.                                                          |
+| `external` | `ReactNode`                        | The link out, always the last control.                                                              |
+
+**Used by:** every record page under `src/modules/`. **Pattern:** `FilePath` for the line (a fixed label with the copy icon and the address in its tooltip), `BackButton`
+and `RefreshButton` for the controls. **Test:** `DetailHeader.test.tsx`.
+
 ## `ListPanel`
 
 **What it is for:** the kind for records you act on. A panel fills its slots and nothing else; a slot

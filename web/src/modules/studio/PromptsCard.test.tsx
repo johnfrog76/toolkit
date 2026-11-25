@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { fileLineValue } from "../../shared/fileLineValue.testHelper";
 import { expectListPanelShape, pageSizeOf } from "../../shell/kinds/panelShapeAssert";
 import { listPageSize } from "../../shell/pageSize";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
@@ -942,7 +943,7 @@ describe("a prompt's reading room", () => {
     envAnswer = {};
   });
 
-  it("reads the prompt by the address's ref, and renders its text", () => {
+  it("reads the prompt by the address's ref, and renders its text", async () => {
     oneAnswer = { data: PR_SHIP };
     mount(promptPath("pr-ship"));
     expect(askedFor).toBe("pr-ship");
@@ -950,7 +951,7 @@ describe("a prompt's reading room", () => {
     expect(screen.getByTestId("viewer").textContent).toBe(PR_SHIP.body);
     expect(screen.getByText("ToolKit's")).toBeTruthy();
     expect(screen.getByText("for working on a team in Azure")).toBeTruthy();
-    expect(screen.getByTestId("file-path").textContent).toContain(PR_SHIP.file_path);
+    expect(await fileLineValue()).toContain(PR_SHIP.file_path);
   });
 
   it("carries the detail the row does not: category, sender, add-on, what it drives, when it changed", () => {
@@ -988,12 +989,12 @@ describe("a prompt's reading room", () => {
     expect(screen.getByText("yours")).toBeTruthy();
   });
 
-  it("one of the Space's reads by space/<name>, with the file's address on GitHub", () => {
+  it("one of the Space's reads by space/<name>, with the file's address on GitHub", async () => {
     oneAnswer = { data: DECK };
     mount(promptPath("space/deck-contract"));
     expect(askedFor).toBe("space/deck-contract");
     expect(screen.getByText("the Space's")).toBeTruthy();
-    expect(screen.getByTestId("file-path").textContent).toContain(DECK.file_path);
+    expect(await fileLineValue()).toContain(DECK.file_path);
     expect(screen.getByTestId("viewer").textContent).toBe(DECK.body);
   });
 

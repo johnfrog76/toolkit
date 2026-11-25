@@ -1,16 +1,15 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router";
-import { Badge, Button, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
+import { Badge, Button, Caption1, makeStyles, tokens } from "@fluentui/react-components";
 import { CommentRegular, LightbulbRegular, ShareRegular } from "@fluentui/react-icons";
 import { CardActions, defineRowMoves } from "../../shared/CardActions";
 import { ConfirmDialog } from "../../shared/ConfirmDialog";
 import { StatusMessage } from "../../shared/StatusMessage";
 import { STUDIO } from "../../shell/consts";
-import { BackButton } from "../../shared/BackButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { EmptyState } from "../../shared/EmptyState";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { PanelFrame } from "../../shared/PanelFrame";
-import { RefreshButton } from "../../shared/RefreshButton";
 import { useGetEnvQuery } from "../../shell/api";
 import { useGetIssueDetailQuery } from "../ado/api.ado";
 import { buildPromoteDesignParams, commandResultMessage } from "../ado/cliBridge";
@@ -57,20 +56,6 @@ export function promoteBlocked(
 
 const useStyles = makeStyles({
   page: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalM, width: "100%" },
-  titleBlock: {
-    display: "flex",
-    flexDirection: "column",
-    rowGap: tokens.spacingVerticalXS,
-    minWidth: 0,
-  },
-  metaRow: {
-    display: "flex",
-    columnGap: tokens.spacingHorizontalS,
-    rowGap: tokens.spacingVerticalXXS,
-    flexWrap: "wrap",
-    alignItems: "center",
-    color: tokens.colorNeutralForeground3,
-  },
 });
 
 export function DesignNotePage() {
@@ -145,12 +130,11 @@ export function DesignNotePage() {
         loadingLabel="Reading the note..."
         empty={empty}
         headerLeft={
-          <>
-            <BackButton />
-            {readable && (
-              <div className={styles.titleBlock}>
-                <Subtitle2 as="h1">{data.title}</Subtitle2>
-                <div className={styles.metaRow}>
+          <DetailHeader
+            title={readable ? data.title : undefined}
+            meta={
+              readable ? (
+                <>
                   <Badge
                     appearance="tint"
                     size="small"
@@ -166,38 +150,38 @@ export function DesignNotePage() {
                   {data.path ? <Caption1>{data.path}</Caption1> : null}
                   {data.space ? <Caption1>for {spaceName(data.space)}</Caption1> : null}
                   {data.description ? <Caption1>{data.description}</Caption1> : null}
-                </div>
-              </div>
-            )}
-          </>
-        }
-        headerRight={
-          readable ? (
-            <>
-              {data.thread ? (
-                <Button
-                  size="small"
-                  appearance="subtle"
-                  icon={<CommentRegular />}
-                  title={`The thread, #${data.thread_number} on GitHub`}
-                  aria-label={`The thread, #${data.thread_number} on GitHub`}
-                  as="a"
-                  href={data.thread}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                />
-              ) : isLiveNote ? (
-                <CardActions
-                  primaryAction={NOTE_MOVES.promote.action({
-                    onClick: () => setConfirming(true),
-                    disabled: !!promoteBlocked(data, env) || promoting,
-                    whyNot: promoteBlocked(data, env) ?? undefined,
-                  })}
-                />
-              ) : null}
-              <RefreshButton onClick={refetch} isFetching={isFetching} />
-            </>
-          ) : undefined
+                </>
+              ) : undefined
+            }
+            refresh={readable ? { onClick: refetch, isFetching } : undefined}
+            actions={
+              readable ? (
+                <>
+                  {data.thread ? (
+                    <Button
+                      size="small"
+                      appearance="subtle"
+                      icon={<CommentRegular />}
+                      title={`The thread, #${data.thread_number} on GitHub`}
+                      aria-label={`The thread, #${data.thread_number} on GitHub`}
+                      as="a"
+                      href={data.thread}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    />
+                  ) : isLiveNote ? (
+                    <CardActions
+                      primaryAction={NOTE_MOVES.promote.action({
+                        onClick: () => setConfirming(true),
+                        disabled: !!promoteBlocked(data, env) || promoting,
+                        whyNot: promoteBlocked(data, env) ?? undefined,
+                      })}
+                    />
+                  ) : null}
+                </>
+              ) : undefined
+            }
+          />
         }
       >
         {promoted ? (

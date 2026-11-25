@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { fileLineValue } from "../../shared/fileLineValue.testHelper";
 import { MemoryRouter } from "react-router";
 import { SkillsPage } from "./SkillsPage";
 
@@ -23,13 +24,13 @@ jest.mock("./api.growth", () => ({
 }));
 
 describe("the Resume page header", () => {
-  it("shows the kind, the title, the file path and the last-modified", () => {
+  it("shows the kind, the title, the file path and the last-modified", async () => {
     render(
       <MemoryRouter>
         <SkillsPage />
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("file-path").textContent).toContain("/hub/resume/resume.md");
+    expect(await fileLineValue()).toContain("/hub/resume/resume.md");
     expect(screen.getAllByText("Resume").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Updated 2026-10-01 09:00")).toBeTruthy();
   });
