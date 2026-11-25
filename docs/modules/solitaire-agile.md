@@ -2000,8 +2000,7 @@ Yesterday; `tkStandup -AsJson` parses and its `text` is the same lines; with the
 answered alone, `tkStandup` is not a command. From there, a Space with no tracker (`tkStandup -Space demo`
 on the sample hub): `tkStandup` names the Space as
 the one tile, a card in Code Review under `Waiting on you` and `Today`, and a card archived today under
-`Yesterday`.
-not a command. `tkTriage` shows the issues in no milestone first; `tkRoute <n> -Size opus -WhatIf`
+`Yesterday`. `tkTriage` shows the issues in no milestone first; `tkRoute <n> -Size opus -WhatIf`
 prints one `gh issue edit` and changes nothing (VERIFY.md, Gate 12, "Triage and Route, against a real
 repository", is the real write).
 
@@ -2113,8 +2112,10 @@ These are how the rituals read, on purpose, and are not on that list:
 - **A window keeps the slot's name.** Under `-Since` the `Yesterday` slot holds the whole window; the
   counts line names its first day, the brief says `<n> closed`, and the detail and work grains still say
   `Yesterday`.
-- **A card has no worker but the engineer.** A local Space's standup is one tile; a card's type is not a
-  worker, and a card cannot be a blocker (there is no walk label on a card).
+- **A card's type is not a worker.** A local Space has no worker labels, so a card is the engineer's unless
+  its `**Agent:**` line (or an older card's Assigned worker) names someone, and then it seats that member
+  ([the cards alone](#the-cards-alone)); with no card naming anyone the standup is one tile. A card cannot
+  be a blocker (there is no walk label on a card).
 - **The card read is every file in `archive/`.** Each archived card is read for its `**Closed:**` day on
   every standup; a hub with thousands of archived cards pays for it.
 - **Only the issue read's rows are candidates.** The suggestion reads the standup's read, capped like it:

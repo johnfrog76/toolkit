@@ -1811,7 +1811,8 @@ class TheDressTable(unittest.TestCase):
     def test_every_row(self):
         for row in DRESS_TABLE["rows"]:
             with self.subTest(sentence=row["sentence"]):
-                self.assertEqual(standup.dress_guard(DRESS_GROUPS[row["group"]], row["sentence"]), row["reason"])
+                facts = {**DRESS_GROUPS[row["group"]], **({"worker": row["worker"]} if "worker" in row else {})}
+                self.assertEqual(standup.dress_guard(facts, row["sentence"]), row["reason"])
 
     def test_every_reason_is_a_guard_of_the_contract_and_every_guard_has_a_row(self):
         reasons = {row["reason"] for row in DRESS_TABLE["rows"] if row["reason"]}
