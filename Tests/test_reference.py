@@ -180,14 +180,29 @@ class ByTheFolderListing(_Hub):
                 self.assertEqual(self.client.get(f"/api/reference/{name}").status_code, 404)
         self.assertEqual(self.client.get(f"/api/reference/{self.NAME}").status_code, 200)
 
-    def test_a_link_in_the_folder_is_not_a_document(self):
-        outside = Path(self.tmp.name) / "outside.md"
-        outside.write_text("# Outside\n", encoding="utf-8")
+    def _link(self, name: str, target: Path) -> None:
         try:
-            os.symlink(outside, self.hub / "reference" / "current" / "link.md")
+            os.symlink(target, self.hub / "reference" / "current" / name)
         except (OSError, NotImplementedError) as e:
             self.skipTest(f"this host cannot create a symbolic link ({type(e).__name__})")
-        self.assertEqual(self.client.get("/api/reference/link.md").status_code, 404)
+
+    def listed(self) -> list[str]:
+        return [d["name"] for d in self.client.get("/api/reference").json()["items"]]
+
+    def test_a_link_to_a_document_inside_the_hub_is_listed_and_opened(self):
+        target = self.hub / "kept" / "elsewhere.md"
+        target.parent.mkdir()
+        target.write_text("# Kept elsewhere\n", encoding="utf-8")
+        self._link("link.md", target)
+        self.assertIn("link.md", self.listed())
+        self.assertEqual(self.client.get("/api/reference/link.md").status_code, 200)
+
+    def test_a_link_to_a_document_outside_the_hub_is_neither_listed_nor_opened(self):
+        outside = Path(self.tmp.name) / "outside.md"
+        outside.write_text("# Outside\n", encoding="utf-8")
+        self._link("out.md", outside)
+        self.assertNotIn("out.md", self.listed())
+        self.assertEqual(self.client.get("/api/reference/out.md").status_code, 404)
 
 
 class TheGate(_Hub):

@@ -923,15 +923,46 @@ def hub_folder(name: str) -> Path:
     return hub_root() / hub_folders().get(name, DEFAULT_HUB_FOLDERS.get(name, name))
 
 
-def file_in_folder(folder: Path, name: str) -> Path | None:
-    """The regular file in ``folder`` whose name is exactly ``name``, or None.
+def _inside_root(path: str, root: str) -> bool:
+    """Whether ``path`` lies strictly inside ``root``; both already resolved."""
+    try:
+        path, root = os.path.normcase(path), os.path.normcase(root)
+        return path != root and os.path.commonpath([path, root]) == root
+    except ValueError:  # two drives, or a relative and an absolute path
+        return False
+
+
+def is_hub_file(path: Path | str, root: Path | str | None = None) -> bool:
+    """Whether the entry at ``path`` is a file a route may open.
+
+    A regular file always is. A link is only when ``root`` is given and the
+    link, every link resolved, ends at a regular file inside ``root``; a link
+    that leaves the root, is broken, or ends at a directory is not. The one
+    rule a route's list and its open both apply, so a list never offers a row
+    the open would refuse. Never raises.
+    """
+    try:
+        if os.path.isfile(path) and not os.path.islink(path):
+            return True
+        if root is None or not os.path.islink(path):
+            return False
+        target = os.path.realpath(path)
+        return os.path.isfile(target) and _inside_root(target, os.path.realpath(root))
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def file_in_folder(folder: Path, name: str, root: Path | None = None) -> Path | None:
+    """The file in ``folder`` whose name is exactly ``name``, or None.
 
     The name is compared with the entries of the folder's own listing and is
-    never joined onto the folder, so the path that comes back is always an
+    never joined onto the folder, so the file that is opened is always an
     entry of that folder, whatever the requested name contains: a separator,
     ``..``, a colon or an absolute path simply matches no entry. The match is
-    exact, letter case included, on every disk. Only a regular file is
-    returned -- not a directory and not a link, wherever it points. A folder
+    exact, letter case included, on every disk. The entry must pass
+    ``is_hub_file``: a regular file, or -- with ``root`` given -- a link whose
+    target, links resolved, is a regular file inside ``root``, so what it
+    resolves to is inside the root too. A directory never matches. A folder
     that is missing or cannot be read has no files, and nothing is raised.
     """
     if not name or not isinstance(name, str):
@@ -940,7 +971,7 @@ def file_in_folder(folder: Path, name: str) -> Path | None:
         with os.scandir(folder) as entries:
             for entry in entries:
                 if entry.name == name:
-                    return Path(entry.path) if entry.is_file(follow_symlinks=False) else None
+                    return Path(entry.path) if is_hub_file(entry.path, root) else None
     except (OSError, ValueError):
         return None
     return None

@@ -706,9 +706,11 @@ web shows it with a copy button on every file page, so a person can hand the rec
 **A route that opens a hub file by a name from the request takes it from the folder's own listing** --
 `file_in_folder()` in `core/config.py`, used by `GET /growth/{file}`, `GET` and `PUT /manager/{file}`,
 `GET /pr-comments/{file}` and `GET /reference/{name}`. The name is compared with the folder's entries,
-exactly, letter case included, and only a regular file matches (not a directory or a link), so what is
-opened is always an entry of that folder. A name that is not there answers as it always has: 404, or 400
-where the route refuses a name shaped like a path. `Tests/test_file_in_folder.py` is the rule's table;
+exactly, letter case included, so what is opened is always an entry of that folder. The entry must be a
+regular file, or a link whose target, links resolved, is a regular file inside the hub; a link that leaves
+the hub, a broken one and a directory never match. Each route's LIST applies the same rule (`is_hub_file()`,
+beside it), so a list never offers a row its open would refuse. A name that is not there answers as it
+always has: 404, or 400 where the route refuses a name shaped like a path. `Tests/test_file_in_folder.py` is the rule's table;
 each route's suite asserts the same shapes. `GET /assets/{space}/{key}/{file}` takes two segments and
 keeps its own rule: the path is resolved, links followed, and must lie inside the Space's `assets/`.
 

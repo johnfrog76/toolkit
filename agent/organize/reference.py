@@ -32,7 +32,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..ado.design import match_words, search_words
-from ..core.config import file_in_folder, hub_folders, hub_root
+from ..core.config import file_in_folder, hub_folders, hub_root, is_hub_file
 from ..core.consts import folder_current, stamp_source
 from .reminders import _require_organize
 
@@ -139,8 +139,9 @@ def list_documents(q: str = "") -> ReferenceList:
     words = search_words(q)
     items: list[ReferenceDoc] = []
     if folder.is_dir():  # a hub with no reference folder has no documents, and that is not an error
+        root = hub_root()
         for f in sorted(folder.glob("*.md"), key=lambda p: p.name.lower()):
-            if not f.is_file():
+            if not is_hub_file(f, root):
                 continue
             doc, text = read_document(f)
             if words:
@@ -163,7 +164,7 @@ def get_reference_document(name: str) -> ReferenceText:
     # The name is the rule's, checked before the disk is: no slash, no dots-only
     # segment, only .md. A refused name is a 404, like one that is not there. The
     # file is then an entry of the folder's own listing, matched by exact name.
-    path = file_in_folder(reference_dir(), name) if _NAME.match(name) and ".." not in name else None
+    path = file_in_folder(reference_dir(), name, hub_root()) if _NAME.match(name) and ".." not in name else None
     if path is None:
         raise HTTPException(status_code=404, detail=f"no reference document {name}")
     doc, text = read_document(path)

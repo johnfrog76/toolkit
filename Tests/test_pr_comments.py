@@ -184,12 +184,27 @@ class DetailByListing(_PrCommentsCase):
                 if status == 404 and "%2F" not in name:
                     self.assertEqual(r.json()["detail"], f"{name} not found")
 
-    def test_a_link_in_the_folder_is_not_a_card(self):
+    def _link(self, name: str, target: Path) -> None:
         try:
-            os.symlink(self.base / "outside.prompt.md", self.hub / "test" / "current" / "64-link.prompt.md")
+            os.symlink(target, self.hub / "test" / "current" / name)
         except (OSError, NotImplementedError) as e:
             self.skipTest(f"this host cannot create a symbolic link ({type(e).__name__})")
-        self.assertEqual(self.client.get("/api/pr-comments/64-link.prompt.md").status_code, 404)
+
+    def listed(self) -> list[str]:
+        return [i["file"] for i in self.client.get("/api/pr-comments").json()["items"]]
+
+    def test_a_link_to_a_card_inside_the_hub_is_listed_and_opened(self):
+        target = self.hub / "kept" / "64-elsewhere.prompt.md"
+        target.parent.mkdir()
+        shutil.copy(MULTI_ROUND, target)
+        self._link("64-link.prompt.md", target)
+        self.assertIn("64-link.prompt.md", self.listed())
+        self.assertEqual(self.client.get("/api/pr-comments/64-link.prompt.md").status_code, 200)
+
+    def test_a_link_to_a_card_outside_the_hub_is_neither_listed_nor_opened(self):
+        self._link("65-out.prompt.md", self.base / "outside.prompt.md")
+        self.assertNotIn("65-out.prompt.md", self.listed())
+        self.assertEqual(self.client.get("/api/pr-comments/65-out.prompt.md").status_code, 404)
 
 
 class SuggestTests(_PrCommentsCase):

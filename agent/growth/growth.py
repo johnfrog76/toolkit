@@ -22,7 +22,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..core.config import file_in_folder, hub_folder, load_config
+from ..core.config import file_in_folder, hub_folder, hub_root, is_hub_file, load_config
 from ..core.parsers import _heading_value
 
 api = APIRouter()
@@ -204,8 +204,9 @@ def _read_all() -> list[GrowthItem]:
     if not directory.exists():
         return []
     items = []
+    root = hub_root()
     for path in sorted(directory.iterdir()):
-        if path.is_file() and path.name.endswith(".prompt.md"):
+        if path.name.endswith(".prompt.md") and is_hub_file(path, root):
             item = parse_growth_file(path)
             if item:
                 items.append(item)
@@ -294,7 +295,7 @@ async def get_growth_detail(filename: str):
     # name holds, what is read is an entry of growth/current/.
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
-    path = file_in_folder(growth_dir(), filename)
+    path = file_in_folder(growth_dir(), filename, hub_root())
     if path is None:
         raise HTTPException(status_code=404, detail=f"{filename} not found")
     item = parse_growth_file(path)

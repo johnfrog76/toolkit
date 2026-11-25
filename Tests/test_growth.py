@@ -224,13 +224,29 @@ class GrowthDetailByListing(_RoutesCase):
             with self.subTest(shape=shape):
                 self.assertEqual(self.client.get(f"/api/growth/{name}").status_code, status)
 
-    def test_a_link_in_the_folder_is_not_an_item(self):
-        link = self.hub / "growth" / "current" / "training-2026-04-03-link.prompt.md"
+    def _link(self, name: str, target: Path) -> None:
         try:
-            os.symlink(self.base / "training-2026-04-01-outside.prompt.md", link)
+            os.symlink(target, self.hub / "growth" / "current" / name)
         except (OSError, NotImplementedError) as e:
             self.skipTest(f"this host cannot create a symbolic link ({type(e).__name__})")
-        self.assertEqual(self.client.get(f"/api/growth/{link.name}").status_code, 404)
+
+    def listed(self) -> list[str]:
+        return [i["filename"] for i in self.client.get("/api/growth").json()["items"]]
+
+    def test_a_link_to_a_file_inside_the_hub_is_listed_and_opened(self):
+        target = self.hub / "notes" / "training-kept-elsewhere.prompt.md"
+        target.parent.mkdir()
+        target.write_text("## Title\ninside\n", encoding="utf-8")
+        self._link("training-2026-04-03-link.prompt.md", target)
+        self.assertIn("training-2026-04-03-link.prompt.md", self.listed())
+        r = self.client.get("/api/growth/training-2026-04-03-link.prompt.md")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIn("inside", r.json()["content"])
+
+    def test_a_link_to_a_file_outside_the_hub_is_neither_listed_nor_opened(self):
+        self._link("training-2026-04-04-out.prompt.md", self.base / "training-2026-04-01-outside.prompt.md")
+        self.assertNotIn("training-2026-04-04-out.prompt.md", self.listed())
+        self.assertEqual(self.client.get("/api/growth/training-2026-04-04-out.prompt.md").status_code, 404)
 
 
 class ResumeTests(_RoutesCase):

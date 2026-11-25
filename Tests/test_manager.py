@@ -259,14 +259,37 @@ class ByTheFolderListing(ManagerRouteTestCase):
                 self.assertEqual(r.status_code, status, r.text)
                 self.assertEqual(_tree(self.base), before)
 
-    def test_a_link_in_the_folder_is_not_a_session(self):
+    def _link(self, name: str, target: Path) -> None:
         try:
-            os.symlink(self.base / "2026-03-01.md", self.session("2026-03-03.md"))
+            os.symlink(target, self.session(name))
         except (OSError, NotImplementedError) as e:
             self.skipTest(f"this host cannot create a symbolic link ({type(e).__name__})")
-        self.assertEqual(self.client.get("/api/manager/2026-03-03.md").status_code, 404)
+
+    def listed(self) -> list[str]:
+        return [i["filename"] for i in self.client.get("/api/manager").json()["items"]]
+
+    def test_a_link_to_a_file_inside_the_hub_is_listed_opened_and_saved_through(self):
+        target = self.hub / "notes" / "kept-elsewhere.md"
+        target.parent.mkdir()
+        target.write_text("# 2026-03-03\n\n## Stage\ndraft\n\n## Since Last Session\nold\n", encoding="utf-8")
+        self._link("2026-03-03.md", target)
+        self.assertIn("2026-03-03.md", self.listed())
+        self.assertEqual(self.client.get("/api/manager/2026-03-03.md").status_code, 200)
         before = _tree(self.base)
-        self.assertEqual(self.client.put("/api/manager/2026-03-03.md", json={"since": "x"}).status_code, 404)
+        r = self.client.put("/api/manager/2026-03-03.md", json={"since": "through the link"})
+        self.assertEqual(r.status_code, 200, r.text)
+        after = _tree(self.base)
+        changed = {k for k in set(before) | set(after) if before.get(k) != after.get(k)}
+        self.assertEqual(changed, {str(target.relative_to(self.base))})
+        self.assertIn("through the link", target.read_text(encoding="utf-8"))
+        self.assertTrue(self.session("2026-03-03.md").is_symlink())
+
+    def test_a_link_to_a_file_outside_the_hub_is_neither_listed_nor_opened(self):
+        self._link("2026-03-04.md", self.base / "2026-03-01.md")
+        self.assertNotIn("2026-03-04.md", self.listed())
+        self.assertEqual(self.client.get("/api/manager/2026-03-04.md").status_code, 404)
+        before = _tree(self.base)
+        self.assertEqual(self.client.put("/api/manager/2026-03-04.md", json={"since": "x"}).status_code, 404)
         self.assertEqual(_tree(self.base), before)
 
 
