@@ -207,6 +207,24 @@ into the Toolkit package, so `Repair-CardLinks` does not apply to it.
 names it (AGENTS.md, "current/ is protected"). A design leaves a folder only through the move verb (L3,
 `MoveDesign`), which never overwrites in either folder.
 
+**A move never contradicts the file.** `MoveDesign` never rewrites an `**Outcome:**` or `> Docs:` line a
+file already carries, so a move whose own word or document differs from one is refused -- exit 2, one
+sentence naming the file and the line, and a hint to edit the line or run the move that matches it --
+before anything is moved, stamped or printed as done, `-WhatIf` included:
+
+| The file already carries | Refused |
+| --- | --- |
+| `**Outcome:** dropped` on the note | `-To Archive` (it would record shipped) |
+| `**Outcome:** shipped` on the note, or on the spec of a Spec | `-To Archive -Dropped` |
+| an `**Outcome:**` whose word is neither `shipped` nor `dropped` (`Shipped 2026-11-20`, `maybe`, nothing) | either archive -- the line reads as no outcome while the Journey would name one; make it one of the two words or take it out |
+| `**Outcome:** dropped` on the spec or the note | `-To Complete` (it would read Archived while the Journey says built) |
+| `> Docs: <path>` naming another path than `-Doc` | `-To Complete` |
+| a spec already in `spec/archive/`, the note still in `design/` | `-To Archive`, with or without `-Dropped` -- the spec's move already recorded what became of the design; move the note into `design/archive/` by hand to finish it |
+
+A line that agrees with the move -- the outcome word ignoring case, the same `-Doc` path -- is kept and not
+written twice, and the move's output says `keep` for it. After any move, the word in the file, the word
+printed and the word in the note's Journey are the same.
+
 ## Examples
 
 `Tests/fixtures/hub/design/board-ideas.md` is a promoted, stamped note the agent's tests and the smoke run

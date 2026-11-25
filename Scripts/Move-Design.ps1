@@ -40,7 +40,10 @@
     Archive does. Never guessed.
 
     It never overwrites, in either folder. Edits go through Write-CardText (the
-    file keeps its endings); the scaffolded spec is created with -New. -WhatIf
+    file keeps its endings); the scaffolded spec is created with -New. Nor does
+    it contradict a file: a move whose outcome or -Doc differs from an
+    **Outcome:** or > Docs: line already there is refused before anything is
+    moved, and a line that agrees is kept and said so. -WhatIf
     prints every move and stamp and touches nothing. Every refusal is one
     sentence and exit 2 (AGENTS.md, "The refusal contract").
 
@@ -322,6 +325,61 @@ if (-not [string]::IsNullOrWhiteSpace($Reason)) {
     if (-not $reasonTail.EndsWith('.')) { $reasonTail += '.' }
 }
 
+# -- What the files already say: a move never contradicts a line it would keep -----
+# MoveDesign never overwrites an **Outcome:** or `> Docs:` line a file carries,
+# so a move whose own word or document differs from one is refused here, before
+# anything is printed as done or moved -- the word in the file, the word printed
+# and the word in the Journey are then always the same. A line that agrees
+# (the outcome word ignoring case, the same Docs path) is kept and said so.
+function Get-P20WrittenLines {
+    # Every line of the file the regex reads, each as the line and group 1.
+    param([string]$RelPath, [string]$Pattern)
+    $path = & $full $RelPath
+    $found = @()
+    if (-not $RelPath -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { return , $found }
+    $text = (Read-CardText -Path $path) -replace "`r`n", "`n"
+    foreach ($m in [regex]::Matches($text, $Pattern)) {
+        $found += [PSCustomObject]@{ Line = $m.Value.Trim(); Value = $m.Groups[1].Value.Trim() }
+    }
+    return , $found
+}
+
+function Test-P20WrittenOutcome {
+    # The word as the file writes it when it already carries an outcome line
+    # that agrees with $Word ('' when it carries none); refuses (exit 2) when one says anything else -- the other word, a
+    # value that is neither (it reads as no outcome), or nothing.
+    param([string]$RelPath, [string]$Word, [string]$Move, [string]$Hint)
+    $agrees = ''
+    $rx = '(?m)^' + [regex]::Escape($outcomeStamp) + '[ \t]*(.*?)[ \t]*$'
+    foreach ($w in (Get-P20WrittenLines -RelPath $RelPath -Pattern $rx)) {
+        $value = $w.Value.ToLowerInvariant()
+        if ($value -eq $Word) { $agrees = $w.Value; continue }
+        if ($outcomes -contains $value) {
+            Write-CliError -Message "$RelPath already carries '$($w.Line)', and $Move would record it $Word." `
+                -Hint "Edit that line, or run the move that matches it: $Hint"
+        }
+        else {
+            Write-CliError -Message "$RelPath already carries '$($w.Line)', which reads as no outcome, and $Move would record it $Word." `
+                -Hint "Edit that line to '$outcomeStamp $($outcomes[0])' or '$outcomeStamp $($outcomes[1])', or take it out, then move the design."
+        }
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    return $agrees
+}
+
+function Assert-P20NotDropped {
+    # A completion is a build: a file that already says dropped would read as
+    # Archived after it while the Journey says Complete.
+    param([string]$RelPath)
+    $rx = '(?m)^' + [regex]::Escape($outcomeStamp) + '[ \t]*(.*?)[ \t]*$'
+    foreach ($w in (Get-P20WrittenLines -RelPath $RelPath -Pattern $rx)) {
+        if ($w.Value.ToLowerInvariant() -ne [string]$outcomes[1]) { continue }
+        Write-CliError -Message "$RelPath already carries '$($w.Line)', and -To Complete would record it built." `
+            -Hint "Edit that line, or run the move that matches it: ${prefix}MoveDesign $Name -To Archive -Dropped -Reason `"...`""
+        exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+}
+
 # -- The journey: one dated, self-contained line per move (D-DL18) -----------------
 function Add-P20JourneyLine {
     param([string]$Path, [string]$NoteRel, [string]$Line, [string]$Thread)
@@ -581,6 +639,10 @@ switch ($To) {
                     exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
                 }
             }
+            $matchHint = "${prefix}MoveDesign $Name -To Complete -Doc <path>"
+            $specKeeps = Test-P20WrittenOutcome -RelPath $spec.Path -Word $word -Move '-To Archive -Dropped' -Hint $matchHint
+            $noteKeeps = ''
+            if ($noteDest) { $noteKeeps = Test-P20WrittenOutcome -RelPath $note.Path -Word $word -Move '-To Archive -Dropped' -Hint $matchHint }
             $notePathAfter = ''
             if ($noteDest) { $notePathAfter = $noteDest } elseif ($note) { $notePathAfter = $note.Path }
             $line = "- $today $label`:$reasonTail"
@@ -588,8 +650,10 @@ switch ($To) {
             else { $line += " The spec is now $specDest in $repoName." }
             Say 'move' "$($spec.Path) -> $specDest"
             if ($noteDest) { Say 'move' "$($note.Path) -> $noteDest" }
-            Say 'stamp' "$specDest with $($consts.stamps.closed) $today and $outcomeStamp $word"
-            if ($noteDest) { Say 'stamp' "$noteDest with $($consts.stamps.closed) $today and $outcomeStamp $word" }
+            if ($specKeeps) { Say 'stamp' "$specDest with $($consts.stamps.closed) $today and keep its $outcomeStamp $specKeeps" }
+            else { Say 'stamp' "$specDest with $($consts.stamps.closed) $today and $outcomeStamp $word" }
+            if ($noteDest -and $noteKeeps) { Say 'stamp' "$noteDest with $($consts.stamps.closed) $today and keep its $outcomeStamp $noteKeeps" }
+            elseif ($noteDest) { Say 'stamp' "$noteDest with $($consts.stamps.closed) $today and $outcomeStamp $word" }
             if ($notePathAfter) { Say 'append' "to $notePathAfter`: $line" }
             if (-not $WhatIf) {
                 Move-P20DesignFile -FromRel $spec.Path -ToRel $specDest
@@ -624,17 +688,32 @@ switch ($To) {
                 exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
             }
             $destRel = "$(& $rel ((Split-Path -Leaf $designDir)))/$archiveName/$($note.Name)"
+            if ($spec -and $spec.Archived) {
+                # The spec already went to its archive (a completion or a drop
+                # that left the note behind): archiving the note alone would
+                # record a second outcome the spec's move never made.
+                Write-CliError -Message "'$title' is $($design.State): its spec is already $($spec.Path), so the note is not archived again with an outcome of its own." `
+                    -Hint "Finish the move the spec made: move $($note.Path) into $destRel by hand$(if ($inRepo) { " (git mv -- $($note.Path) $destRel)" }), and say why in its ## Journey."
+                exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+            }
             if (Test-Path -LiteralPath (& $full $destRel)) {
                 Write-CliError -Message "$destRel already exists. Not overwriting it."
                 exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
             }
             $word = [string]$outcomes[0]
             if ($Dropped) { $word = [string]$outcomes[1] }
+            if ($Dropped) {
+                $keeps = Test-P20WrittenOutcome -RelPath $note.Path -Word $word -Move '-To Archive -Dropped' -Hint "${prefix}MoveDesign $Name -To Archive"
+            }
+            else {
+                $keeps = Test-P20WrittenOutcome -RelPath $note.Path -Word $word -Move '-To Archive' -Hint "${prefix}MoveDesign $Name -To Archive -Dropped -Reason `"...`""
+            }
             $label = $word.Substring(0, 1).ToUpperInvariant() + $word.Substring(1)
             if ($Dropped) { $line = "- $today $label`:$reasonTail This note is now $destRel in $repoName." }
             else { $line = "- $today $label`: shipped as written.$reasonTail This note is now $destRel in $repoName." }
             Say 'move' "$($note.Path) -> $destRel"
-            Say 'stamp' "$destRel with $($consts.stamps.closed) $today and $outcomeStamp $word"
+            if ($keeps) { Say 'stamp' "$destRel with $($consts.stamps.closed) $today and keep its $outcomeStamp $keeps" }
+            else { Say 'stamp' "$destRel with $($consts.stamps.closed) $today and $outcomeStamp $word" }
             Say 'append' "to $destRel`: $line"
             if (-not $WhatIf) {
                 Move-P20DesignFile -FromRel $note.Path -ToRel $destRel
@@ -700,6 +779,19 @@ switch ($To) {
                 exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
             }
         }
+        Assert-P20NotDropped -RelPath $spec.Path
+        if ($noteDest) { Assert-P20NotDropped -RelPath $note.Path }
+        # A Docs line already in the spec stays; a different -Doc is refused.
+        $samePath = { param([string]$P) return ((& $rel $P.Trim()) -replace '^(\./)+', '').TrimStart('/') }
+        $docRel = & $samePath $docRel
+        $docsKept = $false
+        foreach ($w in (Get-P20WrittenLines -RelPath $spec.Path -Pattern ([string]$consts.design.docsRegex))) {
+            $had = & $samePath $w.Value
+            if ($had -ceq $docRel) { $docsKept = $true; continue }
+            Write-CliError -Message "$($spec.Path) already carries '$($w.Line)', and -Doc names $docRel." `
+                -Hint "Edit that line, or run the move that matches it: ${prefix}MoveDesign $Name -To Complete -Doc $had"
+            exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+        }
         $notePathAfter = ''
         if ($noteDest) { $notePathAfter = $noteDest } elseif ($note) { $notePathAfter = $note.Path }
         $line = "- $today $stateComplete`: built. The docs are $docRel.$reasonTail"
@@ -707,7 +799,8 @@ switch ($To) {
         else { $line += " The spec is now $specDest in $repoName." }
         Say 'move' "$($spec.Path) -> $specDest"
         if ($noteDest) { Say 'move' "$($note.Path) -> $noteDest" }
-        Say 'write' "'$docsLine $docRel' into $specDest and stamp both with $($consts.stamps.closed) $today"
+        if ($docsKept) { Say 'keep' "'$docsLine $docRel' in $specDest and stamp both with $($consts.stamps.closed) $today" }
+        else { Say 'write' "'$docsLine $docRel' into $specDest and stamp both with $($consts.stamps.closed) $today" }
         if ($notePathAfter) { Say 'append' "to $notePathAfter`: $line" }
         if (-not $WhatIf) {
             Move-P20DesignFile -FromRel $spec.Path -ToRel $specDest

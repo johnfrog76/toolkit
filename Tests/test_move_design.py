@@ -474,6 +474,113 @@ class TheMoveDesignVerb(unittest.TestCase):
         self.assertIn("X=0", out)
         self.assertRegex(self.read(self.repo / "spec/archive/lonely.spec.md"), rf"{re.escape(OUTCOME)} dropped\n$")
 
+    # -- A move never contradicts a line the file already carries ---------------------
+
+    def note_with_outcome(self, value: str) -> Path:
+        """board-ideas with an **Outcome:** line already written by hand."""
+        path = self.repo / "design/board-ideas.md"
+        self.write(path, self.NOTE + f"{OUTCOME} {value}\n")
+        self.commit(self.repo)
+        return path
+
+    def test_a_different_doc_from_the_specs_docs_line_is_refused(self):
+        self.write(
+            self.repo / "spec/the-pair.spec.md", self.PAIR_SPEC.replace("Contract.", f"{DOCS} docs/a.md\n\nContract.")
+        )
+        self.commit(self.repo)
+        for what_if in ("", " -WhatIf"):
+            out = self.assert_refused(
+                f"the-pair -To Complete -Doc docs/board.md{what_if}",
+                f"spec/the-pair.spec.md already carries '{DOCS} docs/a.md', and -Doc names docs/board.md",
+            )
+            self.assertIn("MoveDesign the-pair -To Complete -Doc docs/a.md", out)
+            self.assertNotIn("Would write", out)
+
+    def test_the_same_doc_as_the_specs_docs_line_completes_and_writes_it_once(self):
+        self.write(
+            self.repo / "spec/the-pair.spec.md",
+            self.PAIR_SPEC.replace("Contract.", f"{DOCS} docs/board.md\n\nContract."),
+        )
+        self.commit(self.repo)
+        out = self.move("the-pair -To Complete -Doc docs/board.md -WhatIf")
+        self.assertIn("X=0", out)
+        self.assertIn(f"Would keep '{DOCS} docs/board.md' in spec/archive/the-pair.spec.md", out)
+        out = self.move("the-pair -To Complete -Doc ./docs/board.md")
+        self.assertIn("X=0", out)
+        spec = self.read(self.repo / "spec/archive/the-pair.spec.md")
+        self.assertEqual(spec.count(DOCS), 1, spec)
+        self.assertIn("The docs are docs/board.md.", self.read(self.repo / "design/archive/the-pair.md"))
+
+    def test_a_plain_archive_over_a_written_dropped_is_refused(self):
+        self.note_with_outcome("dropped")
+        for what_if in ("", " -WhatIf"):
+            out = self.assert_refused(
+                f"board-ideas -To Archive{what_if}",
+                f"design/board-ideas.md already carries '{OUTCOME} dropped', and -To Archive would record it shipped",
+            )
+            self.assertIn("MoveDesign board-ideas -To Archive -Dropped -Reason", out)
+            self.assertNotIn("Would stamp", out)
+
+    def test_a_plain_archive_over_an_outcome_that_is_neither_word_is_refused(self):
+        for value in ("Shipped 2026-11-20", "maybe"):
+            self.note_with_outcome(value)
+            for what_if in ("", " -WhatIf"):
+                self.assert_refused(
+                    f"board-ideas -To Archive{what_if}",
+                    f"design/board-ideas.md already carries '{OUTCOME} {value}', which reads as no outcome",
+                )
+
+    def test_dropped_over_a_written_shipped_is_refused(self):
+        self.note_with_outcome("shipped")
+        for what_if in ("", " -WhatIf"):
+            out = self.assert_refused(
+                f'board-ideas -To Archive -Dropped -Reason "No"{what_if}',
+                f"design/board-ideas.md already carries '{OUTCOME} shipped', "
+                "and -To Archive -Dropped would record it dropped",
+            )
+            self.assertIn("MoveDesign board-ideas -To Archive", out)
+        # On a Spec, the spec's own line is read too.
+        self.write(self.repo / "spec/the-pair.spec.md", self.PAIR_SPEC + f"\n{OUTCOME} shipped\n")
+        self.commit(self.repo)
+        self.assert_refused(
+            'the-pair -To Archive -Dropped -Reason "No"',
+            f"spec/the-pair.spec.md already carries '{OUTCOME} shipped'",
+        )
+
+    def test_a_written_outcome_that_agrees_is_kept_and_said_once(self):
+        self.note_with_outcome("Shipped")
+        out = self.move("board-ideas -To Archive -WhatIf")
+        self.assertIn("X=0", out)
+        self.assertIn(f"and keep its {OUTCOME} Shipped", out)
+        out = self.move("board-ideas -To Archive")
+        self.assertIn("X=0", out)
+        text = self.read(self.repo / "design/archive/board-ideas.md")
+        self.assertEqual(text.count(OUTCOME), 1, text)
+        self.assertIn("Shipped: shipped as written.", text)
+
+    def test_a_dropped_spec_line_refuses_a_completion(self):
+        self.write(self.repo / "spec/the-pair.spec.md", self.PAIR_SPEC + f"\n{OUTCOME} dropped\n")
+        self.commit(self.repo)
+        self.assert_refused(
+            "the-pair -To Complete -Doc docs/board.md",
+            f"spec/the-pair.spec.md already carries '{OUTCOME} dropped', and -To Complete would record it built",
+        )
+
+    def test_archiving_the_note_of_a_completed_design_is_refused(self):
+        # The spec completed alone: the note is still live, the design reads Complete.
+        self.write(self.repo / "spec/archive/board-ideas.spec.md", f"---\nid: {ID_A}\n---\n\n# Board ideas (spec)\n")
+        self.commit(self.repo)
+        for args in (
+            "board-ideas -To Archive",
+            "board-ideas -To Archive -WhatIf",
+            'board-ideas -To Archive -Dropped -Reason "No"',
+        ):
+            out = self.assert_refused(
+                args, "'Board ideas' is Complete: its spec is already spec/archive/board-ideas.spec.md"
+            )
+            self.assertIn("design/archive/", out)
+            self.assertNotIn("shipped as written", out)
+
     # -- Naming the design ------------------------------------------------------------
 
     def test_names_an_id_prefix_a_file_or_a_stem_and_refuses_the_ambiguous_and_the_unknown(self):
