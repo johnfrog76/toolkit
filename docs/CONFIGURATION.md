@@ -531,8 +531,13 @@ Which prompt is **configuration, not contract** -- a team's prompts are its own 
 `config.default.json`, one row per kind: a card's type with the spaces removed (`Bug`, `Task`,
 `UserStory`, `Feature`, `Spike`) or `issue`, for a GitHub issue no card carries. A value is a path
 relative to the Toolkit package, or absolute; an `agentic/<name>` row goes through the one prompt lookup,
-so a tuned copy in `agenticExtensionPath` wins. The shipped rows all name `agentic/build.prompt.md`, which starts the work on a card that already exists
-and hands over to `pr-ship` when the code is ready; no `design` row ships, because no design prompt does.
+so a tuned copy in `agenticExtensionPath` wins. An `agentic/org/<role>` row names a role, and is found where a
+position's role is ([the org chart](hub/org.md#where-a-positions-prompt-is-found)): the hub's `agentic/org/`,
+then the hub's `agentic/`, then the toolkit's `agentic/org/`, after a tuned copy in `agenticExtensionPath` --
+so a hub's own role wins. The shipped rows all name `agentic/org/build.prompt.md`, the builder's role, which
+starts the work on a card that already exists and hands over to `pr-ship` when the code is ready. A row, or a
+`-Prompt`, naming `agentic/build.prompt.md`, where the builder's brief was before it became a role, still
+finds it; no `design` row ships, because no design prompt does.
 
 ```powershell
 tkConfig -Set startWork.prompts.Bug=agentic/my-bug-fix.prompt.md     # one row, in config.local.json

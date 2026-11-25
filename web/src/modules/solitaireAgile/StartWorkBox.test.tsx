@@ -9,9 +9,9 @@ import { StartWorkBox, blockTitle } from "./StartWorkBox";
 // The block is the shared fixture's (Tests/fixtures/start-work/expected-card.md),
 // the same bytes Tests/Test-StartWork.ps1 and Tests/test_bridge.py compare.
 
-// The golden runs to the prompt's heading; the prompt is the shipped agentic/build.prompt.md.
+// The golden runs to the prompt's heading; the prompt is the shipped builder's role, agentic/org/build.prompt.md.
 const FIXTURE = path.resolve(__dirname, "../../../../Tests/fixtures/start-work/expected-card.md");
-const PROMPT = path.resolve(__dirname, "../../../../agentic/build.prompt.md");
+const PROMPT = path.resolve(__dirname, "../../../../agentic/org/build.prompt.md");
 const lf = (p: string) => fs.readFileSync(p, "utf8").replace(/\r\n/g, "\n").replace(/\s+$/, "");
 const BLOCK = `${lf(FIXTURE)}\n${lf(PROMPT)}`;
 

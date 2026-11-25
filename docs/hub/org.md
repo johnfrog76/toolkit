@@ -87,8 +87,8 @@ compared character for character (`A` is not `a`); a number given as an id is re
 ## Where a position's prompt is found
 
 A position's `prompt` names a **role**: a job description, one `<role>.prompt.md`. The toolkit ships
-five in its own `agentic/org/` -- `pm`, `team-lead`, `vp-of-engineering`, `vp-of-product` and `intern`,
-each described in [the roles](../../agentic/org/README.md#the-roles) with what it takes in and what it
+six in its own `agentic/org/` -- `pm`, `team-lead`, `vp-of-engineering`, `vp-of-product`, `intern` and
+`build`, the builder's role, which `tkStartWork` carries and finds by this same lookup -- each described in [the roles](../../agentic/org/README.md#the-roles) with what it takes in and what it
 hands on -- and a hub may write its own. The name is looked up in three folders, in this order, and the
 first that has the file is the one used:
 

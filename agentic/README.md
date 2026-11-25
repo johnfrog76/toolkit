@@ -22,7 +22,7 @@ gap a prompt has to work around, the prompt says what to do in one line and link
 
 | Prompt | What it carries |
 |---|---|
-| `build` | Safety Contract. Build a card that already exists: its branch from current main, the work, each commit threaded in, its sections written as you go, then `pr-ship`. The prompt `tkStartWork`'s hand-off block carries for every kind. |
+| `build` | Safety Contract. The builder's role, in `org/`: build a card that already exists -- its branch from current main, the work, each commit threaded in, its sections written as you go, then `pr-ship`. The prompt `tkStartWork`'s hand-off block carries for every kind, for every way of working. |
 | `ado-comments` | Safety Contract. Two-pass PR comment triage. |
 | `pr-ship` | Safety Contract. Stage 1: context check, commit, draft PR. |
 | `pr-publish` | Safety Contract. Stage 2: draft → ready, comms. |
@@ -108,10 +108,10 @@ ones it belongs with:
 | `design` | works a design note or a spec |
 | `org` | is a role in the org -- a job description a seat or a card's job is worked from |
 
-The shipped ones carry theirs in the index, not in their frontmatter: `build`, `pr-ship` and `pr-publish`
+The shipped ones carry theirs in the index, not in their frontmatter: `pr-ship` and `pr-publish`
 are `ship`; `ado-comments`, `pr-review` and `pr-suggest` are `review`; `new-bug`, `new-user-story`
 and `new-issue` are `tracker`; `generate-review`, `growth-create-training` and
-`growth-create-presentation` are `growth`; `manager1on1` is `meetings`; the roles -- `pm`, `team-lead`,
+`growth-create-presentation` are `growth`; `manager1on1` is `meetings`; the roles -- `build`, `pm`, `team-lead`,
 `vp-of-engineering`, `vp-of-product` and `intern` -- are `org`.
 
 Below the title, a prompt you open by hand speaks to the assistant as "you" and to you as "the

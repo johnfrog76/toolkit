@@ -30,7 +30,8 @@ function deps(list: () => Promise<PromptsResponse>, answer: () => Promise<Comman
 describe("the Space's how-we-work note after With agents", () => {
   it("the listing already carries the note: no call", async () => {
     const { d, run } = deps(
-      () => Promise.resolve(listing([{ group: "toolkit", path: "agentic/build.prompt.md" }, NOTE])),
+      () =>
+        Promise.resolve(listing([{ group: "toolkit", path: "agentic/org/build.prompt.md" }, NOTE])),
       () => Promise.resolve(reply({})),
     );
     expect(await writeHowWeWork(d, "github-demo")).toEqual({ kind: "listed" });
@@ -41,7 +42,7 @@ describe("the Space's how-we-work note after With agents", () => {
     const out =
       "\n  [+] Wrote how we work in GitHub demo (github-demo)\n\n  Paste this line ...\n    How we work here: /hub/github-demo/agentic/how-we-work.md\n";
     const { d, run } = deps(
-      () => Promise.resolve(listing([{ group: "toolkit", path: "agentic/build.prompt.md" }])),
+      () => Promise.resolve(listing([{ group: "toolkit", path: "agentic/org/build.prompt.md" }])),
       () => Promise.resolve(reply({ output: out })),
     );
     expect(await writeHowWeWork(d, "github-demo")).toEqual({

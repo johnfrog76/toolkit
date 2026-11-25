@@ -14,8 +14,8 @@
                             including the prompt's heading
         expected-issue.md   the same for StartWork 41
 
-    The prompt section is the SHIPPED agentic/build.prompt.md, which the
-    shipped startWork.prompts rows name: each expected block is its golden,
+    The prompt section is the SHIPPED builder's role, agentic/org/build.prompt.md,
+    which the shipped startWork.prompts rows name: each expected block is its golden,
     LF, then that file's own text -- so the golden and the prompt cannot drift.
 
     1. Off      with features.solitaireAgile unset there is no StartWork and
@@ -99,7 +99,7 @@ function Read-Fixture {
     return [System.IO.File]::ReadAllText((Join-Path $fixtureDir $Name)).Replace("`r`n", "`n")
 }
 # The prompt is the shipped file itself, read the way the verb reads it.
-$promptText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'agentic/build.prompt.md')).Replace("`r`n", "`n").TrimEnd([char]10)
+$promptText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'agentic/org/build.prompt.md')).Replace("`r`n", "`n").TrimEnd([char]10)
 $wantCard = (Read-Fixture 'expected-card.md').TrimEnd([char]10) + "`n" + $promptText
 $wantIssue = (Read-Fixture 'expected-issue.md').TrimEnd([char]10) + "`n" + $promptText
 $spaceFixture = (Read-Fixture 'space.json') | ConvertFrom-Json
@@ -120,11 +120,12 @@ function Invoke-Verb {
     # -Prompts is this machine's startWork.prompts patch; '{}' leaves the shipped rows.
     # -PathPrefix puts a folder (the stub claude's) first on PATH; -PathOnly
     # replaces PATH outright (the no-claude case: git's folder and nothing else).
-    param([string]$Snippet, [bool]$On = $true, [string]$Prompts = '{}', [switch]$Quiet, [string]$PathPrefix = '', [string]$PathOnly = '')
+    # -Extension is this machine's agenticExtensionPath, '' for none.
+    param([string]$Snippet, [bool]$On = $true, [string]$Prompts = '{}', [switch]$Quiet, [string]$PathPrefix = '', [string]$PathOnly = '', [string]$Extension = '')
     $features = '{}'
     if ($On) { $features = '{ "solitaireAgile": true }' }
     [System.IO.File]::WriteAllText((Join-Path $pkg 'config.local.json'),
-        "{ `"promptsRoot`": `"$($hub -replace '\\', '/')`", `"activeSpace`": `"widgets`", `"quietStart`": true, `"features`": $features, `"startWork`": { `"prompts`": $Prompts } }", $utf8)
+        "{ `"promptsRoot`": `"$($hub -replace '\\', '/')`", `"activeSpace`": `"widgets`", `"quietStart`": true, `"features`": $features, `"startWork`": { `"prompts`": $Prompts }, `"agenticExtensionPath`": `"$($Extension -replace '\\', '/')`" }", $utf8)
     if (Test-Path -LiteralPath $ghLog) { Remove-Item -LiteralPath $ghLog -Force }
     $q = { param($p) $p -replace "'", "''" }
     $quietLine = ''
@@ -191,7 +192,7 @@ function Get-HubSnapshot {
 try {
     New-Item -ItemType Directory -Path $pkg, $logDir, $current, $archive, (Join-Path $hub 'board/current') -Force | Out-Null
     foreach ($item in @('utilities.psm1', 'config.default.json', 'consts.json')) { Copy-Item (Join-Path $pkgRoot $item) $pkg -Force }
-    # agentic/ too: the shipped rows name agentic/build.prompt.md, and the block carries it.
+    # agentic/ too: the shipped rows name agentic/org/build.prompt.md, and the block carries it.
     foreach ($folder in @('Scripts', 'Config', 'Prompt20Toolkit', 'templates', 'agentic')) { Copy-Item (Join-Path $pkgRoot $folder) $pkg -Recurse -Force }
     $spaceJson = ConvertTo-Json -InputObject ([ordered]@{
             slug = [string]$spaceFixture.slug; name = [string]$spaceFixture.name; status = [string]$spaceFixture.status
@@ -236,7 +237,7 @@ try {
     $r = Invoke-Verb 'tkStartWork 23A3'
     Assert-True 'StartWork 23A3 exits 0 and prints expected-card.md, byte for byte' ($r.Exit -eq '0' -and $r.Inner -ceq $wantCard) ("`n--- got ---`n$($r.Inner)`n--- want ---`n$wantCard")
     Assert-True 'nothing before the block and nothing after it' ($r.Inner.StartsWith('# Start work: Task 23A3') -and $r.Inner.EndsWith($promptText))
-    Assert-True 'the shipped rows carry agentic/build.prompt.md, whole' ($r.Inner.Contains("## The prompt (agentic/build.prompt.md)`n---`n") -and $r.Inner -notmatch '## The prompt \(agentic/pr-ship')
+    Assert-True 'the shipped rows carry the builder''s role, agentic/org/build.prompt.md, whole' ($r.Inner.Contains("## The prompt (agentic/org/build.prompt.md)`n---`n") -and $r.Inner -notmatch '## The prompt \(agentic/pr-ship')
     Assert-True 'the card''s commit bullets, PR URL: and footer travel whole' ($r.Inner.Contains('- 80e2168 Route') -and $r.Inner.Contains('PR URL: https://github.com/acme/widgets/pull/57') -and $r.Inner.Contains('**Sprint:** Phase 6: the long milestone title that is longer than twenty characters'))
     # The hand-off asks an agent to name itself on the card (docs/hub/cards.md, "The Agent line").
     Assert-True 'the block tells the agent to write the card''s **Agent:** line' ($r.Inner.Contains('**Agent:**'))
@@ -295,8 +296,38 @@ try {
     $o = Invoke-Verb "tkStartWork 23A3 -Prompt '$($alt -replace "'", "''")'"
     Assert-True '-Prompt carries another prompt for this call, LF' ($o.Exit -eq '0' -and $o.Inner.EndsWith("other.prompt.md)`n# Other")) $o.Inner
     # From a folder with no agentic/ of its own, so the path is read against the package.
-    $o = Invoke-Verb "Set-Location '$($scratch -replace "'", "''")'; tkStartWork 23A3 -Prompt agentic/build.prompt.md"
+    $o = Invoke-Verb "Set-Location '$($scratch -replace "'", "''")'; tkStartWork 23A3 -Prompt agentic/org/build.prompt.md"
     Assert-True '-Prompt relative to the package' ($o.Exit -eq '0' -and $o.Inner -ceq $wantCard) $o.All
+    # The path the builder's brief had before it became a role still works: it is found as the role.
+    $o = Invoke-Verb "Set-Location '$($scratch -replace "'", "''")'; tkStartWork 23A3 -Prompt agentic/build.prompt.md"
+    Assert-True '-Prompt agentic/build.prompt.md, the old path, finds the role' ($o.Exit -eq '0' -and $o.Inner -ceq $wantCard) $o.All
+    $o = Invoke-Verb 'tkStartWork 23A3' -Prompts '{ "Task": "agentic/build.prompt.md" }'
+    Assert-True 'a row naming the old path finds the role' ($o.Exit -eq '0' -and $o.Inner -ceq $wantCard) $o.All
+
+    # -- 5b. The role is found where a position's role is -------------------------
+    Write-Host ""
+    Write-Host "-- The builder's role, found as a role -----------------" -ForegroundColor Cyan
+    # The hub's agentic/org/, then the hub's agentic/, then the toolkit's agentic/org/; a tuned copy in this
+    # machine's agenticExtensionPath before all three, as for every shipped prompt.
+    $hubRoles = Join-Path $hub 'agentic/org'
+    New-Item -ItemType Directory -Path $hubRoles -Force | Out-Null
+    $hubFlat = Join-Path $hub 'agentic/build.prompt.md'
+    [System.IO.File]::WriteAllText($hubFlat, "# The hub's builder, in agentic/`r`n", $utf8)
+    $o = Invoke-Verb 'tkStartWork 23A3'
+    Assert-True 'a hub''s agentic/build.prompt.md wins over the shipped role' ($o.Exit -eq '0' -and $o.Inner.EndsWith("## The prompt (agentic/build.prompt.md)`n# The hub's builder, in agentic/")) $o.Inner
+    $o = Invoke-Verb 'tkStartWork 23A3' -Prompts '{ "Task": "agentic/build.prompt.md" }'
+    Assert-True 'and so it does for a row naming the old path' ($o.Exit -eq '0' -and $o.Inner.EndsWith("# The hub's builder, in agentic/")) $o.Inner
+    [System.IO.File]::WriteAllText((Join-Path $hubRoles 'build.prompt.md'), "# The hub's own builder`n", $utf8)
+    $o = Invoke-Verb 'tkStartWork 23A3'
+    Assert-True 'a hub''s own role in agentic/org/ wins over its agentic/ and the shipped one' ($o.Exit -eq '0' -and $o.Inner.EndsWith("## The prompt (agentic/org/build.prompt.md)`n# The hub's own builder")) $o.Inner
+    $ext = Join-Path $scratch 'mine'
+    New-Item -ItemType Directory -Path $ext -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $ext 'build.prompt.md'), "# This machine's builder`n", $utf8)
+    $o = Invoke-Verb 'tkStartWork 23A3' -Extension $ext
+    Assert-True 'a tuned copy in agenticExtensionPath wins over the hub''s role' ($o.Exit -eq '0' -and $o.Inner.EndsWith("# This machine's builder")) $o.Inner
+    Remove-Item -LiteralPath $hubFlat, (Join-Path $hubRoles 'build.prompt.md') -Force
+    $o = Invoke-Verb 'tkStartWork 23A3'
+    Assert-True 'with the hub''s copies gone, the shipped role again' ($o.Exit -eq '0' -and $o.Inner -ceq $wantCard) $o.All
 
     $refusals = [ordered]@{
         'a kind with no row names the key'      = @{ Snippet = 'tkStartWork K7M2'; Says = 'No prompt is configured for a Meeting (startWork.prompts.Meeting)'; Hint = 'Config -Set startWork.prompts.Meeting=' }

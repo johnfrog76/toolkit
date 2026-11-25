@@ -13,4 +13,4 @@ Tags: sonnet; sev2
 
 Triage does not say who has an item.
 
-## The prompt (agentic/build.prompt.md)
+## The prompt (agentic/org/build.prompt.md)
