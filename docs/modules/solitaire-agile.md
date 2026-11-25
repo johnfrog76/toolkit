@@ -1382,8 +1382,12 @@ lets the farthest scroll sit on a stop's edge too.
 **The keyboard.** The track is one tab stop. Left and Right step between releases, Home and End jump to
 the ends, and focus follows the step; with the panel open, it follows too. Enter or Space opens the panel,
 Escape or **Close** shuts it, focus going back to the stop. Each stop's accessible name is the whole fact
--- `v0.3.0, shipped 12 October 2026, 1 entry, 1 milestone reached` -- and the open stop names the panel
+-- `v0.3.0, shipped 12 October 2026, 1 entry, 1 milestone reached` -- and it is the button's own text: what
+the stop draws, with the punctuation and the words only a screen reader needs (`shipped`, the milestones)
+hidden in between, so the name always holds the visible words. The open stop names the panel
 (`aria-expanded`, `aria-controls`). The flags are not a second tab stop: the panel lists every milestone.
+The panel's links are drawn in the panel's own text colour, underlined, so they keep their contrast in
+every theme.
 
 Under the timeline, for now, the flat list of the Space's GitHub milestones and its award, below, headed
 `GitHub milestones` as the page's second level. It goes once the award fires from the timeline.

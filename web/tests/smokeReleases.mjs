@@ -47,9 +47,9 @@ function git(cwd, args, day = "") {
     GIT_CONFIG_GLOBAL: devNull,
     GIT_CONFIG_SYSTEM: devNull,
     GIT_AUTHOR_NAME: "Smoke",
-    GIT_AUTHOR_EMAIL: "smoke@example.invalid",
+    GIT_AUTHOR_EMAIL: "smoke@example.com",
     GIT_COMMITTER_NAME: "Smoke",
-    GIT_COMMITTER_EMAIL: "smoke@example.invalid",
+    GIT_COMMITTER_EMAIL: "smoke@example.com",
   };
   if (day) env.GIT_AUTHOR_DATE = env.GIT_COMMITTER_DATE = `${day}T12:00:00Z`;
   const r = spawnSync("git", args, { cwd, env, encoding: "utf8", windowsHide: true });
@@ -87,7 +87,7 @@ const panelHeading = (page) =>
     .locator('[data-testid="release-panel"] h2')
     .textContent({ timeout: 5000 })
     .catch(() => "");
-const focusedLabel = (page) => page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "");
+const focusedLabel = (page) => page.evaluate(() => document.activeElement?.textContent ?? "");
 
 /** Open the timeline and wait for its stops; false when none was drawn. */
 async function openTimeline(page, base) {

@@ -152,6 +152,26 @@ const useStyles = makeStyles({
     border: `1px solid ${tokens.colorNeutralStroke1}`,
   },
   stopMeta: { color: tokens.colorNeutralForeground3 },
+  // Words a screen reader hears and the eye does not: the punctuation and the
+  // facts between a stop's lines.
+  unseen: {
+    position: "absolute",
+    width: "1px",
+    height: "1px",
+    margin: "-1px",
+    padding: 0,
+    overflow: "hidden",
+    clip: "rect(0 0 0 0)",
+    whiteSpace: "nowrap",
+    border: 0,
+  },
+  // The panel's links: the panel's own text colour, underlined. The theme's link
+  // colour does not hold its contrast on the panel in every theme.
+  panelLink: {
+    color: tokens.colorNeutralForeground1,
+    textDecorationLine: "underline",
+    ":hover": { color: tokens.colorNeutralForeground1Hover },
+  },
   // The room after the last stop that lets the track's far end sit on a stop's
   // edge too (trackSpacer); never wide enough to make a track that fit overflow.
   spacer: { flexShrink: 0 },
@@ -203,19 +223,29 @@ const entryCount = (r: Release): number => r.notes.reduce((n, g) => n + g.entrie
 const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 const reachedCount = (r: Release): number => r.milestones.filter((m) => m.reachedOn).length;
 
-/** A stop's accessible name: the whole fact, as a screen reader hears it. */
-export function stopLabel(r: Release): string {
-  const head = r.inProgress
-    ? `In progress${r.previous ? `, since ${r.previous}` : ""}`
-    : `${r.tag}, shipped ${dayWords(r.date)}`;
+/** A stop's words, as drawn and as heard: what the eye reads (`name`, `when`,
+ *  `entries`) and what only a screen reader hears (`whenLead`, `extras`). */
+export function stopParts(r: Release) {
   const reached = reachedCount(r);
   const aimed = r.milestones.length - reached;
-  return [
-    head,
-    plural(entryCount(r), "entry", "entries"),
-    ...(reached ? [`${plural(reached, "milestone")} reached`] : []),
-    ...(aimed ? [`${plural(aimed, "milestone")} open`] : []),
-  ].join(", ");
+  return {
+    name: releaseName(r),
+    whenLead: r.inProgress ? "" : "shipped ",
+    when: releaseWhen(r),
+    entries: plural(entryCount(r), "entry", "entries"),
+    extras: [
+      ...(reached ? [`${plural(reached, "milestone")} reached`] : []),
+      ...(aimed ? [`${plural(aimed, "milestone")} open`] : []),
+    ],
+  };
+}
+
+/** A stop's accessible name: the whole fact, as a screen reader hears it. The
+ *  button's own text IS this name -- what it draws, with the words only a screen
+ *  reader needs hidden in between -- so the name always holds the visible text. */
+export function stopLabel(r: Release): string {
+  const p = stopParts(r);
+  return [p.name, `${p.whenLead}${p.when}`, p.entries, ...p.extras].join(", ");
 }
 
 /** A milestone's one line: reached on its day, or how far along it is. */
@@ -350,7 +380,7 @@ function ReleasePanel({
           onClick={onClose}
         />
       </div>
-      <Link href={r.url} target="_blank" rel="noopener noreferrer">
+      <Link className={styles.panelLink} href={r.url} target="_blank" rel="noopener noreferrer">
         {r.inProgress ? "Compare on GitHub" : "Release on GitHub"} <OpenRegular aria-hidden />
       </Link>
 
@@ -373,7 +403,12 @@ function ReleasePanel({
                 <span className={styles.gold} aria-hidden>
                   {m.reachedOn ? <FlagFilled /> : <FlagRegular />}
                 </span>
-                <Link href={m.url} target="_blank" rel="noopener noreferrer">
+                <Link
+                  className={styles.panelLink}
+                  href={m.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   {m.title}
                 </Link>
               </div>
@@ -427,7 +462,12 @@ function ReleasePanel({
           <ul className={styles.list}>
             {r.pulls.map((p) => (
               <li key={p.number}>
-                <Link href={p.url} target="_blank" rel="noopener noreferrer">
+                <Link
+                  className={styles.panelLink}
+                  href={p.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   #{p.number}
                 </Link>{" "}
                 {p.title}
@@ -445,7 +485,12 @@ function ReleasePanel({
           <ul className={styles.list}>
             {r.issues.map((i) => (
               <li key={i.number} data-testid="release-issue">
-                <Link href={i.url} target="_blank" rel="noopener noreferrer">
+                <Link
+                  className={styles.panelLink}
+                  href={i.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   #{i.number}
                 </Link>
                 {titleOf.has(i.number) ? ` ${titleOf.get(i.number)}` : ""}
@@ -582,6 +627,7 @@ export function ReleasesTimeline() {
           >
             {releases.map((r, i) => {
               const gold = reachedCount(r) > 0;
+              const parts = stopParts(r);
               return (
                 <div
                   key={r.tag || "in-progress"}
@@ -632,7 +678,6 @@ export function ReleasesTimeline() {
                       i === selected && styles.stopSelected,
                     )}
                     tabIndex={i === selected ? 0 : -1}
-                    aria-label={stopLabel(r)}
                     aria-current={i === selected ? "true" : undefined}
                     aria-expanded={open && i === selected}
                     aria-controls={open && i === selected ? panelId : undefined}
@@ -643,11 +688,21 @@ export function ReleasesTimeline() {
                     }}
                   >
                     <Body1>
-                      <strong>{releaseName(r)}</strong>
+                      <strong>{parts.name}</strong>
+                      <span className={styles.unseen}>, </span>
                     </Body1>
-                    <Caption1 className={styles.stopMeta}>{releaseWhen(r)}</Caption1>
                     <Caption1 className={styles.stopMeta}>
-                      {plural(entryCount(r), "entry", "entries")}
+                      {parts.whenLead ? (
+                        <span className={styles.unseen}>{parts.whenLead}</span>
+                      ) : null}
+                      {parts.when}
+                      <span className={styles.unseen}>, </span>
+                    </Caption1>
+                    <Caption1 className={styles.stopMeta}>
+                      {parts.entries}
+                      {parts.extras.length ? (
+                        <span className={styles.unseen}>{`, ${parts.extras.join(", ")}`}</span>
+                      ) : null}
                     </Caption1>
                   </button>
                 </div>

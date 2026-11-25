@@ -153,7 +153,10 @@ describe("the Releases timeline", () => {
 
   it("one stop a release, the one in progress first, each named by the whole fact", () => {
     render(<ReleasesPage />);
-    expect(stops().map((b) => b.getAttribute("aria-label"))).toEqual([
+    // The name is the button's own text -- what it draws, and the words only a
+    // screen reader hears between -- never an aria-label beside it.
+    expect(stops().every((b) => !b.hasAttribute("aria-label"))).toBe(true);
+    expect(stops().map((b) => b.textContent)).toEqual([
       "In progress, since v0.3.0, 3 entries, 1 milestone reached, 2 milestones open",
       "v0.3.0, shipped 12 October 2026, 1 entry, 2 milestones reached",
       "v0.2.0, shipped 1 October 2026, 2 entries, 1 milestone reached",
@@ -412,7 +415,7 @@ describe("the words", () => {
     const m = releases[0].milestones[0];
     expect(milestoneWords(m)).toBe("open, 1 of 3 closed");
     expect(stopLabel({ ...releases[0], previous: "", milestones: [], notes: [] })).toBe(
-      "In progress, 0 entries",
+      "In progress, nothing tagged yet, 0 entries",
     );
   });
 });
