@@ -1,6 +1,5 @@
-import { Subtitle2, Caption1, Badge, makeStyles, tokens } from "@fluentui/react-components";
-import { RefreshButton } from "../../shared/RefreshButton";
-import { BackButton } from "../../shared/BackButton";
+import { Caption1, Badge, makeStyles, tokens } from "@fluentui/react-components";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { PanelFrame } from "../../shared/PanelFrame";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 // growthApi, not the shell's api: "Resume" is this module's tag and only
@@ -9,7 +8,6 @@ import { growthApi, useGetResumeQuery } from "./api.growth";
 import { useDispatch } from "react-redux";
 import { PersonStarRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
-import { FilePath } from "../../shared/FilePath";
 
 const useStyles = makeStyles({
   page: {
@@ -17,18 +15,6 @@ const useStyles = makeStyles({
     flexDirection: "column",
     gap: tokens.spacingVerticalM,
     width: "100%",
-  },
-  titleBlock: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "2px",
-    minWidth: 0,
-  },
-  pathLine: {
-    display: "flex",
-    alignItems: "center",
-    gap: tokens.spacingHorizontalS,
-    flexWrap: "wrap" as const,
   },
 });
 
@@ -64,29 +50,24 @@ export function SkillsPage() {
           ) : undefined
         }
         headerLeft={
-          <>
-            <BackButton />
-            <Badge color="brand" appearance="outline" size="small">
-              Resume
-            </Badge>
-            <div className={styles.titleBlock}>
-              <Subtitle2>Resume</Subtitle2>
-              <div className={styles.pathLine}>
-                <FilePath path={resumeData?.path} />
+          <DetailHeader
+            title="Resume"
+            meta={
+              <>
+                <Badge color="brand" appearance="outline" size="small">
+                  Resume
+                </Badge>
                 {resumeData?.last_modified && (
-                  <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
-                    Updated {resumeData.last_modified}
-                  </Caption1>
+                  <Caption1>Updated {resumeData.last_modified}</Caption1>
                 )}
-              </div>
-            </div>
-          </>
-        }
-        headerRight={
-          <RefreshButton
-            onClick={() => dispatch(growthApi.util.invalidateTags(["Resume"]))}
-            isFetching={isFetching}
-            title="Refresh resume"
+              </>
+            }
+            path={resumeData?.path}
+            refresh={{
+              onClick: () => dispatch(growthApi.util.invalidateTags(["Resume"])),
+              isFetching,
+              title: "Refresh resume",
+            }}
           />
         }
       >

@@ -1,17 +1,8 @@
 import { useState } from "react";
 import { useParams, useSearchParams } from "react-router";
-import {
-  Subtitle2,
-  Caption1,
-  Badge,
-  Button,
-  Spinner,
-  makeStyles,
-  tokens,
-} from "@fluentui/react-components";
-import { RefreshButton } from "../../shared/RefreshButton";
+import { Caption1, Badge, Button, Spinner, makeStyles, tokens } from "@fluentui/react-components";
 import { CloudArrowUpRegular, SaveRegular } from "@fluentui/react-icons";
-import { BackButton } from "../../shared/BackButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { MarkdownBlock } from "../../shared/MarkdownBlock";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { PanelFrame } from "../../shared/PanelFrame";
@@ -22,7 +13,6 @@ import {
 } from "./api.ado";
 import { DocumentSearchRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
-import { FilePath } from "../../shared/FilePath";
 
 const useStyles = makeStyles({
   page: {
@@ -30,12 +20,6 @@ const useStyles = makeStyles({
     flexDirection: "column",
     gap: tokens.spacingVerticalM,
     width: "100%",
-  },
-  titleBlock: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "2px",
-    minWidth: 0,
   },
   resultBox: {
     marginTop: tokens.spacingVerticalS,
@@ -116,53 +100,53 @@ export function ReviewPage() {
           ) : undefined
         }
         headerLeft={
-          <>
-            <BackButton />
-            <Badge color="brand" appearance="outline" size="small">
-              Review
-            </Badge>
-            <div className={styles.titleBlock}>
-              <Subtitle2 as="h1">
-                {pendingFiles.length > 0
-                  ? "Pending Review"
-                  : reviewDetail
-                    ? reviewDetail.title || reviewDetail.period
-                    : "Reviews"}
-              </Subtitle2>
-              {pendingFiles.length === 0 && <FilePath path={reviewDetail?.path} />}
-            </div>
-            {pendingFiles.length > 0 && (
-              <Badge color="warning" appearance="filled" size="medium">
-                {pendingFiles.length} file{pendingFiles.length !== 1 ? "s" : ""}
-              </Badge>
-            )}
-          </>
-        }
-        headerRight={
-          pendingFiles.length > 0 ? (
-            <>
-              <RefreshButton onClick={refetch} isFetching={isFetching} />
-
-              <Button
-                icon={<SaveRegular />}
-                size="small"
-                appearance="subtle"
-                disabled={isCommitting}
-                onClick={() => commit(true)}
-              >
-                Commit only
-              </Button>
-              <Button
-                icon={<CloudArrowUpRegular />}
-                size="small"
-                appearance="primary"
-                disabled={isCommitting}
-                onClick={() => commit(false)}
-              >
-                Commit &amp; Sync
-              </Button>
-            </>
-          ) : null
+          <DetailHeader
+            title={
+              pendingFiles.length > 0
+                ? "Pending Review"
+                : reviewDetail
+                  ? reviewDetail.title || reviewDetail.period
+                  : "Reviews"
+            }
+            meta={
+              <>
+                <Badge color="brand" appearance="outline" size="small">
+                  Review
+                </Badge>
+                {pendingFiles.length > 0 && (
+                  <Badge color="warning" appearance="filled" size="medium">
+                    {pendingFiles.length} file{pendingFiles.length !== 1 ? "s" : ""}
+                  </Badge>
+                )}
+              </>
+            }
+            path={pendingFiles.length === 0 ? reviewDetail?.path : undefined}
+            refresh={pendingFiles.length > 0 ? { onClick: refetch, isFetching } : undefined}
+            actions={
+              pendingFiles.length > 0 ? (
+                <>
+                  <Button
+                    icon={<SaveRegular />}
+                    size="small"
+                    appearance="subtle"
+                    disabled={isCommitting}
+                    onClick={() => commit(true)}
+                  >
+                    Commit only
+                  </Button>
+                  <Button
+                    icon={<CloudArrowUpRegular />}
+                    size="small"
+                    appearance="primary"
+                    disabled={isCommitting}
+                    onClick={() => commit(false)}
+                  >
+                    Commit &amp; Sync
+                  </Button>
+                </>
+              ) : undefined
+            }
+          />
         }
       >
         {pendingFiles.length > 0 ? (

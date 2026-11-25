@@ -147,7 +147,7 @@
       ],
       "sender": "by hand",
       "module": "solitaireAgile",
-      "drives": "Proposals only, to the seat it assists: milestones (placed by that seat with Route -Milestone), breakdowns, close-outs, bug severities (Route -Severity) and shipped designs to archive (MoveDesign)",
+      "drives": "Fetches the tracker's milestones and where each stands (Triage, gh api read only), and proposes, to the seat it assists: milestones (placed by that seat with Route -Milestone), breakdowns, close-outs and bug severities (Route -Severity); writes nothing",
       "category": "org"
     },
     "pm": {
@@ -184,6 +184,15 @@
       "sender": "by hand",
       "module": "solitaireAgile",
       "drives": "Owns scope, voice and what a user will see: decisions written where they belong, a design made a spec ready to build (NewDesign, MoveDesign -To Spec), reviews before a user-facing change merges, and the release notes for the owner's word",
+      "category": "org"
+    },
+    "butler": {
+      "workflows": [
+        "agents"
+      ],
+      "sender": "by hand",
+      "module": "solitaireAgile",
+      "drives": "Keeps the designs once a week: stamps every unstamped note and spec (StampDesign), brings the seat it reports to the designs whose work has shipped, and archives each one that seat says yes to (MoveDesign -To Archive, -To Complete -Doc)",
       "category": "org"
     }
   }

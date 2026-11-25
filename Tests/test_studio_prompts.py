@@ -225,7 +225,7 @@ class WithTeamAgileOff(PromptsCase):
 
     def test_the_roles_are_absent(self):
         rows = self.rows()
-        for role in ("intern", "pm", "team-lead", "vp-of-engineering", "vp-of-product"):
+        for role in ("intern", "butler", "pm", "team-lead", "vp-of-engineering", "vp-of-product"):
             self.assertNotIn(role, rows)
             self.assertEqual(self.client.get(f"{ROUTE}/{role}").status_code, 404, role)
 

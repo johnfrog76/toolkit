@@ -1,13 +1,11 @@
 import { useNavigate, useParams } from "react-router";
-import { Subtitle2, Badge, makeStyles, tokens } from "@fluentui/react-components";
-import { BackButton } from "../../shared/BackButton";
+import { Badge, makeStyles, tokens } from "@fluentui/react-components";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { PanelFrame } from "../../shared/PanelFrame";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { useGetGrowthDetailQuery } from "./api.growth";
 import { TargetArrowRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
-import { FilePath } from "../../shared/FilePath";
-import { RefreshButton } from "../../shared/RefreshButton";
 import { GoalActions } from "./GoalActions";
 
 const useStyles = makeStyles({
@@ -16,12 +14,6 @@ const useStyles = makeStyles({
     flexDirection: "column",
     gap: tokens.spacingVerticalM,
     width: "100%",
-  },
-  titleBlock: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "2px",
-    minWidth: 0,
   },
 });
 
@@ -59,10 +51,10 @@ export function GoalDetailPage() {
           ) : undefined
         }
         headerLeft={
-          <>
-            <BackButton />
-            {data && (
-              <>
+          <DetailHeader
+            title={data?.title}
+            meta={
+              data ? (
                 <Badge
                   color={isPresentation ? "brand" : isGoal ? "informative" : "success"}
                   appearance="outline"
@@ -70,36 +62,37 @@ export function GoalDetailPage() {
                 >
                   {isPresentation ? "Presentation" : isGoal ? "Goal" : "Training"}
                 </Badge>
-                <div className={styles.titleBlock}>
-                  <Subtitle2>{data.title}</Subtitle2>
-                  <FilePath path={data.path} />
-                </div>
-              </>
-            )}
-          </>
-        }
-        headerRight={
-          data ? (
-            <>
-              <Badge
-                color={
-                  data.status === "complete"
-                    ? "success"
-                    : data.status === "new"
-                      ? "important"
-                      : "subtle"
-                }
-                appearance="tint"
-                size="small"
-              >
-                {data.status === "complete" ? "Complete" : data.status === "new" ? "New" : "Active"}
-              </Badge>
-              {/* The row's moves, on the page where the progress log is read:
+              ) : undefined
+            }
+            path={data?.path}
+            refresh={data ? { onClick: refetch, isFetching } : undefined}
+            actions={
+              data ? (
+                <>
+                  <Badge
+                    color={
+                      data.status === "complete"
+                        ? "success"
+                        : data.status === "new"
+                          ? "important"
+                          : "subtle"
+                    }
+                    appearance="tint"
+                    size="small"
+                  >
+                    {data.status === "complete"
+                      ? "Complete"
+                      : data.status === "new"
+                        ? "New"
+                        : "Active"}
+                  </Badge>
+                  {/* The row's moves, on the page where the progress log is read:
                   Complete while the goal is not complete, Archive either way. */}
-              <GoalActions item={data} onArchived={() => navigate("/growth")} />
-              <RefreshButton onClick={refetch} isFetching={isFetching} />
-            </>
-          ) : undefined
+                  <GoalActions item={data} onArchived={() => navigate("/growth")} />
+                </>
+              ) : undefined
+            }
+          />
         }
       >
         {data && (

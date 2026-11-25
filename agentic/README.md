@@ -67,7 +67,8 @@ between them. They ride Team Agile, so like the add-ons' prompts they are listed
 | `team-lead` | solitaireAgile | Leads one lane or Space: briefs a builder per card from `tkStartWork` with the stop rule, reads every diff, proves the work and catches it up with its base by merge, and hands on one ready pull request at a time. Never merges its own work. Suggested model: Opus |
 | `vp-of-engineering` | solitaireAgile | Owns how the work is built across lanes, and holds the merge duty unless the how-we-work note gives it to another seat: checks a ready pull request for itself, then merges and reports the hash, or sends it back with a finding |
 | `vp-of-product` | solitaireAgile | Owns what the product is for and how it reads: decisions written where they belong, a design made a spec ready to build with `tkNewDesign` and `tkMoveDesign`, a read of anything a user will see before it merges, and the release notes for the owner's word |
-| `intern` | solitaireAgile | Assists the seat that plans the work, with proposals only: milestones for a Space that has none, breakdowns of an issue or user story too big for one card, close-outs with their evidence, a severity for each bug, and designs whose work has shipped to archive. That seat decides and writes, with `tkRoute`, `tkMoveDesign` and on the tracker. Suggested model: Haiku |
+| `intern` | solitaireAgile | Assists the seat that plans the work and writes nothing: fetches the tracker's milestones and where each one stands for the team, and proposes milestones for a Space that has none, breakdowns of an issue or user story too big for one card, close-outs with their evidence, and a severity for each bug. That seat decides and writes, with `tkRoute` and on the tracker. Suggested model: Haiku |
+| `butler` | solitaireAgile | Keeps the org's designs once a week: gives every unstamped note and spec its id with `tkStampDesign`, brings the seat it reports to the designs whose work has shipped with their evidence, and archives each one that seat says yes to with `tkMoveDesign`. Never commits to a main line or merges. Suggested model: Haiku |
 
 ## The shape of a prompt
 
@@ -112,7 +113,7 @@ The shipped ones carry theirs in the index, not in their frontmatter: `build`, `
 are `ship`; `ado-comments`, `pr-review` and `pr-suggest` are `review`; `new-bug`, `new-user-story`
 and `new-issue` are `tracker`; `generate-review`, `growth-create-training` and
 `growth-create-presentation` are `growth`; `manager1on1` is `meetings`; the roles -- `pm`, `team-lead`,
-`vp-of-engineering`, `vp-of-product` and `intern` -- are `org`.
+`vp-of-engineering`, `vp-of-product`, `intern` and `butler` -- are `org`.
 
 Below the title, a prompt you open by hand speaks to the assistant as "you" and to you as "the
 user". The two the tools send speak about the tool in the third person above the line, and the

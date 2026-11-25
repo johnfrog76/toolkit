@@ -1,18 +1,16 @@
 import { useMemo } from "react";
 import { useParams } from "react-router";
-import { Badge, Button, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
+import { Badge, Button, Caption1, makeStyles, tokens } from "@fluentui/react-components";
 import { CommentRegular, LightbulbRegular, OpenRegular } from "@fluentui/react-icons";
 import { useGetDesignDocQuery, useGetIssueDetailQuery } from "./api.ado";
 import type { DesignDocDetail, IssueDetail } from "./api.ado";
 import { documentWithThread } from "./documentWithThread";
 import { repoLinkBase } from "./docRooms";
 import { FOLDERS } from "../../shell/consts";
-import { BackButton } from "../../shared/BackButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { EmptyState } from "../../shared/EmptyState";
-import { FilePath } from "../../shared/FilePath";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { PanelFrame } from "../../shared/PanelFrame";
-import { RefreshButton } from "../../shared/RefreshButton";
 
 // The reading room for ONE design or spec (Studio S2, D-S11) -- the house's
 // reading page, the same frame an issue or a card is read in: PanelFrame, the
@@ -22,20 +20,6 @@ import { RefreshButton } from "../../shared/RefreshButton";
 // route the issue's own reading room reads, so one zoom, one "On this page".
 const useStyles = makeStyles({
   page: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalM, width: "100%" },
-  titleBlock: {
-    display: "flex",
-    flexDirection: "column",
-    rowGap: tokens.spacingVerticalXS,
-    minWidth: 0,
-  },
-  metaRow: {
-    display: "flex",
-    columnGap: tokens.spacingHorizontalS,
-    rowGap: tokens.spacingVerticalXXS,
-    flexWrap: "wrap",
-    alignItems: "center",
-    color: tokens.colorNeutralForeground3,
-  },
 });
 
 /** The document, then its thread when it has one and it could be read -- the
@@ -104,12 +88,11 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
         loadingLabel="Reading the document..."
         empty={empty}
         headerLeft={
-          <>
-            <BackButton />
-            {readable && (
-              <div className={styles.titleBlock}>
-                <Subtitle2 as="h1">{data.title}</Subtitle2>
-                <div className={styles.metaRow}>
+          <DetailHeader
+            title={readable ? data.title : undefined}
+            meta={
+              readable ? (
+                <>
                   <Badge
                     appearance="tint"
                     size="small"
@@ -139,16 +122,12 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
                   {data.id ? <Caption1 title={data.id}>{data.id.slice(0, 8)}</Caption1> : null}
                   <Caption1>{data.repo}</Caption1>
                   {data.description ? <Caption1>{data.description}</Caption1> : null}
-                </div>
-                <FilePath path={data.url} what="document link" />
-              </div>
-            )}
-          </>
-        }
-        headerRight={
-          readable ? (
-            <>
-              {data.thread ? (
+                </>
+              ) : undefined
+            }
+            url={readable ? data.url : undefined}
+            actions={
+              readable && data.thread ? (
                 <Button
                   size="small"
                   appearance="subtle"
@@ -159,20 +138,24 @@ export function DesignDocPage({ archive = false }: { archive?: boolean }) {
                   target="_blank"
                   rel="noopener noreferrer"
                 />
-              ) : null}
-              <Button
-                size="small"
-                appearance="subtle"
-                icon={<OpenRegular />}
-                title="Open on GitHub"
-                as="a"
-                href={data.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              />
-              <RefreshButton onClick={refetch} isFetching={isFetching} />
-            </>
-          ) : undefined
+              ) : undefined
+            }
+            refresh={readable ? { onClick: refetch, isFetching } : undefined}
+            external={
+              readable ? (
+                <Button
+                  size="small"
+                  appearance="subtle"
+                  icon={<OpenRegular />}
+                  title="Open on GitHub"
+                  as="a"
+                  href={data.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                />
+              ) : undefined
+            }
+          />
         }
       >
         {readable && (
