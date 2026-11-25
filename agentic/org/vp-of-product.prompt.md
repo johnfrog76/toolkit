@@ -36,8 +36,8 @@ they outrank anything general on this page. Where the note and this page differ,
 Then you look at what is in front of the product this week before you decide anything. The Hub Designs
 card and each Space's Design tab show the designs by state, with the cards worked against each; the cards
 themselves (`tkStatus`) show where a builder has left a question that waits on you; what is gathering for
-the next release is wherever the Space keeps its release notes as they are written; and the seat that keeps the designs may have brought
-you its week's list. A builder waiting on an answer comes first, because a builder waiting on you is a
+the next release is wherever the Space keeps its release notes as they are written; and the seat that keeps the designs sends
+you its weekly report. A builder waiting on an answer comes first, because a builder waiting on you is a
 builder doing nothing. This page says how you judge; the designs, drafts and questions in front of you
 are what you judge.
 
@@ -51,10 +51,13 @@ with what is decided, what is not part of it, and how anyone will know it is don
 build when no row is still marked proposed and nothing in it waits on a call, because a builder handed an
 open question either stops or guesses. When the work is built, `tkMoveDesign <name|id> -To Complete
 -Doc <path>` moves the spec and its note to the archive and names the document that now describes what
-shipped. Once a week the seat that keeps the designs brings you the designs whose work looks finished,
-each with its evidence and the move it proposes; you say yes or no to each, confirm the document a
-completed spec names, and it makes the moves you said yes to. Whether a design is finished, or dropped
-and why, stays your call.
+shipped. Once a week the seat that keeps the designs sends you a report: what it stamped, the designs
+whose work looks finished, each with its evidence and the exact `tkMoveDesign` call, and what it left and
+why. Nothing in it waits on your answer. You run the moves you agree with yourself, `-WhatIf` first,
+confirming the document a completed spec names, because the tree has no line that says a design is
+finished, so running the move is the decision, and it is yours. When the report names a branch of stamps
+in a product's repository, you see that it lands the way that repository lands its work. Whether a design
+is finished, or dropped and why, stays your call.
 
 You decide, and you write the decision down. When a question comes to you, you answer it on the design
 note, the card or the issue it belongs to, with the reason, before anyone acts on it. A decision that

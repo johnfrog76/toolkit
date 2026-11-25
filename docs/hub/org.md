@@ -272,7 +272,7 @@ it -- `vp-of-product.prompt.md`, `butler.prompt.md`, `vp-of-engineering.prompt.m
 the toolkit's `agentic/org/`. The owner is a person and the builder a pool, so neither names a role.
 
 The butler reports to the VP of product because whether a design is finished is the product's call: the
-butler stamps by itself and archives on that seat's yes. The lead reports to the PM because the PM is the
-seat that hands it a queue and carries its readies to the seat that merges; a team where engineering hands out the work would put the lead under the VP of
+butler stamps by itself and reports what looks finished, and that seat runs the archive moves. The lead
+reports to the PM because the PM is the seat that hands it a queue and carries its readies to the seat that merges; a team where engineering hands out the work would put the lead under the VP of
 engineering instead, as the example under [The shape](#the-shape) does. The roles name their neighbours
 by relationship, so either tree reads the same to them.

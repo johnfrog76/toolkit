@@ -192,7 +192,7 @@
       ],
       "sender": "by hand",
       "module": "solitaireAgile",
-      "drives": "Keeps the designs once a week: stamps every unstamped note and spec (StampDesign), brings the seat it reports to the designs whose work has shipped, and archives each one that seat says yes to (MoveDesign -To Archive, -To Complete -Doc)",
+      "drives": "Keeps the designs once a week, unattended: stamps every unstamped note and spec (StampDesign), and reports to the seat above it what it stamped, the designs whose work has shipped with the MoveDesign call that seat would run to archive them, and what it left and why",
       "category": "org"
     }
   }
