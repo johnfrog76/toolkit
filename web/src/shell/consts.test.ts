@@ -533,6 +533,8 @@ describe("consts.json", () => {
       file: "Config/models.json",
       // The order a card's agent is worked out in: the first source that answers wins.
       agentSources: ["line", "assigned", "trailer", "none"],
+      // The ids no model produced: not a model, known or unknown.
+      notModels: ["<synthetic>"],
     });
 
     // The statuses a reply may set, per tracker.

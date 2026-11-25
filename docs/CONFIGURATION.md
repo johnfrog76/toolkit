@@ -758,6 +758,9 @@ and **how a card's agent is worked out** (`models.file`, the model map `Config/m
 worker label is a source a caller may ask for by passing an order that names it, and the shipped order does not read it;
 and `regex.coAuthorTrailer`, a commit's `Co-Authored-By` trailer with the key in any case -- `Resolve-P20CardAgent`
 and `resolve_card_agent` read all three, see [the card](hub/cards.md), "How a card's agent is worked out"),
+and **the ids that are not a model** (`models.notModels`, `["<synthetic>"]`: the id Claude Code writes on a line no
+model produced, which the usage reader does not count and the model object -- `Get-P20ModelObject`, `model_object` --
+answers no object for),
 and **the product's version** (`version`, the one top-level value that is not a group: `Env` prints it
 in its first block, `GET /api/env` serves it and the System page's Environment card shows it).
 Two files carry a copy because they must hold their own literal -- `ModuleVersion` in
