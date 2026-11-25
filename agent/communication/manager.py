@@ -29,7 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..ado import bridge
 from ..core import log_writer, model
 from ..core.cards import write_card_text
-from ..core.config import hub_folder, hub_root, load_config
+from ..core.config import file_in_folder, hub_folder, hub_root, is_hub_file, load_config
 from ..core.consts import folder_archive, folder_current, re_session_name
 from ..core.parsers import _heading_value
 from . import comms
@@ -105,9 +105,10 @@ def _series_title(series: str, date_str: str) -> str:
 
 
 def _safe_name(filename: str) -> str:
-    """A session filename and nothing else. The hub is a directory this process
-    can write to, so a name that can traverse out of it is refused outright
-    rather than normalised into something plausible."""
+    """A session filename and nothing else: a name that looks like a path is
+    answered 400 rather than not-found. The file itself is only ever taken from
+    the folder's own listing (``file_in_folder``), so this is the answer's
+    shape, not what keeps the read and the write inside ``manager/``."""
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
     return filename
@@ -116,8 +117,8 @@ def _safe_name(filename: str) -> str:
 def _session_location(filename: str) -> tuple[Path, str] | None:
     """The session file and the folder it is in -- current/ or archive/ -- or None."""
     for folder in _FOLDERS:
-        path = _manager_dir(folder) / filename
-        if path.exists() and path.is_file():
+        path = file_in_folder(_manager_dir(folder), filename, hub_root())
+        if path is not None:
             return path, folder
     return None
 
@@ -400,8 +401,9 @@ async def get_manager():
         directory = _manager_dir(folder)
         if not directory.exists():
             continue
+        root = hub_root()
         for path in sorted(directory.iterdir(), reverse=True):
-            if path.is_file() and path.suffix == ".md":
+            if path.suffix == ".md" and is_hub_file(path, root):
                 item = _parse_manager_session(path, folder)
                 if item:
                     items.append(item)
@@ -557,8 +559,11 @@ async def create_manager_session(req: ManagerCreateRequest):
 @api.put("/manager/{filename}", response_model=ManagerDetailResponse)
 async def update_manager_session(filename: str, req: ManagerSaveRequest):
     filename = _safe_name(filename)
-    path = _manager_dir(folder_current()) / filename
-    if not path.exists():
+    # Only a file already in current/ is written: the name is matched against
+    # the folder's listing, so the save can never create a file, and a link it
+    # writes through ends at a file inside the hub.
+    path = file_in_folder(_manager_dir(folder_current()), filename, hub_root())
+    if path is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
     lines = path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
