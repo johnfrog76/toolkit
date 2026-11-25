@@ -50,6 +50,11 @@
                      chart's own reader, a Space slug and Team Agile in, the
                      Space's seats as model objects out, in the chart's order;
                      no machine or person in the output; no caller yet.
+    2c'''''. Join    the same file's join and room rows: today's members, the
+                     seats and the sessions in, the members with their models,
+                     the source and the unknown ids out, under both namings;
+                     every team case's record given back with nothing added;
+                     the seating with the tier a session adds; no caller yet.
     2c'. The team    Tests/fixtures/rituals/standup-team.json: every size
                      row (a stored teamSize read as the room), every seat row
                      (who is present: the ones with work first, then the idle),
@@ -1472,6 +1477,8 @@ foreach ($row in @($teamTable.room)) {
 $walkRooms = @($teamTable.room | Where-Object { ([string]$_.name).StartsWith('walk-size-') })
 Assert-True 'the walk rows are the three rooms: no labels, the engineer with work in its own window, and 1, 4 and 7 invented with 6, 3 and 0 desks' ($walkRooms.Count -eq 3 -and ((@($walkRooms | ForEach-Object { "$($_.size):$(@($_.round | Where-Object { $_.cast }).Count):$(@($_.desks).Count)" })) -join ',') -ceq '3:1:6,6:4:3,9:7:0' -and @($walkRooms | Where-Object { @($_.labels).Count -ne 0 -or [string]$_.round[0].label -cne 'widgets' -or [string]$_.round[0].window -cne [string]$consts.rituals.room.engineer }).Count -eq 0)
 
+# Each case's fill, kept for the join's regression below.
+$teamFilled = New-Object System.Collections.ArrayList
 for ($n = 0; $n -lt $teamCases.Count; $n++) {
     $case = $teamCases[$n]
     $name = 'team-' + [string]$case.name
@@ -1491,6 +1498,7 @@ for ($n = 0; $n -lt $teamCases.Count; $n++) {
     else {
         $s = Invoke-P20StandupFill -AsOf $teamAsOf[$n] -Labels @($teamTable.workerLabels) -Issues @($case.issues) -Tracker ([pscustomobject]@{ ok = $true; reason = '' }) -Space 'widgets' -PackageRoot $pkgRoot -TeamSize $case.teamSize
     }
+    [void]$teamFilled.Add(@($case, $s))
     Assert-True "${name}: team.size is $($exp.team.size)" ([int]$s.team.size -eq [int]$exp.team.size) "got $($s.team.size)"
     $want = (@($exp.workers | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.empty)/$([bool]$_.present)" })) -join ','
     $got = (@($s.workers | ForEach-Object { "$($_.label)/$($_.name)/$([bool]$_.empty)/$([bool]$_.present)" })) -join ','
@@ -1607,6 +1615,190 @@ for ($n = 0; $n -lt $teamCases.Count; $n++) {
     Assert-True "the standup always runs: $($case.name) -- no work at all, a room of $($case.teamSize), every speaker idle, and the chair's turn last" (@($case.labels).Count -eq 0 -and @($case.issues).Count -eq 0 -and @($case.cards).Count -eq 0 -and [int]$quiet.team.size -eq [int]$case.teamSize -and @($quiet.workers | Where-Object { -not $_.empty }).Count -eq 0 -and $quietWork.Contains("`n$chairLine`n")) $quietWork
 }
 Assert-True 'the standup always runs: a day with no work is a case at every size' (((@($idleSizes | Sort-Object)) -join ',') -ceq ((@($consts.rituals.teamSizes | ForEach-Object { [int]$_ } | Sort-Object)) -join ',')) ($idleSizes -join ',')
+
+# -- 1d''. The join and the seating ---------------------------------------
+# standup-sessions.json's join and room sections, the SAME rows
+# Tests/test_rituals.py asserts from agent/solitaire/room_join.py and
+# standup.room_seats, and the stage reads in seats.test.ts: today's members, the
+# seats reader's seats and the session reader's pairs in, the members with
+# their models out (Join-P20StandupMembers); and the room seated with the tier
+# a session adds (Get-P20StandupRoomSeats). A model's name, family and known
+# are the lookup's own answer, so the table does not move when a map row is added.
+Write-Host ""
+Write-Host "-- The join and the seating --" -ForegroundColor Cyan
+$joinRows = @($sessionsTable.join)
+$joinSources = (@($joinRows | ForEach-Object { [string]$_.expected.source } | Sort-Object -Unique)) -join ','
+Assert-True 'the sessions table has its join rows, each named, and every source among them' ($joinRows.Count -ge 15 -and @($joinRows | Where-Object { -not [string]$_.name }).Count -eq 0 -and $joinSources -ceq 'room,seats,seats+sessions,sessions') "$($joinRows.Count) rows; $joinSources"
+$joinAdded = @('models', 'session', 'record')
+$joinRun = {
+    param($Row, [string]$Naming = 'today')
+    $seats = @()
+    $i = 0
+    foreach ($text in @($Row.seats)) {
+        $seats += [ordered]@{ seat = "seat-$i"; position = 'crew'; model = (Get-P20ModelObject -Id (Resolve-P20SeatModelId -Model ([string]$text) -PackageRoot $pkgRoot) -SessionId $null -PackageRoot $pkgRoot) }
+        $i++
+    }
+    $engineer = $null
+    if ($null -ne $Row.engineer) { $engineer = $Row.engineer }
+    return Join-P20StandupMembers -Labelled @($Row.labelled) -Members @($Row.members) -Engineer $engineer -Cards @($Row.cards) -Seats $seats -Sessions @($Row.sessions) -Naming $Naming -PackageRoot $pkgRoot
+}
+$modelLine = {
+    param($Model)
+    $fam = '<null>'
+    if ($null -ne $Model.family) { $fam = [string]$Model.family }
+    $sid = '<null>'
+    if ($null -ne $Model.sessionId) { $sid = [string]$Model.sessionId }
+    "$($Model.id):${sid}:$($Model.name):${fam}:$($Model.known)"
+}
+$memberLine = {
+    param($Member, [bool]$WithPlate)
+    $plate = ''
+    if ($WithPlate) { $plate = '|' + [string]$Member.plate }
+    "$($Member.label)|$($Member.name)|$([bool]$Member.empty)$plate|$([bool]$Member.record)|$([bool]$Member.session)|" + ((@($Member.models | Where-Object { $null -ne $_ } | ForEach-Object { & $modelLine $_ })) -join ';')
+}
+$strip = {
+    param($Member)
+    $o = [ordered]@{}
+    foreach ($k in @($Member.Keys)) { if ($joinAdded -cnotcontains [string]$k) { $o[[string]$k] = $Member[$k] } }
+    return $o
+}
+foreach ($jrow in $joinRows) {
+    foreach ($naming in @('today', 'map')) {
+        $got = & $joinRun $jrow $naming
+        $wantLines = @()
+        $gotLines = @()
+        $gm = @($got.members)
+        $wm = @($jrow.expected.members)
+        for ($j = 0; $j -lt [Math]::Max($gm.Count, $wm.Count); $j++) {
+            $w = $null
+            if ($j -lt $wm.Count) { $w = $wm[$j] }
+            $withPlate = ($null -ne $w) -and $null -ne $w.PSObject.Properties['plate']
+            if ($null -ne $w) {
+                $wName = [string]$w.name
+                if ($naming -ceq 'map' -and $w.PSObject.Properties['nameMap']) { $wName = [string]$w.nameMap }
+                $wModels = @($w.models | ForEach-Object { Get-P20ModelObject -Id ([string]$_.id) -SessionId ([string]$_.sessionId) -PackageRoot $pkgRoot })
+                $wantLines += (& $memberLine ([pscustomobject]@{ label = $w.label; name = $wName; empty = $w.empty; plate = $w.plate; record = $w.record; session = $w.session; models = $wModels }) $withPlate)
+            }
+            if ($j -lt $gm.Count) { $gotLines += (& $memberLine $gm[$j] $withPlate) }
+        }
+        $ok = ([string]$got.source -ceq [string]$jrow.expected.source) -and ((@($got.unknown) -join ',') -ceq (@($jrow.expected.unknown) -join ',')) -and (($gotLines -join "`n") -ceq ($wantLines -join "`n"))
+        Assert-True "join ($naming): $($jrow.name)" $ok "`n  got  $($got.source) [$(@($got.unknown) -join ',')] $($gotLines -join ' ; ')`n  want $($jrow.expected.source) [$(@($jrow.expected.unknown) -join ',')] $($wantLines -join ' ; ')"
+    }
+    # Each input member comes back whole: every field it had, in its order, and three keys added after.
+    $got = & $joinRun $jrow
+    $inputs = @(@($jrow.labelled) + @($jrow.members) + @($jrow.engineer) | Where-Object { $null -ne $_ })
+    $whole = @()
+    foreach ($w in $inputs) {
+        $mine = @(@($got.members) | Where-Object { [string]$_.label -ceq [string]$w.label -and $_.record })
+        $wantKeys = (@($w.PSObject.Properties | ForEach-Object { $_.Name }) + $joinAdded) -join ','
+        $wantJson = ConvertTo-Json -InputObject $w -Depth 8 -Compress
+        if ($mine.Count -ne 1 -or (@($mine[0].Keys) -join ',') -cne $wantKeys -or (ConvertTo-Json -InputObject (& $strip $mine[0]) -Depth 8 -Compress) -cne $wantJson) { $whole += [string]$w.label }
+    }
+    Assert-True "join: $($jrow.name) -- each input member comes back whole, with models, session and record added" ($whole.Count -eq 0) ($whole -join ',')
+}
+Assert-True 'join: the naming is a parameter, and today is the default' (((& $joinRun $joinRows[1]) | ConvertTo-Json -Depth 8 -Compress) -ceq ((& $joinRun $joinRows[1] 'today') | ConvertTo-Json -Depth 8 -Compress))
+# The regression: every case of standup-team.json, its fill's record through the
+# join with no seat and no session, is that record field for field.
+$regress = @()
+foreach ($pair in $teamFilled) {
+    $tcase = $pair[0]
+    $record = @($pair[1].workers)
+    $eng = $null
+    $rest = $record
+    if ($tcase.PSObject.Properties['cards']) {
+        $eng = $record[$record.Count - 1]
+        $rest = @($record | Select-Object -First ($record.Count - 1))
+    }
+    $joined = Join-P20StandupMembers -Labelled @() -Members $rest -Engineer $eng -PackageRoot $pkgRoot
+    $same = ([string]$joined.source -ceq 'room') -and @($joined.unknown).Count -eq 0 -and @($joined.members).Count -eq $record.Count
+    for ($j = 0; $same -and $j -lt $record.Count; $j++) {
+        $m = $joined.members[$j]
+        $same = ((ConvertTo-Json -InputObject (& $strip $m) -Depth 12 -Compress) -ceq (ConvertTo-Json -InputObject $record[$j] -Depth 12 -Compress)) -and @($m.models).Count -eq 0 -and -not $m.session -and $m.record
+    }
+    if (-not $same) { $regress += [string]$tcase.name }
+}
+Assert-True "join: with no seat and no session, every case of standup-team.json gives back its fill's record, field for field ($($teamFilled.Count) cases)" ($regress.Count -eq 0 -and $teamFilled.Count -eq $teamCases.Count) ($regress -join ',')
+
+# The seating with the tier a session adds.
+$sroomRows = @($sessionsTable.room)
+foreach ($prefix in @('tiers-', 'session-before-team-', 'more-sessions-')) {
+    $sizesHere = (@($sroomRows | Where-Object { ([string]$_.name).StartsWith($prefix) } | ForEach-Object { [int]$_.size } | Sort-Object)) -join ','
+    Assert-True "room: the $prefix rows are a room at every size" ($sizesHere -ceq ((@($consts.rituals.teamSizes | ForEach-Object { [int]$_ } | Sort-Object)) -join ',')) $sizesHere
+}
+$joinByName = @{}
+foreach ($jrow in $joinRows) { $joinByName[[string]$jrow.name] = $jrow }
+$linked = 0
+foreach ($row in $sroomRows) {
+    $labels = @(@($row.labels) | Where-Object { $null -ne $_ } | ForEach-Object { @{ label = [string]$_.label; empty = [bool]$_.empty; session = [bool]$_.session } })
+    $engineer = $null
+    if ($null -ne $row.engineer) { $engineer = @{ label = [string]$row.engineer.label; empty = [bool]$row.engineer.empty } }
+    $got = Get-P20StandupRoomSeats -Size ([int]$row.size) -Engineer $engineer -Labels $labels
+    $wantRound = & $seatLine @($row.round)
+    $gotRound = & $seatLine @($got.round)
+    $wantRest = ((@($row.present | ForEach-Object { [string]$_ })) -join ',') + ' | ' + ((@($row.desks | ForEach-Object { [string]$_ })) -join ',')
+    $gotRest = ((@($got.present | ForEach-Object { [string]$_ })) -join ',') + ' | ' + ((@($got.desks | ForEach-Object { [string]$_ })) -join ',')
+    Assert-True "room with sessions: $($row.name)" ($gotRound -ceq $wantRound -and $gotRest -ceq $wantRest) "`n  got  $gotRound -- $gotRest`n  want $wantRound -- $wantRest"
+    # The room's rules over the row, and the tiers in order.
+    & $ruleSizeSeen "room with sessions: $($row.name)" ([int]$row.size) @($got.round).Count
+    & $ruleDesks "room with sessions: $($row.name)" ([int]$row.size) @($got.desks).Count
+    & $ruleEngineer "room with sessions: $($row.name)" @($got.round) $engineer
+    $shown = @($labels | Where-Object { $_.session } | ForEach-Object { $_.label })
+    $windows = @(@($got.round) | ForEach-Object { [string]$_.window }) + @($got.desks)
+    $speaks = ((@($got.round | Where-Object { -not $_.cast } | ForEach-Object { [string]$_.label })) -join ',') -ceq ((@($got.present)) -join ',')
+    Assert-True "room with sessions: $($row.name) -- everyone seated has one turn, a member a session shows is real, and no window is shared" ($speaks -and @($got.round | Where-Object { $_.cast -and $shown -ccontains [string]$_.label }).Count -eq 0 -and ((@($windows | Sort-Object)) -join ',') -ceq ((@($roomMembers | Sort-Object)) -join ',') -and @(@($got.round) | ForEach-Object { [string]$_.window } | Sort-Object -Unique).Count -eq @($got.round).Count)
+    $order = @()
+    if ($null -ne $engineer) { $order += [string]$engineer.label }
+    $order += @($labels | Where-Object { -not $_.empty } | ForEach-Object { $_.label })
+    $order += @($labels | Where-Object { $_.empty -and $_.session } | ForEach-Object { $_.label })
+    $order += @($labels | Where-Object { $_.empty -and -not $_.session } | ForEach-Object { $_.label })
+    Assert-True "room with sessions: $($row.name) -- the engineer, the members with work, the idle a session shows, then the other idle; never by usage" (((@($got.present)) -join ',') -ceq ((@($order | Select-Object -First ([int]$row.size - 1))) -join ','))
+    # A row with no session flag seats as standup-team.json always has.
+    $plain = @($labels | ForEach-Object { @{ label = $_.label; empty = $_.empty } })
+    $falseFlag = @($labels | ForEach-Object { @{ label = $_.label; empty = $_.empty; session = $false } })
+    $a = Get-P20StandupRoomSeats -Size ([int]$row.size) -Engineer $engineer -Labels $plain
+    $b = Get-P20StandupRoomSeats -Size ([int]$row.size) -Engineer $engineer -Labels $falseFlag
+    Assert-True "room with sessions: $($row.name) -- no flag and a false one seat alike" (((& $seatLine @($a.round)) -ceq (& $seatLine @($b.round))) -and ((@($a.present) -join ',') -ceq (@($b.present) -join ',')))
+    # A row that names a join seats that join's members.
+    if ($row.PSObject.Properties['join']) {
+        $linked++
+        $src = $joinByName[[string]$row.join]
+        $jm = @((& $joinRun $src).members)
+        $je = 'none'
+        $jrest = $jm
+        if ($null -ne $src.engineer) { $last = $jm[$jm.Count - 1]; $je = "$($last.label)/$([bool]$last.empty)"; $jrest = @($jm | Select-Object -First ($jm.Count - 1)) }
+        $jl = (@($jrest | ForEach-Object { "$($_.label)/$([bool]$_.empty)/$([bool]$_.session)" })) -join ','
+        $re = 'none'
+        if ($null -ne $engineer) { $re = "$($engineer.label)/$($engineer.empty)" }
+        $rl = (@($labels | ForEach-Object { "$($_.label)/$($_.empty)/$($_.session)" })) -join ','
+        Assert-True "room with sessions: $($row.name) -- the join row's members, seated" ($je -ceq $re -and $jl -ceq $rl) "join $je $jl; row $re $rl"
+    }
+}
+Assert-True 'room with sessions: at least three rows seat a join row' ($linked -ge 3) "$linked"
+# standup-team.json's own room rows: the same with a false flag on every label.
+foreach ($row in @($teamTable.room)) {
+    $engineer = $null
+    if ($null -ne $row.engineer) { $engineer = @{ label = [string]$row.engineer.label; empty = [bool]$row.engineer.empty } }
+    $flagged = @(@($row.labels) | Where-Object { $null -ne $_ } | ForEach-Object { @{ label = [string]$_.label; empty = [bool]$_.empty; session = $false } })
+    $got = Get-P20StandupRoomSeats -Size ([int]$row.size) -Engineer $engineer -Labels $flagged
+    Assert-True "room: $($row.name) -- the same with every session flag false" ((& $seatLine @($got.round)) -ceq (& $seatLine @($row.round)))
+}
+
+# Nothing calls the join yet: no verb, no wrapper, no other script names it --
+# only Scripts/Standup-Rules.ps1, which defines it, and its twin
+# agent/solitaire/room_join.py.
+$joinNames = @('Join-P20StandupMembers', 'Get-P20StandupModelName')
+$joinCallers = @()
+foreach ($dir in @('Scripts', 'Prompt20Toolkit', 'Config', 'agent')) {
+    foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $pkgRoot $dir) -Recurse -File -Include '*.ps1', '*.psm1', '*.psd1', '*.json', '*.py' -ErrorAction SilentlyContinue)) {
+        if ($f.Name -eq 'Standup-Rules.ps1' -or ($f.Name -eq 'room_join.py' -and $f.Directory.Name -eq 'solitaire')) { continue }
+        $body = [System.IO.File]::ReadAllText($f.FullName)
+        foreach ($n in $joinNames) { if ($body.Contains($n)) { $joinCallers += "$($f.Name): $n" } }
+    }
+}
+$rulesBody = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Scripts/Standup-Rules.ps1'))
+# A call names a parameter after it; the comments that name the join do not.
+$rulesCalls = @([regex]::Matches($rulesBody, '(?m)^.*\bJoin-P20StandupMembers\s+-[A-Za-z].*$'))
+Assert-True 'the join has no caller yet: no verb, no wrapper, no fill and no route' ($joinCallers.Count -eq 0 -and $rulesCalls.Count -eq 0) (($joinCallers + @($rulesCalls | ForEach-Object { $_.Value.Trim() })) -join '; ')
 
 # -- 1e. The dress guard -----------------------------------------------------
 # Tests/fixtures/rituals/standup-dress.json, every row, the SAME rows

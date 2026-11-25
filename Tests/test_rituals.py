@@ -2214,6 +2214,231 @@ class TheTeamTable(unittest.TestCase):
         self.assertEqual([w.label for w in again.workers], [w.label for w in back.workers if w.present])
 
 
+JOIN_ADDED = ("models", "session", "record")
+
+
+def _join_row(row: dict, naming: str = "today") -> dict:
+    """A ``join`` row through ``join_members``: each seat's free-text model through the
+    seats reader's own lookup, as that reader hands a seat on."""
+    from agent.core.models import model_object
+    from agent.solitaire import room_join
+    from agent.solitaire.org_seats import seat_model_id
+
+    seats = [
+        {"seat": f"seat-{i}", "position": "crew", "model": model_object(seat_model_id(text), None)}
+        for i, text in enumerate(row["seats"])
+    ]
+    return room_join.join_members(
+        row["labelled"], row["members"], row["engineer"], row["cards"], seats, row["sessions"], naming=naming
+    )
+
+
+def _join_expected(row: dict, naming: str) -> list[dict]:
+    """A row's expected members under ``naming``, each model the lookup's own object."""
+    from agent.core.models import model_object
+
+    out = []
+    for w in row["expected"]["members"]:
+        want = {k: v for k, v in w.items() if k != "nameMap"}
+        if naming == "map" and "nameMap" in w:
+            want["name"] = w["nameMap"]
+        want["models"] = [model_object(m["id"], m["sessionId"]) for m in w["models"]]
+        out.append(want)
+    return out
+
+
+def _join_projection(members: list[dict], expected: list[dict]) -> list[dict]:
+    return [{k: m.get(k) for k in e} for m, e in zip(members, expected, strict=False)]
+
+
+def _seating_of(members: list[dict], has_engineer: bool) -> tuple[dict | None, list[dict]]:
+    """A join's members as the seating reads them: the engineer the last, the rest
+    ``{label, empty, session}`` (``session`` only where it is true)."""
+    engineer = {"label": members[-1]["label"], "empty": members[-1]["empty"]} if has_engineer else None
+    rest = members[:-1] if has_engineer else members
+    labels = []
+    for m in rest:
+        row = {"label": m["label"], "empty": m["empty"]}
+        if m["session"]:
+            row["session"] = True
+        labels.append(row)
+    return engineer, labels
+
+
+def _room_with_sessions(row: dict) -> dict:
+    engineer = row.get("engineer")
+    return standup.room_seats(
+        row["size"],
+        (engineer["label"], engineer["empty"]) if engineer else None,
+        [(w["label"], w["empty"], w.get("session", False)) for w in row["labels"]],
+    )
+
+
+class TheJoin(unittest.TestCase):
+    """standup-sessions.json's ``join`` section -- the same rows tkTestToolkit -Rituals
+    asserts from the CLI's Join-P20StandupMembers: today's members, the seats reader's
+    seats and the session reader's pairs in, the members with their models out."""
+
+    def test_the_table_has_its_rows_and_every_source(self):
+        rows = SESSIONS_TABLE["join"]
+        self.assertGreaterEqual(len(rows), 15)
+        self.assertTrue(all(r.get("name") for r in rows))
+        self.assertEqual({r["expected"]["source"] for r in rows}, {"seats+sessions", "sessions", "seats", "room"})
+
+    def test_every_join_row_under_both_namings(self):
+        for row in SESSIONS_TABLE["join"]:
+            for naming in ("today", "map"):
+                with self.subTest(row=row["name"], naming=naming):
+                    got = _join_row(row, naming)
+                    want = _join_expected(row, naming)
+                    self.assertEqual(got["source"], row["expected"]["source"])
+                    self.assertEqual(got["unknown"], row["expected"]["unknown"])
+                    self.assertEqual(len(got["members"]), len(want))
+                    self.assertEqual(_join_projection(got["members"], want), want)
+
+    def test_each_input_member_comes_back_whole_with_three_keys_added(self):
+        """Nothing a member had is changed or reordered: the join copies it and adds
+        ``models``, ``session`` and ``record`` after its own fields."""
+        for row in SESSIONS_TABLE["join"]:
+            with self.subTest(row=row["name"]):
+                got = _join_row(row)["members"]
+                inputs = row["labelled"] + row["members"] + ([row["engineer"]] if row["engineer"] else [])
+                for w in inputs:
+                    mine = [m for m in got if m["label"] == w["label"] and m["record"]]
+                    self.assertEqual(len(mine), 1, w["label"])
+                    self.assertEqual(list(mine[0])[: len(w)], list(w))
+                    self.assertEqual(list(mine[0])[len(w) :], list(JOIN_ADDED))
+                    self.assertEqual({k: mine[0][k] for k in w}, w)
+
+    def test_with_no_seat_and_no_session_the_join_is_todays_record_for_every_team_case(self):
+        """The regression: every case of standup-team.json, its fill's record through the
+        join with nothing more, is the record field for field, every member kept."""
+        from agent.solitaire import room_join
+
+        for case in TEAM_TABLE["cases"]:
+            with self.subTest(case=case["name"]):
+                record = [w.model_dump() for w in _fill_team(case).workers]
+                has_engineer = "cards" in case
+                engineer = record[-1] if has_engineer else None
+                rest = record[:-1] if has_engineer else record
+                got = room_join.join_members([], rest, engineer)
+                self.assertEqual(got["source"], "room")
+                self.assertEqual(got["unknown"], [])
+                self.assertEqual([{k: v for k, v in m.items() if k not in JOIN_ADDED} for m in got["members"]], record)
+                self.assertTrue(all(m["models"] == [] and not m["session"] and m["record"] for m in got["members"]))
+
+    def test_the_naming_is_a_parameter_and_today_is_the_default(self):
+        row = next(r for r in SESSIONS_TABLE["join"] if any("nameMap" in m for m in r["expected"]["members"]))
+        self.assertEqual(_join_row(row), _join_row(row, "today"))
+        with self.assertRaises(ValueError):
+            _join_row(row, "usage")
+
+    def test_a_session_never_moves_an_item(self):
+        """Who reports a card is the cards' business: every member's items come back as
+        they went in, whatever the seats and sessions add."""
+        for row in SESSIONS_TABLE["join"]:
+            got = {m["label"]: m for m in _join_row(row)["members"] if m["record"]}
+            for w in row["labelled"] + row["members"]:
+                with self.subTest(row=row["name"], member=w["label"]):
+                    self.assertEqual(got[w["label"]]["empty"], w["empty"])
+
+    def test_nothing_calls_it_yet(self):
+        """No route, no verb: no module of the agent imports the join or calls it (a
+        docstring may name it)."""
+        calls = r"join_members\(|import room_join|room_join import|from \.room_join|room_join\.join_members\("
+        for path in sorted((REPO_ROOT / "agent").rglob("*.py")):
+            if path.name == "room_join.py" and path.parent.name == "solitaire":
+                continue
+            with self.subTest(path=path.relative_to(REPO_ROOT).as_posix()):
+                self.assertNotRegex(path.read_text(encoding="utf-8"), calls)
+
+
+class TheRoomWithSessions(unittest.TestCase):
+    """standup-sessions.json's ``room`` section: the seating with the tier a session
+    adds -- the same rows tkTestToolkit -Rituals asserts from Get-P20StandupRoomSeats
+    and the stage reads in seats.test.ts."""
+
+    def test_the_table_has_every_tier_at_every_size(self):
+        rows = SESSIONS_TABLE["room"]
+        self.assertTrue(all(r.get("name") for r in rows))
+        for prefix in ("tiers-", "session-before-team-", "more-sessions-"):
+            self.assertEqual(
+                sorted(r["size"] for r in rows if r["name"].startswith(prefix)), sorted(C.rituals_team_sizes()), prefix
+            )
+
+    def test_every_room_row(self):
+        for row in SESSIONS_TABLE["room"]:
+            with self.subTest(row=row["name"]):
+                got = _room_with_sessions(row)
+                self.assertEqual(got["present"], row["present"])
+                self.assertEqual(got["round"], row["round"])
+                self.assertEqual(got["desks"], row["desks"])
+
+    def test_every_room_row_keeps_the_rules(self):
+        room = C.rituals_room()
+        members = [w["id"] for w in room["windows"] if w["id"] != room["chair"]]
+        for row in SESSIONS_TABLE["room"]:
+            with self.subTest(row=row["name"]):
+                got = _room_with_sessions(row)
+                assert_the_size_seen_is_the_size_picked(self, row["size"], len(got["round"]))
+                assert_the_desks_are_past_the_size(self, row["size"], len(got["desks"]))
+                assert_the_engineer_sits(self, got["round"], row["engineer"])
+                # Everyone seated speaks: one turn each, and a member a session shows is real.
+                self.assertEqual([r["label"] for r in got["round"] if not r["cast"]], got["present"])
+                shown = {w["label"] for w in row["labels"] if w.get("session")}
+                self.assertTrue(all(not r["cast"] for r in got["round"] if r["label"] in shown))
+                windows = [r["window"] for r in got["round"]]
+                self.assertEqual(sorted(windows + got["desks"]), sorted(members))
+                self.assertEqual(len(set(windows)), len(windows))
+
+    def test_the_tiers_in_order_and_never_by_usage(self):
+        """The engineer, the members with work, the idle a session shows, the other
+        idle, each run in label order; absence falls on the lowest tier first."""
+        for row in SESSIONS_TABLE["room"]:
+            with self.subTest(row=row["name"]):
+                labels = row["labels"]
+                tiers = (
+                    [w["label"] for w in labels if not w["empty"]]
+                    + [w["label"] for w in labels if w["empty"] and w.get("session")]
+                    + [w["label"] for w in labels if w["empty"] and not w.get("session")]
+                )
+                order = ([row["engineer"]["label"]] if row["engineer"] else []) + tiers
+                self.assertEqual(row["present"], order[: row["size"] - 1])
+
+    def test_a_row_without_a_session_seats_as_it_always_has(self):
+        """With no row saying session, the seating is standup-team.json's: the same
+        answer with the flag left off as with it false."""
+        for row in SESSIONS_TABLE["room"] + TEAM_TABLE["room"]:
+            with self.subTest(row=row["name"]):
+                plain = [(w["label"], w["empty"]) for w in row["labels"]]
+                engineer = (row["engineer"]["label"], row["engineer"]["empty"]) if row["engineer"] else None
+                self.assertEqual(
+                    standup.room_seats(row["size"], engineer, plain),
+                    standup.room_seats(row["size"], engineer, [(*p, False) for p in plain]),
+                )
+
+    def test_a_row_that_names_a_join_seats_that_joins_members(self):
+        joins = {r["name"]: r for r in SESSIONS_TABLE["join"]}
+        linked = [r for r in SESSIONS_TABLE["room"] if "join" in r]
+        self.assertGreaterEqual(len(linked), 3)
+        for row in linked:
+            with self.subTest(row=row["name"]):
+                source = joins[row["join"]]
+                got = _join_row(source)["members"]
+                self.assertEqual(_seating_of(got, source["engineer"] is not None), (row["engineer"], row["labels"]))
+
+    def test_a_kept_family_sits_in_its_window_and_an_unknown_id_in_a_free_one(self):
+        kept = C.rituals_room()["kept"]
+        row = next(r for r in SESSIONS_TABLE["room"] if r["name"].startswith("kept-window-"))
+        windows = {r["label"]: r["window"] for r in row["round"]}
+        self.assertEqual(windows["opus"], kept["opus"])
+        self.assertNotIn("haiku", kept)
+        self.assertNotIn(windows["haiku"], kept.values())
+        row = next(r for r in SESSIONS_TABLE["room"] if r["name"].startswith("unknown-id-"))
+        windows = {r["label"]: r["window"] for r in row["round"]}
+        self.assertNotEqual(windows["claude-opus-7"], kept["opus"])
+
+
 class TheDressTable(unittest.TestCase):
     """Every row of standup-dress.json -- the same rows tkTestToolkit -Rituals asserts
     against Test-P20StandupDress -- and the dress around it, the model stubbed: no

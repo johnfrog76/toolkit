@@ -67,6 +67,10 @@
                                chart's tree in use, each a model object by
                                lookup -- {seat, position, model} and nothing
                                else. Nothing calls it yet.
+      Join-P20StandupMembers   the join: today's members, the Space's seats and
+                               its sessions -> the members, each with its
+                               models[], and the source and the unknown ids.
+                               Pure. Nothing calls it yet.
 
     The agent's agent/solitaire/standup.py implements the same rule over the
     same files; Tests/fixtures/rituals/standup.json (issues),
@@ -564,11 +568,15 @@ function Get-P20StandupRoomSeats {
 
       Size is the room's windows, the chair's one of them, so Size - 1 members
       sit. Engineer is @{ label; empty } or $null for a fill with no engineer;
-      Labels the labelled workers as @{ label; empty }, in label order.
+      Labels the labelled workers as @{ label; empty }, in label order. A label
+      row may also say session = $true: a session shows that member (the join,
+      Join-P20StandupMembers); a row that does not say it is $false.
 
         - The seats go to the engineer, then the labelled workers with
-          something to say, then the idle ones, each run in label order.
-          Whoever is past the seats is absent.
+          something to say, then the idle ones a session shows, then the other
+          idle ones, each run in label order. With no row saying session the
+          third run is empty, and the order is the one it always was. Whoever
+          is past the seats is absent. Never ordered by usage.
         - A seat nobody takes is filled by an invented cast member: the member
           windows nobody sits in, in grid order (rituals.room.windows, the
           chair's left out), each labelled with its cast id.
@@ -620,7 +628,8 @@ function Get-P20StandupRoomSeats {
     }
     foreach ($w in $all) { $people.Add('w:' + [string]$w.label) }
     foreach ($w in $all) { if (-not $w.empty) { $order.Add('w:' + [string]$w.label) } }
-    foreach ($w in $all) { if ($w.empty) { $order.Add('w:' + [string]$w.label) } }
+    foreach ($w in $all) { if ($w.empty -and [bool]$w.session) { $order.Add('w:' + [string]$w.label) } }
+    foreach ($w in $all) { if ($w.empty -and -not [bool]$w.session) { $order.Add('w:' + [string]$w.label) } }
     $seated = New-Object 'System.Collections.Generic.List[string]'
     for ($i = 0; $i -lt $order.Count -and $i -lt $seats; $i++) { $seated.Add($order[$i]) }
 
@@ -1375,6 +1384,227 @@ function Get-P20StandupOrgSeats {
     if (-not $TeamAgile -or $null -eq $OrgRead -or [string]$OrgRead.Status -cne 'ok') { return @() }
     try { return @(ConvertTo-P20StandupOrgSeats -Chart $OrgRead.Chart -Space $Space -PackageRoot $PackageRoot) }
     catch { return @() }
+}
+
+# -- The join: today's members, the Space's seats and its sessions -------------
+#
+# Who is in the room, from three sources, as pure functions over plain data
+# (docs/modules/solitaire-agile.md, "Where the room's members come from"). The
+# agent's agent/solitaire/room_join.py is the same rule over the same table
+# (Tests/fixtures/rituals/standup-sessions.json, its join and room sections):
+#
+#   Get-P20StandupModelName   a member's models -> the name its most recent one
+#                             gives it (the map's own name, never parsed).
+#   Join-P20StandupMembers    today's members, the seats reader's seats and
+#                             the session reader's pairs -> the members, each
+#                             with its models[], plus source and unknown.
+#
+# Members are keyed by family, as today: two ids of one family are one member,
+# and an id the map does not know is a member of its own keyed by the id. Each
+# source ADDS members; none takes one away, and none moves an item: the cards
+# still decide who reports what. Nothing calls the join yet.
+
+function Get-P20StandupModelName {
+    <#
+      The name a member's models give it: the `name` of its most recent known
+      model -- the one the map's `current` block names for the family, when the
+      member has that id, else the last of them in id order (ordinal) -- and ''
+      when it has no known model. The map is read, never the id: a session
+      carries no time the join may order by, so "most recent" is the map's word
+      for it. room_join.model_name in the agent.
+    #>
+    param($Models, $Current)
+    $known = @(@($Models) | Where-Object { $null -ne $_ -and $_.known })
+    if ($known.Count -eq 0) { return '' }
+    if ($null -eq $Current) { $Current = Get-P20ModelCurrent }
+    $family = [string]$known[0].family
+    $now = ''
+    foreach ($k in @($Current.Keys)) { if ([string]$k -ieq $family) { $now = [string]$Current[$k] } }
+    foreach ($m in $known) { if ($now -and [string]$m.id -ceq $now) { return [string]$m.name } }
+    $ids = [string[]]@($known | ForEach-Object { [string]$_.id })
+    [Array]::Sort($ids, [System.StringComparer]::Ordinal)
+    $last = $ids[$ids.Count - 1]
+    return [string](@($known | Where-Object { [string]$_.id -ceq $last })[0].name)
+}
+
+function Join-P20StandupMembers {
+    <#
+      The join. Pure over its inputs and the model map; nothing is read but the map.
+
+        -Labelled  the labelled workers, as the fill builds them.
+        -Members   the members the cards name that no label routes to
+                   (Get-P20StandupSeatedMembers), as the fill builds them.
+        -Engineer  the engineer's tile, or $null for a fill with none.
+        -Cards     the model ids the cards in play name (Resolve-P20CardAgent's
+                   id), in any order; an empty one is skipped.
+        -Seats     the seats reader's answer (Get-P20StandupOrgSeats).
+        -Sessions  the session reader's pairs (Read-P20StandupSessions).
+        -Naming    'today' (the default) names a member as the room does today:
+                   a labelled worker by the tracker's word, a card member by its
+                   family with a capital (an unknown id as written), and a member
+                   the seats or sessions add the same way. 'map' names every
+                   member made from a card, a seat or a session by its most
+                   recent model (Get-P20StandupModelName, the map's own name); a
+                   labelled worker keeps the tracker's word, the engineer the
+                   Space's name, and an unknown id is named as written.
+
+      Every model id is looked up (Get-P20ModelObject) and keyed by its family,
+      or by the id as written when the map has no row for it, compared ignoring
+      case as a card's family is. A key no member holds adds a member, labelled
+      with the family (or the id), with nothing to report and its plate as a
+      card member's (New-P20StandupCardMember); a card id adds nobody, because
+      the cards already decided who is in today's room. Returns
+      [ordered]@{ members; source; unknown }:
+
+        members  today's record and the added members in label order
+                 (Sort-P20StandupWorkersByLabel), then the engineer. Each is a
+                 copy of its input with three keys more: models, one model
+                 object per distinct id the cards, seats and sessions give the
+                 member, sorted by id, its sessionId the ordinally last session
+                 that shows the id ($null when none does -- the session
+                 reader's pairs carry no time, so the last by id is what the
+                 join can say); session,
+                 whether a session shows it; and record, $false for a member
+                 only a seat or a session adds -- in the round, never in the
+                 record -- and $true for everyone else.
+        source   'seats+sessions', 'sessions', 'seats', or 'room' when neither
+                 gives a model: then members is today's record, field for field.
+        unknown  the ids among the members' models the map has no row for,
+                 sorted, distinct.
+    #>
+    param(
+        $Labelled,
+        $Members,
+        $Engineer,
+        $Cards,
+        $Seats,
+        $Sessions,
+        [string[]]$Slots = @('yesterday', 'today', 'blockers'),
+        [ValidateSet('today', 'map')][string]$Naming = 'today',
+        [string]$PackageRoot
+    )
+    $lookArgs = @{}
+    if ($PackageRoot) { $lookArgs.PackageRoot = $PackageRoot }
+    $current = Get-P20ModelCurrent @lookArgs
+    $copy = {
+        param($Row, [bool]$InRecord)
+        $out = [ordered]@{}
+        if ($Row -is [System.Collections.IDictionary]) { foreach ($k in @($Row.Keys)) { $out[[string]$k] = $Row[$k] } }
+        else { foreach ($p in @($Row.PSObject.Properties)) { $out[[string]$p.Name] = $p.Value } }
+        $out['models'] = [object[]]@()
+        $out['session'] = $false
+        $out['record'] = $InRecord
+        return $out
+    }
+    $keyOf = {
+        param($Model)
+        if ($Model.family) { return ([string]$Model.family).ToLowerInvariant() }
+        return ([string]$Model.id).ToLowerInvariant()
+    }
+    $byKey = @{}
+    $cardKeys = @{}
+    $team = New-Object System.Collections.ArrayList
+    foreach ($w in @($Labelled | Where-Object { $null -ne $_ })) {
+        $c = & $copy $w $true
+        [void]$team.Add($c)
+        $low = ([string]$c.label).ToLowerInvariant()
+        if (-not $byKey.ContainsKey($low)) { $byKey[$low] = $c }
+    }
+    foreach ($w in @($Members | Where-Object { $null -ne $_ })) {
+        $c = & $copy $w $true
+        [void]$team.Add($c)
+        $low = ([string]$c.label).ToLowerInvariant()
+        if (-not $byKey.ContainsKey($low)) { $byKey[$low] = $c; $cardKeys[$low] = $true }
+    }
+    $engineerCopy = $null
+    if ($null -ne $Engineer) { $engineerCopy = & $copy $Engineer $true }
+
+    # Every id each source gives, as (key, id, sessionId), and who it adds.
+    $found = New-Object System.Collections.ArrayList
+    $added = New-Object System.Collections.ArrayList
+    $sessionKeys = @{}
+    $seatCount = 0
+    $sessionCount = 0
+    $add = {
+        param($Model)
+        $k = & $keyOf $Model
+        if ($byKey.ContainsKey($k)) { return }
+        $family = [string]$Model.family
+        if (-not $family) { $family = [string]$Model.id }
+        $m = New-P20StandupCardMember -Family $family -Slots $Slots -AsWritten:(-not $Model.known)
+        $m['empty'] = $true
+        $c = & $copy $m $false
+        $byKey[$k] = $c
+        $cardKeys[$k] = $true
+        [void]$added.Add($c)
+    }
+    foreach ($seat in @($Seats | Where-Object { $null -ne $_ })) {
+        $spec = $seat
+        if ($seat -is [System.Collections.IDictionary]) { if ($seat.Contains('model')) { $spec = $seat['model'] } }
+        elseif ($seat.PSObject.Properties['model']) { $spec = $seat.model }
+        $model = Get-P20ModelObject -Id ([string]$spec.id) -SessionId $null @lookArgs
+        if ($null -eq $model) { continue }
+        $seatCount++
+        & $add $model
+        [void]$found.Add(@((& $keyOf $model), [string]$model.id, $null))
+    }
+    foreach ($pair in @($Sessions | Where-Object { $null -ne $_ })) {
+        $model = Get-P20ModelObject -Id ([string]$pair.id) -SessionId ([string]$pair.sessionId) @lookArgs
+        if ($null -eq $model) { continue }
+        $sessionCount++
+        & $add $model
+        $k = & $keyOf $model
+        $sessionKeys[$k] = $true
+        [void]$found.Add(@($k, [string]$model.id, $model.sessionId))
+    }
+    foreach ($id in @($Cards)) {
+        $model = Get-P20ModelObject -Id ([string]$id) -SessionId $null @lookArgs
+        if ($null -eq $model) { continue }
+        [void]$found.Add(@((& $keyOf $model), [string]$model.id, $null))
+    }
+
+    # Each member's ids, and the last session that shows each one.
+    $ids = @{}
+    foreach ($f in $found) {
+        $k = [string]$f[0]
+        if (-not $byKey.ContainsKey($k)) { continue }
+        if (-not $ids.ContainsKey($k)) { $ids[$k] = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([System.StringComparer]::Ordinal) }
+        $mid = [string]$f[1]
+        $sid = $f[2]
+        if (-not $ids[$k].ContainsKey($mid)) { $ids[$k][$mid] = $null }
+        if ($sid -and ($null -eq $ids[$k][$mid] -or [string]::CompareOrdinal([string]$sid, [string]$ids[$k][$mid]) -gt 0)) { $ids[$k][$mid] = [string]$sid }
+    }
+    $unknown = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($k in @($ids.Keys)) {
+        $member = $byKey[$k]
+        $names = [string[]]@($ids[$k].Keys)
+        [Array]::Sort($names, [System.StringComparer]::Ordinal)
+        $models = @()
+        foreach ($mid in $names) {
+            $o = Get-P20ModelObject -Id $mid -SessionId $ids[$k][$mid] @lookArgs
+            $models += $o
+            if (-not $o.known -and -not $unknown.Contains($mid)) { $unknown.Add($mid) }
+        }
+        $member['models'] = [object[]]$models
+        if ($sessionKeys.ContainsKey($k)) { $member['session'] = $true }
+        if ($Naming -ceq 'map' -and $cardKeys.ContainsKey($k)) {
+            $named = Get-P20StandupModelName -Models $models -Current $current
+            if (-not $named -and @($models).Count -gt 0) { $named = [string]$models[0].id }
+            if ($named) { $member['name'] = $named }
+        }
+    }
+    $unknownSorted = [string[]]$unknown.ToArray()
+    [Array]::Sort($unknownSorted, [System.StringComparer]::Ordinal)
+
+    $source = 'room'
+    if ($seatCount -gt 0 -and $sessionCount -gt 0) { $source = 'seats+sessions' }
+    elseif ($sessionCount -gt 0) { $source = 'sessions' }
+    elseif ($seatCount -gt 0) { $source = 'seats' }
+    $everyone = Sort-P20StandupWorkersByLabel ([object[]](@($team.ToArray()) + @($added.ToArray())))
+    $out = New-Object System.Collections.ArrayList
+    foreach ($m in @($everyone)) { [void]$out.Add($m) }
+    if ($null -ne $engineerCopy) { [void]$out.Add($engineerCopy) }
+    return [ordered]@{ members = [object[]]$out.ToArray(); source = $source; unknown = $unknownSorted }
 }
 
 function ConvertTo-P20StandupDay {

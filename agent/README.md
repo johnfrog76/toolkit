@@ -110,6 +110,7 @@ agent/
     ├── milestones.py         GET /ritual/milestones -- the Releases tab: the core's milestone rows, gated, kept a minute
     ├── org.py                GET /ritual/org -- the org chart: the hub's org.json, read by a mirror of the CLI's reader; no tracker
     ├── org_seats.py          the seats reader: a Space's seats in the org chart's tree in use, as model objects by lookup -- {seat, position, model} only; no route calls it yet
+    ├── room_join.py          the join: today's members, a Space's seats and its sessions -> the members with their models, the source and the unknown ids; pure, no route calls it yet
     ├── sessions.py           the session reader: which models worked in a Space's checkout in a window, from Claude Code's session files -- {id, sessionId} pairs only; no route calls it yet
     └── triage.py             GET /ritual/triage -- the open issues by milestone (V1); the answers are Route, through the bridge
 ```

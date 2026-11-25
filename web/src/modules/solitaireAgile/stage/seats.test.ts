@@ -178,6 +178,45 @@ describe("the stage seats every row of the shared room table", () => {
   }
 });
 
+// The join's room rows (Tests/fixtures/rituals/standup-sessions.json, `room`):
+// standup-team.json's shape, with a label row that may say a session shows the
+// member. The stage is given each row as the response would carry it, exactly
+// as above: it reads the round's order and never the flag, so the tier a
+// session adds needs nothing of the stage.
+const sessionsTable = JSON.parse(
+  fs.readFileSync(path.join(FIXTURES, "standup-sessions.json"), "utf8"),
+) as {
+  room: (Omit<RoomRow, "labels"> & {
+    labels: { label: string; empty: boolean; session?: boolean }[];
+  })[];
+};
+
+describe("the stage seats every room row of the join's table", () => {
+  it("the table has rows for the stage to read, a session member among them", () => {
+    expect(sessionsTable.room.length).toBeGreaterThan(0);
+    expect(sessionsTable.room.some((r) => r.labels.some((l) => l.session))).toBe(true);
+  });
+
+  for (const row of sessionsTable.room) {
+    it(row.name, () => {
+      const present = new Set(row.present);
+      const record = [
+        ...row.labels.map((l) => worker(l.label, l.empty, present.has(l.label))),
+        ...(row.engineer ? [worker(row.engineer.label, row.engineer.empty, true)] : []),
+      ];
+      const room = dealRoom(responseOf(record, row.round, row.engineer?.label ?? null));
+      expect(room.members.map((m) => [m.worker.label, m.cast, m.castId])).toEqual(
+        row.round.map((r) => [r.label, r.cast, r.window]),
+      );
+      expect(room.desks.map((d) => d.castId)).toEqual(row.desks);
+      expect(room.members.length + room.desks.length).toBe(MEMBER_SEATS);
+      // A member a session shows is a real member: never an invented one.
+      const shown = new Set(row.labels.filter((l) => l.session).map((l) => l.label));
+      for (const m of room.members) if (shown.has(m.worker.label)) expect(m.cast).toBe(false);
+    });
+  }
+});
+
 describe("a member a card names whose family keeps no window", () => {
   it("wears its family in capitals, the plate the response gives, in the next free window", () => {
     const c = table.cases.find((x) => x.name === "no-kept-window")!;

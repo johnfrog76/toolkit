@@ -801,17 +801,22 @@ def team_size(stored) -> int:
     return rituals_team_size_default()
 
 
-def room_seats(size: int, engineer: tuple[str, bool] | None, labels: list[tuple[str, bool]]) -> dict:
+def room_seats(size: int, engineer: tuple[str, bool] | None, labels: list[tuple]) -> dict:
     """The room, from who there is. Pure over plain data; the mirror of
-    ``Get-P20StandupRoomSeats``; standup-team.json's ``room`` rows.
+    ``Get-P20StandupRoomSeats``; standup-team.json's ``room`` rows, and
+    standup-sessions.json's.
 
     ``size`` is the room's windows, the chair's one of them, so ``size - 1``
     members sit. ``engineer`` is ``(label, empty)`` or None for a fill with no
-    engineer; ``labels`` the labelled workers as ``(label, empty)``, in label order.
+    engineer; ``labels`` the labelled workers as ``(label, empty)``, in label
+    order -- or ``(label, empty, session)``, ``session`` true where a session
+    shows that member (the join, ``room_join.join_members``); a pair is false.
 
     - The seats go to the engineer, then the labelled workers with something to
-      say, then the idle ones, each run in label order. Whoever is past the seats
-      is absent.
+      say, then the idle ones a session shows, then the other idle ones, each run
+      in label order. With no ``session`` true the third run is empty, and the
+      order is the one it always was. Whoever is past the seats is absent. Never
+      ordered by usage.
     - A seat nobody takes is filled by an invented cast member: the member
       windows nobody sits in, in grid order (``rituals.room.windows``, the chair's
       left out), each labelled with its cast id.
@@ -837,11 +842,13 @@ def room_seats(size: int, engineer: tuple[str, bool] | None, labels: list[tuple[
     seats = max(size - 1, 0)
     # A member is its kind and its label: the engineer and a labelled worker can
     # share a label (a Space whose slug is one of its worker labels) and stay two.
-    people = ([(True, engineer[0])] if engineer else []) + [(False, label) for label, _ in labels]
+    rows = [(row[0], row[1], bool(row[2]) if len(row) > 2 else False) for row in labels]
+    people = ([(True, engineer[0])] if engineer else []) + [(False, label) for label, _, _ in rows]
     order = (
         ([(True, engineer[0])] if engineer else [])
-        + [(False, label) for label, empty in labels if not empty]
-        + [(False, label) for label, empty in labels if empty]
+        + [(False, label) for label, empty, _ in rows if not empty]
+        + [(False, label) for label, empty, shown in rows if empty and shown]
+        + [(False, label) for label, empty, shown in rows if empty and not shown]
     )
     seated = order[:seats]
     reserved = {own(label) for _, label in people if own(label)}
