@@ -33,6 +33,7 @@ try:
     from fastapi.testclient import TestClient
 
     from agent.ado import accounting
+    from agent.ado.design import parse_design_doc
     from agent.app import app
     from agent.core import config
     from agent.studio import notes
@@ -936,6 +937,86 @@ class ThePromote(unittest.TestCase):
                 self.assertIn("EXIT=2", out)
                 self.assertEqual([c for c in calls if "create" in c], [])
                 self.assertEqual(self.note.read_text(encoding="utf-8"), content)
+
+    # -- The thread line goes where the title rule says the title is (the Docs line's one rule) --
+
+    NOTE_ID = "aaaaaaaa-0000-4000-8000-000000000586"
+    URL = "https://github.com/acme/widgets/issues/41"
+    FRONT = f'---\nid: {NOTE_ID}\ndescription: "What the board could show next"\nspace: widgets\n---\n\n'
+
+    def promoted(self, note: str) -> tuple[str, list[str], bytes]:
+        self.note.write_bytes(note.encode("utf-8"))
+        out, calls = self.promote("tkNewItem -FromDesign board-ideas.md")
+        return out, calls, self.note.read_bytes()
+
+    def test_a_note_titled_by_a_second_level_heading_is_promoted_under_its_title_line(self):
+        out, calls, raw = self.promoted(self.FRONT + "## Title\n\nBoard ideas\n\n## Problem\n\nLanes only.\n")
+        self.assertIn("EXIT=0", out)
+        creates = [c for c in calls if c.startswith("gh issue | create")]
+        self.assertEqual(len(creates), 1, calls)
+        args = creates[0].split(" | ")
+        self.assertEqual(args[args.index("--title") + 1], "Board ideas")
+        body = args[args.index("--body") + 1]
+        self.assertTrue(body.startswith("## Problem"), body)  # the title section is the issue's title, not its body
+        text = raw.decode("utf-8")
+        self.assertEqual(
+            text,
+            self.FRONT + f"## Title\n\nBoard ideas\n\n> GitHub: {self.URL}\n\n## Problem\n\nLanes only.\n",
+        )
+        self.assertEqual(text.count("> GitHub:"), 1, text)
+        doc = parse_design_doc(text, "design/board-ideas.md")
+        self.assertEqual((doc.id, doc.title), (self.NOTE_ID, "Board ideas"))
+        self.assertEqual((doc.thread_number, doc.thread_repo), (41, "acme/widgets"))
+
+    def test_a_note_with_a_leading_title_keeps_todays_placement_byte_for_byte(self):
+        _out, _calls, raw = self.promoted(self.FRONT + "# Board ideas\n## Problem\n\nLanes only.\n")
+        self.assertEqual(
+            raw.decode("utf-8"), self.FRONT + f"# Board ideas\n\n> GitHub: {self.URL}\n\n## Problem\n\nLanes only.\n"
+        )
+
+    def test_a_deep_level_one_line_is_not_a_title_so_the_note_is_refused_as_untitled(self):
+        # The title rule reads a `# ` line only as the FIRST heading; one after
+        # `## Problem` is a sentence. With no `## Title` either, the note has no
+        # title to name the issue with -- the same refusal as a note with none.
+        note = self.FRONT + "## Problem\n\nLanes only.\n\n# Not the title\n"
+        out, calls, raw = self.promoted(note)
+        self.assertIn("EXIT=2", out)
+        self.assertIn("design/board-ideas.md has no title to name the issue with", out)
+        self.assertEqual([c for c in calls if "create" in c], [])
+        self.assertEqual(raw.decode("utf-8"), note)
+
+    def test_a_crlf_note_titled_by_a_second_level_heading_stays_crlf(self):
+        note = (self.FRONT + "## Title\n\nBoard ideas\n\n## Problem\n\nLanes only.\n").replace("\n", "\r\n")
+        out, _calls, raw = self.promoted(note)
+        self.assertIn("EXIT=0", out)
+        self.assertNotIn(b"\n", raw.replace(b"\r\n", b""), "a bare LF line in a CRLF note")
+        self.assertEqual(
+            raw,
+            (self.FRONT + f"## Title\n\nBoard ideas\n\n> GitHub: {self.URL}\n\n## Problem\n\nLanes only.\n")
+            .replace("\n", "\r\n")
+            .encode("utf-8"),
+        )
+
+    def test_a_second_level_titled_note_already_threaded_is_refused_unchanged(self):
+        note = self.FRONT + "## Title\n\nBoard ideas\n\n> GitHub: https://github.com/acme/widgets/issues/7\n"
+        out, calls, raw = self.promoted(note)
+        self.assertIn("EXIT=2", out)
+        self.assertIn("already has its thread", out)
+        self.assertEqual([c for c in calls if "create" in c], [])
+        self.assertEqual(raw.decode("utf-8"), note)
+
+    def test_a_note_with_no_title_at_all_is_refused_in_one_sentence(self):
+        for why, note in (
+            ("only frontmatter", self.FRONT),
+            ("an empty title section", self.FRONT + "## Title\n\n## Problem\n\nLanes only.\n"),
+        ):
+            with self.subTest(why=why):
+                out, calls, raw = self.promoted(note)
+                self.assertIn("EXIT=2", out)
+                self.assertIn("has no title to name the issue with", out)
+                self.assertEqual(out.count("Error:"), 1, out)
+                self.assertEqual([c for c in calls if "create" in c], [])
+                self.assertEqual(raw.decode("utf-8"), note)
 
     def test_an_unspaced_note_on_an_ado_space_is_refused_d_s9(self):
         self.note.write_text(self.NOTE.replace("space: widgets\n", ""), encoding="utf-8")

@@ -6,7 +6,8 @@
 # NOT a runnable verb: this file is DOT-SOURCED -- by Set-DesignStamp.ps1 (the
 # stamping pass reads a file's id through it), by Get-OptionalSurfaces.ps1 (the
 # "Design lifecycle" row counts unstamped files through it), by MoveDesign when
-# it is built (L3: the verb refuses by the same state rule), and by
+# it is built (L3: the verb refuses by the same state rule), by NewItem
+# -FromDesign (a note's title, and where its thread line goes), and by
 # Tests/Test-Design.ps1. The agent's agent/ado/design.py is the other
 # implementation of the same rule, and Tests/fixtures/design/states.json holds
 # the two to one table.
@@ -128,33 +129,43 @@ function Get-P20DesignTitle {
     return $line.Trim()
 }
 
-function Add-P20DocsLineText {
+function Add-P20DesignLineText {
     <#
-      The text of a spec with its Docs line added -- the text half of
-      MoveDesign -To Complete's writer, which reads the file and writes the
-      answer back through Write-CardText. The line goes, with a blank line
-      either side:
+      The text of a design file with one `> ` line added under its title -- the
+      ONE placement both such lines follow: a spec's Docs line (MoveDesign
+      -To Complete) and a note's thread line (NewItem -FromDesign). Each writer
+      reads the file and writes the answer back through Write-CardText. The
+      line goes, with a blank line either side:
         1. under the title the title rule finds (Get-P20DesignTitleIndex): the
            leading `# ` heading, or the title line under `## Title`;
         2. else as the first line of the body, after the frontmatter;
         3. else, with neither, at the top.
       Never above the frontmatter: a file that does not open with `---` has no
-      id, and is no longer a design. Text that already carries a Docs line comes
-      back unchanged. The answer is LF; the writer gives an edited file back
-      the endings it had.
+      id, and is no longer a design. Text that already has a line starting with
+      $Stamp comes back unchanged. The answer is LF; the writer gives an edited
+      file back the endings it had.
     #>
-    param([string]$Text, [string]$DocsLine)
+    param([string]$Text, [string]$Line, [string]$Stamp)
     $current = $Text -replace "`r`n", "`n"
-    $stamp = [string](Get-P20Consts).design.docsLine
-    if ($current -match ('(?m)^' + [regex]::Escape($stamp))) { return $current }
+    if ($Stamp -and $current -match ('(?m)^' + [regex]::Escape($Stamp))) { return $current }
     $lines = [System.Collections.Generic.List[string]]::new()
     foreach ($l in ($current -split "`n")) { $lines.Add($l) }
     $at = Get-P20DesignTitleIndex -Lines ([string[]]$lines)
     if ($at -lt 0) { $at = Get-P20FrontEnd -Lines ([string[]]$lines) }
-    $insert = @('', $DocsLine)
+    $insert = @('', $Line)
     if ($at + 1 -lt $lines.Count -and $lines[$at + 1].Trim() -ne '') { $insert += '' }
     $lines.InsertRange($at + 1, [string[]]$insert)
     return ($lines -join "`n")
+}
+
+function Add-P20DocsLineText {
+    <#
+      The text of a spec with its Docs line added (MoveDesign -To Complete):
+      Add-P20DesignLineText's placement, and a spec that already carries a Docs
+      line comes back unchanged.
+    #>
+    param([string]$Text, [string]$DocsLine)
+    return (Add-P20DesignLineText -Text $Text -Line $DocsLine -Stamp ([string](Get-P20Consts).design.docsLine))
 }
 
 function Get-P20StampValue {

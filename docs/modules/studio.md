@@ -129,11 +129,11 @@ adds (spec: "Promote ... `NewItem`, the same verb the Backlog uses"):
 
 | Verb | Does | Touches a file |
 | --- | --- | --- |
-| `NewItem -FromDesign <note> [-Type ...] [-Tags <a;b>] [-Sprint <m>] [-AssignTo <who>] [-Project <repo>] [-ReadOnly]` | opens an issue in the ACTIVE Space's repo: its title the note's `#` title, its body the note's text without its frontmatter and title, labelled `design` (`consts.json` `studio.promoteLabel`) beside any `-Tags`; then writes `> GitHub: <issue url>` under the note's title (a blank line either side) through `Write-CardText`, an EDIT -- the note keeps its own line endings. `-ReadOnly` prints what it would create and write, and does neither | rewrites one note: inserts one line |
+| `NewItem -FromDesign <note> [-Type ...] [-Tags <a;b>] [-Sprint <m>] [-AssignTo <who>] [-Project <repo>] [-ReadOnly]` | opens an issue in the ACTIVE Space's repo: its title the note's title by the title rule ([the hub's design document](../hub/design.md#how-the-title-is-read): the leading `#` heading, else the line under `## Title`), its body the note's text without its frontmatter and title (a `## Title` section leaves whole), labelled `design` (`consts.json` `studio.promoteLabel`) beside any `-Tags`; then writes `> GitHub: <issue url>` under that title line (a blank line either side) through `Write-CardText`, an EDIT -- the note keeps its own line endings. `-ReadOnly` prints what it would create and write, and does neither | rewrites one note: inserts one line |
 
 It refuses, stated with exit 2, asking nothing of `gh` and writing nothing, when: `-Title`, `-Description`, `-AcceptanceCriteria` or
 `-ReproSteps` is given beside it (the note is the title and body); the name is not a note's; there is no
-such note; the note already has a thread (a note is promoted once); the note names a Space you are not in
+such note; the note has no title the title rule reads (a `#` line deep in the body is not one); the note already has a thread (a note is promoted once); the note names a Space you are not in
 (`SwitchSpace <it>`, then promote -- its thread belongs in that product's tracker); or the Space you are in
 is not GitHub (D-S9: a design's thread is a GitHub issue). The label must exist on the repo, as every
 `NewItem` label must.

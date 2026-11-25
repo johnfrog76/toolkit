@@ -169,13 +169,22 @@ if ($PSBoundParameters.ContainsKey('FromDesign')) {
             if ($noteLines[$i] -match '^space:\s*(.*)$') { $noteSpace = $Matches[1].Trim().Trim('"').Trim("'") }
         }
     }
-    $titleIndex = -1
-    for ($i = $bodyStart; $i -lt $noteLines.Count; $i++) {
-        if ($noteLines[$i] -match '^# (.+)$') { $titleIndex = $i; $Title = $Matches[1].Trim(); break }
-    }
+    # The title is the one rule's (Read-DesignTree.ps1, docs/hub/design.md): the
+    # leading `# ` heading, else the line under `## Title`. A `# ` line deeper
+    # in the body is a sentence, so a note with neither has no title to give.
+    . (Join-Path $PSScriptRoot 'Read-DesignTree.ps1')
+    $titleIndex = Get-P20DesignTitleIndex -Lines ([string[]]$noteLines)
     if ($titleIndex -lt 0) {
-        Write-CliError -Message "$designFolderName/$FromDesign has no '# ' title line to name the issue with." -Hint 'Give the note a title, then promote it.'
+        Write-CliError -Message "$designFolderName/$FromDesign has no title to name the issue with." `
+            -Hint 'Give the note a leading # heading, or its title under a ## Title heading, then promote it.'
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
+    }
+    $Title = Get-P20DesignTitle -Text $noteText -Name ''
+    # The title leaves the body: the `# ` line, or the `## Title` section --
+    # its heading, the blank lines under it and the title line.
+    $titleFrom = $titleIndex
+    if ($noteLines[$titleIndex] -notmatch '^#[ \t]') {
+        while ($titleFrom -gt $bodyStart -and $noteLines[$titleFrom] -cnotmatch '^##[ \t]+Title[ \t]*$') { $titleFrom-- }
     }
     $activeSpace = ''
     if ($global:P20Config -and $global:P20Config.ActiveSpace) { $activeSpace = [string]$global:P20Config.ActiveSpace }
@@ -184,7 +193,7 @@ if ($PSBoundParameters.ContainsKey('FromDesign')) {
             -Hint "$(Get-CliPrefix)SwitchSpace $noteSpace, then promote it -- its thread belongs in that product's tracker."
         exit 2  # stated refusal -- see AGENTS.md, "The refusal contract"
     }
-    $kept = @(for ($i = $bodyStart; $i -lt $noteLines.Count; $i++) { if ($i -ne $titleIndex) { $noteLines[$i] } })
+    $kept = @(for ($i = $bodyStart; $i -lt $noteLines.Count; $i++) { if ($i -lt $titleFrom -or $i -gt $titleIndex) { $noteLines[$i] } })
     $Description = ($kept -join "`n").Trim()
     $labelList = @($studio.promoteLabel)
     if (-not [string]::IsNullOrWhiteSpace($Tags)) { $labelList += $Tags }
@@ -482,21 +491,13 @@ if ((Resolve-P20Tracker -OrgUrl $org) -eq 'github') {
     Write-Host "[+] Created: issue #$newNumber -- $Title" -ForegroundColor Green
     Write-Host "    $issueUrl" -ForegroundColor Cyan
     if ($designPath -and $issueUrl) {
-        # The thread line goes under the title, a blank line either side: the
-        # place every design note and issue file in the corpus carries it.
-        $current = ([System.IO.File]::ReadAllText($designPath)) -replace "`r`n", "`n"
-        $lines = [System.Collections.Generic.List[string]]::new()
-        foreach ($l in ($current -split "`n")) { $lines.Add($l) }
-        $at = -1
-        $inFront = ($lines.Count -gt 0 -and $lines[0].Trim() -eq '---')
-        for ($i = 0; $i -lt $lines.Count; $i++) {
-            if ($inFront) { if ($i -gt 0 -and $lines[$i].Trim() -eq '---') { $inFront = $false }; continue }
-            if ($lines[$i] -match '^# ') { $at = $i; break }
-        }
-        $insert = @('', "$($studio.threadLine) $issueUrl")
-        if ($at + 1 -lt $lines.Count -and $lines[$at + 1].Trim() -ne '') { $insert += '' }
-        $lines.InsertRange($at + 1, [string[]]$insert)
-        Write-CardText -Path $designPath -Content ($lines -join "`n")
+        # The thread line goes under the title the title rule finds, a blank
+        # line either side: the place every design note and issue file in the
+        # corpus carries it, and the one placement the Docs line follows too
+        # (Add-P20DesignLineText). An EDIT: the note keeps its own endings.
+        $current = [System.IO.File]::ReadAllText($designPath)
+        $threaded = Add-P20DesignLineText -Text $current -Line "$($studio.threadLine) $issueUrl" -Stamp ([string]$studio.threadLine)
+        Write-CardText -Path $designPath -Content $threaded
         Write-Host "    Wrote the thread into $designFolderName/$FromDesign" -ForegroundColor Green
     }
     if ($cardPath -and $issueUrl) {
