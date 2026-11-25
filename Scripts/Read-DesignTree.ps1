@@ -74,40 +74,87 @@ function Get-P20FileId {
     return (Get-P20FrontValue -Text $Text -Key ([string](Get-P20Consts).design.idKey))
 }
 
-function Get-P20DesignTitle {
+function Get-P20DesignTitleIndex {
     <#
-      A note's or a spec's title, read after the frontmatter -- the ONE rule,
+      The index of the line a note's or a spec's title is read from, or -1 when
+      the rule reads none (the title is then the file's name) -- the ONE rule,
       pinned row for row by Tests/fixtures/design/titles.json (agent/ado/design.py
       doc_title is the agent's side):
-        1. the FIRST heading, when it is level one (`# Title`) -- a `# ` deeper in
-           the body, after any other heading, is a sentence, not the title;
+        1. the FIRST heading after the frontmatter, when it is level one
+           (`# Title`) -- a `# ` deeper in the body, after any other heading, is
+           a sentence, not the title;
         2. else the first non-empty line after the first `## Title` heading,
            unless that line is itself a heading;
-        3. else the file's name.
+        3. else none.
+      Lines may carry a trailing CR; both endings read the same.
     #>
-    param([string]$Text, [string]$Name)
+    param([string[]]$Lines)
     $heading = '^(#{1,6})(?:[ \t]+(.*?))?[ \t]*$'
-    $lines = $Text -split "`n"
-    $start = (Get-P20FrontEnd -Lines $lines) + 1
+    $start = (Get-P20FrontEnd -Lines $Lines) + 1
     $first = $true
-    for ($i = $start; $i -lt $lines.Count; $i++) {
-        $m = [regex]::Match($lines[$i].TrimEnd("`r"), $heading)
+    for ($i = $start; $i -lt $Lines.Count; $i++) {
+        $m = [regex]::Match($Lines[$i].TrimEnd("`r"), $heading)
         if (-not $m.Success) { continue }
         $hashes = $m.Groups[1].Value
         $words = $m.Groups[2].Value.Trim()
-        if ($first -and $hashes -eq '#' -and $words) { return $words }
+        if ($first -and $hashes -eq '#' -and $words) { return $i }
         $first = $false
         if ($hashes -ceq '##' -and $words -ceq 'Title') {
-            for ($j = $i + 1; $j -lt $lines.Count; $j++) {
-                $next = $lines[$j].TrimEnd("`r")
+            for ($j = $i + 1; $j -lt $Lines.Count; $j++) {
+                $next = $Lines[$j].TrimEnd("`r")
                 if (-not $next.Trim()) { continue }
-                if ([regex]::IsMatch($next, $heading)) { return $Name }
-                return $next.Trim()
+                if ([regex]::IsMatch($next, $heading)) { return -1 }
+                return $j
             }
-            return $Name
+            return -1
         }
     }
-    return $Name
+    return -1
+}
+
+function Get-P20DesignTitle {
+    <#
+      A note's or a spec's title, read after the frontmatter by the one rule
+      (Get-P20DesignTitleIndex): the leading `# ` heading's words, else the line
+      under `## Title`, else the file's name.
+    #>
+    param([string]$Text, [string]$Name)
+    $lines = $Text -split "`n"
+    $at = Get-P20DesignTitleIndex -Lines $lines
+    if ($at -lt 0) { return $Name }
+    $line = $lines[$at].TrimEnd("`r")
+    $m = [regex]::Match($line, '^#[ \t]+(.*?)[ \t]*$')
+    if ($m.Success) { return $m.Groups[1].Value.Trim() }
+    return $line.Trim()
+}
+
+function Add-P20DocsLineText {
+    <#
+      The text of a spec with its Docs line added -- the text half of
+      MoveDesign -To Complete's writer, which reads the file and writes the
+      answer back through Write-CardText. The line goes, with a blank line
+      either side:
+        1. under the title the title rule finds (Get-P20DesignTitleIndex): the
+           leading `# ` heading, or the title line under `## Title`;
+        2. else as the first line of the body, after the frontmatter;
+        3. else, with neither, at the top.
+      Never above the frontmatter: a file that does not open with `---` has no
+      id, and is no longer a design. Text that already carries a Docs line comes
+      back unchanged. The answer is LF; the writer gives an edited file back
+      the endings it had.
+    #>
+    param([string]$Text, [string]$DocsLine)
+    $current = $Text -replace "`r`n", "`n"
+    $stamp = [string](Get-P20Consts).design.docsLine
+    if ($current -match ('(?m)^' + [regex]::Escape($stamp))) { return $current }
+    $lines = [System.Collections.Generic.List[string]]::new()
+    foreach ($l in ($current -split "`n")) { $lines.Add($l) }
+    $at = Get-P20DesignTitleIndex -Lines ([string[]]$lines)
+    if ($at -lt 0) { $at = Get-P20FrontEnd -Lines ([string[]]$lines) }
+    $insert = @('', $DocsLine)
+    if ($at + 1 -lt $lines.Count -and $lines[$at + 1].Trim() -ne '') { $insert += '' }
+    $lines.InsertRange($at + 1, [string[]]$insert)
+    return ($lines -join "`n")
 }
 
 function Get-P20StampValue {
