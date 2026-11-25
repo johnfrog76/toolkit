@@ -39,7 +39,7 @@ import { MilestonesPage } from "./MilestonesPage";
 // open panel follows the step. Escape closes the panel.
 //
 // The flat GitHub milestones list and its award stay under the timeline until the
-// award moves onto it (#386): MilestonesPage, headed as the page's second level.
+// award moves onto it: MilestonesPage, headed as the page's second level.
 
 const useStyles = makeStyles({
   page: { display: "flex", flexDirection: "column", rowGap: tokens.spacingVerticalM, minWidth: 0 },

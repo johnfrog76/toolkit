@@ -25,7 +25,7 @@ the last tag (or not reached at all) is the release in progress's -- pinned by
 ``Tests/fixtures/releases/placement.json`` so a future verb answers the same.
 
 A READ: nothing is written, here, in the checkout or on the tracker. Pre-release
-tags (``-rc.N``) are not releases here; they are #326's checkpoints, not built.
+tags (``-rc.N``) are not releases here; release-candidate checkpoints are not built yet.
 """
 
 from __future__ import annotations
