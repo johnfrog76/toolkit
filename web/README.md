@@ -1790,8 +1790,9 @@ empty page looks empty rather than half finished.
 
 - **`<StatTile count label color? />`** -- `count` arrives formatted (`3/5`, `42%`,
   `toLocaleString()`; a count that can run to thousands goes through `shared/formatCount.ts`, exact and
-  grouped by the reader's locale, as Test Health's tiles, suite rows and y-axis all do); `color` is for a count that is a VERDICT (Test Health's pass ratio, the sprint's
-  days left, velocity) and nothing else. It forwards its ref, so a `Tooltip` wraps one directly.
+  grouped by the reader's locale, as Test Health's tiles, suite rows and y-axis all do); `color` is for a count that is a VERDICT (Test Health's pass ratio) and nothing else; the danger colour
+  is for a failure, never a count. Sprint Velocity draws its counts plain, with the days left in the warning
+  colour at five or fewer, and none at all when the days left are not known. It forwards its ref, so a `Tooltip` wraps one directly.
 - Every card that counts uses it: the Space summary, the Issue Report, Test Health, Sprint Velocity,
   Milestones. A new counting card does too -- never a `Title3` over a `Caption1`.
   `StatTile.test.tsx` and `IssueReportCard.test.tsx` pin it.
@@ -1832,7 +1833,9 @@ DevOps link: such a card stays in view under every repository. Two things here t
 design, not a missing route. And `SprintVelocity` offers no "Run"
 button, because `StressCheck` is not a key in the CLI's command table and every press would come
 back `status: rejected`. `SprintVelocity` is a read of `status` and
-`activity` and keeps its charts, its repo dropdown and its refresh; what a real `StressCheck` verb
+`activity` and keeps its charts, its repo dropdown and its refresh. The history's team count already includes mine, so each daily bar is drawn as
+my commits and the rest of the team and stands as high as the team's count; the footer's "Recorded as of" is the last
+recorded day whatever its count; and the active days are out of the calendar days elapsed. What a real `StressCheck` verb
 would have to be is written down in an open issue on the tracker.
 
 ## The growth module's surface

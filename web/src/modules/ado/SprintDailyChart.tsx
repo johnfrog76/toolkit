@@ -4,51 +4,21 @@ import { ContentFlexFillWrapper } from "../../shared/ContentFlexFillWrapper";
 import { useChartColors } from "../../hooks/chartPalette";
 import { useWornTheme } from "../../hooks/useWornTheme";
 import { useGetSprintActivityQuery } from "./api.ado";
-import type { SprintActivityEntry, SprintActivityResponse } from "./api.ado";
-import { localDay } from "../../utility/dates";
+import type { SprintActivityResponse } from "./api.ado";
+import { SPRINT_WORDS, buildSprintBars } from "./sprintActivity";
+import type { SprintBar } from "./sprintActivity";
 
-interface VelocityBar {
-  label: string;
-  mine: number;
-  team: number;
-}
-
-function buildChartData(
-  startDate: string,
-  endDate: string,
-  mine: SprintActivityEntry[],
-  team: SprintActivityEntry[],
-): VelocityBar[] {
-  const mineMap = new Map(mine.map((d) => [d.date, d.count]));
-  const teamMap = new Map(team.map((d) => [d.date, d.count]));
-  const start = new Date(startDate + "T00:00:00");
-  const end = new Date(endDate + "T00:00:00");
-  const bars: VelocityBar[] = [];
-  const cursor = new Date(start);
-  while (cursor <= end) {
-    const dateStr = localDay(cursor);
-    bars.push({
-      label: cursor.toLocaleString("default", { weekday: "short", day: "numeric" }),
-      mine: mineMap.get(dateStr) ?? 0,
-      team: teamMap.get(dateStr) ?? 0,
-    });
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return bars;
-}
-
-function ChartTooltipContent({
+// The tooltip states the record as it has it: my commits, and the team's total
+// (which includes mine) -- not the two drawn parts of the bar.
+export function ChartTooltipContent({
   active,
   payload,
-  label,
 }: {
   active?: boolean;
-  payload?: Array<{ value: number; dataKey: string }>;
-  label?: string;
+  payload?: Array<{ payload: SprintBar }>;
 }) {
   if (!active || !payload?.length) return null;
-  const mine = payload.find((p) => p.dataKey === "mine")?.value ?? 0;
-  const team = payload.find((p) => p.dataKey === "team")?.value ?? 0;
+  const { label, mine, team } = payload[0].payload;
   return (
     <div
       style={{
@@ -69,12 +39,15 @@ function ChartTooltipContent({
       )}
       {team > 0 && (
         <div>
-          Team: {team} merge{team !== 1 ? "s" : ""}
+          Team: {team} commit{team !== 1 ? "s" : ""}
         </div>
       )}
     </div>
   );
 }
+
+/** What the chart draws, for a screen reader: one bar a day, the team's total in two parts. */
+export const SPRINT_CHART_DESCRIPTION = `Commits per day. Each bar is the ${SPRINT_WORDS.team} for the day, drawn as ${SPRINT_WORDS.mine} and the ${SPRINT_WORDS.rest}.`;
 
 export function SprintDailyChart({
   repo,
@@ -88,7 +61,7 @@ export function SprintDailyChart({
   const activity = activityOverride ?? fetched;
 
   const chartData = activity
-    ? buildChartData(activity.startDate, activity.endDate, activity.mine, activity.team)
+    ? buildSprintBars(activity.startDate, activity.endDate, activity.mine, activity.team)
     : [];
 
   const topOp = theme === "dark" ? 0.72 : 0.42;
@@ -96,32 +69,34 @@ export function SprintDailyChart({
 
   return (
     <ContentFlexFillWrapper>
-      <ResponsiveContainer width="100%" height={128}>
-        <BarChart data={chartData}>
-          <defs>
-            <linearGradient id="svMine" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={colors.billingBar} stopOpacity={topOp} />
-              <stop offset="100%" stopColor={colors.billingBar} stopOpacity={botOp} />
-            </linearGradient>
-            <linearGradient id="svTeam" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={colors.billingAvg} stopOpacity={topOp} />
-              <stop offset="100%" stopColor={colors.billingAvg} stopOpacity={botOp} />
-            </linearGradient>
-          </defs>
-          <XAxis
-            dataKey="label"
-            tick={{ fontSize: 10 }}
-            interval={0}
-            angle={-45}
-            textAnchor="end"
-            height={34}
-          />
-          <YAxis tick={{ fontSize: 10 }} width={30} allowDecimals={false} />
-          <RTooltip content={<ChartTooltipContent />} cursor={{ fill: "transparent" }} />
-          <Bar dataKey="mine" stackId="a" fill="url(#svMine)" radius={[0, 0, 0, 0]} />
-          <Bar dataKey="team" stackId="a" fill="url(#svTeam)" radius={[2, 2, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
+      <div role="img" aria-label={SPRINT_CHART_DESCRIPTION} style={{ width: "100%" }}>
+        <ResponsiveContainer width="100%" height={128}>
+          <BarChart data={chartData}>
+            <defs>
+              <linearGradient id="svMine" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={colors.billingBar} stopOpacity={topOp} />
+                <stop offset="100%" stopColor={colors.billingBar} stopOpacity={botOp} />
+              </linearGradient>
+              <linearGradient id="svTeam" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={colors.billingAvg} stopOpacity={topOp} />
+                <stop offset="100%" stopColor={colors.billingAvg} stopOpacity={botOp} />
+              </linearGradient>
+            </defs>
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 10 }}
+              interval={0}
+              angle={-45}
+              textAnchor="end"
+              height={34}
+            />
+            <YAxis tick={{ fontSize: 10 }} width={30} allowDecimals={false} />
+            <RTooltip content={<ChartTooltipContent />} cursor={{ fill: "transparent" }} />
+            <Bar dataKey="drawnMine" stackId="a" fill="url(#svMine)" radius={[0, 0, 0, 0]} />
+            <Bar dataKey="rest" stackId="a" fill="url(#svTeam)" radius={[2, 2, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </ContentFlexFillWrapper>
   );
 }
