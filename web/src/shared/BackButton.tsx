@@ -28,6 +28,7 @@ export function BackButton({ title = "Back" }: BackButtonProps) {
       appearance="subtle"
       onClick={onBack}
       title={title}
+      aria-label={title}
     />
   );
 }

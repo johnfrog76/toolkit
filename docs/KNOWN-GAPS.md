@@ -47,6 +47,18 @@ the room (the agent answers 413 and says so); it opens on GitHub.
 
 **Issue:** [#292](https://github.com/johnfrog76/toolkit/issues/292)
 
+### Three record pages do not show a local file's absolute path
+
+**What you see:** Every record page's header carries the File line, a copy button whose tooltip holds the
+address. On the Docs viewer the line holds the document's link on GitHub, not its path on this machine; the
+design note page and the PR comments page show no line, because their routes send no absolute path (a
+design note's is relative to the hub, a review round's is only a file name). Until the agent sends the
+absolute path, a document read from a local checkout cannot be handed to an agent from the page in one step.
+
+**Where you meet it:** [web README](../web/README.md#reading-a-card), "Reading a card"
+
+**Issue:** [#529](https://github.com/johnfrog76/toolkit/issues/529)
+
 ### The standup's decide and look queues are empty
 
 **What you see:** On every Space, Team Agile's standup fills only the `walk` queue. `decide` and `look`

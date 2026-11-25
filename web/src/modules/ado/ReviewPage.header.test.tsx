@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { fileLineValue } from "../../shared/fileLineValue.testHelper";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { ReviewPage } from "./ReviewPage";
 
@@ -44,12 +45,16 @@ const open = () =>
   );
 
 describe("the review page header", () => {
-  it("shows the kind, the review's title and the file path", () => {
+  afterEach(() => {
+    pending = [];
+  });
+
+  it("shows the kind, the review's title and the file path", async () => {
     pending = [];
     open();
     expect(screen.getByText("Review")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "April work review" })).toBeTruthy();
-    expect(screen.getByTestId("file-path").textContent).toContain(
+    expect(await fileLineValue()).toContain(
       "/hub/reviews/first/2026/2026-04-01_2026-04-30/review.md",
     );
   });

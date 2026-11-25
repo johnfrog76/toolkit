@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams } from "react-router";
 import ReactMarkdown from "react-markdown";
 import { markdownPlugins } from "../../shared/markdownPlugins";
 import {
   Card,
-  Title2,
   Title3,
   Body1,
   Body2,
@@ -22,9 +21,8 @@ import {
 } from "@fluentui/react-components";
 import { HairlineDivider } from "../../shared/HairlineDivider";
 import { timeAgo, formatDate } from "../../utility/dates";
-import { RefreshButton } from "../../shared/RefreshButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import {
-  ArrowLeftRegular,
   CheckmarkCircleRegular,
   CircleRegular,
   BotRegular,
@@ -51,23 +49,6 @@ const useStyles = makeStyles({
     display: "flex",
     flexDirection: "column",
     gap: tokens.spacingVerticalL,
-  },
-  topBar: {
-    display: "flex",
-    alignItems: "center",
-    gap: tokens.spacingHorizontalM,
-    flexWrap: "wrap" as const,
-  },
-  titleArea: {
-    flex: 1,
-    minWidth: 0,
-  },
-  progressRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: tokens.spacingHorizontalS,
-    marginTop: tokens.spacingVerticalXS,
-    flexWrap: "wrap" as const,
   },
   commentCard: {
     padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalM}`,
@@ -258,7 +239,6 @@ export function PRCommentsDetail({
 }: { filename?: string; hideGuide?: boolean } = {}) {
   const params = useParams<{ filename: string }>();
   const filename = filenameProp ?? params.filename;
-  const navigate = useNavigate();
   const styles = useStyles();
 
   const {
@@ -439,9 +419,7 @@ export function PRCommentsDetail({
   if (pageError) {
     return (
       <div>
-        <Button appearance="subtle" icon={<ArrowLeftRegular />} onClick={() => navigate("/")}>
-          Back
-        </Button>
+        <DetailHeader />
         <div className={styles.pageErrorBanner} style={{ marginTop: "1rem" }}>
           <Body1>{pageError}</Body1>
         </div>
@@ -457,14 +435,11 @@ export function PRCommentsDetail({
 
   return (
     <div className={styles.page}>
-      {/* ── Top bar ── */}
-      <div className={styles.topBar}>
-        <Button appearance="subtle" icon={<ArrowLeftRegular />} onClick={() => navigate("/")}>
-          Back
-        </Button>
-        <div className={styles.titleArea}>
-          <Title2 as="h1">{detail.title || detail.file}</Title2>
-          <div className={styles.progressRow}>
+      {/* ── Header ── */}
+      <DetailHeader
+        title={detail.title || detail.file}
+        meta={
+          <>
             <Badge appearance="filled" color={openCount > 0 ? "danger" : "success"} size="medium">
               {openCount} open
             </Badge>
@@ -473,10 +448,10 @@ export function PRCommentsDetail({
             </Badge>
             <Caption1>PR {detail.pr_id}</Caption1>
             {detail.round_num > 1 && <Caption1>Round {detail.round_num}</Caption1>}
-          </div>
-        </div>
-        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
-      </div>
+          </>
+        }
+        refresh={{ onClick: () => refetch(), isFetching }}
+      />
 
       <HairlineDivider />
 

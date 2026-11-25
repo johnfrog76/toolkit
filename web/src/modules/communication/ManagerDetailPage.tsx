@@ -8,7 +8,6 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
-  Subtitle2,
   Caption1,
   Badge,
   Button,
@@ -27,9 +26,8 @@ import {
 } from "@fluentui/react-components";
 import { EditRegular, SendRegular, SparkleFilled } from "@fluentui/react-icons";
 import { DialogDismiss } from "../../shared/DialogDismiss";
-import { BackButton } from "../../shared/BackButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { PanelFrame } from "../../shared/PanelFrame";
-import { RefreshButton } from "../../shared/RefreshButton";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { useGetEnvQuery } from "../../shell/api";
 import { Timer } from "./Timer";
@@ -45,7 +43,6 @@ import {
 } from "./api.communication";
 import { PeopleCommunityRegular } from "@fluentui/react-icons";
 import { EmptyState } from "../../shared/EmptyState";
-import { FilePath } from "../../shared/FilePath";
 
 type RewriteField = "since" | "forward" | "retro";
 
@@ -70,12 +67,6 @@ const useStyles = makeStyles({
     flexDirection: "column",
     gap: tokens.spacingVerticalM,
     width: "100%",
-  },
-  titleBlock: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "2px",
-    minWidth: 0,
   },
   dialogFields: {
     display: "flex",
@@ -201,51 +192,19 @@ export function ManagerDetailPage() {
             />
           ) : undefined
         }
-        headerRight={
-          <>
-            <Timer />
-            {data && (
-              <Button
-                icon={<EditRegular />}
-                size="small"
-                appearance="subtle"
-                title={isRetroStage ? "Add retro notes" : "Edit plan notes"}
-                onClick={() => setDialogOpen(true)}
-              />
-            )}
-            {/* The session page: the notes form, and the retro send. This read
-                view is where the card's row lands, and once nothing
-                on it led to the page the send button is on. */}
-            {data && filename && (
-              <Button
-                icon={<SendRegular />}
-                size="small"
-                appearance="subtle"
-                onClick={() => navigate(sessionPath(filename))}
-              >
-                Edit / send
-              </Button>
-            )}
-            {/* Complete and still open: the one step left is to close it, and it
-                is done here rather than in a terminal. */}
-            {data && data.date && !isClosed && !nextStage && (
-              <CloseMeetingButton filename={data.filename} date={data.date} series={data.series} />
-            )}
-            <RefreshButton onClick={refetch} isFetching={isFetching} />
-          </>
-        }
         headerLeft={
-          <>
-            <BackButton />
-            {data && sessionStage && (
-              <>
+          <DetailHeader
+            title={data && sessionStage ? `${data.series || "1:1"} — ${sessionDate}` : undefined}
+            meta={
+              data && sessionStage ? (
                 <Badge color={sessionStage.color} appearance="outline" size="small">
                   {sessionStage.label}
                 </Badge>
-                <div className={styles.titleBlock}>
-                  <Subtitle2 as="h1">
-                    {data.series || "1:1"} — {sessionDate}
-                  </Subtitle2>
+              ) : undefined
+            }
+            extra={
+              data && sessionStage ? (
+                <>
                   <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
                     {/* Closing is MeetingAgenda -Close -- the verb that moves the file
                         to manager/archive/ AND writes the closed stamp -- and now
@@ -267,11 +226,48 @@ export function ManagerDetailPage() {
                         {data.carried_from_note}
                       </Caption1>
                     )}
-                  <FilePath path={data.path} />
-                </div>
+                </>
+              ) : undefined
+            }
+            path={data && sessionStage ? data.path : undefined}
+            refresh={{ onClick: refetch, isFetching }}
+            actions={
+              <>
+                <Timer />
+                {data && (
+                  <Button
+                    icon={<EditRegular />}
+                    size="small"
+                    appearance="subtle"
+                    title={isRetroStage ? "Add retro notes" : "Edit plan notes"}
+                    onClick={() => setDialogOpen(true)}
+                  />
+                )}
+                {/* The session page: the notes form, and the retro send. This read
+                view is where the card's row lands, and once nothing
+                on it led to the page the send button is on. */}
+                {data && filename && (
+                  <Button
+                    icon={<SendRegular />}
+                    size="small"
+                    appearance="subtle"
+                    onClick={() => navigate(sessionPath(filename))}
+                  >
+                    Edit / send
+                  </Button>
+                )}
+                {/* Complete and still open: the one step left is to close it, and it
+                is done here rather than in a terminal. */}
+                {data && data.date && !isClosed && !nextStage && (
+                  <CloseMeetingButton
+                    filename={data.filename}
+                    date={data.date}
+                    series={data.series}
+                  />
+                )}
               </>
-            )}
-          </>
+            }
+          />
         }
       >
         {data &&

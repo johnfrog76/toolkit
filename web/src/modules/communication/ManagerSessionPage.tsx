@@ -11,7 +11,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import {
-  Subtitle2,
   Caption1,
   Body1,
   Badge,
@@ -24,7 +23,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { ArrowRightRegular, SendRegular } from "@fluentui/react-icons";
-import { BackButton } from "../../shared/BackButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { HairlineDivider } from "../../shared/HairlineDivider";
 import { InfoTip } from "../../shared/InfoTip";
 import { MarkdownBlock } from "../../shared/MarkdownBlock";
@@ -307,13 +306,15 @@ export function ManagerSessionPage() {
           ) : undefined
         }
         headerLeft={
-          <>
-            <BackButton />
-            <Badge color={badgeColor} appearance="outline" size="small">
-              {stageLabel}
-            </Badge>
-            <Subtitle2 as="h1">{title}</Subtitle2>
-          </>
+          <DetailHeader
+            title={title}
+            meta={
+              <Badge color={badgeColor} appearance="outline" size="small">
+                {stageLabel}
+              </Badge>
+            }
+            path={data?.path}
+          />
         }
       >
         {isBusy ? (

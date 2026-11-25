@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { fileLineValue } from "../../shared/fileLineValue.testHelper";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { IssueDetailPage } from "./IssueDetailPage";
 import type { IssueDetail } from "./api.ado";
@@ -77,7 +78,7 @@ function mount() {
 }
 
 describe("the reading room", () => {
-  it("shows the body, the thread and the timeline's high signal", () => {
+  it("shows the body, the thread and the timeline's high signal", async () => {
     answer.data = DETAIL;
     answer.error = undefined;
     mount();
@@ -102,8 +103,8 @@ describe("the reading room", () => {
     expect(screen.getByTitle("Open on GitHub").getAttribute("href")).toBe(DETAIL.url);
     expect(screen.getByTitle("Refresh")).toBeTruthy();
     // the record's address, the shared line every detail page carries
-    expect(screen.getByTestId("file-path").textContent).toContain(DETAIL.url);
-    expect(screen.getByRole("button", { name: "Copy the issue link" })).toBeTruthy();
+    expect(await fileLineValue()).toContain(DETAIL.url);
+    expect(screen.getByRole("button", { name: "Copy the file link" })).toBeTruthy();
     expect(screen.getByTitle("Back")).toBeTruthy();
     expect(screen.getByLabelText("Severity")).toBeTruthy();
   });

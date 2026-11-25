@@ -1,12 +1,10 @@
 import { useParams } from "react-router";
-import { Badge, Caption1, Subtitle2, makeStyles, tokens } from "@fluentui/react-components";
+import { Badge, Caption1, makeStyles, tokens } from "@fluentui/react-components";
 import { BookRegular } from "@fluentui/react-icons";
-import { BackButton } from "../../shared/BackButton";
+import { DetailHeader } from "../../shared/DetailHeader";
 import { EmptyState } from "../../shared/EmptyState";
-import { FilePath } from "../../shared/FilePath";
 import { MarkdownViewer } from "../../shared/MarkdownViewer";
 import { PanelFrame } from "../../shared/PanelFrame";
-import { RefreshButton } from "../../shared/RefreshButton";
 import { useGetReferenceDocumentQuery } from "./api.organize";
 
 // The reading room for ONE reference document, read only: the house's reading
@@ -15,20 +13,6 @@ import { useGetReferenceDocumentQuery } from "./api.organize";
 // nothing here that writes (docs/modules/organize.md, "Reference").
 const useStyles = makeStyles({
   page: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalM, width: "100%" },
-  titleBlock: {
-    display: "flex",
-    flexDirection: "column",
-    rowGap: tokens.spacingVerticalXS,
-    minWidth: 0,
-  },
-  metaRow: {
-    display: "flex",
-    columnGap: tokens.spacingHorizontalS,
-    rowGap: tokens.spacingVerticalXXS,
-    flexWrap: "wrap",
-    alignItems: "center",
-    color: tokens.colorNeutralForeground3,
-  },
 });
 
 export function ReferencePage() {
@@ -57,25 +41,22 @@ export function ReferencePage() {
         loadingLabel="Reading the document..."
         empty={empty}
         headerLeft={
-          <>
-            <BackButton />
-            {readable && (
-              <div className={styles.titleBlock}>
-                <Subtitle2 as="h1">{data.title}</Subtitle2>
-                <div className={styles.metaRow}>
+          <DetailHeader
+            title={readable ? data.title : undefined}
+            meta={
+              readable ? (
+                <>
                   <Badge appearance="tint" size="small" color="informative">
                     reference
                   </Badge>
                   {data.valid ? <Caption1>Valid: {data.valid}</Caption1> : null}
                   {data.source ? <Caption1>Source: {data.source}</Caption1> : null}
-                </div>
-                <FilePath path={data.path} />
-              </div>
-            )}
-          </>
-        }
-        headerRight={
-          readable ? <RefreshButton onClick={refetch} isFetching={isFetching} /> : undefined
+                </>
+              ) : undefined
+            }
+            path={readable ? data.path : undefined}
+            refresh={readable ? { onClick: refetch, isFetching } : undefined}
+          />
         }
       >
         {readable && (
