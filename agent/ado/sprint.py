@@ -687,17 +687,12 @@ async def get_stress_repos():
         for name in names
     ]
 
-    default_repo: str | None = None
-    if _stress_log_default().exists():
-        try:
-            log = json.loads(_stress_log_default().read_text(encoding="utf-8-sig"))
-            # stress-log.json is a single global file — only trust its repoKey
-            # when it was actually written for the active Space, else a stale
-            # run from a different org leaks its selection in here.
-            if isinstance(log, dict) and log.get("org") == active:
-                default_repo = log.get("repoKey") or None
-        except (json.JSONDecodeError, OSError):
-            pass
+    # stress-log.json is a single global file — only trust its repoKey when it
+    # was written for the active Space, else a stale run from a different org
+    # leaks its selection in here. The same reader as the other two routes, so
+    # no shape of the file fails this one either.
+    log, _ = _read_log(None, active)
+    default_repo = (_text(log.get("repoKey")) or None) if log is not None else None
     if (default_repo is None or default_repo not in names) and repos:
         default_repo = repos[0].name
 

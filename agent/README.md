@@ -624,8 +624,9 @@ The sprint gate is the honest kind. With `features.sprintAwareness` off, `/stres
 `{"enabled": false, "detail": "sprint awareness is off for this org"}` **without reading the log
 file** -- not a 404, not an empty success that looks like "no data this sprint".
 
-With it on, `/stress-status` and `/stress-sprint-activity` read the log through one reader,
-`_read_log`, so one file reads one way on both. A missing file, one that is not UTF-8 or not JSON,
+With it on, `/stress-status`, `/stress-sprint-activity` and `/stress-repos` read the log through
+one reader, `_read_log`, so one file reads one way on all three (`/stress-repos` takes only the
+log's `repoKey`, as its default repository, and says no reason). A missing file, one that is not UTF-8 or not JSON,
 and one that is not an object answer the route's no-reading shape with the reason in `detail` (the
 activity route's window then comes from the committed history alone). So does a log that is not the
 active Space's and the asked repository's (`_log_refusal`): one that names another Space, or none,

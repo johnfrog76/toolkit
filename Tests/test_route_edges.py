@@ -440,15 +440,49 @@ class ASprintLogReadsOneWay(unittest.TestCase):
                 self.assertEqual((activity["startDate"], activity["endDate"]), ("2026-11-20", "2026-12-01"))
                 self.assertEqual(activity["mine"], [{"date": "2026-11-20", "count": 1, "churn": 0}])
 
+    def test_the_repo_list_reads_the_log_through_the_same_reader(self):
+        # (the log, the Space's projects, the default repo served)
+        alpha_beta = [{"repo": "alpha"}, {"repo": "beta"}]
+        for text, projects, want in (
+            (b"\xff\xfe\x00{", [], None),
+            (b"\xff\xfe\x00{", alpha_beta, "alpha"),
+            (json.dumps({"org": SPACE, "repoKey": 5}), [], None),
+            (json.dumps({"org": SPACE, "repoKey": 5}), alpha_beta, "alpha"),
+            (json.dumps({"org": SPACE, "repoKey": ["beta"]}), [], None),
+            ("[1, 2]", [], None),
+            ("[1, 2]", alpha_beta, "alpha"),
+            ("", alpha_beta, "alpha"),
+            ("{not json", alpha_beta, "alpha"),
+            (json.dumps({"org": "elsewhere", "repoKey": "beta"}), alpha_beta, "alpha"),
+            (json.dumps({"repoKey": "beta"}), alpha_beta, "alpha"),
+            (json.dumps({"org": SPACE, "repoKey": "beta"}), alpha_beta, "beta"),
+            (json.dumps({"org": SPACE, "repoKey": "gamma"}), alpha_beta, "alpha"),
+            (json.dumps({"org": SPACE, "repoKey": "gamma"}), [], "gamma"),
+            (json.dumps({"org": SPACE, "sourceRepo": "https://example.com/acme/beta.git"}), alpha_beta, "alpha"),
+        ):
+            with self.subTest(text=text, projects=len(projects)):
+                self.space["projects"] = projects
+                self.write_log(text)
+                reply = self.client.get("/api/stress-repos")
+                self.assertEqual(reply.status_code, 200, reply.text)
+                body = reply.json()
+                self.assertEqual(body["defaultRepo"], want)
+                self.assertEqual([r["name"] for r in body["repos"]], [p["repo"] for p in projects])
+
     def test_with_sprint_awareness_off_both_routes_answer_as_before_and_read_nothing(self):
         self.on = False
         self.write_log("{not json")
-        with mock.patch.object(sprint, "_stress_log_path") as path:
+        with (
+            mock.patch.object(sprint, "_stress_log_path") as path,
+            mock.patch.object(sprint, "_stress_log_default") as default,
+        ):
             self.assertEqual(self.status(), STATUS_OFF)
             self.assertEqual(
                 self.activity(), {"startDate": "2026-11-25", "endDate": "2026-11-25", "mine": [], "team": []}
             )
+            self.assertEqual(self.client.get("/api/stress-repos").json(), {"repos": [], "defaultRepo": None})
         path.assert_not_called()
+        default.assert_not_called()
 
 
 if __name__ == "__main__":

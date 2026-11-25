@@ -204,8 +204,9 @@ switch.
 
 The Sprint tab's three routes -- `GET /api/stress-status`, `GET /api/stress-sprint-activity` and
 `GET /api/stress-repos` -- are gated on the Space's `features.sprintAwareness` and answer as off
-without reading anything where it is off. With it on, the first two read the hub-root stress log
-one way: a log that is missing, unreadable or not an object, or that names another Space, no Space,
+without reading anything where it is off. With it on, all three read the hub-root stress log
+one way, and no shape of it fails one of them (`stress-repos` takes only its default repository from
+it): a log that is missing, unreadable or not an object, or that names another Space, no Space,
 or another repository than the one asked for, is not used, and both routes say why in `detail`, in
 the same sentence; the activity route then draws the repository's committed history in its own
 window. Days left comes from the sprint's end date on the day it is read -- the log's, else the
