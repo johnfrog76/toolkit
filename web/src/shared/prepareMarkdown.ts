@@ -271,16 +271,26 @@ export function sectionOf(headings: Heading[], id: string | null): string | null
 export function dropLeadingTitle(body: string, titleAbove: string | undefined): string {
   if (!titleAbove) return body;
   const lines = body.split("\n");
-  // The body's FIRST top-level heading, outside code: a blockquote, a note or
-  // blank lines may come before it.
-  let inFence = false;
+  // Only a LEADING title goes (the product's one title rule, the agent's
+  // doc_title): the first heading of the body, when it is level one. Blank
+  // lines, blockquotes and comments may come before it; any prose, any other
+  // heading or a code fence means the body has no title of its own.
   let first = -1;
+  let inComment = false;
   for (let i = 0; i < lines.length; i++) {
-    if (FENCE.test(lines[i])) inFence = !inFence;
-    if (!inFence && /^#\s+\S/.test(lines[i])) {
-      first = i;
-      break;
+    const line = lines[i];
+    const t = line.trim();
+    if (inComment) {
+      inComment = !t.includes("-->");
+      continue;
     }
+    if (t === "" || t.startsWith(">")) continue;
+    if (t.startsWith("<!--")) {
+      inComment = !t.includes("-->");
+      continue;
+    }
+    if (/^#\s+\S/.test(line)) first = i;
+    break;
   }
   if (first < 0) return body;
   const same = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
