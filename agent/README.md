@@ -617,7 +617,7 @@ terminal write it with one writer and there is no second shape to drift.
 the person's and an org cannot override it; only the org-scoped keys -- `sprintAwareness` -- are
 read from the active Space. In this half the list is `ORG_FEATURES` in `core/config.py`:
 `load_config()["features"]` is the merged view, `/env` serves it, and
-`_active_org_feature` in `ado/sprint.py` reads it rather than the org directly.
+`_active_space_feature` in `ado/sprint.py` reads it rather than the org directly.
 `Tests/test_features.py` pins the rule.
 
 The sprint gate is the honest kind. With `features.sprintAwareness` off, `/stress-status` returns
