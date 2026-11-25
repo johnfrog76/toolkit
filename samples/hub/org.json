@@ -25,6 +25,16 @@
           ]
         },
         {
+          "id": "butler",
+          "title": "Butler",
+          "prompt": "butler.prompt.md",
+          "reportsTo": "vp-product",
+          "defaultModel": "haiku",
+          "seats": [
+            { "id": "butler", "model": "haiku", "machine": "this-machine" }
+          ]
+        },
+        {
           "id": "vp-engineering",
           "title": "VP of engineering",
           "prompt": "vp-of-engineering.prompt.md",

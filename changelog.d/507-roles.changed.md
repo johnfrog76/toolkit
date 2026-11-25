@@ -1,0 +1,1 @@
+- The intern now fetches the tracker's milestones and where each one stands for the team, still writing nothing, and no longer proposes designs to archive: that is the butler's round. Every role now opens by reading its situation -- the Space, the tracker, the open cards, what waits on whom -- before it does its job, and the roles page gives each role a short bio.

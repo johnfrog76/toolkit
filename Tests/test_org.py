@@ -446,6 +446,7 @@ class TheRoute(OrgBase):
             [
                 ("owner", 0),
                 ("vp-product", 1),
+                ("butler", 2),
                 ("vp-engineering", 1),
                 ("pm", 1),
                 ("team-lead", 2),
@@ -459,6 +460,7 @@ class TheRoute(OrgBase):
         # so the lookup finds the toolkit's agentic/org/ and the ref is a shipped one.
         roles = {
             "vp-product": ("vp-of-product", "owner", "VP of product"),
+            "butler": ("butler", "vp-product", "Butler"),
             "vp-engineering": ("vp-of-engineering", "owner", "VP of engineering"),
             "pm": ("pm", "owner", "PM"),
             "team-lead": ("team-lead", "pm", "Team lead"),

@@ -18,15 +18,21 @@ whom and which model or person sits in each seat is the hub's `org.json`
 `"prompt": "<role>.prompt.md"`. A team's own way of working (card size, what a milestone means to
 them, who decides what) is its Space's how-we-work note, which every role reads first.
 
+**Every role responds to the work at hand.** A role is not a job sheet run the same way every day. Each
+one tells its seat to read its situation first -- the Space, the tracker, the open cards, what waits on
+whom -- with the verbs that seat would use, and then to do the job for the work in front of it. The role
+sets the standards and the judgement; the work supplies the specifics.
+
 ## The roles
 
 | Role | Takes in | Hands on | Suggested model |
 |---|---|---|---|
-| `pm` | the owner's direction, the open issues (`tkTriage`) and the active cards (`tkStatus`), a ready from a lead, a merge's hash, and the drafts of a seat that assists it | a queue of cards whose specs are ready, to the seats that lead the work; each ready, checked once more, to the seat that merges; what merged and closed onto the cards and the tracker (`tkLand`); and its decision on each draft, written itself (`tkRoute`, `tkMoveDesign`, the tracker) | Opus (`opus`) |
+| `pm` | the owner's direction, the open issues (`tkTriage`) and the active cards (`tkStatus`), a ready from a lead, a merge's hash, and the drafts of a seat that assists it | a queue of cards whose specs are ready, to the seats that lead the work; each ready, checked once more, to the seat that merges; what merged and closed onto the cards and the tracker (`tkLand`); and its decision on each draft, written itself (`tkRoute`, `tkNewItem`, the tracker) | Opus (`opus`) |
 | `team-lead` | a card or a queue of them, for one lane or Space | a pull request made ready, one at a time, proved and caught up with its base; and the findings its lane turned up, to the seat that plans the work | Opus (`opus`); its builders chosen per card |
 | `vp-of-engineering` | a ready pull request, named by its head | a merge, reported with its hash to the seat that keeps the record, or a finding that sends the pull request back; the engineering standards every lane holds | the team's choice: a judgement seat |
-| `vp-of-product` | a design question, a draft (a note, a spec, a page, a piece of copy) or a release candidate | a decision written where it belongs, a spec made ready to build, or a release note for the owner's word | the team's choice: a judgement seat |
-| `intern` | the open issues (`tkTriage`) and the active cards (`tkStatus`), joined on the id, the Space's `design/` and `spec/` notes, and the how-we-work note | proposals, to the seat it assists: milestones (a name, the items, why they go together), breakdowns of an issue or user story too big for one card, items that look done with the evidence, and a severity with its reason for each bug -- one at a time, or as a single list over the open bug backlog with the uncertain ones marked; and designs whose work has shipped, to archive | Haiku (`haiku`) |
+| `vp-of-product` | a design question, a draft (a note, a spec, a page, a piece of copy), a release candidate, and the week's list of designs to archive from the seat that keeps them | a decision written where it belongs, a spec made ready to build, a yes or no on each design to archive, or a release note for the owner's word | the team's choice: a judgement seat |
+| `intern` | the open issues (`tkTriage`) and the active cards (`tkStatus`), joined on the id, the tracker's milestones (`gh api`, read only), and the how-we-work note | the milestones and where each stands, to the team; and proposals, to the seat it assists: milestones (a name, the items, why they go together), breakdowns of an issue or user story too big for one card, items that look done with the evidence, and a severity with its reason for each bug -- one at a time, or as a single list over the open bug backlog with the uncertain ones marked | Haiku (`haiku`) |
+| `butler` | the design notes and specs in the hub and each product's repository, once a week: the Design lifecycle row (`tkEnv`), `tkStampDesign -WhatIf`, and the cards each design names | every unstamped file given its id (`tkStampDesign`, `-Hub`), said in a line; the designs whose work looks finished, with the evidence and the move it proposes, to the seat it reports to; and on that seat's yes, each move made (`tkMoveDesign`) | Haiku (`haiku`) |
 
 **The owner is not a role file.** Every role names "the owner" as the person whose word settles scope,
 voice, anything a person outside the team will see, and anything that cannot be undone -- what ships and
@@ -53,6 +59,21 @@ is a pool in `org.json` rather than a seat, and the brief it works from is still
 folder above, which `tkStartWork` carries. A hub that wants a role the toolkit does not ship writes its
 own and names it in `org.json` (see below).
 
+## Who they are
+
+- **The PM** is the team's memory and its sense of order. Ask it what is next, what is waiting on whom, or
+  whether a thing is really done, and it can tell you, because it read the tracker before you asked.
+- **The team lead** sees how the pieces fit before they collide. It reads every diff all the way down,
+  calls nothing a flake until it has earned the word, and leaves its lane clean at the end of the day.
+- **The VP of engineering** is the steady hand at the main line. It reads carefully, says no kindly, and
+  reports every merge with its hash, so the record never has to go looking.
+- **The VP of product** keeps asking who this is for. It reads every screen as a stranger would, and it is
+  happiest when the simplest version turns out to be the right one.
+- **The intern** is eager, curious and quick to ask. It fetches the milestones so everyone knows how close
+  the next one is, and it fetches the pizza when the team gets there.
+- **The butler** keeps the house. Once a week it gives every design its id and brings the finished ones to
+  be put away, and the best sign it was here is that nobody had to tidy anything.
+
 ## How work moves between the roles
 
 Work goes down a chain, one step to a seat, and the record comes back up it. Who sits in each seat is
@@ -60,12 +81,11 @@ Work goes down a chain, one step to a seat, and the record comes back up it. Who
 
 1. **Plan.** The seat that owns the product turns a design into a spec ready to build. The seat that plans
    the work turns direction into milestones, issues and cards, in the order the owner set. A seat that
-   assists it -- the intern -- drafts milestones, breakdowns, close-outs, severities and designs to
-   archive; the seat it assists decides each and makes the writes itself: it creates a milestone on the
-   tracker by hand, because no verb creates one, places each issue with `tkRoute <n> -Milestone <title>`,
-   which only accepts an existing open milestone, applies a severity with `tkRoute <n> -Severity <sev>`,
-   archives a shipped design with `tkMoveDesign` (`-To Archive`, or `-To Complete -Doc <path>` for one
-   with a spec), splits an issue into sub-issues, and closes what is done. A card with no issue cannot go
+   assists it -- the intern -- fetches the tracker's milestones and where each stands, and drafts
+   milestones, breakdowns, close-outs and severities; the seat it assists decides each and makes the
+   writes itself: it creates a milestone on the tracker by hand, because no verb creates one, places each
+   issue with `tkRoute <n> -Milestone <title>`, which only accepts an existing open milestone, applies a
+   severity with `tkRoute <n> -Severity <sev>`, splits an issue into sub-issues, and closes what is done. A card with no issue cannot go
    into a tracker milestone, so the intern proposes it as a candidate for the planned release and the seat
    places it there.
 2. **Hand out.** The seat that plans the work reads each card's spec, and hands a lead a queue of the
@@ -80,10 +100,16 @@ Work goes down a chain, one step to a seat, and the record comes back up it. Who
 6. **Record.** The seat that plans the work records the merge: `tkLand <id>` writes it onto the card,
    closes the issue and archives the card. Then the lead catches up its next ready.
 7. **Celebrate.** When a milestone's last item closes, the intern orders pizza for the team.
+8. **Keep the designs.** Once a week the butler gives every design note and spec with no id its own
+   (`tkStampDesign`, `-Hub` for the hub's), and brings the seat that owns the product the designs whose
+   work has shipped, each with its evidence. That seat says yes or no to each, and the butler archives each
+   yes with `tkMoveDesign` (`-To Archive` for a note with no spec, `-To Complete -Doc <path>` for a built
+   and documented spec). Neither verb commits: a change in a product's repository goes through that
+   repository's own way of landing work.
 
 In the sample hub's `org.json` (`samples/hub/org.json`), the VP of product, the VP of engineering and the
-PM report to the owner, the team lead and the intern report to the PM, and a builder pool sits under the
-team lead. Every office there names its shipped role, which the sample hub does not copy. That is one way
+PM report to the owner, the butler reports to the VP of product, the team lead and the intern report to
+the PM, and a builder pool sits under the team lead. Every office there names its shipped role, which the sample hub does not copy. That is one way
 to seat the chain; the roles only say which relationship they have to the seats beside them.
 
 ## Where a role is found
