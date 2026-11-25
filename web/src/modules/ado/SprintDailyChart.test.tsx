@@ -36,7 +36,14 @@ jest.mock("recharts", () => ({
 }));
 jest.mock("./api.ado", () => ({ useGetSprintActivityQuery: () => ({}) }));
 
-const bar: SprintBar = { date: "2026-03-02", label: "Mon 2", mine: 2, team: 5, rest: 3 };
+const bar: SprintBar = {
+  date: "2026-03-02",
+  label: "Mon 2",
+  mine: 2,
+  drawnMine: 2,
+  team: 5,
+  rest: 3,
+};
 
 describe("SprintDailyChart", () => {
   it("states mine and the team's total as the record has them", () => {
