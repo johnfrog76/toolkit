@@ -30,7 +30,8 @@ function deps(list: () => Promise<PromptsResponse>, answer: () => Promise<Comman
 describe("the Space's how-we-work note after With agents", () => {
   it("the listing already carries the note: no call", async () => {
     const { d, run } = deps(
-      () => Promise.resolve(listing([{ group: "toolkit", path: "agentic/org/build.prompt.md" }, NOTE])),
+      () =>
+        Promise.resolve(listing([{ group: "toolkit", path: "agentic/org/build.prompt.md" }, NOTE])),
       () => Promise.resolve(reply({})),
     );
     expect(await writeHowWeWork(d, "github-demo")).toEqual({ kind: "listed" });
