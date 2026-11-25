@@ -53,9 +53,10 @@
   },
 
   "models": {
-    "_": "The model map's file (Config/models.json): every reader of a card's Agent line takes provider, family and display name from it. agentSources is the order a card's agent is worked out in (Resolve-P20CardAgent, parsers.resolve_card_agent; docs/hub/cards.md, \"How a card's agent is worked out\"): line, the card's **Agent:** line; assigned, for a card with no Agent line, its **Assigned:** value when that is a worker size -- a key of the map's current block, which resolves it to a model id -- as Route -Assign <size> writes it on a card with no issue; trailer, the Co-Authored-By trailers of the commits its bullets name; none, a person worked it alone. The first source that answers wins; none always answers, so it ends the list. label, the card's issue's worker label, is a source a caller may ask for by passing an order that names it; the shipped order does not read it, because a label says who was meant to do the work, not who did.",
+    "_": "The model map's file (Config/models.json): every reader of a card's Agent line takes provider, family and display name from it. agentSources is the order a card's agent is worked out in (Resolve-P20CardAgent, parsers.resolve_card_agent; docs/hub/cards.md, \"How a card's agent is worked out\"): line, the card's **Agent:** line; assigned, for a card with no Agent line, its **Assigned:** value when that is a worker size -- a key of the map's current block, which resolves it to a model id -- as Route -Assign <size> writes it on a card with no issue; trailer, the Co-Authored-By trailers of the commits its bullets name; none, a person worked it alone. The first source that answers wins; none always answers, so it ends the list. label, the card's issue's worker label, is a source a caller may ask for by passing an order that names it; the shipped order does not read it, because a label says who was meant to do the work, not who did. notModels are the model ids Claude Code writes on a line no model produced (<synthetic>): the usage reader does not count them, and the model object (Get-P20ModelObject, model_object) answers no object for them -- they are not a model, known or unknown.",
     "file": "Config/models.json",
-    "agentSources": ["line", "assigned", "trailer", "none"]
+    "agentSources": ["line", "assigned", "trailer", "none"],
+    "notModels": ["<synthetic>"]
   },
 
   "tokens": {
