@@ -12,7 +12,7 @@ This page is the story. The file's exact shape, field by field, is [`docs/hub/or
 | Reader | What the org is to them |
 | --- | --- |
 | **The team** | a shared understanding: who sits where, who reports to whom, and which seat merges |
-| **An agent** | `org.json`, the structure itself, readable as it is. `tkOrgChart -AsJson` prints it in the same shape the web UI reads |
+| **An agent** | `org.json`, the structure itself, readable as it is. `tkOrgChart -AsJson` prints it in the shape the web UI reads, less the few fields only the page uses |
 | **You** | the Org tab in Team Agile: the tree drawn as offices, each org's description, and each role's job description one click away |
 
 The org rides [Team Agile](modules/solitaire-agile.md). It is there wherever Team Agile is on in the
