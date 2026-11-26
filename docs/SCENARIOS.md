@@ -555,9 +555,11 @@ tag-based releases are built the rows are GitHub milestones, and the panel says 
 
 The strip reads **Standup | Triage | Releases | Org**; Org is `/solitaire-agile/org`, under the ONE Team Agile
 entry, with the chrome, and absent with the flag off whatever `org.json` says (`scenarios.test.tsx`, "Org: a
-page under Team Agile's one entry"). The page is a read: no tree to choose, no `active` state, no write. A dropdown
-previews the org presets (`GET /api/ritual/org/presets`) beside Your org, the hub's chart; a preview writes nothing
-(`OrgPage.test.tsx`, "the presets").
+page under Team Agile's one entry"). Two dropdowns sit at the header's right: **View** picks the org shown -- the
+saved orgs, then the presets (`GET /api/ritual/org/presets`) as previews -- and **Active**, once an org is saved,
+picks the one in use. The page's writes are `Staff`'s, through the bridge: "Use this org" saves a preset as a draft,
+and Active runs `Staff -Activate` (`OrgPage.test.tsx`, "the presets", "with saved orgs: View and Active", "Use this
+org: the steps").
 
 | `GET /api/ritual/org` answers | The page shows |
 | --- | --- |
@@ -568,9 +570,14 @@ previews the org presets (`GET /api/ritual/org/presets`) beside Your org, the hu
 | a position with no seats (the pool) | one wider card, `POSITION · pool`, its default-model line under it, not a link |
 | a position with a prompt | the office is a link: the prompt in the Studio's reading room (`/studio/prompts/yours/<name>`) |
 | 404 `missing` (no `org.json`) or `no-hub` | `No org chart yet`, with the agent's sentence (`There is no org.json in the hub.`) |
-| 409 (the file fails its checks) | `The org chart could not be read`, with the agent's sentence -- an error |
+| 409 (the file fails its checks) | `The org chart could not be read`, with the agent's sentence, said plainly; View opens on `Your org` and still offers the presets |
 | nothing (the agent is away) | `Could not read the org chart` -- an error |
-| and `GET /api/ritual/org/presets` serves presets | a dropdown at the right of the header, `Your org` first; picking a preset makes its title the heading with its size as a badge, puts its description under it and draws its chart; with no `org.json` the presets are still offered |
+| and `GET /api/ritual/org/presets` serves presets | View at the right of the header: the saved orgs, then the presets, smallest first; picking a preset makes its title the heading with its size as a badge, puts its description under it, draws its chart and offers `Use this org` |
+| no `org.json` yet, and presets served | View opens on the Executive Suite (Small) preview, with `A preview. Nothing is saved yet.` under the heading, and no Active dropdown -- there is nothing to choose |
+| one or more saved orgs (`trees`) | View lists them first; Active, beside it, lists them only, the active one chosen, no None; picking another runs `Staff -Activate <id>` through `POST /api/cmd/Staff`, with no confirmation, and shows that org |
+| the org shown is not the active one | one line under the heading, no badge: `A draft. Your active org is <title>.` on a saved draft, `A preview. Your active org is <title>.` on a preset; nothing on the active org |
+| `Use this org`, on a preview | a dialog with three questions, each answered with its default: who you are (`You`), the VP of engineering's model (Opus; Fable; Sonnet `(not recommended)`), the VP of product's (Fable; Opus; Sonnet `(not recommended)`); Cancel writes nothing; Save runs `Staff -Preset <size> -Owner ... -VpEngineering ... -VpProduct ...` and then shows the saved org -- a draft, or, as the first org, the one in use |
+| a write the verb refuses (`status: error`) | the verb's own sentence, said plainly -- in the dialog for a save, under the heading for Active; the agent away is the one error |
 
 ### The Lounge (on)
 

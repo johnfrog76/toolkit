@@ -6,9 +6,9 @@
 //
 //   node tests/smoke.mjs [--port=<n>] [--modules=off|on]
 //                        [--viewport=desktop|mobile|both] [--shots=<dir>]
-//   node tests/smoke.mjs --studio|--matrix|--a11y|--first-run [--port=<n>] [--agent-port=<n>] [--python=<exe>]
+//   node tests/smoke.mjs --studio|--matrix|--a11y|--first-run|--org [--port=<n>] [--agent-port=<n>] [--python=<exe>]
 //
-// (`--studio`, `--matrix`, `--a11y` and `--first-run` are modes that start and stop their OWN
+// (`--studio`, `--matrix`, `--a11y`, `--first-run` and `--org` are modes that start and stop their OWN
 // servers -- the Studio's contract, each module flag alone plus fresh and
 // hostile browser storage, axe on every page, and the first run's first drag on
 // a copy of samples/hub; see "A mode that owns its servers" below,
@@ -54,6 +54,7 @@ import { runA11y } from "./smokeA11y.mjs";
 import { runMatrix } from "./smokeMatrix.mjs";
 import { runStudio } from "./smokeStudio.mjs";
 import { runFirstRun } from "./smokeFirstRun.mjs";
+import { runOrg } from "./smokeOrg.mjs";
 
 const arg = (name, fallback) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -75,6 +76,9 @@ const arg = (name, fallback) => {
 // `--first-run` is the fourth: a COPY of samples/hub, as Start makes, and the
 // first tutorial card dragged from Backlog to To do with the moved file read
 // back (smokeFirstRun.mjs).
+// `--org` is the fifth: a COPY of samples/hub again, a preset saved from the
+// Org tab as a draft and then made active, org.json read back after each
+// (smokeOrg.mjs).
 const ownStackMode = process.argv.includes("--studio")
   ? runStudio
   : process.argv.includes("--matrix")
@@ -83,7 +87,9 @@ const ownStackMode = process.argv.includes("--studio")
       ? runA11y
       : process.argv.includes("--first-run")
         ? runFirstRun
-        : null;
+        : process.argv.includes("--org")
+          ? runOrg
+          : null;
 if (ownStackMode) {
   const ownRepoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
   process.exit(

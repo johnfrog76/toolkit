@@ -88,6 +88,8 @@ class OrgResult:
     active_tree: str = ""
     chart: dict | None = None
     seat_count: int = 0
+    # Every tree of the file, in its order, as the route lists them (``tree_summaries``).
+    trees: list[dict] = field(default_factory=list)
     path: str = ""
 
 
@@ -434,7 +436,31 @@ def read_org_chart(
     picked = next(t for t in trees if t["id"] == chosen)
     chart = _chart(picked, active)
     seat_count = sum(len(p["seats"]) for p in chart["tree"]["positions"])
-    return OrgResult("ok", warnings=warnings, active_tree=active, chart=chart, seat_count=seat_count)
+    return OrgResult(
+        "ok",
+        warnings=warnings,
+        active_tree=active,
+        chart=chart,
+        seat_count=seat_count,
+        trees=tree_summaries(trees, active),
+    )
+
+
+def tree_summaries(trees: list[dict], active_tree: str) -> list[dict]:
+    """Every tree of a valid file, in the file's order, as the Org tab lists
+    them (docs/hub/org.md, "The response"): ``{id, title, size, preset, active}``,
+    ``active`` true on the one tree in use. Each is read the way ``_chart``
+    reads a tree, so a title here is the title the tree's own chart has."""
+    return [
+        {
+            "id": t["id"],
+            "title": t["title"],
+            "size": t["size"] or None,
+            "preset": t["preset"] or None,
+            "active": t["id"] == active_tree,
+        }
+        for t in trees
+    ]
 
 
 # -- The hub -------------------------------------------------------------------
@@ -568,6 +594,7 @@ def org_chart(tree: str = "") -> dict:
         log_writer.write_log("ERR", f"agent{ROUTE}", f"{result.kind}: {result.message}")
         raise _refusal(result)
     chart = with_prompts(result.chart)
+    chart["trees"] = result.trees
     log_writer.write_log(
         "CMD",
         f"agent{ROUTE}",

@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
-import type { OrgPreset, OrgResponse } from "./api.solitaireAgile";
+import type { CommandResponse } from "../ado/api.ado";
+import type { OrgPreset, OrgResponse, OrgTreeSummary } from "./api.solitaireAgile";
 import {
   ORG_PAGE_TITLE,
   OrgPage,
@@ -16,11 +17,31 @@ import { modelNameOf, orgResponse } from "./orgFixture";
 // The responses are the SHARED table's (Tests/fixtures/org/charts/), the same
 // documents the CLI's reader and the agent's are held to.
 
-let response: { data?: OrgResponse; isLoading: boolean; error?: unknown } = { isLoading: false };
+type ChartRead = { data?: OrgResponse; isLoading: boolean; error?: unknown };
+let response: ChartRead = { isLoading: false };
+/** Another saved tree, read by ?tree=<id>, by its id. */
+let treeResponses: Record<string, ChartRead> = {};
 let presetsResponse: { data?: { presets: OrgPreset[] }; isLoading: boolean } = { isLoading: false };
+/** What the next Staff call through the bridge answers; a thrown value is the agent away. */
+let staffAnswer: () => Promise<CommandResponse> = () =>
+  Promise.resolve({ status: "success", output: "", error: "", duration: 1 } as CommandResponse);
+const runStaff = jest.fn((arg: { params: string[] }) => ({ unwrap: () => staffAnswer(), arg }));
+/** What a refetch of the active read answers (after a save). */
+let refetched: ChartRead = { isLoading: false };
+const refetch = jest.fn(() => {
+  // The hook answers what the agent now serves: the next render reads it.
+  response = refetched;
+  return Promise.resolve(refetched);
+});
 jest.mock("./api.solitaireAgile", () => ({
-  useGetOrgChartQuery: () => response,
+  useGetOrgChartQuery: (tree: string, opts?: { skip?: boolean }) =>
+    opts?.skip
+      ? { isLoading: false }
+      : tree
+        ? (treeResponses[tree] ?? { isLoading: true })
+        : { ...response, refetch },
   useGetOrgPresetsQuery: () => presetsResponse,
+  useRunStaffMutation: () => [runStaff, { isLoading: false }],
 }));
 
 function Where() {
@@ -51,7 +72,12 @@ const wheres = (el: HTMLElement) =>
 
 beforeEach(() => {
   response = { isLoading: false, data: orgResponse("valid") };
+  treeResponses = {};
   presetsResponse = { isLoading: false };
+  runStaff.mockClear();
+  refetch.mockClear();
+  staffAnswer = () =>
+    Promise.resolve({ status: "success", output: "", error: "", duration: 1 } as CommandResponse);
 });
 
 describe("the chart, over the table's tree shaped like ours", () => {
@@ -305,6 +331,7 @@ describe("when there is no chart", () => {
 function preset(id: string, size: string, title: string, chart: string): OrgPreset {
   const c = orgResponse(chart);
   c.tree.title = title;
+  c.tree.size = size;
   return {
     id,
     size,
@@ -346,20 +373,20 @@ describe("the presets", () => {
     ]);
   });
 
-  it("opens on your org: the hub's chart under its own name, with no description and no size", () => {
+  it("opens on the active org: the hub's chart under its own name, with no description and no size", () => {
     draw();
-    expect(screen.getByTestId("org-preset-select").textContent).toContain(YOUR_ORG_LABEL);
+    expect(screen.getByTestId("org-preset-select").textContent).toContain("Laptop and mini");
     expect(screen.getByTestId("org-heading").textContent).toBe("Laptop and mini");
     expect(positions()).toContain("pm");
     expect(screen.queryByTestId("org-preset-description")).toBeNull();
     expect(screen.queryByTestId("org-preset-size")).toBeNull();
   });
 
-  it("offers your org, then the presets smallest first", () => {
+  it("offers the saved orgs, then the presets smallest first", () => {
     draw();
     fireEvent.click(screen.getByTestId("org-preset-select"));
     expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
-      YOUR_ORG_LABEL,
+      "Laptop and mini",
       "Executive Suite (S)",
       "Branch Office (M)",
       "Corporate Headquarters (L)",
@@ -383,7 +410,7 @@ describe("the presets", () => {
   it("picking your org again draws the hub's chart", () => {
     draw();
     pick("Branch Office (M)");
-    pick(YOUR_ORG_LABEL);
+    pick("Laptop and mini");
     expect(positions()).toContain("pm");
     expect(screen.queryByTestId("org-preset-description")).toBeNull();
   });
@@ -397,9 +424,9 @@ describe("the presets", () => {
       },
     };
     draw();
-    expect(screen.getByText("No org chart yet")).toBeTruthy();
-    pick("Corporate Headquarters (L)");
+    expect(screen.getByTestId("org-heading").textContent).toBe("The Executive Suite");
     expect(screen.queryByText("No org chart yet")).toBeNull();
+    pick("Corporate Headquarters (L)");
     expect(positions()).toContain("pm");
   });
 
@@ -411,8 +438,8 @@ describe("the presets", () => {
 });
 
 describe("the heading with no chart", () => {
-  it("is the page's own name while there is no org.json and no preset picked", () => {
-    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+  it("is the page's own name while there is no org.json and no preset to show", () => {
+    presetsResponse = { isLoading: false };
     response = {
       isLoading: false,
       error: {
@@ -422,5 +449,265 @@ describe("the heading with no chart", () => {
     };
     draw();
     expect(screen.getByTestId("org-heading").textContent).toBe(ORG_PAGE_TITLE);
+  });
+});
+
+// -- Saved orgs, the Active dropdown and "Use this org" (card 4) ------------------
+
+/** The hub's chart with its file's trees listed, the first of them active. */
+function withTrees(trees: Partial<OrgTreeSummary>[], name = "valid"): OrgResponse {
+  const c = orgResponse(name);
+  c.trees = trees.map((t, i) => ({
+    id: t.id ?? `t${i}`,
+    title: t.title ?? `Tree ${i}`,
+    size: t.size ?? null,
+    preset: t.preset ?? null,
+    active: t.active ?? i === 0,
+  }));
+  return c;
+}
+
+const TWO = [
+  { id: "main", title: "Laptop and mini", active: true },
+  { id: "branch", title: "One machine", active: false },
+];
+
+const options = () => screen.getAllByRole("option").map((o) => o.textContent);
+
+describe("with no org saved yet (Small First)", () => {
+  beforeEach(() => {
+    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+    response = {
+      isLoading: false,
+      error: {
+        status: 404,
+        data: { detail: { kind: "missing", message: "There is no org.json in the hub." } },
+      },
+    };
+  });
+
+  it("View opens on the Executive Suite (Small) preview, and says nothing is saved yet", () => {
+    draw();
+    expect(screen.getByTestId("org-heading").textContent).toBe("The Executive Suite");
+    expect(screen.getByTestId("org-not-active").textContent).toBe(
+      "A preview. Nothing is saved yet.",
+    );
+  });
+
+  it("draws no Active dropdown: there is nothing to choose", () => {
+    draw();
+    expect(screen.queryByTestId("org-active-select")).toBeNull();
+  });
+
+  it("offers Use this org on the preview", () => {
+    draw();
+    expect(screen.getByTestId("org-use").textContent).toBe("Use this org");
+  });
+});
+
+describe("with saved orgs: View and Active", () => {
+  beforeEach(() => {
+    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+    response = { isLoading: false, data: withTrees(TWO) };
+    treeResponses = { branch: { isLoading: false, data: withTrees(TWO, "valid-tree-by-id") } };
+  });
+
+  it("View lists the saved orgs first, then the presets", () => {
+    draw();
+    fireEvent.click(screen.getByTestId("org-preset-select"));
+    expect(options()).toEqual([
+      "Laptop and mini",
+      "One machine",
+      "Executive Suite (S)",
+      "Branch Office (M)",
+      "Corporate Headquarters (L)",
+    ]);
+  });
+
+  it("Active lists the saved orgs only, the active one chosen, and no None", () => {
+    draw();
+    const select = screen.getByTestId("org-active-select");
+    expect(select.textContent).toContain("Laptop and mini");
+    fireEvent.click(select);
+    expect(options()).toEqual(["Laptop and mini", "One machine"]);
+  });
+
+  it("the active org has no line under its heading", () => {
+    draw();
+    expect(screen.queryByTestId("org-not-active")).toBeNull();
+  });
+
+  it("a saved draft says so, naming the active org", () => {
+    draw();
+    pick("One machine");
+    expect(screen.getByTestId("org-heading").textContent).toBe("One machine");
+    expect(screen.getByTestId("org-not-active").textContent).toBe(
+      "A draft. Your active org is Laptop and mini.",
+    );
+    expect(screen.queryByTestId("org-use")).toBeNull();
+  });
+
+  it("a preview says so, naming the active org", () => {
+    draw();
+    pick("Branch Office (M)");
+    expect(screen.getByTestId("org-not-active").textContent).toBe(
+      "A preview. Your active org is Laptop and mini.",
+    );
+  });
+
+  it("changing Active runs Staff -Activate through the bridge, with no confirmation", async () => {
+    draw();
+    fireEvent.click(screen.getByTestId("org-active-select"));
+    fireEvent.click(screen.getByRole("option", { name: "One machine" }));
+    await waitFor(() => expect(runStaff).toHaveBeenCalledTimes(1));
+    expect(runStaff.mock.calls[0][0]).toEqual({ params: ["-Activate", "branch"] });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("org-heading").textContent).toBe("One machine"));
+  });
+
+  it("picking the org already active writes nothing", () => {
+    draw();
+    fireEvent.click(screen.getByTestId("org-active-select"));
+    fireEvent.click(screen.getByRole("option", { name: "Laptop and mini" }));
+    expect(runStaff).not.toHaveBeenCalled();
+  });
+
+  it("a refusal is the verb's own sentence, said plainly, not as an error", async () => {
+    staffAnswer = () =>
+      Promise.resolve({
+        status: "error",
+        output: "",
+        error: "-Activate names 'branch', which is not a tree in org.json. Trees: main.",
+        duration: 1,
+      } as CommandResponse);
+    draw();
+    fireEvent.click(screen.getByTestId("org-active-select"));
+    fireEvent.click(screen.getByRole("option", { name: "One machine" }));
+    const note = await screen.findByTestId("org-note");
+    expect(note.textContent).toBe(
+      "-Activate names 'branch', which is not a tree in org.json. Trees: main.",
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("the agent away is the one error", async () => {
+    staffAnswer = () => Promise.reject(new Error("offline"));
+    draw();
+    fireEvent.click(screen.getByTestId("org-active-select"));
+    fireEvent.click(screen.getByRole("option", { name: "One machine" }));
+    const note = await screen.findByTestId("org-note");
+    expect(note.textContent).toContain("Could not reach the agent");
+  });
+});
+
+describe("Use this org: the steps", () => {
+  beforeEach(() => {
+    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+    response = { isLoading: false, data: withTrees([TWO[0]]) };
+  });
+
+  const openSteps = () => {
+    draw();
+    pick("Executive Suite (S)");
+    fireEvent.click(screen.getByTestId("org-use"));
+    return screen.getByTestId("org-use-dialog");
+  };
+
+  it("asks three questions, each answered with its default, Sonnet not recommended", () => {
+    const dialog = openSteps();
+    expect((within(dialog).getByTestId("org-step-owner") as HTMLInputElement).value).toBe("You");
+    const eng = within(dialog).getByTestId("org-step-vp-engineering");
+    const prod = within(dialog).getByTestId("org-step-vp-product");
+    expect((within(eng).getByLabelText("Opus") as HTMLInputElement).checked).toBe(true);
+    expect((within(prod).getByLabelText("Fable") as HTMLInputElement).checked).toBe(true);
+    expect(within(eng).getByLabelText("Sonnet (not recommended)")).toBeTruthy();
+    expect(
+      within(dialog).getByText(/saved as a draft: your active org stays Laptop and mini\./),
+    ).toBeTruthy();
+  });
+
+  it("Cancel leaves, and nothing is written", () => {
+    const dialog = openSteps();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByTestId("org-use-dialog")).toBeNull();
+    expect(runStaff).not.toHaveBeenCalled();
+  });
+
+  it("Save runs Staff -Preset with the answers, then shows the saved org", async () => {
+    refetched = {
+      isLoading: false,
+      data: withTrees([
+        TWO[0],
+        { id: "executive-suite", title: "The Executive Suite", size: "S", active: false },
+      ]),
+    };
+    treeResponses = {
+      "executive-suite": { isLoading: false, data: orgResponse("one-tree-no-active-tree") },
+    };
+    treeResponses["executive-suite"].data!.tree.title = "The Executive Suite";
+    const dialog = openSteps();
+    fireEvent.change(within(dialog).getByTestId("org-step-owner"), { target: { value: "Sam" } });
+    fireEvent.click(
+      within(within(dialog).getByTestId("org-step-vp-engineering")).getByLabelText(
+        "Sonnet (not recommended)",
+      ),
+    );
+    fireEvent.click(within(dialog).getByTestId("org-use-save"));
+    await waitFor(() => expect(runStaff).toHaveBeenCalledTimes(1));
+    expect(runStaff.mock.calls[0][0]).toEqual({
+      params: ["-Preset", "S", "-Owner", "Sam", "-VpEngineering", "sonnet", "-VpProduct", "fable"],
+    });
+    await waitFor(() => expect(screen.queryByTestId("org-use-dialog")).toBeNull());
+    expect(refetch).toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByTestId("org-not-active").textContent).toBe(
+        "A draft. Your active org is Laptop and mini.",
+      ),
+    );
+    expect(screen.queryByTestId("org-use")).toBeNull();
+  });
+
+  it("a first org is said to be the one in use", () => {
+    response = {
+      isLoading: false,
+      error: { status: 404, data: { detail: { kind: "missing", message: "No file." } } },
+    };
+    draw();
+    fireEvent.click(screen.getByTestId("org-use"));
+    expect(screen.getByText(/It is your first org, so it is the one in use\./)).toBeTruthy();
+  });
+
+  it("a refusal stays in the dialog as the verb's sentence, plainly", async () => {
+    staffAnswer = () =>
+      Promise.resolve({
+        status: "error",
+        output: "",
+        error:
+          "org.json already holds 3 trees (a, b, c): a file holds at most 3, so nothing was written.",
+        duration: 1,
+      } as CommandResponse);
+    const dialog = openSteps();
+    fireEvent.click(within(dialog).getByTestId("org-use-save"));
+    const refusal = await within(dialog).findByTestId("org-use-refusal");
+    expect(refusal.textContent).toContain("a file holds at most 3");
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("a file that does not read, with presets to offer", () => {
+  it("opens on Your org with the sentence that says why, the presets still there", () => {
+    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+    const message = "Positions in tree 'a' report to each other in a loop: p -> r -> q -> p.";
+    response = {
+      isLoading: false,
+      error: { status: 409, data: { detail: { kind: "cycle", message } } },
+    };
+    draw();
+    expect(screen.getByTestId("org-preset-select").textContent).toContain(YOUR_ORG_LABEL);
+    expect(screen.getByText("The org chart could not be read")).toBeTruthy();
+    expect(screen.getByText(message)).toBeTruthy();
+    expect(screen.queryByTestId("org-active-select")).toBeNull();
+    pick("Executive Suite (S)");
+    expect(screen.getByTestId("org-heading").textContent).toBe("The Executive Suite");
   });
 });

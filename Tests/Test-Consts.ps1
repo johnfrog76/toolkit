@@ -308,6 +308,8 @@ $expected = [ordered]@{
     'org.rolesFolder'           = 'org'
     # Where the package keeps the org presets: Set-Staff.ps1 reads (Get-P20Consts).org.presetsFolder.
     'org.presetsFolder'         = 'samples/org-presets'
+    # The Org tab's "Use this org" steps and Staff -Preset's VP defaults: Set-Staff.ps1 reads (Get-P20Consts).org.steps.
+    'org.steps'                 = 'owner=You,vpEngineering=opus,vpProduct=fable,families=opus fable sonnet,recommended=opus fable'
     # The model map a card's Agent id is looked up in: Get-P20ModelInfo reads (Get-P20Consts).models.file.
     'models.file'               = 'Config/models.json'
     # The order a card's agent is worked out in: Resolve-P20CardAgent reads (Get-P20Consts).models.agentSources.

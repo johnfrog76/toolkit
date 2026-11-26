@@ -124,11 +124,14 @@ $maxTrees = 3
 # still starts staffed: the role -> the family its seats start with. Every pool
 # (a position with no seats: the builders) has its default-model line set to
 # the pool's family instead. Every other seat starts vacant.
+# The two VP defaults are the Org tab's step defaults too, so both read them
+# from consts.json org.steps.
+$steps = (Get-P20Consts).org.steps
 $roleEngineering = 'vp-of-engineering.prompt.md'
 $roleProduct = 'vp-of-product.prompt.md'
 $seatDefaults = [ordered]@{
-    $roleEngineering    = 'opus'
-    $roleProduct        = 'fable'
+    $roleEngineering    = [string]$steps.vpEngineering
+    $roleProduct        = [string]$steps.vpProduct
     'team-lead.prompt.md' = 'opus'
     'intern.prompt.md'  = 'haiku'
     'butler.prompt.md'  = 'haiku'

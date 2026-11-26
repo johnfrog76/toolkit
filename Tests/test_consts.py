@@ -446,6 +446,14 @@ EXPECTED = {
     ("org", "rolesFolder"): "org",
     # Where the package keeps the org presets: config.ORG_PRESETS_DIR is read through org_presets_folder().
     ("org", "presetsFolder"): "samples/org-presets",
+    # The Org tab's "Use this org" steps and Staff -Preset's VP defaults: the web asks, the CLI fills.
+    ("org", "steps"): {
+        "owner": "You",
+        "vpEngineering": "opus",
+        "vpProduct": "fable",
+        "families": ["opus", "fable", "sonnet"],
+        "recommended": ["opus", "fable"],
+    },
     # The model map a card's Agent id is looked up in: the agent reads it through models_file().
     ("models", "file"): "Config/models.json",
     # The order a card's agent is worked out in: the agent reads it through model_agent_sources().
@@ -661,6 +669,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.org_file(), EXPECTED[("org", "file")])
         self.assertEqual(C.org_roles_folder(), EXPECTED[("org", "rolesFolder")])
         self.assertEqual(C.org_presets_folder(), EXPECTED[("org", "presetsFolder")])
+        self.assertEqual(C.consts()["org"]["steps"], EXPECTED[("org", "steps")])
         self.assertEqual(C.models_file(), EXPECTED[("models", "file")])
         self.assertEqual(C.model_agent_sources(), tuple(EXPECTED[("models", "agentSources")]))
         self.assertEqual(C.model_not_models(), tuple(EXPECTED[("models", "notModels")]))

@@ -475,20 +475,45 @@ its level's. With no `org.json` the page says `No org chart yet` and the agent's
 checks (409) is said plainly too, `The org chart could not be read` and its sentence; a tree the file does not have (422, `unknown-tree`) is said plainly in
 the page's own words, `That org chart is not in the file` and `The chart asked for is not one of the trees in the
 hub's org.json. Nothing was drawn.`, decided by the kind and never the agent's sentence, which is the
-terminal's (the page asks for no tree today, so it meets this only if that changes); no answer is `Could not read the org chart`, the one state drawn as an error: the error tone is kept for the agent being away or failing, and a thing to know about the file is not one. The page chooses no
-tree, draws no `active` state or merge, and writes nothing. `OrgPage.test.tsx` and `orgChart.test.ts` draw the shared
+terminal's (the page asks for a saved tree by the id the route listed, so it meets this only if the file changes under it); no answer is `Could not read the org chart`, the one state drawn as an error: the error tone is kept for the agent being away or failing, and a thing to know about the file is not one. The page draws no
+merge yet; its writes are `Staff`'s, below. `OrgPage.test.tsx` and `orgChart.test.ts` draw the shared
 table's charts (`Tests/fixtures/org/charts/`).
 
-A dropdown at the right of the panel's header previews the **org presets** (`GET /api/ritual/org/presets`;
-[Org presets](../hub/org.md#org-presets)): **Your org**, the hub's own chart and the default, then
-**Executive Suite (S)**, **Branch Office (M)** and **Corporate Headquarters (L)** -- a preset is named by its
-title without a leading "The", and its size. The panel's heading is the org shown: the hub's tree's name for
-Your org (`Org chart` while there is no chart), or the picked preset's title with its size beside it as a badge in words (`Small`, `Medium`, `Large`, from the file's `S`, `M`, `L` by one mapping),
-the one badge the page draws -- the heading in the panel headings' own `Subtitle2`. Under a preset's title is its
-description in Fluent's `Body2` (16px, the step at 1rem), its lines kept near 78 characters; then its chart, in the same offices and art, its open seats as empty desks. Picking Your org
-draws the hub's chart again. A preview writes nothing: `org.json` stays the hub's, hand-edited. With no
-`org.json` the page still offers the presets, the `No org chart yet` state standing in the panel while Your org
-is picked; with no preset served there is no dropdown and the page is the hub's chart alone, as before.
+Two dropdowns at the right of the panel's header keep looking at an org apart from which org is in use, the way a
+repository's branch switcher sits beside its default branch:
+
+- **View** picks the org shown. It lists the hub's **saved orgs** first -- every tree of `org.json`, from the
+  route's `trees` ([the response](../hub/org.md#the-response)) -- then the **org presets** (`GET
+  /api/ritual/org/presets`; [Org presets](../hub/org.md#org-presets)) as previews: **Executive Suite (S)**,
+  **Branch Office (M)** and **Corporate Headquarters (L)**, each named by its title without a leading "The", and
+  its size. A saved org other than the active one is read by `GET /api/ritual/org?tree=<id>`. With no org saved
+  yet, View opens on the **Executive Suite (Small)**, the simplest; with one, on the active org. A file that does
+  not read opens on **Your org**, with the sentence that says why, and still offers the presets.
+- **Active**, beside it, appears only once there is a saved org to choose. It lists the saved orgs only, never a
+  preset, and has no None. Picking one runs `Staff -Activate <tree-id>` through the bridge (`POST /api/cmd/Staff`),
+  with no confirmation, since one pick undoes it; the page then reads the file again and shows that org.
+
+The panel's heading is the org shown: its title (`Org chart` while there is no chart), with its size beside it as a
+badge in words (`Small`, `Medium`, `Large`, from the file's `S`, `M`, `L` by one mapping), the one badge the page
+draws -- the heading in the panel headings' own `Subtitle2`. When the org shown is not the active one, **one line
+under the heading** says so, and nothing else marks it: `A draft. Your active org is <title>.` on a saved draft,
+`A preview. Your active org is <title>.` on a preset, and `A preview. Nothing is saved yet.` on a preset when the hub
+has no org. Under it is the org's description, where it has one, in Fluent's `Body2` (16px, the step at 1rem), its
+lines kept near 78 characters; then its chart, in the same offices and art, its open seats as empty desks. With no
+preset served there is no dropdown and the page is the hub's chart alone, as before.
+
+**Use this org**, beside the line on a preset, opens the steps (`UseOrgDialog.tsx`): a Fluent `Dialog` with three
+questions, each already answered with its default, so any can be skipped, none comes before another, and Cancel
+leaves with nothing written -- who you are (the owner's name, `You`), the VP of engineering's model (Opus; Fable;
+Sonnet marked `not recommended`) and the VP of product's (Fable; Opus; Sonnet `not recommended`). The choices and
+defaults are `consts.json` `org.steps`, which `Staff -Preset` fills with too. A dialog and not a wizard because every
+question is in view at once: there is no order to follow and no step to be held at. **Save** is the page's one
+write of a tree: `Staff -Preset <S|M|L> -Owner ... -VpEngineering ... -VpProduct ...` through the bridge. It saves a
+**draft**, and the dialog says so ("your active org stays ..."); the hub's first org is the only one, so it is the
+one in use, and the dialog says that instead. The page then reads the file again and shows the saved org. A write
+the verb refuses (`status: error`) is shown as the verb's own sentence, plainly -- in the dialog for a save, under
+the heading for Active; the agent away is the one error. The page itself has no route that writes: every write is
+`Staff`'s.
 
 ### The page
 
@@ -1997,7 +2022,7 @@ standup is complete and correct; nothing on screen says a dress was skipped.
 | `tkTestToolkit -StartWork` | the hand-off block, typed in a fresh shell over a scratch hub built from `Tests/fixtures/start-work/`: off is no verb and no bridge entry; `StartWork 23A3` is `expected-card.md` byte for byte, and so is the card in CRLF, the id in lower case and the full filename; `39` never assembles `Task139`; a `how-we-work.md` switches section one's heading to its path -- `agentic/how-we-work.md`, which `HowWeWork` writes, over one at the Space's folder root, which is still read alone; issue 41, which no card carries, is `expected-issue.md` with one `gh issue view`; `-Prompt` absolute and package-relative; a partial name named in a terminal and refused for a non-interactive caller; and every refusal exit 2 with one `Error:` block and the hub untouched -- no row for the kind (naming `startWork.prompts.Meeting`), a row whose file is missing, a `-Prompt` that is no file, no id, nothing matching, an archived card, a closed issue, a pull request, an Azure DevOps Space, an undeclared `-Space`. And `-Launch`, from scratch clones with a stub `claude` first on the PATH: `-WhatIf` prints the worktree add, the block file, the exact command and the log and leaves nothing; the model from the `**Assigned:**` line, the Tags, an issue's label and the issue behind a numbered card; `fable` on a card and on an issue, no size, `me`, a size with no model, no git repository, another repository's origin, a failed worktree add, no `claude`, `-Clip` with `-Launch` and `-WhatIf` alone each refused with nothing started; off Windows the launch itself, read through a pipe -- back while the stub lives on, and the log's first message the block, whole |
 | `tkTestToolkit -OrgChart` | the org chart: the reader over `Tests/fixtures/org/table.json` (a case per row of [what is checked](../hub/org.md#what-is-checked) and per way a valid file reads, which `Tests/test_org.py` holds the agent's reader to as well), `OrgChart` typed in a fresh shell over a scratch copy of `samples/hub` (off is no verb, the text and `-AsJson` against the table, the whole shape's title, `roleTitle`, session and merge, every refusal exit 2 writing nothing), the `Org chart` inventory row's four states, `samples/hub/org.json` valid, and the schema (`Config/org.schema.json`) validating the sample hub's file and the three presets with `Test-Json -Schema` -- a named skip on Windows PowerShell 5.1 |
 | `Tests/test_org.py` | `GET /api/ritual/org` and the agent's reader over the same `Tests/fixtures/org/table.json`: every case read by the reader and through the route -- the chart as JSON, key order aside, once the route's `promptTitle`, `promptRef` and each seat's `modelName` are taken off, `modelName` checked where the row states it; each failure's `kind`, its sentence and its status (404 `missing` and `no-hub`, 409 for an invalid file, 422 for an unknown `tree`); the reader alone (a byte order mark, `NaN`, a number as an id, exact key names, a seat with both a model and a person, a very deep tree, siblings in file order); the prompt fields (front matter, heading, file name, none, a file the room does not list, the extension folder's copy, a renamed agentic folder, the same title as the Studio's row); the gate (the switch off, the Space answered `alone`: 404 and the file never read); nothing written to the hub; the sample hub; the presets -- the three in `samples/org-presets/`, smallest first, each passing every check with only shipped roles, a field the reader does not know read fine, a file that is no preset left out, the route needing no `org.json` and 404 with the switch off; the schema (`Config/org.schema.json`) with `jsonschema`, the sample hub's file and each preset as a tree valid, what it refuses and what it lets through; and `modelName`, the model map's name by id, by family and as written |
-| `web/src/modules/solitaireAgile/OrgPage.test.tsx`, "the presets" | the dropdown: Your org first and the hub's chart by default, then the presets smallest first, each named by its title without a leading "The" and its size; the heading the hub's tree's name, or `Org chart` with no chart; picking one makes its title the heading with its size as a badge, puts its description under it with no short description, and draws its chart, and Your org draws the hub's again; with no `org.json` the presets are still offered; with none served there is no dropdown |
+| `web/src/modules/solitaireAgile/OrgPage.test.tsx`, "the presets", "with no org saved yet (Small First)", "with saved orgs: View and Active", "Use this org: the steps" | View: the saved orgs first and the active one by default, then the presets smallest first, each named by its title without a leading "The" and its size; with no org saved, the Executive Suite (Small) preview, `A preview. Nothing is saved yet.` and no Active dropdown; a file that does not read opening on Your org with its sentence; the heading the org's title, or `Org chart` with no chart; a preset's title, size badge, description and chart; the line under the heading on a draft and on a preview, and none on the active org. Active: the saved orgs only, the active one chosen, no None; a pick running `Staff -Activate <id>` with no confirmation and showing that org, the active one writing nothing, a refusal's sentence said plainly and the agent away the one error. The steps: three questions answered with their defaults (`You`, Opus, Fable; Sonnet `(not recommended)`), the draft or first-org note, Cancel writing nothing, Save running `Staff -Preset S -Owner ... -VpEngineering ... -VpProduct ...` and then showing the saved draft, and a refusal kept in the dialog, plainly. `cliBridge.test.ts` pins the two argv builders |
 | `Tests/test_bridge.py`, "StartWorkThroughTheBridge" | `StartWork` in the bridge's table with Team Agile on and `rejected` with it off; through the bridge, `expected-card.md` byte for byte; a refusal `status: error` with the verb's sentence |
 | `web/src/modules/solitaireAgile/StartWorkBox.test.tsx` | the copy box: one `StartWork` call, `expected-card.md` shown verbatim with its head as the title, Copy copying exactly the block, a refusal shown as the verb's sentence with no Copy, the agent away said so; no **Launch** while `/env` does not say `startWorkLaunch` is true, and with it, one more `StartWork` call with `-Launch` and what it printed or refused with |
 | `tkTestToolkit -Consts`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts` | the `startWork.text` headings; the `rituals` values (`triageRoute`, `milestonesRoute`, `grains`, `numberWords`, the four `work*Regex` patterns, the `work*` phrases and the `prose*` words among them, the dress's `dressGuards` and four `dress*Regex` patterns, and what moved's `motions`, the `itemMotion`, `motion*`, `commit*` and `counts*` words, and the room's `teamSizes` and `teamSizeDefault`), stated from all three halves; the turn's `turnOpen` and `turnClose`; `{n} to walk`, `No blockers.`, `Good morning.`, `That's it for me.` and `Yesterday I closed` never retyped in the CLI's scripts or the agent; `Waiting on you`, `nothing in flight` and `Routed to` never retyped in the CLI's scripts |

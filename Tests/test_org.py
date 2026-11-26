@@ -237,6 +237,10 @@ class TheSharedTable(OrgBase):
                     }
                     for where, name in want.get("modelNames", {}).items():
                         self.assertEqual(names.get(where, "no such seat"), name, where)
+                    # The file's trees, listed: the tree shown among them, exactly one in use.
+                    trees = body.pop("trees")
+                    self.assertIn(body["tree"]["id"], [t["id"] for t in trees])
+                    self.assertEqual([t["id"] for t in trees if t["active"]], [want["activeTree"]])
                     for position in body["tree"]["positions"]:
                         # the fields only the route adds; the table's response is the shared part
                         added = {"promptTitle", "promptRef", "defaultModelName"}
@@ -381,6 +385,37 @@ class TheRoute(OrgBase):
         (self.hub / "roles" / "lead.prompt.md").write_text("# From roles\n", encoding="utf-8")
         lead = self.positions(self.client.get(ROUTE))["lead"]
         self.assertEqual((lead["promptTitle"], lead["promptRef"]), ("From roles", "yours/lead"))
+
+    def test_the_route_lists_every_tree_of_the_file_in_its_order(self):
+        doc = json.loads((FIXTURES / "docs" / "valid.json").read_text(encoding="utf-8"))
+        self.put(doc, {n: "" for n in TABLE["prompts"]})
+        for query in ("", "?tree=branch"):
+            with self.subTest(query=query):
+                body = self.client.get(ROUTE + query).json()
+                self.assertEqual(
+                    body["trees"],
+                    [
+                        {"id": "main", "title": "Laptop and mini", "size": None, "preset": None, "active": True},
+                        {"id": "branch", "title": "One machine", "size": None, "preset": None, "active": False},
+                    ],
+                )
+
+    def test_a_tree_from_a_preset_lists_its_size_and_preset(self):
+        doc = json.loads((FIXTURES / "docs" / "shape.json").read_text(encoding="utf-8"))
+        self.put(doc, {n: "" for n in TABLE["prompts"]})
+        trees = self.client.get(ROUTE).json()["trees"]
+        self.assertEqual(
+            trees,
+            [
+                {
+                    "id": "branch-office",
+                    "title": "The Branch Office",
+                    "size": "M",
+                    "preset": "branch-office",
+                    "active": True,
+                }
+            ],
+        )
 
     def test_tree_asks_for_another_tree_and_active_tree_still_says_which_is_in_use(self):
         doc = {

@@ -68,6 +68,7 @@ What each `npm run` script does:
 | `npm run smoke:matrix` | `node tests/smoke.mjs --matrix` | Each module flag alone, the flip, fresh and storage-refusing contexts, on its own servers too |
 | `npm run smoke:a11y` | `node tests/smoke.mjs --a11y` | axe on every page the registry mounts, flags off and on, `seaglass` and `aurora`, on its own servers; lists findings by impact and fails on any serious or critical one |
 | `npm run smoke:first-run` | `node tests/smoke.mjs --first-run` | The first run's first move: on a copy of `samples/hub`, the first tutorial card dragged from Backlog to To do and the moved file read back, on its own servers |
+| `npm run smoke:org` | `node tests/smoke.mjs --org` | The Org tab's first write: on a copy of `samples/hub`, the Small preset saved as a draft through Use this org, then made active through the Active dropdown, `org.json` read back after each, on its own servers |
 | (flag) `--shots=<dir>` | | One PNG per route per viewport, under the gitignored `web/shots/` |
 
 `npm run build` does **not** run the tests or the type-check. Run `npm run type-check && npm run
@@ -94,6 +95,7 @@ web/
 ├── tests/smokeMatrix.mjs   its --matrix cases, on the same kind of servers
 ├── tests/smokeA11y.mjs     its --a11y audit, on the same kind of servers
 ├── tests/smokeFirstRun.mjs  its --first-run drag, on the same kind of servers and a copy of samples/hub
+├── tests/smokeOrg.mjs       its --org save and activate on the Org tab, on the same kind of servers and a copy of samples/hub
 ├── tests/jest.setup.cjs   jest setupFiles: Node's TextEncoder/TextDecoder for jsdom, which React Router 8 needs
 ├── tests/jest.layout.cjs  jest setupFiles: an offsetParent and a <body> size, so Fluent's focus layer sees what can take focus
 ├── tests/jest.afterEnv.cjs jest setupFilesAfterEnv: Testing Library waits up to 5 s for an element
@@ -159,7 +161,8 @@ web/
     │   ├── MilestonesPage  one row per milestone, its bar the tracker's numbers; the award queue (award.ts)
     │   ├── AwardDialog     the award -- congratulations, what it took, the trophy -- and useConfetti()'s one caller
     │   ├── Trophy          the award's picture: a gold trophy, an inline SVG
-    │   ├── OrgPage         the org chart: offices by level, walls by level, a card a seat, an office a link to its prompt
+    │   ├── OrgPage         the org chart: offices by level, walls by level, a card a seat, an office a link to its prompt; View and Active
+    │   ├── UseOrgDialog    "Use this org": the three steps, answered with their defaults, saved through Staff -Preset
     │   ├── orgChart.ts     the chart's rules: the position-to-face map, the walls, the plates' words, the tidy-tree layout
     │   ├── OrgParts        an office door (frame, wall, sill) and the plate under it
     │   ├── VacantSeat      a seat nobody sits in -- today a placeholder; the empty desk scene replaces its inside
@@ -2062,6 +2065,10 @@ takes about ten minutes. `docs/TESTING.md` has the detail.
 **`--first-run`** (`npm run smoke:first-run`) is the first tutorial card's move, on the same kind of
 servers with a COPY of `samples/hub` as the hub (the way `Start` makes one): Demo's board shows the card
 alone in Backlog, the drag lands it in To do, and the file is read back from `demo/current/`.
+
+**`--org`** (`npm run smoke:org`) is the Org tab's first write, on the same kind of servers and a copy of
+`samples/hub`: the Small preset saved as a draft through **Use this org**, then made active through the **Active**
+dropdown, with `org.json` read back after each.
 
 **A second axis: the viewport.**
 

@@ -573,9 +573,23 @@ export interface OrgTree {
   positions: OrgPosition[];
 }
 
+/** One tree of the hub's file, as the route lists them: every saved org. */
+export interface OrgTreeSummary {
+  id: string;
+  title: string;
+  size: string | null;
+  /** The preset the tree was saved from. */
+  preset: string | null;
+  /** True on the one tree in use (the file's activeTree, or its only tree). */
+  active: boolean;
+}
+
 export interface OrgResponse {
   activeTree: string;
   tree: OrgTree;
+  /** Every tree of the file, in its order: added by GET /api/ritual/org alone
+   *  (a preset's chart has none). */
+  trees?: OrgTreeSummary[];
 }
 
 /** A refusal's detail: the kind is the contract, the message the sentence. */
@@ -586,17 +600,30 @@ export interface OrgRefusal {
 
 export const ORG_QUERY = underBase(RITUALS.orgRoute);
 
-export const orgEndpoints = api.injectEndpoints({
+/** The org file's tag: Staff's writes invalidate every chart read. */
+const orgApi = api.enhanceEndpoints({ addTagTypes: ["Org"] });
+
+export const orgEndpoints = orgApi.injectEndpoints({
   endpoints: (builder) => ({
-    // GET /api/ritual/org -- the tree in use, read from the hub's org.json
-    getOrgChart: builder.query<OrgResponse, void>({
-      query: () => ORG_QUERY,
+    // GET /api/ritual/org[?tree=<id>] -- the tree in use (""), or another saved
+    // tree of the hub's org.json; each answer lists every tree of the file.
+    getOrgChart: builder.query<OrgResponse, string>({
+      query: (tree) => (tree ? `${ORG_QUERY}?tree=${encodeURIComponent(tree)}` : ORG_QUERY),
       keepUnusedDataFor: CACHE_TTL,
+      providesTags: ["Org"],
+    }),
+
+    // POST /api/cmd/Staff -- the org file's one writer, through the bridge: a
+    // preset saved as a draft (buildStaffPresetParams) or the tree in use chosen
+    // (buildStaffActivateParams). Either way every chart is read again.
+    runStaff: builder.mutation<CommandResponse, { params: string[] }>({
+      query: ({ params }) => ({ url: "cmd/Staff", method: "POST", body: { params } }),
+      invalidatesTags: ["Org"],
     }),
   }),
 });
 
-export const { useGetOrgChartQuery } = orgEndpoints;
+export const { useGetOrgChartQuery, useRunStaffMutation } = orgEndpoints;
 
 // -- The org presets (the Org tab's dropdown) ------------------------------
 //

@@ -21,6 +21,8 @@ import {
   buildEditWorkItemParams,
   buildStandupRemindParams,
   buildRouteParams,
+  buildStaffActivateParams,
+  buildStaffPresetParams,
   buildMoveDesignParams,
   buildCoverParams,
   splitHubUnsets,
@@ -841,6 +843,43 @@ describe("buildStandupRemindParams", () => {
 
 // Route's argv -- Scripts/Set-Route.ps1's param() block. The number is
 // positional; each answer is one switch, and the verb writes one gh edit each.
+describe("buildStaffPresetParams and buildStaffActivateParams", () => {
+  it("is -Preset, then each answer given, in the param() block's order", () => {
+    expect(buildStaffPresetParams({ size: "S" })).toEqual(["-Preset", "S"]);
+    expect(
+      buildStaffPresetParams({
+        size: "M",
+        owner: " Sam Lee ",
+        vpEngineering: "opus",
+        vpProduct: "fable",
+      }),
+    ).toEqual([
+      "-Preset",
+      "M",
+      "-Owner",
+      "Sam Lee",
+      "-VpEngineering",
+      "opus",
+      "-VpProduct",
+      "fable",
+    ]);
+  });
+
+  it("leaves a blank answer out, so the verb's default fills it", () => {
+    expect(buildStaffPresetParams({ size: "L", owner: "  ", vpProduct: "" })).toEqual([
+      "-Preset",
+      "L",
+    ]);
+  });
+
+  it("activates by the switch and the tree's id, never with -Preset", () => {
+    expect(buildStaffActivateParams("executive-suite-2")).toEqual([
+      "-Activate",
+      "executive-suite-2",
+    ]);
+  });
+});
+
 describe("buildRouteParams", () => {
   it("puts the issue number first, positional", () => {
     expect(buildRouteParams({ number: 132 })).toEqual(["132"]);
