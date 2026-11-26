@@ -99,7 +99,9 @@ text fields as text (a number as its text).
 
 ### One complete tree
 
-The Branch Office, staffed, after the owner has named themselves ("Sam") and a few seats are filled:
+A tree started from the Branch Office and then edited by hand -- its one team lead office given a second seat --
+after the owner has named themselves ("Sam") and a few seats are filled. The preset itself has one team, one lead
+and its own builders ([Org presets](#org-presets)); a hand-made office of several seats reads and draws as well:
 
 ```json
 {
@@ -177,7 +179,8 @@ shadowing a shipped one.
 
 A **position** is the office; its prompt is the job description; the model in it is **staffing**, which
 changes for budget or quality. A position holds an **array of seats**, because one office can be filled
-more than once: a team lead is one office with a seat per Space.
+more than once. The presets give each team an office of its own instead -- one lead seat and the team's own
+builder pool under it, a column a team -- and a hand-made office of several seats is drawn as a room.
 
 | State | When | How it reads |
 | --- | --- | --- |
@@ -352,15 +355,16 @@ and [`Staff -Preset`](#the-one-writer-staff) saves a copy of one as a tree of `o
 | Size | Preset | `id` | Seats | Room | Fits |
 | --- | --- | --- | --- | --- | --- |
 | S | The Executive Suite | `executive-suite` | the owner, the VP of engineering (drives the work through builders) and the VP of product (reads what ships and holds the merge); a builder pool | 3 | one product, one person, moving fast |
-| M | The Branch Office | `branch-office` | S, plus a team lead with a seat per product and builders under them, and a test runner; leads send their readies straight to the seat that merges | 6 | two or three products |
-| L | Corporate Headquarters | `corporate-headquarters` | M, plus a PM the leads report to, a merge stand-in, the butler (the weekly bot) and the intern | 9 | many products, a heavy merge queue, an owner with little time |
+| M | The Branch Office | `branch-office` | S, plus one team -- a team lead (`lead-team`, one seat) with its own builder pool (`builders-team`) -- and a test runner; the lead sends its readies straight to the seat that merges | 6 | two or three products |
+| L | Corporate Headquarters | `corporate-headquarters` | M, plus a PM, a team for each project under it -- two to start, `lead-team-1` and `lead-team-2`, each one lead with its own builder pool (`builders-team-1`, `builders-team-2`) -- a merge stand-in, the butler (the weekly bot) and the intern | 9 | many products, a heavy merge queue, an owner with little time |
 
 In every preset **the VP of product holds the merge**. The roles write the merge once, as the VP of
 engineering's by default, and let a team place it elsewhere ([the roles](../../agentic/org/README.md)); each
 preset's description says where it sits. The merge stand-in covers that seat's merge. The owner's seat is a person (`You`); every other seat is open, for the owner to fill. No seat names a machine, and no
 tree lists any: sessions talk across machines, so a machine is not a boundary in an org.
-The test runner, the merge stand-in and the builders name no role, because none is shipped for them. L has ten seats for a room of
-nine: the room seats who has work first, and the butler is a weekly bot.
+The test runner, the merge stand-in and the builders name no role, because none is shipped for them. M has five seats for a room of
+six, and L ten for a room of nine: the room seats who has work first, and the butler is a weekly bot. Every
+team lead's seat is `lead`, and no team names a Space yet: binding a team to a Space is a later step.
 
 A preset file is **one tree** in [the shape](#a-tree), read as the one tree of a file, and it validates against
 the schema's `#/$defs/tree`. The fields a preset uses:
@@ -402,14 +406,17 @@ Staff -Activate <tree-id> [-WhatIf]
   family resolves through the map's `current` block, an id passes through, and nothing is parsed. A name that is
   neither is refused.
 
-  | Position | Its seats start with |
+  The defaults are keyed by the **role** a position names -- its `prompt` -- not by its id, so every team's lead
+  starts staffed whatever its office is called:
+
+  | A position whose role is | Its seats start with |
   | --- | --- |
-  | `vp-engineering` | Opus, or `-VpEngineering <model>` |
-  | `vp-product` | Fable, or `-VpProduct <model>`, and `merges: true` |
-  | `team-lead` | Opus, every seat |
-  | `intern`, `butler` | Haiku |
-  | `builder` (the pool) | its `defaultModel` line becomes Sonnet's id |
-  | `pm`, `test-runner`, `merge-stand-in`, and any other | vacant |
+  | `vp-of-engineering.prompt.md` | Opus, or `-VpEngineering <model>` |
+  | `vp-of-product.prompt.md` | Fable, or `-VpProduct <model>`, and `merges: true` |
+  | `team-lead.prompt.md` | Opus, every seat |
+  | `intern.prompt.md`, `butler.prompt.md` | Haiku |
+  | any pool (no seats: the builders, each team's own) | its `defaultModel` line becomes Sonnet's id |
+  | anything else -- the PM, the test runner, the merge stand-in | vacant |
 
 - **A saved tree is a draft.** `-Preset` never changes the tree in use; `-Activate <tree-id>` is the one way to
   choose it, and it does not go with `-Preset`. The first tree of a new file is the only one, so by the reading

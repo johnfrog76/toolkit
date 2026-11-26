@@ -605,7 +605,8 @@ try {
     Assert-Equal '  the tree in use stays as it was' 'executive-suite' $doc.activeTree
     Assert-Equal '  -VpEngineering takes a model id as it is' 'claude-sonnet-5-5' (Get-OrgSeat $b3 'vp-engineering')[0].model
     Assert-Equal '  -VpProduct takes a family, stored as its id' $idOf.opus (Get-OrgSeat $b3 'vp-product')[0].model
-    Assert-Equal '  every team lead seat is current.opus' "$($idOf.opus),$($idOf.opus)" (@((Get-OrgSeat $b3 'team-lead') | ForEach-Object { $_.model }) -join ',')
+    Assert-Equal '  the team lead''s seat is current.opus, by its role (team-lead.prompt.md), whatever its office is called' $idOf.opus (@((Get-OrgSeat $b3 'lead-team') | ForEach-Object { $_.model }) -join ',')
+    Assert-Equal '  and the team''s own builder pool''s line is current.sonnet' $idOf.sonnet (@($b3.positions | Where-Object { $_.id -eq 'builders-team' })[0].defaultModel)
     Assert-True '  the test runner starts vacant' (-not (Get-OrgSeat $b3 'test-runner')[0].PSObject.Properties['model'])
     Assert-True '  OrgChart -Tree prints the draft, not the tree in use' ((Get-Section $third.All 'branch').StartsWith('Org chart: The Branch Office (branch) -- not the tree in use (executive-suite)')) $third.All
 
@@ -658,6 +659,9 @@ try {
     Assert-Equal '  the intern and the butler: current.haiku' "$($idOf.haiku),$($idOf.haiku)" ("$((Get-OrgSeat $hq 'intern')[0].model),$((Get-OrgSeat $hq 'butler')[0].model)")
     Assert-True '  the PM, the test runner and the merge stand-in start vacant' (@('pm', 'test-runner', 'merge-stand-in' | ForEach-Object { (Get-OrgSeat $hq $_)[0].PSObject.Properties['model'] } | Where-Object { $_ }).Count -eq 0)
     Assert-Equal '  the preset''s own id is kept as its preset' 'corporate-headquarters' $hq.preset
+    Assert-Equal '  each team''s lead is current.opus, one lead to a team' "$($idOf.opus),$($idOf.opus)" ("$((Get-OrgSeat $hq 'lead-team-1')[0].model),$((Get-OrgSeat $hq 'lead-team-2')[0].model)")
+    Assert-Equal '  and each team''s own pool''s line current.sonnet' "$($idOf.sonnet),$($idOf.sonnet)" ((@('builders-team-1', 'builders-team-2' | ForEach-Object { $id = $_; @($hq.positions | Where-Object { $_.id -eq $id })[0].defaultModel })) -join ',')
+    Assert-True '  and no team is bound to a Space: binding one is a later step' (@('lead-team-1', 'lead-team-2' | ForEach-Object { (Get-OrgSeat $hq $_)[0].PSObject.Properties['space'] } | Where-Object { $_ }).Count -eq 0)
 
     # -Activate on a one-tree file with no activeTree: that tree is already in use.
     $before = Get-OrgBytes

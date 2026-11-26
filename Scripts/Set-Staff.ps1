@@ -118,18 +118,23 @@ $fileName = Get-P20OrgFileName
 $cfg = $global:P20Config
 $maxTrees = 3
 
-# The default models (docs/hub/org.md, "Staff"): a position's id -> the family
-# its seats start with. The pool's family is its default-model line instead.
-# Every other seat starts vacant.
+# The default models (docs/hub/org.md, "The one writer: Staff"), keyed by the
+# ROLE a position names -- its prompt, the role file -- not by its id, so a
+# preset may call its offices what it likes (lead-team-1, lead-team-2) and each
+# still starts staffed: the role -> the family its seats start with. Every pool
+# (a position with no seats: the builders) has its default-model line set to
+# the pool's family instead. Every other seat starts vacant.
+$roleEngineering = 'vp-of-engineering.prompt.md'
+$roleProduct = 'vp-of-product.prompt.md'
 $seatDefaults = [ordered]@{
-    'vp-engineering' = 'opus'
-    'vp-product'     = 'fable'
-    'team-lead'      = 'opus'
-    'intern'         = 'haiku'
-    'butler'         = 'haiku'
+    $roleEngineering    = 'opus'
+    $roleProduct        = 'fable'
+    'team-lead.prompt.md' = 'opus'
+    'intern.prompt.md'  = 'haiku'
+    'butler.prompt.md'  = 'haiku'
 }
 $poolDefault = 'sonnet'
-$mergesPosition = 'vp-product'
+$mergesRole = $roleProduct
 
 function Stop-Staff([string]$Message, [string]$Hint = '') {
     if (-not $Hint) { $Hint = "Usage: $usage" }
@@ -242,9 +247,9 @@ if ($creating) {
     }
     # A given model is resolved on its own: a default is looked up only where none was given.
     if ($PSBoundParameters.ContainsKey('VpEngineering')) { $vpEngModel = & $resolve $VpEngineering '-VpEngineering' }
-    else { $vpEngModel = & $resolve $seatDefaults['vp-engineering'] 'the default' }
+    else { $vpEngModel = & $resolve $seatDefaults[$roleEngineering] 'the default' }
     if ($PSBoundParameters.ContainsKey('VpProduct')) { $vpProdModel = & $resolve $VpProduct '-VpProduct' }
-    else { $vpProdModel = & $resolve $seatDefaults['vp-product'] 'the default' }
+    else { $vpProdModel = & $resolve $seatDefaults[$roleProduct] 'the default' }
     if ($PSBoundParameters.ContainsKey('Owner') -and -not ([string]$Owner).Trim()) { Stop-Staff '-Owner needs a name: the owner is a person, in your own words.' }
     if ($PSBoundParameters.ContainsKey('Title') -and -not ([string]$Title).Trim()) { Stop-Staff '-Title needs the words to call the tree.' }
 
@@ -284,7 +289,7 @@ if ($creating) {
     }
     if ($PSBoundParameters.ContainsKey('Title')) { Set-StaffField $newTree 'title' $Title.Trim() }
     foreach ($position in (Get-P20OrgItems (Get-P20OrgField $newTree 'positions'))) {
-        $positionId = Get-P20OrgText (Get-P20OrgField $position 'id')
+        $role = Get-P20OrgText (Get-P20OrgField $position 'prompt')
         $seats = (Get-P20OrgItems (Get-P20OrgField $position 'seats'))
         $isRoot = -not (Get-P20OrgText (Get-P20OrgField $position 'reportsTo'))
         if ($isRoot) {
@@ -294,17 +299,17 @@ if ($creating) {
             continue
         }
         if ($seats.Count -eq 0) {
-            if ($positionId -ceq 'builder') { Set-StaffField $position 'defaultModel' (& $resolve $poolDefault 'the default') }
+            Set-StaffField $position 'defaultModel' (& $resolve $poolDefault 'the default')
             continue
         }
         $model = ''
-        if ($positionId -ceq 'vp-engineering') { $model = $vpEngModel }
-        elseif ($positionId -ceq 'vp-product') { $model = $vpProdModel }
-        elseif ($seatDefaults.Contains($positionId)) { $model = & $resolve $seatDefaults[$positionId] 'the default' }
+        if ($role -ceq $roleEngineering) { $model = $vpEngModel }
+        elseif ($role -ceq $roleProduct) { $model = $vpProdModel }
+        elseif ($role -and $seatDefaults.Contains($role)) { $model = & $resolve $seatDefaults[$role] 'the default' }
         if (-not $model) { continue }
         foreach ($seat in $seats) {
             Set-StaffField $seat 'model' $model
-            if ($positionId -ceq $mergesPosition) { Set-StaffField $seat 'merges' $true }
+            if ($role -ceq $mergesRole) { Set-StaffField $seat 'merges' $true }
         }
     }
 }

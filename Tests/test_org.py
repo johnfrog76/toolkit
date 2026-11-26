@@ -591,12 +591,29 @@ class ThePresets(unittest.TestCase):
                     with self.subTest(p["id"], seat=seat["id"]):
                         self.assertEqual(seat["state"], "vacant")
 
-    def test_the_seats_fill_the_room_in_s_and_m(self):
-        # L has ten seats for a room of nine: the room seats who has work first.
-        for p in self.presets[:2]:
+    def test_the_seats_and_the_room(self):
+        # S fills its room of three. M has five seats for a room of six, and L ten for a room of
+        # nine: the room seats who has work first.
+        seats = [sum(len(x["seats"]) for x in p["chart"]["tree"]["positions"]) for p in self.presets]
+        self.assertEqual(seats, [3, 5, 10])
+        self.assertEqual(seats[0], self.presets[0]["teamSize"])
+
+    def test_a_team_is_one_lead_and_its_own_builders(self):
+        # One lead seat to an office, and each lead's own pool reporting to it alone: M has one
+        # team, L one under the PM for each project.
+        want = {"executive-suite": 0, "branch-office": 1, "corporate-headquarters": 2}
+        for p in self.presets:
+            positions = p["chart"]["tree"]["positions"]
+            leads = [x for x in positions if x["prompt"] == "team-lead.prompt.md"]
             with self.subTest(p["id"]):
-                seats = sum(len(x["seats"]) for x in p["chart"]["tree"]["positions"])
-                self.assertEqual(seats, p["teamSize"])
+                self.assertEqual(len(leads), want[p["id"]])
+                for lead in leads:
+                    self.assertEqual([s["id"] for s in lead["seats"]], ["lead"])
+                    pools = [x for x in positions if x["reportsTo"] == lead["id"]]
+                    self.assertEqual(len(pools), 1, lead["id"])
+                    self.assertEqual((pools[0]["seats"], pools[0]["title"]), ([], "Builder"))
+                    boss = "pm" if p["id"] == "corporate-headquarters" else "vp-engineering"
+                    self.assertEqual(lead["reportsTo"], boss)
 
     def test_no_seat_names_a_machine_and_no_text_names_one(self):
         # Sessions talk across machines, so a machine is not a boundary in an org.

@@ -25,11 +25,13 @@ one from its dropdown:
 
 - **The Executive Suite (Small).** You, a VP of engineering who drives the work through builders, and a
   VP of product who reads what ships and holds the merge. Every decision is made at the top.
-- **The Branch Office (Medium).** The Executive Suite, plus a team lead who takes the cards, briefs a
-  builder for each and checks the work, and a test runner who proves each change before it merges.
+- **The Branch Office (Medium).** The Executive Suite, plus one team -- a team lead with their own
+  builders, who takes the cards, briefs a builder for each and checks the work -- and a test runner who
+  proves each change before it merges.
 - **Corporate Headquarters (Large).** The full org, with seats for the process: a PM who plans the work
-  and keeps the record, team leads under the PM, a merge stand-in, a weekly butler that keeps the design
-  notes tidy, and an intern that fetches the milestones and drafts proposals.
+  and keeps the record, a team for each project under the PM, each lead with their own builders, a merge
+  stand-in, a weekly butler that keeps the design notes tidy, and an intern that fetches the milestones and
+  drafts proposals.
 
 **Small first.** The Executive Suite is the simplest, and the place to learn how a team of agents works
 together: a few seats, a few choices, each with a sensible default. Each org's description on the Org tab
@@ -72,19 +74,21 @@ An org is made of **positions**, the offices, and the **seats** in each:
 - **Every other seat** holds a model and, if you like, the name of the session that sits there: the name
   other sessions use to reach it. A seat with neither is **vacant**, and the Org tab draws it as an empty
   desk.
-- **Builders are a pool,** not seats. They come and go with the cards, at the pool's default model.
+- **Builders are a pool,** not seats. They come and go with the cards, at the pool's default model. A team
+  is one lead and its own pool, so each team's builders work for that lead alone.
 - **The default models** a saved org starts with:
 
   | Seat | Starts with |
   | --- | --- |
   | VP of engineering | Opus (`-VpEngineering` to choose another) |
   | VP of product | Fable (`-VpProduct` to choose another), and the merge |
-  | Team lead | Opus |
-  | Builders (the pool) | Sonnet |
+  | Team lead, in every team | Opus |
+  | Builders (each team's own pool) | Sonnet |
   | Intern, butler | Haiku |
   | PM, test runner, merge stand-in | vacant, for you to fill |
 
-  A model is stored as its id from [`Config/models.json`](../Config/models.json), and the page shows its
+  A seat starts with its default by the role it holds, so every team's lead starts at Opus whatever its
+  office is called. A model is stored as its id from [`Config/models.json`](../Config/models.json), and the page shows its
   name ("Opus 5.5") by looking it up, never by reading the id.
 
 ## How it fits orchestration

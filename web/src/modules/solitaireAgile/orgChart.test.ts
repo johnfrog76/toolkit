@@ -1,4 +1,8 @@
+import fs from "node:fs";
+import path from "node:path";
 import { FACE_IDS } from "../../shared/refinedFaces";
+import type { OrgPosition } from "./api.solitaireAgile";
+import type { PlacedOffice } from "./orgChart";
 import {
   LEVEL_FACES,
   LEVEL_WALLS,
@@ -52,7 +56,7 @@ describe("the position-to-face map", () => {
   it("the lead's seats take its faces in turn; an unnamed position takes its level's", () => {
     const lead = orgResponse("valid").tree.positions.find((p) => p.id === "team-lead")!;
     expect(lead.seats.map((_, i) => seatFace(lead, i))).toEqual(["dev-hero", "ops-dev", "qa"]);
-    const stranger = { ...lead, id: "not-in-the-map", level: 1 };
+    const stranger = { ...lead, id: "not-in-the-map", prompt: null, level: 1 };
     expect(positionFaces(stranger, 0)[0]).toBe("designer");
     expect(positionFaces(stranger, 1)[0]).toBe("ultrawide");
     expect(positionFaces({ ...stranger, level: 9 })).toEqual(LEVEL_FACES[4]);
@@ -145,4 +149,106 @@ describe("the layout", () => {
       expect(o.left + o.width).toBeLessThanOrEqual(layout.width);
     }
   });
+});
+
+// -- A team is one lead and its own builders (the M and L presets) ---------------
+
+/** A preset file's positions in tree order with their level, as the route serves them. */
+function presetPositions(file: string): OrgPosition[] {
+  const raw = JSON.parse(
+    fs.readFileSync(path.resolve(__dirname, "../../../../samples/org-presets", file), "utf8"),
+  ) as {
+    positions: {
+      id: string;
+      title?: string;
+      prompt?: string;
+      reportsTo?: string;
+      seats?: { id: string }[];
+    }[];
+  };
+  const out: OrgPosition[] = [];
+  const walk = (id: string | undefined, level: number) => {
+    for (const p of raw.positions.filter((x) => (x.reportsTo ?? undefined) === id)) {
+      out.push({
+        id: p.id,
+        title: p.title ?? p.id,
+        prompt: p.prompt ?? null,
+        reportsTo: p.reportsTo ?? null,
+        defaultModel: null,
+        defaultModelName: null,
+        recommend: [],
+        level,
+        seats: (p.seats ?? []).map((s) => ({
+          id: s.id,
+          roleTitle: null,
+          model: null,
+          modelName: null,
+          person: null,
+          session: null,
+          merges: null,
+          space: null,
+          state: "vacant" as const,
+        })),
+        promptTitle: null,
+        promptRef: null,
+      });
+      walk(p.id, level + 1);
+    }
+  };
+  walk(undefined, 0);
+  return out;
+}
+
+describe("the faces of a team, by its role", () => {
+  it("a lead's office is a lead's faces whatever it is called, and every pool is builders", () => {
+    for (const file of ["branch-office.json", "corporate-headquarters.json"]) {
+      const positions = presetPositions(file);
+      for (const p of positions.filter((x) => x.id.startsWith("lead-team"))) {
+        expect(positionFaces(p)).toBe(POSITION_FACES["team-lead"]);
+      }
+      for (const p of positions.filter((x) => x.id.startsWith("builders-team"))) {
+        expect(positionFaces(p)).toBe(POSITION_FACES.builder);
+      }
+    }
+  });
+});
+
+describe("the layout of a team: one lead, its own pool", () => {
+  it.each([
+    ["branch-office.json", [["lead-team", "builders-team"]]],
+    [
+      "corporate-headquarters.json",
+      [
+        ["lead-team-1", "builders-team-1"],
+        ["lead-team-2", "builders-team-2"],
+      ],
+    ],
+  ])(
+    "%s: each lead is a bare one-seat office, with a line to its own pool under it",
+    (file, teams) => {
+      const layout = layoutChart(presetPositions(file));
+      const at = (id: string) => layout.offices.find((o) => o.position.id === id)!;
+      const lines = layout.lines.map((l) => `${l.from.position.id}>${l.to.position.id}`);
+      for (const [lead, pool] of teams) {
+        expect(at(lead).width).toBe(SIZE.cell + 2 * SIZE.pad);
+        expect(at(pool).width).toBe(SIZE.poolCell + 2 * SIZE.pad);
+        expect(at(pool).cx).toBe(at(lead).cx);
+        expect(lines.filter((l) => l.endsWith(`>${pool}`))).toEqual([`${lead}>${pool}`]);
+        expect(lines.filter((l) => l.startsWith(`${lead}>`))).toEqual([`${lead}>${pool}`]);
+      }
+      for (const o of layout.offices) {
+        expect(o.left).toBeGreaterThanOrEqual(0);
+        expect(o.left + o.width).toBeLessThanOrEqual(layout.width);
+      }
+      // No two offices on a row overlap: a column a team.
+      const rows = new Map<number, PlacedOffice[]>();
+      for (const o of layout.offices) rows.set(o.top, [...(rows.get(o.top) ?? []), o]);
+      for (const row of rows.values()) {
+        const sorted = [...row].sort((a, b) => a.left - b.left);
+        for (let i = 1; i < sorted.length; i++) {
+          expect(sorted[i].left).toBeGreaterThanOrEqual(sorted[i - 1].left + sorted[i - 1].width);
+        }
+      }
+    },
+  );
 });

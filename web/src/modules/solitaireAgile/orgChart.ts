@@ -36,10 +36,20 @@ export const LEVEL_FACES: readonly (readonly FaceId[])[] = [
   ["minimalist", "new-hire", "vibemancer", "qa"],
 ];
 
+/** A position the map does not name by id takes its role's faces: a team lead's
+ *  office is a lead whatever it is called (lead-team-1), and a pool is builders. */
+export const ROLE_FACES: Readonly<Record<string, string>> = {
+  "team-lead.prompt.md": "team-lead",
+};
+export const POOL_FACES = "builder";
+
 /** The faces a position's seats take in turn. `order` is the position's place
  *  among its level's positions, so two unnamed positions on one level differ. */
 export function positionFaces(position: OrgPosition, order = 0): readonly FaceId[] {
-  const named = POSITION_FACES[position.id];
+  const named =
+    POSITION_FACES[position.id] ??
+    (position.prompt ? POSITION_FACES[ROLE_FACES[position.prompt] ?? ""] : undefined) ??
+    (position.seats.length === 0 ? POSITION_FACES[POOL_FACES] : undefined);
   if (named) return named;
   const level = LEVEL_FACES[Math.min(Math.max(position.level, 0), LEVEL_FACES.length - 1)];
   return [...level.slice(order % level.length), ...level.slice(0, order % level.length)];
