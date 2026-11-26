@@ -70,7 +70,9 @@ M1b 1.6.0  The bar, held again   cut 2026-11-09: the request gate, names are nam
         |
 M2b 1.7.0  The standup seats the team   cut 2026-11-22: team size and the room, the org chart, the Agent line, the refined cast, one list shape, the settings drawer, the sign-in strip
         |
-M4b 1.8.0  The tour                    Kit's narrated tour, and the ten-minute walk on a machine that has never seen the product
+M2c 1.8.0  The org                     cut 2026-11-25: the shipped roles, the butler as a weekly bot, What's new, one record header
+        |
+M4b 1.9.0  The tour                    Kit's narrated tour, and the ten-minute walk on a machine that has never seen the product
         |
 M5         The rename                 a cards core and an ado module; no version
         :
@@ -163,7 +165,7 @@ the release is not held on a deck.
 ### M4c -- 1.5.0, Team Agile says what it is -- cut 2026-10-26
 
 Team Agile's page says what it is for, and what it shows has a place of its own. **Cut 2026-10-26** with all
-three on main and green, ahead of the tour, which carries to 1.8.0 unchanged.
+three on main and green, ahead of the tour, which carries to 1.9.0 unchanged.
 
 - The standup page opens on an **Agenda**: what moved since the last standup, and what is waiting on you,
   as cards with one action, Work it now; the suggestion's row above them; the text stays on its own tabs (C6VH).
@@ -206,10 +208,26 @@ person, and a card names the model that works it. **Cut 2026-11-22.**
 - **The desk:** `Daily` in the terminal, `Burn -Reading` and the weekly burndown, `Test -Isolated`, the Python
   requirements floors, and the Windows PowerShell 5.1 fixes from the review queue.
 
-Carries to 1.8.0: the tour (M4b), unchanged; and two `VERIFY.md` Gate 12 rows wait for the Windows host, the
+Carries on: the tour (M4b), unchanged, now 1.9.0; and two `VERIFY.md` Gate 12 rows wait for the Windows host, the
 requirements floors under a real `py -3` and the sign-in strip against a real signed-out `az`.
 
-### M4b -- 1.8.0, the tour
+### M2c -- 1.8.0, the org -- cut 2026-11-25
+
+The org's seats get roles of their own, and each one reads the work at hand before it does its job.
+**Done when:** every office in the sample hub's `org.json` names a shipped role, and the butler runs weekly
+on its own. **Cut 2026-11-25**, ahead of the tour, which carries to 1.9.0 unchanged.
+
+- **The roles:** `agentic/org/` ships the PM, the team lead, the VPs of engineering and product, the intern
+  and the butler; each opens by reading its situation -- the Space, the tracker, the open cards, what waits on
+  whom -- and a role of the hub's own under the same name wins.
+- **The butler as a weekly bot:** a routine you schedule stamps every design with no id and reports what
+  looks finished, with the evidence and the `MoveDesign` call that would archive it; it archives nothing itself.
+- **What's new:** the web UI opens the release's notes the first time it runs a new version, and again from
+  the account menu.
+- **One record header:** every page that shows one record draws the same header, its File line a button
+  that copies the path or the link.
+
+### M4b -- 1.9.0, the tour
 
 **Done when:** Kit's guided tour is narrated and in the launcher, and the ten-minute walk has been timed on a
 machine that has never seen the product (the `VERIFY.md` Gate 12 row 4D77 added, with the time on it).
