@@ -386,7 +386,7 @@ describe("the presets", () => {
     draw();
     fireEvent.click(screen.getByTestId("org-preset-select"));
     expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
-      "Laptop and mini",
+      "Laptop and mini Active",
       "Executive Suite (S)",
       "Branch Office (M)",
       "Corporate Headquarters (L)",
@@ -410,7 +410,7 @@ describe("the presets", () => {
   it("picking your org again draws the hub's chart", () => {
     draw();
     pick("Branch Office (M)");
-    pick("Laptop and mini");
+    pick("Laptop and mini Active");
     expect(positions()).toContain("pm");
     expect(screen.queryByTestId("org-preset-description")).toBeNull();
   });
@@ -463,6 +463,8 @@ function withTrees(trees: Partial<OrgTreeSummary>[], name = "valid"): OrgRespons
     size: t.size ?? null,
     preset: t.preset ?? null,
     active: t.active ?? i === 0,
+    state: t.state ?? ((t.active ?? i === 0) ? "active" : "draft"),
+    activatedAt: t.activatedAt ?? null,
   }));
   return c;
 }
@@ -528,8 +530,8 @@ describe("with saved orgs: View and Active", () => {
     draw();
     fireEvent.click(screen.getByTestId("org-preset-select"));
     expect(options()).toEqual([
-      "Laptop and mini",
-      "One machine",
+      "Laptop and mini Active",
+      "One machine Draft",
       "Executive Suite (S)",
       "Branch Office (M)",
       "Corporate Headquarters (L)",
@@ -551,7 +553,7 @@ describe("with saved orgs: View and Active", () => {
 
   it("a saved draft says so, naming the active org", () => {
     draw();
-    pick("One machine");
+    pick("One machine Draft");
     expect(screen.getByTestId("org-heading").textContent).toBe("One machine");
     expect(screen.getByTestId("org-not-active").textContent).toBe(
       "A draft. Your active org is Laptop and mini.",
@@ -721,5 +723,59 @@ describe("a file that does not read, with presets to offer", () => {
     expect(screen.queryByTestId("org-active-select")).toBeNull();
     pick("Executive Suite (S)");
     expect(screen.getByTestId("org-heading").textContent).toBe("The Executive Suite");
+  });
+});
+
+describe("an org's state: active, draft, inactive", () => {
+  const THREE = [
+    { id: "main", title: "Laptop and mini", active: true, state: "active" as const },
+    {
+      id: "branch",
+      title: "One machine",
+      active: false,
+      state: "inactive" as const,
+      activatedAt: "2026-11-01",
+    },
+    { id: "draft", title: "A draft org", active: false, state: "draft" as const },
+  ];
+  beforeEach(() => {
+    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+    response = { isLoading: false, data: withTrees(THREE) };
+    treeResponses = {
+      branch: { isLoading: false, data: withTrees(THREE, "valid-tree-by-id") },
+      draft: { isLoading: false, data: withTrees(THREE, "valid-tree-by-id") },
+    };
+  });
+
+  it("View names each saved org's state beside its title, in muted text", () => {
+    draw();
+    fireEvent.click(screen.getByTestId("org-preset-select"));
+    expect(screen.getAllByTestId("org-view-state").map((s) => s.textContent)).toEqual([
+      "Active",
+      "Inactive",
+      "Draft",
+    ]);
+  });
+
+  it("an inactive org says so, naming the active org", () => {
+    draw();
+    pick("One machine Inactive");
+    expect(screen.getByTestId("org-not-active").textContent).toBe(
+      "Inactive. Your active org is Laptop and mini.",
+    );
+  });
+
+  it("a draft still says it is a draft", () => {
+    draw();
+    pick("A draft org Draft");
+    expect(screen.getByTestId("org-not-active").textContent).toBe(
+      "A draft. Your active org is Laptop and mini.",
+    );
+  });
+
+  it("Active lists the saved orgs only, by title, with no state words", () => {
+    draw();
+    fireEvent.click(screen.getByTestId("org-active-select"));
+    expect(options()).toEqual(["Laptop and mini", "One machine", "A draft org"]);
   });
 });

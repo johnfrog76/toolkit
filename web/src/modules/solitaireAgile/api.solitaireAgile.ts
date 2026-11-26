@@ -582,7 +582,14 @@ export interface OrgTreeSummary {
   preset: string | null;
   /** True on the one tree in use (the file's activeTree, or its only tree). */
   active: boolean;
+  /** Derived by the reader, never stored: active (in use), draft (never in use)
+   *  or inactive (in use before) -- docs/hub/org.md, "An org's state". */
+  state: OrgState;
+  /** The day the tree last became the org in use, YYYY-MM-DD; null if never stamped. */
+  activatedAt: string | null;
 }
+
+export type OrgState = "active" | "draft" | "inactive";
 
 export interface OrgResponse {
   activeTree: string;

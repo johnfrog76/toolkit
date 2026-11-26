@@ -41,6 +41,7 @@
         "description": { "description": "A few sentences: how the work flows, who owns what, what it fits.", "type": "string" },
         "teamSize": { "description": "The standup room the org suggests. The Space's features.teamSize decides.", "enum": [3, 6, 9] },
         "preset": { "description": "The id of the preset the tree was started from.", "type": "string" },
+        "activatedAt": { "description": "The day the tree last became the org in use, YYYY-MM-DD, written by Staff. It tells an inactive org (in use before) from a draft (never in use); the state itself is derived, never stored.", "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
         "positions": {
           "description": "The positions, in the order siblings are drawn.",
           "type": "array",

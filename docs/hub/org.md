@@ -62,6 +62,7 @@ never a Space.
 | `description` | no | a few sentences: how the work flows and who owns what, by the same rule for counts |
 | `teamSize` | no | the standup room the org suggests: 3, 6 or 9. A suggestion only: the Space's `features.teamSize` decides the room |
 | `preset` | no | the id of the preset the tree was started from |
+| `activatedAt` | no | the day the tree last **became the org in use**, `YYYY-MM-DD`, written by `Staff` ([An org's state](#an-orgs-state)). A hand edit may write it; nothing asks one to |
 | `positions` | **yes** | the positions, in the order siblings are drawn |
 | `name` | no, **retired** | an older file's title, read when there is no `title` |
 | `machines` | no, **retired** | read without a word, never drawn: a machine is not a boundary in an org |
@@ -152,6 +153,26 @@ three presets against it: `Tests/test_org.py` with `jsonschema` (a dev-only depe
 `agent/requirements-dev.txt`), and `tkTestToolkit -OrgChart` with `Test-Json -Schema` on PowerShell 7, a named
 skip on Windows PowerShell 5.1, which has no `Test-Json`. The readers do not read the schema: it is the contract a
 file is written to, and a reader stays as tolerant as the reading rule says.
+
+## An org's state
+
+Each tree of the file has a state, **derived and never stored**, so it can never disagree with `activeTree`:
+
+| State | When |
+| --- | --- |
+| `active` | `activeTree` names it -- or, with one tree and no `activeTree`, it is that tree. The one pointer, so exactly one tree is active |
+| `inactive` | it is not active and carries an `activatedAt`: it was in use before, and another is now |
+| `draft` | it is not active and carries no `activatedAt`: saved, and never in use. In an older file with no stamps, every tree but the active one reads as a draft |
+
+`activatedAt` is the one stored fact behind it, and `Staff` writes it whenever a tree **becomes** the org in use:
+`Staff -Activate` stamps the tree it puts in use; `Staff -Preset` stamps a new file's first tree, which is in use
+from the moment it is saved; and whenever `Staff` adds a tree beside, or `-Activate` takes out of use, a tree in use
+that has no stamp, it stamps that tree too, so it reads inactive rather than draft. `-Activate` on the tree already
+in use writes nothing. Both readers derive the state the same way -- the CLI's `Get-P20OrgTreeState`, the agent's
+`tree_state` -- from one shared table, [`Tests/fixtures/org/state.json`](../../Tests/fixtures/org/state.json),
+asserted by `tkTestToolkit -OrgChart` and `Tests/test_org.py`. `OrgChart` lists a file's trees with their states
+(`Trees: main (active), branch (draft)`) when it has more than one, and the route's `trees` carries each one's
+`state` and `activatedAt`.
 
 ## Where a position's prompt is found
 
@@ -293,7 +314,7 @@ the file writes it:
 | `promptTitle` | the prompt's title: its front matter's `title`, else its one `#` heading, else the file's name without `.prompt.md` | `agent/studio/prompts.py`'s `record`, the one reader every prompt goes through -- not a second parser |
 | `promptRef` | the address after `/studio/prompts/` that opens the prompt in the Studio's reading room: `yours/<name>` for the hub's copy, `<name>` for a role the toolkit ships -- the `ref` a Studio prompt row carries (the web builds the link with `promptPath(ref)`) | the same rule the Studio lists by; `null` for a file the room does not list (not `<name>.prompt.md`, or a name that is not a plain word), which still has its title |
 | `defaultModelName` (a position's) | its `defaultModel` line by the same lookup as `modelName`: a pool's line that `Staff` wrote as an id reads as the model's name ("Sonnet 5.5"); words read as written; `null` with no line | the same as `modelName` |
-| `trees` (the document's) | every tree of the file, in its order, as the Org tab's View and Active dropdowns list them: `{ "id", "title", "size", "preset", "active" }`, each read as that tree's own chart reads it (`title`, `size` and `preset` `null` where unset), and `active` true on the one tree in use -- the same list whichever tree `?tree=` asks for | `agent/solitaire/org.py`'s `tree_summaries`, over the trees the reader has already checked |
+| `trees` (the document's) | every tree of the file, in its order, as the Org tab's View and Active dropdowns list them: `{ "id", "title", "size", "preset", "active", "state", "activatedAt" }` -- `state` is [the tree's state](#an-orgs-state), `active` true on the active one alone -- each read as that tree's own chart reads it (`title`, `size`, `preset` and `activatedAt` `null` where unset) -- the same list whichever tree `?tree=` asks for | `agent/solitaire/org.py`'s `tree_summaries`, over the trees the reader has already checked |
 | `modelName` (a seat's) | what the seat's `model` is called: the model map's `name` for an id it has a row for ("Opus 5.5"); for a family the map's `current` names (`opus`), the name of the id that family is today; anything else as written; `null` with no model | `agent/core/models.py`'s `model_info` and `current_model`, the lookup the Agent line uses -- looked up, never parsed |
 
 The prompt fields are `null` on a position with no `prompt`. The file read is the one the reading room opens -- the

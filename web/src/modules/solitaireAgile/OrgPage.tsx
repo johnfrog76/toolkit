@@ -30,7 +30,13 @@ import {
   useGetOrgPresetsQuery,
   useRunStaffMutation,
 } from "./api.solitaireAgile";
-import type { OrgPosition, OrgPreset, OrgRefusal, OrgTreeSummary } from "./api.solitaireAgile";
+import type {
+  OrgPosition,
+  OrgPreset,
+  OrgRefusal,
+  OrgState,
+  OrgTreeSummary,
+} from "./api.solitaireAgile";
 import { UseOrgDialog, refusalText } from "./UseOrgDialog";
 import { OfficeDoor, Plate, SeatCell } from "./OrgParts";
 import type { PlacedOffice } from "./orgChart";
@@ -88,6 +94,16 @@ const useStyles = makeStyles({
     maxWidth: "35em",
     color: tokens.colorNeutralForeground2,
   },
+  // A saved org's option in View: its title, and its state in muted text at the end
+  // of the row -- the secondary text a Fluent option carries.
+  optionRow: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    columnGap: tokens.spacingHorizontalL,
+    width: "100%",
+  },
+  optionState: { color: tokens.colorNeutralForeground3 },
   select: { minWidth: "220px" },
   selects: { display: "flex", columnGap: tokens.spacingHorizontalL, alignItems: "center" },
   // A dropdown with its visible label before it: "View" and "Active".
@@ -425,17 +441,25 @@ export const previewView = (id: string) => `${PREVIEW}${id}`;
 /** The one line under the heading when the org shown is not the active one
  *  (docs/modules/solitaire-agile.md, "The web UI"): the accepted copy. */
 export function notActiveLine(
-  shown: "draft" | "preview" | "active",
+  shown: "draft" | "inactive" | "preview" | "active",
   activeTitle: string | null,
 ): string | null {
   if (shown === "active") return null;
   if (shown === "draft") return `A draft. Your active org is ${activeTitle}.`;
+  if (shown === "inactive") return `Inactive. Your active org is ${activeTitle}.`;
   return activeTitle
     ? `A preview. Your active org is ${activeTitle}.`
     : "A preview. Nothing is saved yet.";
 }
 
-/** View, at the right of the panel's header: the saved orgs, then the presets. */
+/** A saved org's state as View says it, in muted text beside its title. */
+export const ORG_STATE_WORDS: Readonly<Record<OrgState, string>> = {
+  active: "Active",
+  draft: "Draft",
+  inactive: "Inactive",
+};
+
+/** View, at the right of the panel's header: the saved orgs, each with its state, then the presets. */
 function ViewSelect({
   saved,
   presets,
@@ -467,8 +491,13 @@ function ViewSelect({
         {saved.length > 0 ? (
           <OptionGroup label="Your orgs">
             {saved.map((t) => (
-              <Option key={t.id} value={savedView(t.id)}>
-                {t.title}
+              <Option key={t.id} value={savedView(t.id)} text={t.title}>
+                <span className={styles.optionRow}>
+                  <span>{t.title}</span>{" "}
+                  <Caption1 className={styles.optionState} data-testid="org-view-state">
+                    {ORG_STATE_WORDS[t.state] ?? t.state}
+                  </Caption1>
+                </span>
               </Option>
             ))}
           </OptionGroup>
@@ -555,6 +584,8 @@ export function OrgPage() {
             size: oursData.tree.size,
             preset: oursData.tree.preset,
             active: true,
+            state: "active" as const,
+            activatedAt: null,
           },
         ]
       : []);
@@ -587,10 +618,13 @@ export function OrgPage() {
         ? other.data
         : null
       : oursData;
-  const shown: "draft" | "preview" | "active" = preset
+  const viewedSaved = saved.find((t) => t.id === savedId);
+  const shown: "draft" | "inactive" | "preview" | "active" = preset
     ? "preview"
     : savedId && savedId !== active?.id
-      ? "draft"
+      ? viewedSaved?.state === "inactive"
+        ? "inactive"
+        : "draft"
       : "active";
   const line = notActiveLine(shown, active?.title ?? null);
 

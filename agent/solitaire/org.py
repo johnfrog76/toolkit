@@ -66,6 +66,7 @@ _KNOWN_KEYS = {
         "description",
         "teamSize",
         "preset",
+        "activatedAt",
         "positions",
         "machines",
     ),
@@ -221,6 +222,7 @@ def _model(data: dict) -> tuple[list[dict] | None, tuple[str, str] | None]:
                 "description": _text(_field(tree, "description")),
                 "teamSize": _whole(_field(tree, "teamSize")),
                 "preset": _text(_field(tree, "preset")),
+                "activatedAt": _text(_field(tree, "activatedAt")),
                 "positions": positions,
             }
         )
@@ -446,11 +448,29 @@ def read_org_chart(
     )
 
 
+# An org's state (docs/hub/org.md, "An org's state"): derived, never stored.
+STATE_ACTIVE = "active"
+STATE_DRAFT = "draft"
+STATE_INACTIVE = "inactive"
+
+
+def tree_state(tree: dict, active_tree: str) -> str:
+    """``active`` for the tree in use (the file's activeTree, or its one tree);
+    else ``inactive`` for a tree that has been in use -- it carries an
+    ``activatedAt`` -- and ``draft`` for one that never was. An old file with
+    no stamps reads its other trees as drafts. The CLI's Get-P20OrgTreeState
+    is the same rule, and Tests/fixtures/org/state.json holds the two to it."""
+    if tree["id"] == active_tree:
+        return STATE_ACTIVE
+    return STATE_INACTIVE if tree["activatedAt"] else STATE_DRAFT
+
+
 def tree_summaries(trees: list[dict], active_tree: str) -> list[dict]:
     """Every tree of a valid file, in the file's order, as the Org tab lists
-    them (docs/hub/org.md, "The response"): ``{id, title, size, preset, active}``,
-    ``active`` true on the one tree in use. Each is read the way ``_chart``
-    reads a tree, so a title here is the title the tree's own chart has."""
+    them (docs/hub/org.md, "The response"): ``{id, title, size, preset, active,
+    state, activatedAt}``, ``active`` true on the one tree in use and ``state``
+    its derived state. Each is read the way ``_chart`` reads a tree, so a title
+    here is the title the tree's own chart has."""
     return [
         {
             "id": t["id"],
@@ -458,6 +478,8 @@ def tree_summaries(trees: list[dict], active_tree: str) -> list[dict]:
             "size": t["size"] or None,
             "preset": t["preset"] or None,
             "active": t["id"] == active_tree,
+            "state": tree_state(t, active_tree),
+            "activatedAt": t["activatedAt"] or None,
         }
         for t in trees
     ]

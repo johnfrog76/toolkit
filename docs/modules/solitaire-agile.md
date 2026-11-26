@@ -484,7 +484,9 @@ keep looking at an org apart from which org is in use, the way a repository's br
 default branch:
 
 - **View** picks the org shown. It lists the hub's **saved orgs** first -- every tree of `org.json`, from the
-  route's `trees` ([the response](../hub/org.md#the-response)) -- then the **org presets** (`GET
+  route's `trees` ([the response](../hub/org.md#the-response)) -- each with its **state** beside its title in muted
+  text, the secondary text a Fluent option carries: **Active**, **Draft** (saved, never in use) or **Inactive** (in
+  use before; [an org's state](../hub/org.md#an-orgs-state)) -- then the **org presets** (`GET
   /api/ritual/org/presets`; [Org presets](../hub/org.md#org-presets)) as previews: **Executive Suite (S)**,
   **Branch Office (M)** and **Corporate Headquarters (L)**, each named by its title without a leading "The", and
   its size. A saved org other than the active one is read by `GET /api/ritual/org?tree=<id>`. With no org saved
@@ -498,7 +500,7 @@ The panel's heading is the org shown: its title (`Org chart` while there is no c
 badge in words (`Small`, `Medium`, `Large`, from the file's `S`, `M`, `L` by one mapping), the one badge the page
 draws -- the heading in the panel headings' own `Subtitle2`. When the org shown is not the active one, **one line
 under the heading** says so, and nothing else marks it: `A draft. Your active org is <title>.` on a saved draft,
-`A preview. Your active org is <title>.` on a preset, and `A preview. Nothing is saved yet.` on a preset when the hub
+`Inactive. Your active org is <title>.` on a saved org that was in use before, `A preview. Your active org is <title>.` on a preset, and `A preview. Nothing is saved yet.` on a preset when the hub
 has no org. Under it is the org's description, where it has one, in Fluent's `Body2` (16px, the step at 1rem), its
 lines kept near 78 characters; then its chart, in the same offices and art, its open seats as empty desks. With no
 preset served there is no dropdown and the page is the hub's chart alone, as before.

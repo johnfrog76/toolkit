@@ -1,0 +1,196 @@
+{
+  "_": "An org's state, derived and never stored (docs/hub/org.md, \"An org's state\"): one table, two readers -- agent/solitaire/org.py's tree_state (Tests/test_org.py) and Scripts/Read-OrgChart.ps1's Get-P20OrgTreeState (tkTestToolkit -OrgChart). Each case is an org.json; expect.states is each tree's state by its id: active for the tree in use (activeTree, or a file's one tree), inactive for a tree that carries an activatedAt and is not in use, draft for one that never did.",
+  "cases": [
+    {
+      "name": "active-and-a-draft",
+      "why": "The tree in use, stamped when it became so, and a tree saved beside it that never was in use.",
+      "org": {
+        "activeTree": "a",
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ],
+            "activatedAt": "2026-11-20"
+          },
+          {
+            "id": "b",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "states": {
+          "a": "active",
+          "b": "draft"
+        }
+      }
+    },
+    {
+      "name": "activated-then-replaced",
+      "why": "A tree that was in use and is not now: it keeps its stamp, so it reads inactive, not draft.",
+      "org": {
+        "activeTree": "b",
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ],
+            "activatedAt": "2026-11-01"
+          },
+          {
+            "id": "b",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ],
+            "activatedAt": "2026-11-20"
+          }
+        ]
+      },
+      "expect": {
+        "states": {
+          "a": "inactive",
+          "b": "active"
+        }
+      }
+    },
+    {
+      "name": "an-old-file-with-no-stamps",
+      "why": "A file written before activatedAt: the tree in use is active, every other tree reads as a draft.",
+      "org": {
+        "activeTree": "b",
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ]
+          },
+          {
+            "id": "b",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ]
+          },
+          {
+            "id": "c",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "states": {
+          "a": "draft",
+          "b": "active",
+          "c": "draft"
+        }
+      }
+    },
+    {
+      "name": "one-tree-no-stamp",
+      "why": "One tree and no activeTree and no stamp: the one tree is the one in use, so it is active.",
+      "org": {
+        "trees": [
+          {
+            "id": "solo",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "states": {
+          "solo": "active"
+        }
+      }
+    },
+    {
+      "name": "the-tree-in-use-unstamped",
+      "why": "The tree in use need not carry a stamp to be active; a stamped tree beside it is inactive.",
+      "org": {
+        "activeTree": "a",
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ]
+          },
+          {
+            "id": "b",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ],
+            "activatedAt": "2026-10-02"
+          }
+        ]
+      },
+      "expect": {
+        "states": {
+          "a": "active",
+          "b": "inactive"
+        }
+      }
+    },
+    {
+      "name": "a-blank-stamp-is-none",
+      "why": "An activatedAt that is blank reads as no stamp: the tree is a draft.",
+      "org": {
+        "activeTree": "a",
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ],
+            "activatedAt": "2026-11-20"
+          },
+          {
+            "id": "b",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ],
+            "activatedAt": "  "
+          }
+        ]
+      },
+      "expect": {
+        "states": {
+          "a": "active",
+          "b": "draft"
+        }
+      }
+    }
+  ]
+}

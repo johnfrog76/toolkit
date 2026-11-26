@@ -52,8 +52,11 @@ tkOrgChart                              # read it back
 ```
 
 - **A hub keeps up to three orgs** in one file, `org.json`, and **one of them is in use.** Only the org in
-  use is read by Team Agile. The others are drafts: you can keep and change them, and they affect nothing
-  until you make one active.
+  use is read by Team Agile; the others affect nothing until you make one active.
+- **Each org has a state: active, draft or inactive.** The **active** org is the one in use. A **draft** was
+  saved and has never been in use; an **inactive** org was in use before and another is now. The state is
+  worked out, never typed: `activeTree` says which org is active, and each org keeps the day it last became
+  active, `activatedAt`, which `tkStaff` writes.
 - **Saving never changes the org in use.** `-Preset` saves a draft, and `-Activate` is the one way to
   choose. Your first org is the only one, so it is in use as soon as it is saved.
 - **Nothing is overwritten.** An org's id is taken once. A fourth org is refused, naming the three you

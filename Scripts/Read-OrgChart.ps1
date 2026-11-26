@@ -97,7 +97,8 @@ function New-P20OrgResult {
         $Warnings = @(),
         [string]$ActiveTree = '',
         $Chart = $null,
-        [int]$SeatCount = 0
+        [int]$SeatCount = 0,
+        $Trees = @()
     )
     return [pscustomobject]@{
         Status     = $Status
@@ -108,6 +109,7 @@ function New-P20OrgResult {
         ActiveTree = $ActiveTree
         Chart      = $Chart
         SeatCount  = $SeatCount
+        Trees      = @($Trees)
     }
 }
 
@@ -120,7 +122,7 @@ function Get-P20OrgWarnings {
     param($Data, [string]$FileName)
     $known = @{
         top      = @('activeTree', 'trees')
-        tree     = @('id', 'title', 'name', 'size', 'shortDescription', 'description', 'teamSize', 'preset', 'positions', 'machines')
+        tree     = @('id', 'title', 'name', 'size', 'shortDescription', 'description', 'teamSize', 'preset', 'activatedAt', 'positions', 'machines')
         position = @('id', 'title', 'prompt', 'reportsTo', 'defaultModel', 'recommend', 'seats')
         seat     = @('id', 'roleTitle', 'model', 'person', 'session', 'merges', 'space', 'machine', 'active')
     }
@@ -206,6 +208,7 @@ function ConvertTo-P20OrgModel {
                 Description      = Get-P20OrgText (Get-P20OrgField $tree 'description')
                 TeamSize         = Get-P20OrgWhole (Get-P20OrgField $tree 'teamSize')
                 Preset           = Get-P20OrgText (Get-P20OrgField $tree 'preset')
+                ActivatedAt      = Get-P20OrgText (Get-P20OrgField $tree 'activatedAt')
                 Positions        = $positions.ToArray()
             })
     }
@@ -371,11 +374,25 @@ function ConvertTo-P20OrgChart {
     }
 }
 
+function Get-P20OrgTreeState {
+    # An org's state (docs/hub/org.md, "An org's state"), derived and never stored:
+    # active for the tree in use (the file's activeTree, or its one tree); else
+    # inactive for a tree that has been in use -- it carries an activatedAt -- and
+    # draft for one that never was. agent/solitaire/org.py's tree_state is the same
+    # rule, and Tests/fixtures/org/state.json holds the two to it.
+    param($Tree, [string]$ActiveTree)
+    if ($Tree.Id -ceq $ActiveTree) { return 'active' }
+    if ($Tree.ActivatedAt) { return 'inactive' }
+    return 'draft'
+}
+
 function Read-P20OrgChart {
     <#
       The org chart in use, read from <PromptsRoot>/org.json.
 
-      Returns @{ Status; Path; Kind; Message; Warnings; ActiveTree; Chart; SeatCount }.
+      Returns @{ Status; Path; Kind; Message; Warnings; ActiveTree; Chart; SeatCount; Trees }.
+      Trees is every tree of the file, in its order: @{ id; title; active; state;
+      activatedAt } -- its state derived by Get-P20OrgTreeState.
       Status is `ok` (Chart is the response), `missing` (no file at the hub root:
       Kind `missing`) or `invalid` (Kind and Message say what is wrong, in one
       sentence). -TreeId asks for another tree of the same file; a name that is
@@ -478,7 +495,16 @@ function Read-P20OrgText {
     $chart = ConvertTo-P20OrgChart -Tree $picked -ActiveTree $active
     $seatCount = 0
     foreach ($position in $chart.tree.positions) { $seatCount += @($position.seats).Count }
-    return (New-P20OrgResult -Status 'ok' -Path $path -Warnings $warnings -ActiveTree $active -Chart $chart -SeatCount $seatCount)
+    $summaries = @($trees | ForEach-Object {
+            [pscustomobject]@{
+                id          = $_.Id
+                title       = $_.Title
+                active      = ($_.Id -ceq $active)
+                state       = (Get-P20OrgTreeState -Tree $_ -ActiveTree $active)
+                activatedAt = $(if ($_.ActivatedAt) { $_.ActivatedAt } else { $null })
+            }
+        })
+    return (New-P20OrgResult -Status 'ok' -Path $path -Warnings $warnings -ActiveTree $active -Chart $chart -SeatCount $seatCount -Trees $summaries)
 }
 
 function Format-P20OrgChartLines {

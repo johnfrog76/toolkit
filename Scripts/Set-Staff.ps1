@@ -341,6 +341,24 @@ if (-not $creating -and $Tree -ceq $inUseBefore) {
     return
 }
 
+# activatedAt (docs/hub/org.md, "An org's state"): the day a tree BECOMES the org
+# in use, the one stored fact that tells an inactive org from a draft. -Activate
+# stamps the tree it puts in use; a new file's first tree is in use from the
+# moment it is saved, so it is stamped then; and a tree added beside an older
+# tree in use that has no stamp stamps that tree too, so it reads inactive, not
+# draft, once another is put in use.
+$today = (Get-Date).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+$treeById = @{}
+foreach ($t in $allTrees) { $treeById[(Get-P20OrgText (Get-P20OrgField $t 'id'))] = $t }
+# The same holds for the tree -Activate takes out of use: an older file's tree in
+# use with no stamp is stamped as it leaves, so it reads inactive, never draft.
+if ($creating -and $allTrees.Count -eq 1) { Set-StaffField $newTree 'activatedAt' $today }
+elseif ($inUseBefore -and $treeById.ContainsKey($inUseBefore)) {
+    $inUse = $treeById[$inUseBefore]
+    if (-not (Get-P20OrgText (Get-P20OrgField $inUse 'activatedAt'))) { Set-StaffField $inUse 'activatedAt' $today }
+}
+if ($Activate) { Set-StaffField $treeById[$targetId] 'activatedAt' $today }
+
 $doc = [ordered]@{}
 if ($active -and -not (Get-P20OrgField $data 'activeTree')) { $doc['activeTree'] = $active }
 if ($data) {

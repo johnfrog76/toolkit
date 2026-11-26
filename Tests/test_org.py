@@ -264,6 +264,31 @@ class TheSharedTable(OrgBase):
                         self.assertTrue(detail["message"].startswith(want["messageStartsWith"]), detail["message"])
 
 
+class TheStateTable(unittest.TestCase):
+    """An org's state, derived from Tests/fixtures/org/state.json -- the table
+    tkTestToolkit -OrgChart asserts for the CLI's reader too."""
+
+    def test_every_case(self):
+        table = json.loads((FIXTURES / "state.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["cases"]), 5)
+        for case in table["cases"]:
+            with self.subTest(case=case["name"]):
+                got = org.read_org_chart(json.dumps(case["org"]), lambda _n: True)
+                self.assertEqual(got.status, "ok", got.message)
+                self.assertEqual({t["id"]: t["state"] for t in got.trees}, case["expect"]["states"])
+                # active stays the one pointer: true on the active tree alone.
+                self.assertEqual(
+                    [t["id"] for t in got.trees if t["active"]],
+                    [i for i, st in case["expect"]["states"].items() if st == "active"],
+                )
+
+    def test_activated_at_is_a_key_the_tool_reads(self):
+        doc = {"trees": [{"id": "t", "activatedAt": "2026-11-26", "positions": [{"id": "r"}]}]}
+        got = org.read_org_chart(json.dumps(doc), lambda _n: True)
+        self.assertEqual(got.warnings, [])
+        self.assertEqual(got.trees[0]["activatedAt"], "2026-11-26")
+
+
 class TheReaderAlone(unittest.TestCase):
     """The pure layer: text and a prompt test in, a result out -- and it never raises."""
 
@@ -395,8 +420,24 @@ class TheRoute(OrgBase):
                 self.assertEqual(
                     body["trees"],
                     [
-                        {"id": "main", "title": "Laptop and mini", "size": None, "preset": None, "active": True},
-                        {"id": "branch", "title": "One machine", "size": None, "preset": None, "active": False},
+                        {
+                            "id": "main",
+                            "title": "Laptop and mini",
+                            "size": None,
+                            "preset": None,
+                            "active": True,
+                            "state": "active",
+                            "activatedAt": None,
+                        },
+                        {
+                            "id": "branch",
+                            "title": "One machine",
+                            "size": None,
+                            "preset": None,
+                            "active": False,
+                            "state": "draft",
+                            "activatedAt": None,
+                        },
                     ],
                 )
 
@@ -413,6 +454,8 @@ class TheRoute(OrgBase):
                     "size": "M",
                     "preset": "branch-office",
                     "active": True,
+                    "state": "active",
+                    "activatedAt": None,
                 }
             ],
         )
@@ -831,6 +874,7 @@ class TheSchema(unittest.TestCase):
             ({"trees": [tree, {**tree, "id": "u"}]}, "file", "'activeTree' is a required property"),
             ({**tree, "size": "XL"}, "tree", "'XL' is not one of"),
             ({**tree, "teamSize": 4}, "tree", "4 is not one of"),
+            ({**tree, "activatedAt": "26 November"}, "tree", "does not match"),
             ({**tree, "positions": [{"title": "x"}]}, "tree", "'id' is a required property"),
             ({**tree, "positions": [{"id": "p", "recommend": "opus"}]}, "tree", "is not of type 'array'"),
             ({**tree, "positions": [{"id": "p", "seats": [{"model": "m"}]}]}, "tree", "'id' is a required property"),
