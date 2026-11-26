@@ -520,6 +520,11 @@ def rituals_org_route() -> str:
     return consts()["rituals"]["orgRoute"]
 
 
+def rituals_org_presets_route() -> str:
+    """The org presets' route, with the /api prefix: ``/api/ritual/org/presets``."""
+    return consts()["rituals"]["orgPresetsRoute"]
+
+
 def rituals_assign_me() -> str:
     """``me`` -- the one answer to who takes an item that is not a size (D-AR10):
     ``Route -Assign me``, a card's ``**Assigned:** me``, and a triage item's

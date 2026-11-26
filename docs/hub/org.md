@@ -255,9 +255,50 @@ Space that is not worked with agents and `OrgChart` is not there -- no verb, no 
 even though the file is. That is the module rule, not a fault; to see the chart from a Space, answer it
 `agents`.
 
+## Org presets
+
+A team starting out should not have to draw an org from an empty file. The toolkit ships three **presets**,
+each one tree in this file's shape that names only the roles the toolkit ships, in
+[`samples/org-presets/`](../../samples/org-presets/) -- beside the sample hub, read from the package and never
+copied into a hub. The Org tab previews them ([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui));
+nothing writes one into `org.json`, which stays the hub's, hand-edited.
+
+| Size | Preset | `id` | Seats | Room | Fits |
+| --- | --- | --- | --- | --- | --- |
+| S | The Executive Suite | `executive-suite` | the owner, the VP of engineering (drives the work through builders) and the VP of product (reads what ships and holds the merge); a builder pool | 3 | one product, one person, moving fast |
+| M | The Branch Office | `branch-office` | S, plus a team lead with a seat per product and builders under them, and a test runner; leads send their readies straight to the seat that merges | 6 | two or three products |
+| L | Corporate Headquarters | `corporate-headquarters` | M, plus a PM the leads report to, a merge stand-in, the butler (the weekly bot) and the intern | 9 | many products, a heavy merge queue, an owner with little time |
+
+In every preset **the VP of product holds the merge**. The roles write the merge once, as the VP of
+engineering's by default, and let a team place it elsewhere ([the roles](../../agentic/org/README.md)); each
+preset's description says where it sits. The merge stand-in covers that seat's merge. The owner's seat is a person (`You`); every other seat is open, for the owner to fill. No seat names a machine, and no
+tree lists any: sessions talk across machines, so a machine is not a boundary in an org.
+The test runner, the merge stand-in and the builders name no role, because none is shipped for them. L has ten seats for a room of
+nine: the room seats who has work first, and the butler is a weekly bot.
+
+A preset file is the tree's fields beside the tree's positions:
+
+| Key | Is |
+| --- | --- |
+| `id` | the preset's address, and the tree's id |
+| `size` | `S`, `M` or `L`; the order they are offered in |
+| `title` | its name, and the tree's name |
+| `shortDescription` | one line: what it is and what it fits, kept for a place that names a preset briefly; the Org tab shows the description |
+| `description` | a few sentences: how the work flows, who owns what, what it fits |
+| `teamSize` | the standup room it suggests, 3, 6 or 9. The Space's own `features.teamSize` decides the room; a preset sets nothing |
+| `positions` | the tree's positions, in the shape above |
+
+**A reader ignores a field it does not know**, at the top and in a position or a seat, without a word, so a
+later field (a preset's swag, its ways of working) can be added without breaking a reader that predates it.
+`GET /api/ritual/org/presets` (`consts.json` `rituals.orgPresetsRoute`) serves all three, S first, each with
+its `chart` in [the response](#the-response)'s shape and the two prompt fields; the tree passes every check in
+[What is checked](#what-is-checked), its prompts looked up in the toolkit's `agentic/org/` alone, and a file that
+does not read as a preset is left out and said in the agent's log. `Tests/test_org.py` holds each preset to the
+checks and to the shipped roles. `OrgChart -Preset` is not built yet: the CLI does not print a preset.
+
 ## What is not in v1
 
-No writer (`Config` and a `Staff` verb come later), no `active` drawn, no count of builders from the cards
+No writer (`Config` and a `Staff` verb come later), no way yet to start `org.json` from a preset (a preset is previewed, not written), no `active` drawn, no count of builders from the cards
 in flight, and no join with the standup's workers. The web's Org tab draws the tree the route serves
 ([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui)); a vacant seat is drawn as an empty desk.
 

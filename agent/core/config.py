@@ -51,6 +51,9 @@ from .consts import (
 CORE_DIR = Path(__file__).resolve().parent
 AGENT_DIR = CORE_DIR.parent
 REPO_ROOT = AGENT_DIR.parent
+# The org presets the toolkit ships (docs/hub/org.md, "Org presets"): starting
+# trees read from the package, never copied into a hub.
+ORG_PRESETS_DIR = REPO_ROOT / "samples" / "org-presets"
 
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config.default.json"
 LOCAL_CONFIG_PATH = REPO_ROOT / "config.local.json"

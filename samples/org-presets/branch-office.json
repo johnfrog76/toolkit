@@ -1,0 +1,51 @@
+{
+  "_comment": "An org preset (docs/hub/org.md, \"Org presets\"): a starting tree in org.json's shape, plus what it is called and what it fits. The Org tab previews it; nothing writes it into a hub. A reader ignores a field it does not know.",
+  "id": "branch-office",
+  "size": "M",
+  "title": "The Branch Office",
+  "shortDescription": "Local leads run the work: a team lead for each product, builders under the leads, and a test runner. For two or three products.",
+  "description": "Each product has its own team lead, who takes the cards for that product, briefs a builder for each, checks the work, and sends each finished pull request straight to the seat that merges, which here is the VP of product. The VP of engineering sets the standards every lane holds and settles anything that crosses products. The test runner runs the full test suites on each change before it merges, so no lead waits on the tests to finish. You set the direction and decide what ships. It fits two or three products worked side by side, each with its own lane.",
+  "teamSize": 6,
+  "positions": [
+    {
+      "id": "owner",
+      "title": "Owner",
+      "seats": [{ "id": "owner", "person": "You" }]
+    },
+    {
+      "id": "vp-engineering",
+      "title": "VP of engineering",
+      "prompt": "vp-of-engineering.prompt.md",
+      "reportsTo": "owner",
+      "seats": [{ "id": "vp-engineering" }]
+    },
+    {
+      "id": "team-lead",
+      "title": "Team lead",
+      "prompt": "team-lead.prompt.md",
+      "reportsTo": "vp-engineering",
+      "seats": [{ "id": "product-one" }, { "id": "product-two" }]
+    },
+    {
+      "id": "builder",
+      "title": "Builder",
+      "reportsTo": "team-lead",
+      "defaultModel": "one per card, briefed by the lead",
+      "seats": []
+    },
+    {
+      "id": "test-runner",
+      "title": "Test runner",
+      "reportsTo": "vp-engineering",
+      "defaultModel": "runs the full test suites before a merge",
+      "seats": [{ "id": "test-runner" }]
+    },
+    {
+      "id": "vp-product",
+      "title": "VP of product",
+      "prompt": "vp-of-product.prompt.md",
+      "reportsTo": "owner",
+      "seats": [{ "id": "vp-product" }]
+    }
+  ]
+}

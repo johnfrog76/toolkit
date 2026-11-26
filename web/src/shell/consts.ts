@@ -212,6 +212,8 @@ export const RITUALS = consts.rituals as {
   milestonesRoute: string;
   /** The org chart's read: the tree in use, with each position's prompt title and reading-room ref. */
   orgRoute: string;
+  /** The org presets' read: the starting orgs the toolkit ships, each with its chart. */
+  orgPresetsRoute: string;
   /** "me": the one answer to who takes an item that is not a size (D-AR10) --
    *  what the Triage page sends as `Route -Assign`, and an item's `who` when it is yours. */
   assignMe: string;

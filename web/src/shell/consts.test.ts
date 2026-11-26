@@ -254,6 +254,7 @@ describe("consts.json", () => {
       triageRoute: "/api/ritual/triage",
       milestonesRoute: "/api/ritual/milestones",
       orgRoute: "/api/ritual/org",
+      orgPresetsRoute: "/api/ritual/org/presets",
       assignMe: "me",
       ceremoniesFile: "Config/ceremonies.json",
       vocabularyFile: "Config/standup-vocabulary.json",
