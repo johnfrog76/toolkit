@@ -135,7 +135,7 @@ The Branch Office, staffed, after the owner has named themselves ("Sam") and a f
 ### The schema
 
 [`Config/org.schema.json`](../../Config/org.schema.json) is the shape above as a JSON Schema (draft 2020-12):
-the required keys, the types, `size` as `S`/`M`/`L`, `teamSize` as 3, 6 or 9, `merges` as a boolean, and
+the required keys (`activeTree` among them when there is more than one tree), the types, `size` as `S`/`M`/`L`, `teamSize` as 3, 6 or 9, `merges` as a boolean, and
 `additionalProperties: true` at every level, so an unknown key passes. A file validates against it as a whole,
 and a preset against its `#/$defs/tree`. It cannot express the cross-field checks -- ids unique, a `reportsTo`
 naming a position in the same tree, no loop, exactly one root, a `prompt` that is a real role file -- which the

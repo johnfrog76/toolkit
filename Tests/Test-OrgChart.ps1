@@ -481,6 +481,7 @@ try {
             'no trees'                    = @('{}', $fileSchema)
             'an empty trees'              = @('{"trees":[]}', $fileSchema)
             'a tree with no id'           = @('{"trees":[{"positions":[]}]}', $fileSchema)
+            'two trees and no activeTree' = @('{"trees":[{"id":"a","positions":[]},{"id":"b","positions":[]}]}', $fileSchema)
             'a size that is not S, M, L'  = @('{"id":"t","positions":[],"size":"XL"}', $treeSchema)
             'a teamSize that is not 3/6/9' = @('{"id":"t","positions":[],"teamSize":4}', $treeSchema)
             'a recommend that is text'    = @('{"id":"t","positions":[{"id":"p","recommend":"opus"}]}', $treeSchema)

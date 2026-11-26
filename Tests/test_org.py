@@ -774,6 +774,7 @@ class TheSchema(unittest.TestCase):
             ({"trees": []}, "file", "should be non-empty"),
             ({"trees": [{"positions": []}]}, "file", "'id' is a required property"),
             ({"trees": [{"id": "t"}]}, "file", "'positions' is a required property"),
+            ({"trees": [tree, {**tree, "id": "u"}]}, "file", "'activeTree' is a required property"),
             ({**tree, "size": "XL"}, "tree", "'XL' is not one of"),
             ({**tree, "teamSize": 4}, "tree", "4 is not one of"),
             ({**tree, "positions": [{"title": "x"}]}, "tree", "'id' is a required property"),

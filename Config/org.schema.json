@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "org.json",
-  "description": "The shape of the hub's org.json, and of an org preset (docs/hub/org.md, \"The shape\"). The file is trees of positions of seats, each addressed by id. A preset file is ONE tree in the same shape, so validate a preset against \"#/$defs/tree\"; the top-level oneOf accepts either a file or a tree. Every level is additionalProperties true: a key a reader does not read is ignored (named once as a warning; a key starting with _ is a note), never refused. machines, machine and active are retired: read and kept, never written or drawn. This schema holds the required keys, the types and the enums. It cannot express the cross-field checks -- ids unique, a reportsTo naming a position in the same tree, no loop, exactly one root, activeTree naming a tree, a prompt that is a real role file -- which the two readers keep (Scripts/Read-OrgChart.ps1, agent/solitaire/org.py) and Tests/fixtures/org/table.json holds.",
+  "description": "The shape of the hub's org.json, and of an org preset (docs/hub/org.md, \"The shape\"). The file is trees of positions of seats, each addressed by id. A preset file is ONE tree in the same shape, so validate a preset against \"#/$defs/tree\"; the top-level oneOf accepts either a file or a tree. Every level is additionalProperties true: a key a reader does not read is ignored (named once as a warning; a key starting with _ is a note), never refused. machines, machine and active are retired: read and kept, never written or drawn. This schema holds the required keys (activeTree among them when there is more than one tree), the types and the enums. It cannot express the cross-field checks -- ids unique, a reportsTo naming a position in the same tree, no loop, exactly one root, activeTree naming a tree, a prompt that is a real role file -- which the two readers keep (Scripts/Read-OrgChart.ps1, agent/solitaire/org.py) and Tests/fixtures/org/table.json holds.",
   "oneOf": [
     { "$ref": "#/$defs/file" },
     { "$ref": "#/$defs/tree" }
@@ -12,6 +12,8 @@
       "type": "object",
       "additionalProperties": true,
       "required": ["trees"],
+      "if": { "required": ["trees"], "properties": { "trees": { "type": "array", "minItems": 2 } } },
+      "then": { "required": ["activeTree"] },
       "properties": {
         "trees": {
           "description": "The trees, at least one. A writer keeps at most three; a reader reads more.",
