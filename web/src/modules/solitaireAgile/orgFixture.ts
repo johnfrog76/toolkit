@@ -51,6 +51,7 @@ export function orgResponse(name: string): OrgResponse {
     const stem = p.prompt ? p.prompt.replace(/\.prompt\.md$/, "") : null;
     p.promptTitle = stem;
     p.promptRef = stem ? `yours/${stem}` : null;
+    p.defaultModelName = modelNameOf(p.defaultModel);
     for (const s of p.seats) s.modelName = modelNameOf(s.model);
   }
   return chart;

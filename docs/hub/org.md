@@ -280,7 +280,7 @@ draw one.
 `activeTree` is always the file's own choice, so a reader asked for another tree still knows which is in
 use. [`Tests/fixtures/org/charts/`](../../Tests/fixtures/org/charts/) holds the responses the table states.
 
-**The one difference between the two halves: the fields only the route adds.** The route adds two keys to
+**The one difference between the two halves: the fields only the route adds.** The route adds three keys to
 every position and one to every seat, which `OrgChart -AsJson` does not print -- the CLI has no prompt reader,
 and the Studio's is the agent's; the model's name is what the Org tab draws, and the terminal prints the model as
 the file writes it:
@@ -289,6 +289,7 @@ the file writes it:
 | --- | --- | --- |
 | `promptTitle` | the prompt's title: its front matter's `title`, else its one `#` heading, else the file's name without `.prompt.md` | `agent/studio/prompts.py`'s `record`, the one reader every prompt goes through -- not a second parser |
 | `promptRef` | the address after `/studio/prompts/` that opens the prompt in the Studio's reading room: `yours/<name>` for the hub's copy, `<name>` for a role the toolkit ships -- the `ref` a Studio prompt row carries (the web builds the link with `promptPath(ref)`) | the same rule the Studio lists by; `null` for a file the room does not list (not `<name>.prompt.md`, or a name that is not a plain word), which still has its title |
+| `defaultModelName` (a position's) | its `defaultModel` line by the same lookup as `modelName`: a pool's line that `Staff` wrote as an id reads as the model's name ("Sonnet 5.5"); words read as written; `null` with no line | the same as `modelName` |
 | `modelName` (a seat's) | what the seat's `model` is called: the model map's `name` for an id it has a row for ("Opus 5.5"); for a family the map's `current` names (`opus`), the name of the id that family is today; anything else as written; `null` with no model | `agent/core/models.py`'s `model_info` and `current_model`, the lookup the Agent line uses -- looked up, never parsed |
 
 The prompt fields are `null` on a position with no `prompt`. The file read is the one the reading room opens -- the

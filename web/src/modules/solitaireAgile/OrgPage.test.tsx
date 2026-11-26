@@ -148,6 +148,16 @@ describe("the chart, over the table's tree shaped like ours", () => {
     );
   });
 
+  it("a pool line written as a model id reads as the model's name", () => {
+    const data = orgResponse("valid");
+    const builder = data.tree.positions.find((p) => p.id === "builder")!;
+    builder.defaultModel = "claude-sonnet-5-5";
+    builder.defaultModelName = "Sonnet 5.5";
+    response = { isLoading: false, data };
+    draw();
+    expect(within(office("builder")).getByTestId("org-pool-line").textContent).toBe("Sonnet 5.5");
+  });
+
   it("an office with a prompt is a link into the reading room, under its prompt's title", () => {
     draw();
     const pm = office("pm");

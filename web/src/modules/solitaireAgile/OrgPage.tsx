@@ -196,7 +196,7 @@ function PoolSeat({ position, order }: { position: OrgPosition; order: number })
       <Plate position={position.title} who={POOL_WORD} />
       {position.defaultModel ? (
         <Caption1 className={styles.poolLine} data-testid="org-pool-line">
-          {position.defaultModel}
+          {position.defaultModelName ?? position.defaultModel}
         </Caption1>
       ) : null}
     </SeatCell>

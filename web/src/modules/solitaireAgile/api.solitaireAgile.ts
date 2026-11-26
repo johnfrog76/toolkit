@@ -555,6 +555,9 @@ export interface OrgPosition {
   /** The address after /studio/prompts/ (promptPath); null with no prompt, or one
    *  the reading room does not list. */
   promptRef: string | null;
+  /** The defaultModel line by its models.json name where it is a model (a pool's
+   *  Sonnet id reads "Sonnet 5.5"); as written otherwise; null with none. */
+  defaultModelName: string | null;
 }
 
 export interface OrgTree {

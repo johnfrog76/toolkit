@@ -239,10 +239,12 @@ class TheSharedTable(OrgBase):
                         self.assertEqual(names.get(where, "no such seat"), name, where)
                     for position in body["tree"]["positions"]:
                         # the fields only the route adds; the table's response is the shared part
+                        added = {"promptTitle", "promptRef", "defaultModelName"}
+                        self.assertEqual(set(position) & added, added, position)
                         self.assertEqual(
-                            set(position) & {"promptTitle", "promptRef"}, {"promptTitle", "promptRef"}, position
+                            position["defaultModelName"], org.model_name(position["defaultModel"]), position
                         )
-                        del position["promptTitle"], position["promptRef"]
+                        del position["promptTitle"], position["promptRef"], position["defaultModelName"]
                         for seat in position["seats"]:
                             self.assertIn("modelName", seat, seat)
                             del seat["modelName"]
@@ -822,6 +824,12 @@ class TheModelName(unittest.TestCase):
                 today = models.current_model(family)
                 self.assertTrue(today)
                 self.assertEqual(org.model_name(family), models.model_info(today)["name"])
+
+    def test_a_pool_line_written_as_an_id_reads_as_its_name(self):
+        # Staff -Preset writes the builder pool's defaultModel as an id; the page shows its name.
+        chart = {"tree": {"positions": [{"prompt": None, "defaultModel": "claude-sonnet-5-5", "seats": []}]}}
+        org.with_prompts(chart)
+        self.assertEqual(chart["tree"]["positions"][0]["defaultModelName"], "Sonnet 5.5")
 
     def test_anything_else_is_as_written_and_no_model_is_none(self):
         self.assertEqual(org.model_name("sonnet for crew cards"), "sonnet for crew cards")

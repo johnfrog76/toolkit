@@ -536,9 +536,11 @@ def model_name(model: str | None) -> str | None:
 def with_prompts(chart: dict) -> dict:
     """The chart with the fields only the route adds: ``promptTitle`` and
     ``promptRef`` on every position (both null for a position with no prompt),
-    and ``modelName`` on every seat (``model_name``)."""
+    ``modelName`` on every seat and ``defaultModelName`` on every position
+    (``model_name``: a pool's line written as an id reads as the model's name)."""
     for position in chart["tree"]["positions"]:
         position["promptTitle"], position["promptRef"] = prompt_fields(position["prompt"] or "")
+        position["defaultModelName"] = model_name(position["defaultModel"])
         for seat in position["seats"]:
             seat["modelName"] = model_name(seat["model"])
     return chart
