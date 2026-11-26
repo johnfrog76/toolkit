@@ -65,7 +65,10 @@ tkOrgChart                              # read it back
 
 An org is made of **positions**, the offices, and the **seats** in each:
 
-- **You are the owner.** The owner's seat is a person, by the name you give it (`-Owner`), never a model.
+- **You are the owner.** The owner's seat is a person, never a model, and **its name is yours to choose
+  and to change.** You name it when you save an org (`tkStaff -Preset S -Owner "Sam"`), and a starting org
+  calls it `You` until you do. To rename it on an org you have already saved, change the owner seat's
+  `person` in `org.json`. The page's seat dialog will make that a button (see "Where it is going").
 - **Every other seat** holds a model and, if you like, the name of the session that sits there: the name
   other sessions use to reach it. A seat with neither is **vacant**, and the Org tab draws it as an empty
   desk.
@@ -123,7 +126,8 @@ None of it works today. [Known gaps](KNOWN-GAPS.md#the-org-is-set-up-from-the-te
   two VPs' models, each with its default filled) and saves it. Two dropdowns: **View**, to choose the org
   you are looking at, and **Active**, to choose the org in use.
 - **The seat dialog.** Each seat of a saved org gets an **Assign** or **Change** button. It sets the
-  seat's model and session, and for a team lead its Space.
+  seat's model and session, and for a team lead its Space. The owner's seat has a **Change** button for
+  your name too.
 - **Adding a team.** A team is a team lead assigned to one Space, with builders under it. The org grows
   with your projects, one team for each: Small has no team, adding the first team makes it the Branch
   Office, and adding a second makes it Corporate Headquarters.
