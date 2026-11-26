@@ -129,24 +129,29 @@ export function OfficeDoor({
   );
 }
 
-/** The plate: `POSITION · who` on its first line, where the seat is under it. */
+/** What a plate says on hover: its line, where the seat is, and the session it is. */
+export function plateHover(line: string, where?: string, session?: string): string {
+  const at = where ? `${line}, ${where}` : line;
+  return session ? `${at}. Session: ${session}` : at;
+}
+
+/** The plate: `POSITION · who` on its first line, where the seat is under it,
+ *  and the seat's session on hover. */
 export function Plate({
   position,
   who,
   where,
+  session,
 }: {
   position: string;
   who?: string;
   where?: string;
+  session?: string;
 }) {
   const styles = useStyles();
   const line = who ? `${position} · ${who}` : position;
   return (
-    <div
-      className={styles.plate}
-      data-testid="org-plate"
-      title={where ? `${line}, ${where}` : line}
-    >
+    <div className={styles.plate} data-testid="org-plate" title={plateHover(line, where, session)}>
       <span className={styles.line} data-testid="org-plate-line">
         {position}
         {who ? <span className={styles.who}> · {who}</span> : null}

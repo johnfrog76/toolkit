@@ -8,6 +8,7 @@ import {
   layoutChart,
   levelWall,
   officeWidth,
+  plateTitle,
   plateWho,
   positionFaces,
   seatFace,
@@ -15,7 +16,7 @@ import {
   vacantMug,
 } from "./orgChart";
 import { MUG_LOOKS } from "./stage/EmptyDesk";
-import { chartNames, orgResponse } from "./orgFixture";
+import { chartNames, modelNameOf, orgResponse } from "./orgFixture";
 
 // The Org page's rules apart from its drawing, over the shared table's charts
 // (Tests/fixtures/org/charts/): which face sits where, the walls by level, what
@@ -70,15 +71,30 @@ describe("the walls and the plates", () => {
     expect(levelWall(7)).toBe(LEVEL_WALLS[4]);
   });
 
-  it("a plate says the model, the person, or vacant; and where the seat is", () => {
+  it("a plate says the model by its name, the person, or vacant; and the Space, never a machine", () => {
+    // An older file: families for models, and a machine on every seat that is never drawn.
     const seats = orgResponse("valid").tree.positions.flatMap((p) => p.seats);
     const by = (id: string) => seats.find((s) => s.id === id)!;
     expect(plateWho(by("owner"))).toBe("Sam");
-    expect(plateWho(by("alpha"))).toBe("fable");
+    expect(plateWho(by("alpha"))).toBe(modelNameOf("fable"));
+    expect(plateWho(by("alpha"))).not.toBe("fable");
     expect(plateWho(by("gamma"))).toBe("vacant");
-    expect(seatWhere(by("alpha"))).toBe("alpha on mini");
-    expect(seatWhere(by("pm"))).toBe("on laptop");
+    expect(seatWhere(by("alpha"))).toBe("alpha");
+    expect(seatWhere(by("pm"))).toBe("");
     expect(seatWhere(by("owner"))).toBe("");
+  });
+
+  it("over the whole shape: a seat's roleTitle on its plate, the model map's name, an unknown id as written", () => {
+    const positions = orgResponse("the-shape-complete").tree.positions;
+    const lead = positions.find((p) => p.id === "team-lead")!;
+    const [alpha, beta] = lead.seats;
+    expect(plateTitle(lead, alpha)).toBe("Alpha lead");
+    expect(plateTitle(lead, beta)).toBe("Team lead");
+    expect(plateWho(alpha)).toBe("Opus 5.5");
+    expect(plateWho(beta)).toBe("a-model-the-map-does-not-know");
+    const vp = positions.find((p) => p.id === "vp-product")!;
+    expect(plateWho(vp.seats[0])).toBe("Fable 5.2");
+    expect(vp.seats[0].session).toBe("product-session");
   });
 });
 

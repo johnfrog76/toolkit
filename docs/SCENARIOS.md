@@ -561,7 +561,7 @@ previews the org presets (`GET /api/ritual/org/presets`) beside Your org, the hu
 
 | `GET /api/ritual/org` answers | The page shows |
 | --- | --- |
-| the tree in use | the tree's name as the heading (`Org chart` while there is no chart); one office a position, a row a level from the owner down, the walls coloured by level, lines from each office to its reports; a card a seat with a bust and a plate, `POSITION · model` and where it sits (`toolkit on mini`); the prompt's title over each office that has one |
+| the tree in use | the tree's title as the heading (an older file's name; `Org chart` while there is no chart); one office a position, a row a level from the owner down, the walls coloured by level, lines from each office to its reports; a card a seat with a bust and a plate, `POSITION · model` -- the seat's `roleTitle` in place of the position's where it has one, the model by its model-map name (`Opus 5.5`) -- and the Space it serves (`alpha`), its session on hover, never a machine; the prompt's title over each office that has one |
 | a position with several seats | a row of cards in one office |
 | a vacant seat | `POSITION · vacant` on a dimmed office with a dashed outline -- a placeholder for the empty desk, the size of a staffed card |
 | the owner's seat (a person) | `Owner · <name>`, no model, not a link |

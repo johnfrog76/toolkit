@@ -513,19 +513,27 @@ export const { useGetRitualMilestonesQuery } = milestonesEndpoints;
 //
 // The hub's org.json, the tree in use, as GET /api/ritual/org serves it
 // (docs/hub/org.md, "The response"): the positions in tree order, each with its
-// level and seats, and the two fields only the agent adds -- the prompt's title
-// and the ref that opens it in the Studio's reading room. A READ: nothing here
-// writes, and there is no Space parameter -- the file is the engineer's.
+// level and seats, and the fields only the agent adds -- the prompt's title and
+// the ref that opens it in the Studio's reading room, and each seat's model by
+// its models.json name. A READ: nothing here writes, and there is no Space
+// parameter -- the file is the engineer's. No machine is served: a machine is
+// not a boundary in an org, so the file's retired machine keys never reach here.
 
 /** One seat of a position: a model, or a person (the owner), or nobody. */
 export interface OrgSeat {
   id: string;
+  /** The seat's own label where it differs from the position's title; the plate shows it instead. */
+  roleTitle: string | null;
+  /** As the file says it: a models.json id, a family, or any text. Never parsed. */
   model: string | null;
+  /** What the model is called: models.json's name, looked up by the agent; as written with no row. */
+  modelName: string | null;
   person: string | null;
-  machine: string | null;
+  /** The session's name: the address readies and messages route to. Shown on hover. */
+  session: string | null;
+  /** True on the seat that holds the merge; null when the file does not say. */
+  merges: boolean | null;
   space: string | null;
-  /** Allowed by the file's shape; nothing draws it yet. */
-  active: boolean | null;
   /** Derived by the reader: vacant is a seat with no model and no person. */
   state: "staffed" | "vacant";
 }
@@ -536,6 +544,8 @@ export interface OrgPosition {
   prompt: string | null;
   reportsTo: string | null;
   defaultModel: string | null;
+  /** The model families the picker offers without a "not recommended" note. */
+  recommend: string[];
   /** The root is 0. */
   level: number;
   /** Empty for a pool (the builders): its default-model line is what it says. */
@@ -549,8 +559,14 @@ export interface OrgPosition {
 
 export interface OrgTree {
   id: string;
-  name: string;
-  machines: string[];
+  /** What the org is called: the file's title, else an older file's name, else the id. */
+  title: string;
+  size: string | null;
+  shortDescription: string | null;
+  description: string | null;
+  teamSize: number | null;
+  /** The preset the tree was started from. */
+  preset: string | null;
   positions: OrgPosition[];
 }
 

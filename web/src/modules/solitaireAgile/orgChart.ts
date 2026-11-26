@@ -77,16 +77,21 @@ export const VACANT_WORD = "vacant";
 /** The word after the position on a pool's plate. */
 export const POOL_WORD = "pool";
 
-/** The plate's second word: the model, the person (the owner), or vacant. */
-export function plateWho(seat: OrgSeat): string {
-  if (seat.state === "vacant") return VACANT_WORD;
-  return seat.person ?? seat.model ?? VACANT_WORD;
+/** The plate's first word: the seat's own roleTitle where it has one, else the position's title. */
+export function plateTitle(position: OrgPosition, seat: OrgSeat): string {
+  return seat.roleTitle ?? position.title;
 }
 
-/** Where a seat sits, where the file says: "toolkit on mini", "on laptop", or "". */
+/** The plate's second word: the person (the owner), the model by its models.json
+ *  name (the agent looks it up; a model with no row is as written), or vacant. */
+export function plateWho(seat: OrgSeat): string {
+  if (seat.state === "vacant") return VACANT_WORD;
+  return seat.person ?? seat.modelName ?? seat.model ?? VACANT_WORD;
+}
+
+/** Where a seat sits: the Space it serves, or "". No machine is ever drawn. */
 export function seatWhere(seat: OrgSeat): string {
-  const on = seat.machine ? `on ${seat.machine}` : "";
-  return [seat.space ?? "", on].filter(Boolean).join(" ");
+  return seat.space ?? "";
 }
 
 /**
