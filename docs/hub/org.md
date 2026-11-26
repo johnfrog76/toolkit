@@ -362,8 +362,10 @@ In every preset **the VP of product holds the merge**. The roles write the merge
 engineering's by default, and let a team place it elsewhere ([the roles](../../agentic/org/README.md)); each
 preset's description says where it sits. The merge stand-in covers that seat's merge. The owner's seat is a person (`You`); every other seat is open, for the owner to fill. No seat names a machine, and no
 tree lists any: sessions talk across machines, so a machine is not a boundary in an org.
-The test runner, the merge stand-in and the builders name no role, because none is shipped for them. M has five seats for a room of
-six, and L ten for a room of nine: the room seats who has work first, and the butler is a weekly bot. Every
+The test runner, the merge stand-in and the builders name no role, because none is shipped for them. A preset's
+`teamSize` is the standup's room (3, 6 or 9, the chair counted), not a count of seats: the room seats who has work
+first, and builders and invented cast members fill the windows left, so M's five seats sit in a room of six and
+L's ten in a room of nine. Every
 team lead's seat is `lead`, and no team names a Space yet: binding a team to a Space is a later step.
 
 A preset file is **one tree** in [the shape](#a-tree), read as the one tree of a file, and it validates against
