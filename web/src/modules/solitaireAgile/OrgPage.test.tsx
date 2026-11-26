@@ -512,6 +512,18 @@ describe("with saved orgs: View and Active", () => {
     treeResponses = { branch: { isLoading: false, data: withTrees(TWO, "valid-tree-by-id") } };
   });
 
+  it("each dropdown carries a visible label that names it: View and Active", () => {
+    draw();
+    expect(screen.getByText("View", { selector: "label" })).toBeTruthy();
+    expect(screen.getByText("Active", { selector: "label" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "View" })).toBe(
+      screen.getByTestId("org-preset-select"),
+    );
+    expect(screen.getByRole("combobox", { name: "Active" })).toBe(
+      screen.getByTestId("org-active-select"),
+    );
+  });
+
   it("View lists the saved orgs first, then the presets", () => {
     draw();
     fireEvent.click(screen.getByTestId("org-preset-select"));

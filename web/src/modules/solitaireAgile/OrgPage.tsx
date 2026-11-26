@@ -5,6 +5,7 @@ import {
   Button,
   Caption1,
   Dropdown,
+  Label,
   MessageBar,
   MessageBarBody,
   Option,
@@ -13,6 +14,7 @@ import {
   makeStyles,
   mergeClasses,
   tokens,
+  useId,
 } from "@fluentui/react-components";
 import { useState } from "react";
 import { DocumentTextRegular, OrganizationRegular } from "@fluentui/react-icons";
@@ -87,7 +89,9 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground2,
   },
   select: { minWidth: "220px" },
-  selects: { display: "flex", columnGap: tokens.spacingHorizontalS, alignItems: "center" },
+  selects: { display: "flex", columnGap: tokens.spacingHorizontalL, alignItems: "center" },
+  // A dropdown with its visible label before it: "View" and "Active".
+  labelled: { display: "flex", alignItems: "center", columnGap: tokens.spacingHorizontalS },
   // The line under the heading, and Use this org beside it on a preview.
   lineRow: {
     display: "flex",
@@ -448,34 +452,38 @@ function ViewSelect({
   onPick: (value: string) => void;
 }) {
   const styles = useStyles();
+  const id = useId("org-view");
   return (
-    <Dropdown
-      aria-label="View"
-      className={styles.select}
-      value={label}
-      selectedOptions={[view]}
-      onOptionSelect={(_, d) => onPick(d.optionValue ?? YOUR_ORG)}
-      data-testid="org-preset-select"
-    >
-      {saved.length > 0 ? (
-        <OptionGroup label="Your orgs">
-          {saved.map((t) => (
-            <Option key={t.id} value={savedView(t.id)}>
-              {t.title}
+    <span className={styles.labelled}>
+      <Label htmlFor={id}>View</Label>
+      <Dropdown
+        id={id}
+        className={styles.select}
+        value={label}
+        selectedOptions={[view]}
+        onOptionSelect={(_, d) => onPick(d.optionValue ?? YOUR_ORG)}
+        data-testid="org-preset-select"
+      >
+        {saved.length > 0 ? (
+          <OptionGroup label="Your orgs">
+            {saved.map((t) => (
+              <Option key={t.id} value={savedView(t.id)}>
+                {t.title}
+              </Option>
+            ))}
+          </OptionGroup>
+        ) : yours ? (
+          <Option value={YOUR_ORG}>{YOUR_ORG_LABEL}</Option>
+        ) : null}
+        <OptionGroup label="Presets">
+          {presets.map((p) => (
+            <Option key={p.id} value={previewView(p.id)}>
+              {presetLabel(p)}
             </Option>
           ))}
         </OptionGroup>
-      ) : yours ? (
-        <Option value={YOUR_ORG}>{YOUR_ORG_LABEL}</Option>
-      ) : null}
-      <OptionGroup label="Presets">
-        {presets.map((p) => (
-          <Option key={p.id} value={previewView(p.id)}>
-            {presetLabel(p)}
-          </Option>
-        ))}
-      </OptionGroup>
-    </Dropdown>
+      </Dropdown>
+    </span>
   );
 }
 
@@ -493,24 +501,28 @@ function ActiveSelect({
   onPick: (id: string) => void;
 }) {
   const styles = useStyles();
+  const id = useId("org-active");
   return (
-    <Dropdown
-      aria-label="Active org"
-      className={styles.select}
-      value={active.title}
-      selectedOptions={[active.id]}
-      disabled={busy}
-      onOptionSelect={(_, d) =>
-        d.optionValue && d.optionValue !== active.id && onPick(d.optionValue)
-      }
-      data-testid="org-active-select"
-    >
-      {saved.map((t) => (
-        <Option key={t.id} value={t.id}>
-          {t.title}
-        </Option>
-      ))}
-    </Dropdown>
+    <span className={styles.labelled}>
+      <Label htmlFor={id}>Active</Label>
+      <Dropdown
+        id={id}
+        className={styles.select}
+        value={active.title}
+        selectedOptions={[active.id]}
+        disabled={busy}
+        onOptionSelect={(_, d) =>
+          d.optionValue && d.optionValue !== active.id && onPick(d.optionValue)
+        }
+        data-testid="org-active-select"
+      >
+        {saved.map((t) => (
+          <Option key={t.id} value={t.id}>
+            {t.title}
+          </Option>
+        ))}
+      </Dropdown>
+    </span>
   );
 }
 

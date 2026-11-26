@@ -479,8 +479,9 @@ terminal's (the page asks for a saved tree by the id the route listed, so it mee
 merge yet; its writes are `Staff`'s, below. `OrgPage.test.tsx` and `orgChart.test.ts` draw the shared
 table's charts (`Tests/fixtures/org/charts/`).
 
-Two dropdowns at the right of the panel's header keep looking at an org apart from which org is in use, the way a
-repository's branch switcher sits beside its default branch:
+Two dropdowns at the right of the panel's header, each with its visible label (**View** and **Active**, 1rem apart),
+keep looking at an org apart from which org is in use, the way a repository's branch switcher sits beside its
+default branch:
 
 - **View** picks the org shown. It lists the hub's **saved orgs** first -- every tree of `org.json`, from the
   route's `trees` ([the response](../hub/org.md#the-response)) -- then the **org presets** (`GET
