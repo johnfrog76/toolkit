@@ -567,6 +567,7 @@ previews the org presets (`GET /api/ritual/org/presets`) beside Your org, the hu
 | the owner's seat (a person) | `Owner · <name>`, no model, not a link |
 | a position with no seats (the pool) | one wider card, `POSITION · pool`, its default-model line under it, not a link |
 | a position with a prompt | the office is a link: the prompt in the Studio's reading room (`/studio/prompts/yours/<name>`) |
+| any chart, any tree | over it at the content area's top right, a `Zoom` toolbar -- **Zoom out**, **Zoom in**, **Fit to width** -- and `Zoom <n>%` in a polite live region; the chart opens fitted to its box's width, capped at 100%, and only the chart scales; its box pans on both axes (`OrgPage.test.tsx`, "the zoom") |
 | 404 `missing` (no `org.json`) or `no-hub` | `No org chart yet`, with the agent's sentence (`There is no org.json in the hub.`) |
 | 409 (the file fails its checks) | `The org chart could not be read`, with the agent's sentence -- an error |
 | nothing (the agent is away) | `Could not read the org chart` -- an error |

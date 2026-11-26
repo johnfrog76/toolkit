@@ -5,12 +5,20 @@ import {
   Dropdown,
   Option,
   Subtitle2,
+  Toolbar,
+  ToolbarButton,
   makeStyles,
   mergeClasses,
   tokens,
 } from "@fluentui/react-components";
-import { useState } from "react";
-import { DocumentTextRegular, OrganizationRegular } from "@fluentui/react-icons";
+import { useLayoutEffect, useRef, useState } from "react";
+import {
+  DocumentTextRegular,
+  OrganizationRegular,
+  ZoomFitRegular,
+  ZoomInRegular,
+  ZoomOutRegular,
+} from "@fluentui/react-icons";
 import { Link } from "react-router";
 import { EmptyState } from "../../shared/EmptyState";
 import type { EmptyMessage } from "../../shared/EmptyState";
@@ -34,6 +42,7 @@ import {
   seatWhere,
 } from "./orgChart";
 import { VacantSeat } from "./VacantSeat";
+import { canZoomIn, canZoomOut, fitScale, zoomIn, zoomLabel, zoomOut } from "./orgZoom";
 
 // The Org tab (docs/modules/solitaire-agile.md, "The web UI"): Team Agile's
 // fourth page, after Standup, Triage and Releases. It draws the tree the agent
@@ -71,13 +80,34 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground2,
   },
   select: { minWidth: "260px" },
-  // The chart is as wide as its tree; a narrow window scrolls it, not the page.
+  // The zoom controls: the top right of the content area, over the chart.
+  zoomBar: {
+    display: "flex",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    columnGap: tokens.spacingHorizontalS,
+    marginTop: tokens.spacingVerticalS,
+  },
+  zoomLevel: {
+    minWidth: "6.5em",
+    color: tokens.colorNeutralForeground2,
+    fontVariantNumeric: "tabular-nums",
+  },
+  // The chart's box: as wide as the content area, panning on both axes, so a
+  // zoomed-in tree scrolls inside it and the page never scrolls sideways. 70vh
+  // keeps the header, the org's line and description and the controls in view
+  // over it on a laptop screen, so a pan never scrolls them away.
   scroller: {
-    overflowX: "auto",
+    overflow: "auto",
+    maxHeight: "70vh",
     paddingTop: tokens.spacingVerticalL,
     paddingBottom: tokens.spacingVerticalL,
   },
-  chart: { position: "relative", marginLeft: "auto", marginRight: "auto" },
+  // The scroll area is the scaled chart's size; centred while it is narrower
+  // than the box, as the chart always was.
+  sizer: { position: "relative", marginLeft: "auto", marginRight: "auto" },
+  // The chart's own layer: drawn at its full size and scaled from its top left.
+  chart: { position: "absolute", left: 0, top: 0, transformOrigin: "0 0" },
   lines: { position: "absolute", left: 0, top: 0, overflow: "visible" },
   office: {
     position: "absolute",
@@ -342,22 +372,92 @@ function noChart(error: unknown, icon: EmptyMessage["icon"]): EmptyMessage {
 }
 
 /** One tree's positions, drawn: the offices by level and the lines between them. */
+/** One tree's positions, drawn: the zoom controls over its box, and in the box
+ *  the offices by level and the lines between them, at the zoom's scale. Only
+ *  the chart's own layer scales (a CSS transform on its inner box); the box's
+ *  scroll area is the scaled size, so it pans on both axes and the page never
+ *  scrolls sideways. It opens fitted to the box's width, capped at 100%, and
+ *  keeps fitting as the box resizes until the person zooms by hand. */
 function ChartDrawing({ positions }: { positions: OrgPosition[] }) {
   const styles = useStyles();
   const layout = layoutChart(positions);
+  const box = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [byHand, setByHand] = useState(false);
+
+  // Measured before paint, so the first frame is already at its fitted scale.
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || byHand) return;
+    const fit = () => setScale(fitScale(el.clientWidth, layout.width));
+    fit();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [byHand, layout.width]);
+
+  const zoom = (next: number) => {
+    setByHand(true);
+    setScale(next);
+  };
+  const fitToWidth = () => {
+    setByHand(false);
+    setScale(fitScale(box.current?.clientWidth ?? 0, layout.width));
+  };
+
   return (
-    <div className={styles.scroller}>
-      <div
-        className={styles.chart}
-        style={{ width: layout.width, height: layout.height }}
-        data-testid="org-chart"
-      >
-        <Lines {...layout} />
-        {layout.offices.map((o) => (
-          <Office key={o.position.id} office={o} />
-        ))}
+    <>
+      <div className={styles.zoomBar}>
+        <Toolbar aria-label="Zoom" size="small" data-testid="org-zoom">
+          <ToolbarButton
+            aria-label="Zoom out"
+            icon={<ZoomOutRegular />}
+            disabled={!canZoomOut(scale)}
+            onClick={() => zoom(zoomOut(scale))}
+          />
+          <ToolbarButton
+            aria-label="Zoom in"
+            icon={<ZoomInRegular />}
+            disabled={!canZoomIn(scale)}
+            onClick={() => zoom(zoomIn(scale))}
+          />
+          <ToolbarButton icon={<ZoomFitRegular />} onClick={fitToWidth}>
+            Fit to width
+          </ToolbarButton>
+        </Toolbar>
+        <Caption1
+          className={styles.zoomLevel}
+          role="status"
+          aria-live="polite"
+          data-testid="org-zoom-level"
+        >
+          {zoomLabel(scale)}
+        </Caption1>
       </div>
-    </div>
+      <div ref={box} className={styles.scroller} data-testid="org-chart-box">
+        <div
+          className={styles.sizer}
+          style={{ width: layout.width * scale, height: layout.height * scale }}
+        >
+          <div
+            className={styles.chart}
+            style={{
+              width: layout.width,
+              height: layout.height,
+              transform: `scale(${scale})`,
+            }}
+            data-testid="org-chart"
+            data-scale={scale}
+          >
+            <Lines {...layout} />
+            {layout.offices.map((o) => (
+              <Office key={o.position.id} office={o} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 

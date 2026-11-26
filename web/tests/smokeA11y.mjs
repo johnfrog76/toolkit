@@ -108,6 +108,7 @@ const PAGES = [
   { group: "solitaireAgile", module: "solitaireAgile", route: "/solitaire-agile" },
   { group: "solitaireAgile", module: "solitaireAgile", route: "/solitaire-agile/triage" },
   { group: "solitaireAgile", module: "solitaireAgile", route: "/solitaire-agile/releases" },
+  { group: "solitaireAgile", module: "solitaireAgile", route: "/solitaire-agile/org" },
   { group: "solitaireAgile", module: "solitaireAgile", route: "/deck/ritual/standup" },
 ];
 
