@@ -1,5 +1,6 @@
 import {
-  Body1,
+  Badge,
+  Body2,
   Caption1,
   Dropdown,
   Option,
@@ -46,43 +47,24 @@ import { VacantSeat } from "./VacantSeat";
 // and are not links. The page is a READ: it chooses no tree, draws no active
 // state, and writes nothing.
 //
-// The dropdown previews a preset (docs/hub/org.md, "Org presets"): the starting
-// orgs the toolkit ships, served by GET /api/ritual/org/presets. Picking one
-// draws its chart with the same offices, its short description under the
-// selector and its description beside it. Nothing is written: org.json stays
-// the hub's, hand-edited.
+// The dropdown at the header's right previews a preset (docs/hub/org.md, "Org
+// presets"): the starting orgs the toolkit ships, served by GET
+// /api/ritual/org/presets. Picking one makes its title the heading, with its
+// size as a badge beside it, puts its description under the title, and draws
+// its chart with the same offices. Nothing is written: org.json stays the
+// hub's, hand-edited.
 
 const useStyles = makeStyles({
   body: { display: "flex", flexDirection: "column", minWidth: 0 },
-  picker: {
-    display: "flex",
-    alignItems: "flex-start",
-    columnGap: tokens.spacingHorizontalXXL,
-    paddingTop: tokens.spacingVerticalS,
-  },
-  pickerColumn: {
-    display: "flex",
-    flexDirection: "column",
-    rowGap: tokens.spacingVerticalXS,
-    width: "320px",
-    flexShrink: 0,
-  },
-  short: { color: tokens.colorNeutralForeground3 },
+  // The org's description, under its title. Its type is Fluent's Body2 (16px,
+  // the step at 1rem); this only places it, and 35em keeps a line near 78 characters.
   description: {
-    marginTop: 0,
+    marginTop: tokens.spacingVerticalS,
     marginBottom: 0,
-    flexGrow: 1,
-    maxWidth: "720px",
-    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
-    borderRadius: tokens.borderRadiusMedium,
-    // The office room's surface, so the panel sits in the card's palette in both themes.
-    backgroundColor: tokens.colorNeutralBackgroundAlpha,
-    outlineWidth: "1px",
-    outlineStyle: "solid",
-    outlineColor: tokens.colorNeutralStroke2,
+    maxWidth: "35em",
     color: tokens.colorNeutralForeground2,
   },
-  subtitle: { color: tokens.colorNeutralForeground3, alignSelf: "center" },
+  select: { minWidth: "260px" },
   // The chart is as wide as its tree; a narrow window scrolls it, not the page.
   scroller: {
     overflowX: "auto",
@@ -379,9 +361,8 @@ export function presetLabel(preset: Pick<OrgPreset, "title" | "size">): string {
   return preset.size ? `${name} (${preset.size})` : name;
 }
 
-/** The selector, with the picked preset's short description under it and its
- *  description beside it. */
-function PresetPicker({
+/** The selector, at the right of the panel's header: Your org, then the presets. */
+function PresetSelect({
   presets,
   picked,
   onPick,
@@ -392,36 +373,27 @@ function PresetPicker({
 }) {
   const styles = useStyles();
   return (
-    <div className={styles.picker} data-testid="org-presets">
-      <div className={styles.pickerColumn}>
-        <Dropdown
-          aria-label="Org"
-          value={picked ? presetLabel(picked) : YOUR_ORG_LABEL}
-          selectedOptions={[picked?.id ?? YOUR_ORG]}
-          onOptionSelect={(_, d) => onPick(d.optionValue ?? YOUR_ORG)}
-          data-testid="org-preset-select"
-        >
-          <Option value={YOUR_ORG}>{YOUR_ORG_LABEL}</Option>
-          {presets.map((p) => (
-            <Option key={p.id} value={p.id}>
-              {presetLabel(p)}
-            </Option>
-          ))}
-        </Dropdown>
-        {picked ? (
-          <Caption1 className={styles.short} data-testid="org-preset-short">
-            {picked.shortDescription}
-          </Caption1>
-        ) : null}
-      </div>
-      {picked ? (
-        <Body1 as="p" className={styles.description} data-testid="org-preset-description">
-          {picked.description}
-        </Body1>
-      ) : null}
-    </div>
+    <Dropdown
+      aria-label="Org"
+      className={styles.select}
+      value={picked ? presetLabel(picked) : YOUR_ORG_LABEL}
+      selectedOptions={[picked?.id ?? YOUR_ORG]}
+      onOptionSelect={(_, d) => onPick(d.optionValue ?? YOUR_ORG)}
+      data-testid="org-preset-select"
+    >
+      <Option value={YOUR_ORG}>{YOUR_ORG_LABEL}</Option>
+      {presets.map((p) => (
+        <Option key={p.id} value={p.id}>
+          {presetLabel(p)}
+        </Option>
+      ))}
+    </Dropdown>
   );
 }
+
+/** What the page is called: the picked preset's title, else the hub's tree's
+ *  name, else the page's own name while there is no chart. */
+export const ORG_PAGE_TITLE = "Org chart";
 
 export function OrgPage() {
   const styles = useStyles();
@@ -435,7 +407,7 @@ export function OrgPage() {
   const noOrg = isLoading || ours ? undefined : <EmptyState {...noChart(error, icon)} />;
   // With no preset to offer, the page is the hub's chart alone, as it always was.
   const empty = presets.length === 0 ? noOrg : undefined;
-  const subtitle = picked ? picked.title : ours?.tree.name;
+  const title = picked ? picked.title : (ours?.tree.name ?? ORG_PAGE_TITLE);
 
   return (
     <div className={styles.body}>
@@ -446,20 +418,29 @@ export function OrgPage() {
         headerLeft={
           <>
             {icon}
-            <Subtitle2 as="h1">Org chart</Subtitle2>
-            {subtitle ? (
-              <Caption1 className={styles.subtitle} data-testid="org-subtitle">
-                {subtitle}
-              </Caption1>
+            <Subtitle2 as="h1" data-testid="org-heading">
+              {title}
+            </Subtitle2>
+            {picked?.size ? (
+              <Badge appearance="tint" color="subtle" size="medium" data-testid="org-preset-size">
+                {picked.size}
+              </Badge>
             ) : null}
           </>
         }
+        headerRight={
+          presets.length > 0 ? (
+            <PresetSelect presets={presets} picked={picked} onPick={setPickedId} />
+          ) : undefined
+        }
       >
-        {presets.length > 0 ? (
-          <PresetPicker presets={presets} picked={picked} onPick={setPickedId} />
-        ) : null}
         {picked ? (
-          <ChartDrawing positions={picked.chart.tree.positions} />
+          <>
+            <Body2 as="p" className={styles.description} data-testid="org-preset-description">
+              {picked.description}
+            </Body2>
+            <ChartDrawing positions={picked.chart.tree.positions} />
+          </>
         ) : ours ? (
           <ChartDrawing positions={ours.tree.positions} />
         ) : (

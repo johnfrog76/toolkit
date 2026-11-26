@@ -561,7 +561,7 @@ previews the org presets (`GET /api/ritual/org/presets`) beside Your org, the hu
 
 | `GET /api/ritual/org` answers | The page shows |
 | --- | --- |
-| the tree in use | the heading `Org chart` and the tree's name; one office a position, a row a level from the owner down, the walls coloured by level, lines from each office to its reports; a card a seat with a bust and a plate, `POSITION · model` and where it sits (`toolkit on mini`); the prompt's title over each office that has one |
+| the tree in use | the tree's name as the heading (`Org chart` while there is no chart); one office a position, a row a level from the owner down, the walls coloured by level, lines from each office to its reports; a card a seat with a bust and a plate, `POSITION · model` and where it sits (`toolkit on mini`); the prompt's title over each office that has one |
 | a position with several seats | a row of cards in one office |
 | a vacant seat | `POSITION · vacant` on a dimmed office with a dashed outline -- a placeholder for the empty desk, the size of a staffed card |
 | the owner's seat (a person) | `Owner · <name>`, no model, not a link |
@@ -570,7 +570,7 @@ previews the org presets (`GET /api/ritual/org/presets`) beside Your org, the hu
 | 404 `missing` (no `org.json`) or `no-hub` | `No org chart yet`, with the agent's sentence (`There is no org.json in the hub.`) |
 | 409 (the file fails its checks) | `The org chart could not be read`, with the agent's sentence -- an error |
 | nothing (the agent is away) | `Could not read the org chart` -- an error |
-| and `GET /api/ritual/org/presets` serves presets | a dropdown above the chart, `Your org` first; picking a preset draws its chart with its short description and description, and with no `org.json` the presets are still offered |
+| and `GET /api/ritual/org/presets` serves presets | a dropdown at the right of the header, `Your org` first; picking a preset makes its title the heading with its size as a badge, puts its description under it and draws its chart; with no `org.json` the presets are still offered |
 
 ### The Lounge (on)
 

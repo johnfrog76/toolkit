@@ -283,7 +283,7 @@ A preset file is the tree's fields beside the tree's positions:
 | `id` | the preset's address, and the tree's id |
 | `size` | `S`, `M` or `L`; the order they are offered in |
 | `title` | its name, and the tree's name |
-| `shortDescription` | one line, under the Org tab's dropdown |
+| `shortDescription` | one line: what it is and what it fits, kept for a place that names a preset briefly; the Org tab shows the description |
 | `description` | a few sentences: how the work flows, who owns what, what it fits |
 | `teamSize` | the standup room it suggests, 3, 6 or 9. The Space's own `features.teamSize` decides the room; a preset sets nothing |
 | `positions` | the tree's positions, in the shape above |

@@ -1,7 +1,13 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import type { OrgPreset, OrgResponse } from "./api.solitaireAgile";
-import { OrgPage, UNKNOWN_TREE_DETAIL, YOUR_ORG_LABEL, presetLabel } from "./OrgPage";
+import {
+  ORG_PAGE_TITLE,
+  OrgPage,
+  UNKNOWN_TREE_DETAIL,
+  YOUR_ORG_LABEL,
+  presetLabel,
+} from "./OrgPage";
 import { orgResponse } from "./orgFixture";
 
 // The Org tab (docs/modules/solitaire-agile.md, "The web UI"): the tree the
@@ -64,7 +70,7 @@ describe("the chart, over the table's tree shaped like ours", () => {
     const levels = ["owner", "vp-product", "pm", "team-lead", "builder"].map(top);
     expect(levels).toEqual([...levels].sort((a, b) => a - b));
     expect(new Set(levels).size).toBe(5);
-    expect(screen.getByTestId("org-subtitle").textContent).toBe("Laptop and mini");
+    expect(screen.getByTestId("org-heading").textContent).toBe("Laptop and mini");
   });
 
   it("the lead's three seats are a row of three cards in one office, the vacant one last", () => {
@@ -288,13 +294,13 @@ describe("the presets", () => {
     ]);
   });
 
-  it("opens on your org: the hub's chart, with no description", () => {
+  it("opens on your org: the hub's chart under its own name, with no description and no size", () => {
     draw();
     expect(screen.getByTestId("org-preset-select").textContent).toContain(YOUR_ORG_LABEL);
-    expect(screen.getByTestId("org-subtitle").textContent).toBe("Laptop and mini");
+    expect(screen.getByTestId("org-heading").textContent).toBe("Laptop and mini");
     expect(positions()).toContain("pm");
-    expect(screen.queryByTestId("org-preset-short")).toBeNull();
     expect(screen.queryByTestId("org-preset-description")).toBeNull();
+    expect(screen.queryByTestId("org-preset-size")).toBeNull();
   });
 
   it("offers your org, then the presets smallest first", () => {
@@ -308,19 +314,18 @@ describe("the presets", () => {
     ]);
   });
 
-  it("picking one draws its chart, its short description under the selector and its description", () => {
+  it("picking one makes its title the heading with its size beside it, its description under it, and draws its chart", () => {
     draw();
     pick("Executive Suite (S)");
     expect(positions()).toEqual(
       orgResponse("one-tree-no-active-tree").tree.positions.map((p) => p.id),
     );
-    expect(screen.getByTestId("org-preset-short").textContent).toBe(
-      "The Executive Suite, in short.",
-    );
+    expect(screen.queryByText("The Executive Suite, in short.")).toBeNull();
     expect(screen.getByTestId("org-preset-description").textContent).toBe(
       "The Executive Suite, at length.",
     );
-    expect(screen.getByTestId("org-subtitle").textContent).toBe("The Executive Suite");
+    expect(screen.getByTestId("org-heading").textContent).toBe("The Executive Suite");
+    expect(screen.getByTestId("org-preset-size").textContent).toBe("S");
   });
 
   it("picking your org again draws the hub's chart", () => {
@@ -350,5 +355,20 @@ describe("the presets", () => {
     presetsResponse = { isLoading: false };
     draw();
     expect(screen.queryByTestId("org-presets")).toBeNull();
+  });
+});
+
+describe("the heading with no chart", () => {
+  it("is the page's own name while there is no org.json and no preset picked", () => {
+    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+    response = {
+      isLoading: false,
+      error: {
+        status: 404,
+        data: { detail: { kind: "missing", message: "There is no org.json in the hub." } },
+      },
+    };
+    draw();
+    expect(screen.getByTestId("org-heading").textContent).toBe(ORG_PAGE_TITLE);
   });
 });
