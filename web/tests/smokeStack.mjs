@@ -50,6 +50,8 @@ const PACKAGE_PARTS = [
   "Prompt20Toolkit",
   "Scripts",
   "templates",
+  // The org presets the Org tab previews (docs/hub/org.md, "Org presets").
+  "samples/org-presets",
   "config.default.json",
   "consts.json",
   "utilities.psm1",

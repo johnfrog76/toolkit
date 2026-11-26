@@ -515,6 +515,181 @@ class TheAppMountsIt(unittest.TestCase):
 
         self.assertIn(C.rituals_org_route(), set(app.openapi()["paths"]))
 
+    def test_the_app_serves_the_presets_route(self):
+        from agent.app import app
+
+        self.assertIn(C.rituals_org_presets_route(), set(app.openapi()["paths"]))
+
+
+# -- The presets (docs/hub/org.md, "Org presets") -------------------------------
+
+PRESETS_ROUTE = "/api/ritual/org/presets"
+PRESET_IDS = ["executive-suite", "branch-office", "corporate-headquarters"]
+
+
+def shipped_prompt(name: str) -> bool:
+    return (prompts.shipped_roles_dir() / name).is_file()
+
+
+class ThePresets(unittest.TestCase):
+    """The three presets the toolkit ships, read from the package."""
+
+    def setUp(self):
+        self.presets = org.org_presets()
+
+    def test_there_are_three_smallest_first(self):
+        self.assertEqual([p["id"] for p in self.presets], PRESET_IDS)
+        self.assertEqual([p["size"] for p in self.presets], ["S", "M", "L"])
+        self.assertEqual([p["teamSize"] for p in self.presets], [3, 6, 9])
+
+    def test_every_file_in_the_folder_reads_as_a_preset(self):
+        files = sorted(config.ORG_PRESETS_DIR.glob("*.json"))
+        self.assertEqual(len(files), len(self.presets), [f.name for f in files])
+        self.assertEqual(sorted(f.stem for f in files), sorted(PRESET_IDS))
+
+    def test_each_carries_its_words(self):
+        for p in self.presets:
+            with self.subTest(p["id"]):
+                for key in ("title", "shortDescription", "description"):
+                    self.assertTrue(p[key], key)
+                self.assertEqual(p["chart"]["tree"]["id"], p["id"])
+                self.assertEqual(p["chart"]["tree"]["name"], p["title"])
+
+    def test_each_names_only_roles_the_toolkit_ships(self):
+        for p in self.presets:
+            for position in p["chart"]["tree"]["positions"]:
+                if position["prompt"]:
+                    with self.subTest(p["id"], position=position["id"]):
+                        self.assertTrue(shipped_prompt(position["prompt"]), position["prompt"])
+
+    def test_the_owner_is_the_root_and_a_person(self):
+        for p in self.presets:
+            with self.subTest(p["id"]):
+                root = p["chart"]["tree"]["positions"][0]
+                self.assertEqual((root["id"], root["level"], root["prompt"]), ("owner", 0, None))
+                self.assertEqual(root["seats"][0]["state"], "staffed")
+
+    def test_every_other_seat_is_open_for_the_owner_to_fill(self):
+        for p in self.presets:
+            for position in p["chart"]["tree"]["positions"][1:]:
+                for seat in position["seats"]:
+                    with self.subTest(p["id"], seat=seat["id"]):
+                        self.assertEqual(seat["state"], "vacant")
+
+    def test_the_seats_fill_the_room_in_s_and_m(self):
+        # L has ten seats for a room of nine: the room seats who has work first.
+        for p in self.presets[:2]:
+            with self.subTest(p["id"]):
+                seats = sum(len(x["seats"]) for x in p["chart"]["tree"]["positions"])
+                self.assertEqual(seats, p["teamSize"])
+
+    def test_no_seat_names_a_machine_and_no_text_names_one(self):
+        # Sessions talk across machines, so a machine is not a boundary in an org.
+        words = ("machine", "laptop", "mini", " pc")
+        for p in self.presets:
+            with self.subTest(p["id"]):
+                self.assertEqual(p["chart"]["tree"]["machines"], [])
+                for position in p["chart"]["tree"]["positions"]:
+                    self.assertTrue(all(s["machine"] is None for s in position["seats"]), position["id"])
+                    self.assertFalse(any(w in (position["defaultModel"] or "").lower() for w in words))
+                text = f"{p['shortDescription']} {p['description']}".lower()
+                self.assertFalse([w for w in words if w in text])
+
+    def test_each_names_who_holds_the_merge(self):
+        for p in self.presets:
+            with self.subTest(p["id"]):
+                self.assertIn("VP of product", p["description"])
+                self.assertIn("merge", p["description"])
+
+
+class APresetFile(unittest.TestCase):
+    """What the reader makes of one preset's text."""
+
+    BASE = {
+        "id": "x",
+        "size": "S",
+        "title": "The X",
+        "shortDescription": "short",
+        "description": "long",
+        "teamSize": 3,
+        "positions": [
+            {"id": "owner", "title": "Owner", "seats": [{"id": "owner", "person": "You"}]},
+            {"id": "pm", "title": "PM", "prompt": "pm.prompt.md", "reportsTo": "owner", "seats": [{"id": "pm"}]},
+        ],
+    }
+
+    def read(self, doc):
+        return org.read_preset(json.dumps(doc), shipped_prompt)
+
+    def test_a_field_it_does_not_know_reads_fine(self):
+        extra = json.loads(json.dumps(self.BASE))
+        extra["swag"] = {"mug": "blue"}
+        extra["waysOfWorking"] = ["readies straight to the merge seat"]
+        extra["positions"][1]["swag"] = "badge"
+        extra["positions"][1]["seats"][0]["desk"] = "by the window"
+        self.assertTrue(same_json(self.read(extra), self.read(self.BASE)))
+        self.assertIsNotNone(self.read(extra))
+
+    def test_its_fields_and_its_chart(self):
+        got = self.read(self.BASE)
+        self.assertEqual(
+            {k: got[k] for k in org.PRESET_FIELDS},
+            {k: self.BASE[k] for k in org.PRESET_FIELDS},
+        )
+        self.assertEqual([x["id"] for x in got["chart"]["tree"]["positions"]], ["owner", "pm"])
+
+    def test_a_tree_that_fails_a_check_is_no_preset(self):
+        broken = json.loads(json.dumps(self.BASE))
+        broken["positions"][1]["reportsTo"] = "nobody"
+        self.assertIsNone(self.read(broken))
+
+    def test_a_role_the_toolkit_does_not_ship_is_no_preset(self):
+        broken = json.loads(json.dumps(self.BASE))
+        broken["positions"][1]["prompt"] = "mine.prompt.md"
+        self.assertIsNone(self.read(broken))
+
+    def test_no_id_or_not_json_is_no_preset(self):
+        no_id = dict(self.BASE)
+        del no_id["id"]
+        self.assertIsNone(self.read(no_id))
+        self.assertIsNone(org.read_preset("{nope", shipped_prompt))
+        self.assertIsNone(org.read_preset("[]", shipped_prompt))
+
+    def test_a_file_that_is_no_preset_is_left_out_of_the_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            (folder / "good.json").write_text(json.dumps(self.BASE), encoding="utf-8")
+            (folder / "bad.json").write_text("{nope", encoding="utf-8")
+            self.assertEqual([p["id"] for p in org.org_presets(folder)], ["x"])
+
+
+class ThePresetsRoute(OrgBase):
+    def test_it_serves_the_three_with_their_charts_and_prompts(self):
+        res = self.client.get(PRESETS_ROUTE)
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertEqual([p["id"] for p in body["presets"]], PRESET_IDS)
+        for p in body["presets"]:
+            for position in p["chart"]["tree"]["positions"]:
+                with self.subTest(p["id"], position=position["id"]):
+                    self.assertIn("promptTitle", position)
+                    self.assertEqual(bool(position["promptTitle"]), bool(position["prompt"]))
+
+    def test_it_needs_no_org_file_and_writes_nothing(self):
+        self.assertFalse((self.hub / "org.json").exists())
+        self.assertEqual(self.client.get(PRESETS_ROUTE).status_code, 200)
+        self.assertFalse(self.hub.exists() and any(self.hub.rglob("*")))
+
+
+class ThePresetsFlagOff(OrgBase):
+    features = {}
+
+    def test_off_is_404(self):
+        with mock.patch.object(org, "org_presets") as read:
+            res = self.client.get(PRESETS_ROUTE)
+        self.assertEqual(res.status_code, 404)
+        read.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

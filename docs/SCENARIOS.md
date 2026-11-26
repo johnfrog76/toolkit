@@ -555,7 +555,9 @@ tag-based releases are built the rows are GitHub milestones, and the panel says 
 
 The strip reads **Standup | Triage | Releases | Org**; Org is `/solitaire-agile/org`, under the ONE Team Agile
 entry, with the chrome, and absent with the flag off whatever `org.json` says (`scenarios.test.tsx`, "Org: a
-page under Team Agile's one entry"). The page is a read: no tree to choose, no `active` state, no write.
+page under Team Agile's one entry"). The page is a read: no tree to choose, no `active` state, no write. A dropdown
+previews the org presets (`GET /api/ritual/org/presets`) beside Your org, the hub's chart; a preview writes nothing
+(`OrgPage.test.tsx`, "the presets").
 
 | `GET /api/ritual/org` answers | The page shows |
 | --- | --- |
@@ -568,6 +570,7 @@ page under Team Agile's one entry"). The page is a read: no tree to choose, no `
 | 404 `missing` (no `org.json`) or `no-hub` | `No org chart yet`, with the agent's sentence (`There is no org.json in the hub.`) |
 | 409 (the file fails its checks) | `The org chart could not be read`, with the agent's sentence -- an error |
 | nothing (the agent is away) | `Could not read the org chart` -- an error |
+| and `GET /api/ritual/org/presets` serves presets | a dropdown above the chart, `Your org` first; picking a preset draws its chart with its short description and description, and with no `org.json` the presets are still offered |
 
 ### The Lounge (on)
 

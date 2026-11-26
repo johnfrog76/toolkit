@@ -38,12 +38,13 @@ from typing import Any
 from fastapi import HTTPException
 
 from ..core import log_writer
-from ..core.config import API_PREFIX, hub_configured, hub_folder, hub_root
-from ..core.consts import org_file, org_roles_folder, rituals_org_route
+from ..core.config import API_PREFIX, ORG_PRESETS_DIR, hub_configured, hub_folder, hub_root
+from ..core.consts import org_file, org_roles_folder, rituals_org_presets_route, rituals_org_route
 from ..studio import prompts
 from .standup import api
 
 ROUTE = rituals_org_route().removeprefix(API_PREFIX)
+PRESETS_ROUTE = rituals_org_presets_route().removeprefix(API_PREFIX)
 
 # The kinds the reader's callers add to the file's own (docs/hub/org.md, "What is checked").
 KIND_NO_HUB = "no-hub"
@@ -516,3 +517,95 @@ async def get_org(tree: str = "") -> dict:
     # engineer's, so there is no ``space``: the Space only decides whether the
     # module is on. ``tree`` asks for another tree of the file, as -Tree does.
     return await asyncio.to_thread(org_chart, tree)
+
+
+# -- The presets ------------------------------------------------------------------
+#
+# docs/hub/org.md, "Org presets": three starting orgs the toolkit ships in
+# samples/org-presets/, each ONE tree in org.json's shape plus what it is
+# called and what it fits. The route serves them for the Org tab to preview;
+# nothing here writes, and a preset never reaches a hub. A preset's own fields
+# are read by name and anything else is ignored without a word, so a later
+# field (the swag, the ways of working) reads fine in a reader that predates it.
+
+# The fields a preset carries beside its tree, in the order the response lists them.
+PRESET_FIELDS = ("id", "size", "title", "shortDescription", "description", "teamSize")
+
+
+def read_preset(text: str, prompt_exists: Callable[[str], bool], file_name: str = "") -> dict | None:
+    """One preset file's text as ``{id, size, title, shortDescription,
+    description, teamSize, chart}``, or None when it is not a preset whose tree
+    passes every check ``read_org_chart`` makes. The tree is the preset's
+    ``positions`` under its ``id``, named by its ``title``; a position's or a
+    seat's unknown key is ignored, as the hub's file has it."""
+    try:
+        data = json.loads(text.lstrip("\ufeff"), parse_constant=_no_constant)
+    except ValueError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    preset_id = _text(_field(data, "id"))
+    title = _text(_field(data, "title")) or preset_id
+    team_size = _field(data, "teamSize")
+    tree = {"id": preset_id, "name": title, "positions": _items(_field(data, "positions"))}
+    result = read_org_chart(json.dumps({"trees": [tree]}), prompt_exists, file_name=file_name or f"{preset_id}.json")
+    if not preset_id or result.status != "ok" or result.chart is None:
+        return None
+    return {
+        "id": preset_id,
+        "size": _text(_field(data, "size")),
+        "title": title,
+        "shortDescription": _text(_field(data, "shortDescription")),
+        "description": _text(_field(data, "description")),
+        "teamSize": team_size if isinstance(team_size, int) and not isinstance(team_size, bool) else None,
+        "chart": result.chart,
+    }
+
+
+# The order the presets are offered in: smallest first.
+_SIZE_ORDER = ("S", "M", "L")
+
+
+def org_presets(folder: Path | None = None) -> list[dict]:
+    """Every preset in ``folder`` (the package's samples/org-presets/), S, M,
+    L, then any other size by id. A preset names only the roles the toolkit
+    ships, so its prompts are looked up in the toolkit's roles folder alone. A
+    file that does not read as a preset is left out and said in the log."""
+    folder = folder or ORG_PRESETS_DIR
+    shipped = prompts.shipped_roles_dir()
+
+    def prompt_exists(name: str) -> bool:
+        return (shipped / name).is_file()
+
+    found: list[dict] = []
+    for path in sorted(folder.glob("*.json")) if folder.is_dir() else []:
+        try:
+            text = path.read_bytes().decode("utf-8", errors="replace")
+        except OSError:
+            text = ""
+        preset = read_preset(text, prompt_exists, path.name)
+        if preset is None:
+            log_writer.write_log("ERR", f"agent{PRESETS_ROUTE}", f"{path.name} is not a preset this tool reads -- left out.")
+            continue
+        found.append(preset)
+
+    def rank(p: dict) -> tuple[int, str]:
+        size = p["size"]
+        return (_SIZE_ORDER.index(size) if size in _SIZE_ORDER else len(_SIZE_ORDER), p["id"])
+
+    return sorted(found, key=rank)
+
+
+def org_presets_response() -> dict:
+    presets = org_presets()
+    for preset in presets:
+        with_prompts(preset["chart"])
+    log_writer.write_log("CMD", f"agent{PRESETS_ROUTE}", f"presets={len(presets)}")
+    return {"presets": presets}
+
+
+@api.get(PRESETS_ROUTE)
+async def get_org_presets() -> dict:
+    # Team Agile's gate, as the chart's own route. The presets are the
+    # package's, so no hub is needed to read them.
+    return await asyncio.to_thread(org_presets_response)

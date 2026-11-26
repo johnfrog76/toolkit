@@ -1,0 +1,80 @@
+{
+  "_comment": "An org preset (docs/hub/org.md, \"Org presets\"): a starting tree in org.json's shape, plus what it is called and what it fits. The Org tab previews it; nothing writes it into a hub. A reader ignores a field it does not know.",
+  "id": "corporate-headquarters",
+  "size": "L",
+  "title": "Corporate Headquarters",
+  "shortDescription": "The full org, with seats for the process: a PM, a merge stand-in, the butler and the intern. For many products and an owner with little time.",
+  "description": "The PM plans the work and keeps the record: it turns your direction into a queue for each team lead, passes each finished pull request to the seat that merges, and records what merged on the cards and the tracker. Team leads run their products with builders under them, and the test runner runs the full test suites on each change before it merges. The VP of product holds the merge, and the merge stand-in covers it when that seat is away, so a heavy queue keeps moving. The VP of engineering holds the standards across the lanes. The butler runs weekly as a bot, giving each new design note its id and reporting which designs look finished; the intern fetches the milestones and drafts proposals for the PM to decide. It fits many products, a heavy merge queue, and an owner who has little time and wants to be asked only what is theirs to decide.",
+  "teamSize": 9,
+  "positions": [
+    {
+      "id": "owner",
+      "title": "Owner",
+      "seats": [{ "id": "owner", "person": "You" }]
+    },
+    {
+      "id": "vp-engineering",
+      "title": "VP of engineering",
+      "prompt": "vp-of-engineering.prompt.md",
+      "reportsTo": "owner",
+      "seats": [{ "id": "vp-engineering" }]
+    },
+    {
+      "id": "test-runner",
+      "title": "Test runner",
+      "reportsTo": "vp-engineering",
+      "defaultModel": "runs the full test suites before a merge",
+      "seats": [{ "id": "test-runner" }]
+    },
+    {
+      "id": "pm",
+      "title": "PM",
+      "prompt": "pm.prompt.md",
+      "reportsTo": "owner",
+      "seats": [{ "id": "pm" }]
+    },
+    {
+      "id": "team-lead",
+      "title": "Team lead",
+      "prompt": "team-lead.prompt.md",
+      "reportsTo": "pm",
+      "seats": [{ "id": "product-one" }, { "id": "product-two" }]
+    },
+    {
+      "id": "builder",
+      "title": "Builder",
+      "reportsTo": "team-lead",
+      "defaultModel": "one per card, briefed by the lead",
+      "seats": []
+    },
+    {
+      "id": "intern",
+      "title": "Intern",
+      "prompt": "intern.prompt.md",
+      "reportsTo": "pm",
+      "seats": [{ "id": "intern" }]
+    },
+    {
+      "id": "vp-product",
+      "title": "VP of product",
+      "prompt": "vp-of-product.prompt.md",
+      "reportsTo": "owner",
+      "seats": [{ "id": "vp-product" }]
+    },
+    {
+      "id": "merge-stand-in",
+      "title": "Merge stand-in",
+      "defaultModel": "covers the VP of product's merge",
+      "reportsTo": "vp-product",
+      "seats": [{ "id": "merge-stand-in" }]
+    },
+    {
+      "id": "butler",
+      "title": "Butler",
+      "prompt": "butler.prompt.md",
+      "reportsTo": "vp-product",
+      "defaultModel": "a weekly bot",
+      "seats": [{ "id": "butler" }]
+    }
+  ]
+}

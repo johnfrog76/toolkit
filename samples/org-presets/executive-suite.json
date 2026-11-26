@@ -1,0 +1,37 @@
+{
+  "_comment": "An org preset (docs/hub/org.md, \"Org presets\"): a starting tree in org.json's shape, plus what it is called and what it fits. The Org tab previews it; nothing writes it into a hub. A reader ignores a field it does not know.",
+  "id": "executive-suite",
+  "size": "S",
+  "title": "The Executive Suite",
+  "shortDescription": "Everything is decided at the top: you and two VPs, with builders working the cards. For one product, one person, moving fast.",
+  "description": "Every decision is made on the top floor. You set the direction and have the final word on what ships. The VP of engineering drives the work: it turns your direction into cards, hands each one to a builder, reads every diff and makes the pull request ready. The VP of product reads what is about to ship as its user would, holds the merge, and keeps the product's voice. It fits one product, built by one person who wants to move fast with two capable seats beside them.",
+  "teamSize": 3,
+  "positions": [
+    {
+      "id": "owner",
+      "title": "Owner",
+      "seats": [{ "id": "owner", "person": "You" }]
+    },
+    {
+      "id": "vp-engineering",
+      "title": "VP of engineering",
+      "prompt": "vp-of-engineering.prompt.md",
+      "reportsTo": "owner",
+      "seats": [{ "id": "vp-engineering" }]
+    },
+    {
+      "id": "vp-product",
+      "title": "VP of product",
+      "prompt": "vp-of-product.prompt.md",
+      "reportsTo": "owner",
+      "seats": [{ "id": "vp-product" }]
+    },
+    {
+      "id": "builder",
+      "title": "Builder",
+      "reportsTo": "vp-engineering",
+      "defaultModel": "one per card, briefed by the VP of engineering",
+      "seats": []
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
-import type { OrgResponse } from "./api.solitaireAgile";
-import { OrgPage, UNKNOWN_TREE_DETAIL } from "./OrgPage";
+import type { OrgPreset, OrgResponse } from "./api.solitaireAgile";
+import { OrgPage, UNKNOWN_TREE_DETAIL, YOUR_ORG_LABEL, presetLabel } from "./OrgPage";
 import { orgResponse } from "./orgFixture";
 
 // The Org tab (docs/modules/solitaire-agile.md, "The web UI"): the tree the
@@ -10,8 +10,10 @@ import { orgResponse } from "./orgFixture";
 // documents the CLI's reader and the agent's are held to.
 
 let response: { data?: OrgResponse; isLoading: boolean; error?: unknown } = { isLoading: false };
+let presetsResponse: { data?: { presets: OrgPreset[] }; isLoading: boolean } = { isLoading: false };
 jest.mock("./api.solitaireAgile", () => ({
   useGetOrgChartQuery: () => response,
+  useGetOrgPresetsQuery: () => presetsResponse,
 }));
 
 function Where() {
@@ -42,6 +44,7 @@ const wheres = (el: HTMLElement) =>
 
 beforeEach(() => {
   response = { isLoading: false, data: orgResponse("valid") };
+  presetsResponse = { isLoading: false };
 });
 
 describe("the chart, over the table's tree shaped like ours", () => {
@@ -239,5 +242,113 @@ describe("when there is no chart", () => {
     const alert = screen.getByRole("alert");
     expect(within(alert).getByText("Could not read the org chart")).toBeTruthy();
     expect(within(alert).getByText("The agent did not answer. Nothing was read.")).toBeTruthy();
+  });
+});
+
+// -- The presets (docs/hub/org.md, "Org presets") ---------------------------
+
+/** A preset over one of the table's charts: the page draws whatever tree it is given. */
+function preset(id: string, size: string, title: string, chart: string): OrgPreset {
+  const c = orgResponse(chart);
+  c.tree.name = title;
+  return {
+    id,
+    size,
+    title,
+    shortDescription: `${title}, in short.`,
+    description: `${title}, at length.`,
+    teamSize: 3,
+    chart: c,
+  };
+}
+
+const PRESETS = [
+  preset("executive-suite", "S", "The Executive Suite", "one-tree-no-active-tree"),
+  preset("branch-office", "M", "The Branch Office", "valid-branch-active"),
+  preset("corporate-headquarters", "L", "Corporate Headquarters", "valid"),
+];
+
+function pick(label: string) {
+  fireEvent.click(screen.getByTestId("org-preset-select"));
+  fireEvent.click(screen.getByRole("option", { name: label }));
+}
+
+const positions = () => screen.getAllByTestId("org-office").map((o) => o.dataset.position);
+
+describe("the presets", () => {
+  beforeEach(() => {
+    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+  });
+
+  it("names a preset by its title without a leading The, and its size", () => {
+    expect(PRESETS.map(presetLabel)).toEqual([
+      "Executive Suite (S)",
+      "Branch Office (M)",
+      "Corporate Headquarters (L)",
+    ]);
+  });
+
+  it("opens on your org: the hub's chart, with no description", () => {
+    draw();
+    expect(screen.getByTestId("org-preset-select").textContent).toContain(YOUR_ORG_LABEL);
+    expect(screen.getByTestId("org-subtitle").textContent).toBe("Laptop and mini");
+    expect(positions()).toContain("pm");
+    expect(screen.queryByTestId("org-preset-short")).toBeNull();
+    expect(screen.queryByTestId("org-preset-description")).toBeNull();
+  });
+
+  it("offers your org, then the presets smallest first", () => {
+    draw();
+    fireEvent.click(screen.getByTestId("org-preset-select"));
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      YOUR_ORG_LABEL,
+      "Executive Suite (S)",
+      "Branch Office (M)",
+      "Corporate Headquarters (L)",
+    ]);
+  });
+
+  it("picking one draws its chart, its short description under the selector and its description", () => {
+    draw();
+    pick("Executive Suite (S)");
+    expect(positions()).toEqual(
+      orgResponse("one-tree-no-active-tree").tree.positions.map((p) => p.id),
+    );
+    expect(screen.getByTestId("org-preset-short").textContent).toBe(
+      "The Executive Suite, in short.",
+    );
+    expect(screen.getByTestId("org-preset-description").textContent).toBe(
+      "The Executive Suite, at length.",
+    );
+    expect(screen.getByTestId("org-subtitle").textContent).toBe("The Executive Suite");
+  });
+
+  it("picking your org again draws the hub's chart", () => {
+    draw();
+    pick("Branch Office (M)");
+    pick(YOUR_ORG_LABEL);
+    expect(positions()).toContain("pm");
+    expect(screen.queryByTestId("org-preset-description")).toBeNull();
+  });
+
+  it("with no org.json the presets are still there to preview", () => {
+    response = {
+      isLoading: false,
+      error: {
+        status: 404,
+        data: { detail: { kind: "missing", message: "There is no org.json in the hub." } },
+      },
+    };
+    draw();
+    expect(screen.getByText("No org chart yet")).toBeTruthy();
+    pick("Corporate Headquarters (L)");
+    expect(screen.queryByText("No org chart yet")).toBeNull();
+    expect(positions()).toContain("pm");
+  });
+
+  it("with no preset served, the page is the hub's chart alone", () => {
+    presetsResponse = { isLoading: false };
+    draw();
+    expect(screen.queryByTestId("org-presets")).toBeNull();
   });
 });

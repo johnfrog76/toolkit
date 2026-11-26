@@ -1,4 +1,14 @@
-import { Caption1, Subtitle2, makeStyles, mergeClasses, tokens } from "@fluentui/react-components";
+import {
+  Body1,
+  Caption1,
+  Dropdown,
+  Option,
+  Subtitle2,
+  makeStyles,
+  mergeClasses,
+  tokens,
+} from "@fluentui/react-components";
+import { useState } from "react";
 import { DocumentTextRegular, OrganizationRegular } from "@fluentui/react-icons";
 import { Link } from "react-router";
 import { EmptyState } from "../../shared/EmptyState";
@@ -6,8 +16,8 @@ import type { EmptyMessage } from "../../shared/EmptyState";
 import { PanelFrame } from "../../shared/PanelFrame";
 import { RefinedBust, bustHeight } from "../../shared/refinedFaces";
 import { promptPath } from "../studio/paths";
-import { useGetOrgChartQuery } from "./api.solitaireAgile";
-import type { OrgPosition, OrgRefusal } from "./api.solitaireAgile";
+import { useGetOrgChartQuery, useGetOrgPresetsQuery } from "./api.solitaireAgile";
+import type { OrgPosition, OrgPreset, OrgRefusal } from "./api.solitaireAgile";
 import { OfficeDoor, Plate, SeatCell } from "./OrgParts";
 import type { PlacedOffice } from "./orgChart";
 import {
@@ -35,9 +45,43 @@ import { VacantSeat } from "./VacantSeat";
 // (promptPath of the position's promptRef); the owner and the pool have none,
 // and are not links. The page is a READ: it chooses no tree, draws no active
 // state, and writes nothing.
+//
+// The dropdown previews a preset (docs/hub/org.md, "Org presets"): the starting
+// orgs the toolkit ships, served by GET /api/ritual/org/presets. Picking one
+// draws its chart with the same offices, its short description under the
+// selector and its description beside it. Nothing is written: org.json stays
+// the hub's, hand-edited.
 
 const useStyles = makeStyles({
   body: { display: "flex", flexDirection: "column", minWidth: 0 },
+  picker: {
+    display: "flex",
+    alignItems: "flex-start",
+    columnGap: tokens.spacingHorizontalXXL,
+    paddingTop: tokens.spacingVerticalS,
+  },
+  pickerColumn: {
+    display: "flex",
+    flexDirection: "column",
+    rowGap: tokens.spacingVerticalXS,
+    width: "320px",
+    flexShrink: 0,
+  },
+  short: { color: tokens.colorNeutralForeground3 },
+  description: {
+    marginTop: 0,
+    marginBottom: 0,
+    flexGrow: 1,
+    maxWidth: "720px",
+    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
+    borderRadius: tokens.borderRadiusMedium,
+    // The office room's surface, so the panel sits in the card's palette in both themes.
+    backgroundColor: tokens.colorNeutralBackgroundAlpha,
+    outlineWidth: "1px",
+    outlineStyle: "solid",
+    outlineColor: tokens.colorNeutralStroke2,
+    color: tokens.colorNeutralForeground2,
+  },
   subtitle: { color: tokens.colorNeutralForeground3, alignSelf: "center" },
   // The chart is as wide as its tree; a narrow window scrolls it, not the page.
   scroller: {
@@ -303,14 +347,95 @@ function noChart(error: unknown, icon: EmptyMessage["icon"]): EmptyMessage {
   };
 }
 
+/** One tree's positions, drawn: the offices by level and the lines between them. */
+function ChartDrawing({ positions }: { positions: OrgPosition[] }) {
+  const styles = useStyles();
+  const layout = layoutChart(positions);
+  return (
+    <div className={styles.scroller}>
+      <div
+        className={styles.chart}
+        style={{ width: layout.width, height: layout.height }}
+        data-testid="org-chart"
+      >
+        <Lines {...layout} />
+        {layout.offices.map((o) => (
+          <Office key={o.position.id} office={o} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The value the dropdown holds for the hub's own chart. */
+export const YOUR_ORG = "";
+/** What the dropdown calls the hub's own chart. */
+export const YOUR_ORG_LABEL = "Your org";
+
+/** A preset as the dropdown names it: its title without a leading "The", and
+ *  its size -- "Executive Suite (S)". */
+export function presetLabel(preset: Pick<OrgPreset, "title" | "size">): string {
+  const name = preset.title.replace(/^The\s+/, "");
+  return preset.size ? `${name} (${preset.size})` : name;
+}
+
+/** The selector, with the picked preset's short description under it and its
+ *  description beside it. */
+function PresetPicker({
+  presets,
+  picked,
+  onPick,
+}: {
+  presets: OrgPreset[];
+  picked: OrgPreset | undefined;
+  onPick: (id: string) => void;
+}) {
+  const styles = useStyles();
+  return (
+    <div className={styles.picker} data-testid="org-presets">
+      <div className={styles.pickerColumn}>
+        <Dropdown
+          aria-label="Org"
+          value={picked ? presetLabel(picked) : YOUR_ORG_LABEL}
+          selectedOptions={[picked?.id ?? YOUR_ORG]}
+          onOptionSelect={(_, d) => onPick(d.optionValue ?? YOUR_ORG)}
+          data-testid="org-preset-select"
+        >
+          <Option value={YOUR_ORG}>{YOUR_ORG_LABEL}</Option>
+          {presets.map((p) => (
+            <Option key={p.id} value={p.id}>
+              {presetLabel(p)}
+            </Option>
+          ))}
+        </Dropdown>
+        {picked ? (
+          <Caption1 className={styles.short} data-testid="org-preset-short">
+            {picked.shortDescription}
+          </Caption1>
+        ) : null}
+      </div>
+      {picked ? (
+        <Body1 as="p" className={styles.description} data-testid="org-preset-description">
+          {picked.description}
+        </Body1>
+      ) : null}
+    </div>
+  );
+}
+
 export function OrgPage() {
   const styles = useStyles();
   const { data, isLoading, error } = useGetOrgChartQuery();
+  const presetsQuery = useGetOrgPresetsQuery();
+  const presets = presetsQuery.data?.presets ?? [];
+  const [pickedId, setPickedId] = useState(YOUR_ORG);
+  const picked = presets.find((p) => p.id === pickedId);
   const icon = <OrganizationRegular />;
-  const layout = data && !error ? layoutChart(data.tree.positions) : null;
-  const empty = isLoading ? undefined : !data || error ? (
-    <EmptyState {...noChart(error, icon)} />
-  ) : undefined;
+  const ours = data && !error ? data : null;
+  const noOrg = isLoading || ours ? undefined : <EmptyState {...noChart(error, icon)} />;
+  // With no preset to offer, the page is the hub's chart alone, as it always was.
+  const empty = presets.length === 0 ? noOrg : undefined;
+  const subtitle = picked ? picked.title : ours?.tree.name;
 
   return (
     <div className={styles.body}>
@@ -322,28 +447,24 @@ export function OrgPage() {
           <>
             {icon}
             <Subtitle2 as="h1">Org chart</Subtitle2>
-            {data && !error ? (
+            {subtitle ? (
               <Caption1 className={styles.subtitle} data-testid="org-subtitle">
-                {data.tree.name}
+                {subtitle}
               </Caption1>
             ) : null}
           </>
         }
       >
-        {layout ? (
-          <div className={styles.scroller}>
-            <div
-              className={styles.chart}
-              style={{ width: layout.width, height: layout.height }}
-              data-testid="org-chart"
-            >
-              <Lines {...layout} />
-              {layout.offices.map((o) => (
-                <Office key={o.position.id} office={o} />
-              ))}
-            </div>
-          </div>
+        {presets.length > 0 ? (
+          <PresetPicker presets={presets} picked={picked} onPick={setPickedId} />
         ) : null}
+        {picked ? (
+          <ChartDrawing positions={picked.chart.tree.positions} />
+        ) : ours ? (
+          <ChartDrawing positions={ours.tree.positions} />
+        ) : (
+          (noOrg ?? null)
+        )}
       </PanelFrame>
     </div>
   );

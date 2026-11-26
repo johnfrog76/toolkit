@@ -578,3 +578,38 @@ export const orgEndpoints = api.injectEndpoints({
 });
 
 export const { useGetOrgChartQuery } = orgEndpoints;
+
+// -- The org presets (the Org tab's dropdown) ------------------------------
+//
+// The starting orgs the toolkit ships (docs/hub/org.md, "Org presets"), as
+// GET /api/ritual/org/presets serves them: each with its words and its chart in
+// the response shape above. The page previews one; nothing writes it.
+
+export interface OrgPreset {
+  id: string;
+  size: string;
+  title: string;
+  shortDescription: string;
+  description: string;
+  /** The standup room it suggests (3, 6 or 9); the Space's own setting decides. */
+  teamSize: number | null;
+  chart: OrgResponse;
+}
+
+export interface OrgPresetsResponse {
+  presets: OrgPreset[];
+}
+
+export const ORG_PRESETS_QUERY = underBase(RITUALS.orgPresetsRoute);
+
+export const orgPresetEndpoints = api.injectEndpoints({
+  endpoints: (builder) => ({
+    // GET /api/ritual/org/presets -- the shipped presets, read from the package
+    getOrgPresets: builder.query<OrgPresetsResponse, void>({
+      query: () => ORG_PRESETS_QUERY,
+      keepUnusedDataFor: CACHE_TTL,
+    }),
+  }),
+});
+
+export const { useGetOrgPresetsQuery } = orgPresetEndpoints;
