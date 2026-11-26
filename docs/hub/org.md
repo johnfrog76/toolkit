@@ -58,8 +58,8 @@ never a Space.
 | `id` | **yes** | the tree's address, unique among the file's trees. For a preset, its preset id (`executive-suite`) |
 | `title` | no | what the org is called ("The Branch Office"); the heading on the Org tab, and the id when absent. **It replaces `name`**: a reader takes an older file's `name` as the title when there is no `title` |
 | `size` | no | `S`, `M` or `L`, drawn as the badge beside a preset's title |
-| `shortDescription` | no | one line: what it is and what it fits |
-| `description` | no | a few sentences: how the work flows, who owns what, what it fits |
+| `shortDescription` | no | one line: what the org is. A count in it states the design's own limit (one team, a team for each project), never the user's world |
+| `description` | no | a few sentences: how the work flows and who owns what, by the same rule for counts |
 | `teamSize` | no | the standup room the org suggests: 3, 6 or 9. A suggestion only: the Space's `features.teamSize` decides the room |
 | `preset` | no | the id of the preset the tree was started from |
 | `positions` | **yes** | the positions, in the order siblings are drawn |
@@ -353,11 +353,11 @@ never used in place. The Org tab previews them ([Team Agile, the web UI](../modu
 and [`Staff -Preset`](#the-one-writer-staff) saves a copy of one as a tree of `org.json`; the folder is
 `consts.json` `org.presetsFolder`.
 
-| Size | Preset | `id` | Seats | Room | Fits |
-| --- | --- | --- | --- | --- | --- |
-| S | The Executive Suite | `executive-suite` | the owner, the VP of engineering (drives the work through builders) and the VP of product (reads what ships and holds the merge); a builder pool | 3 | one product, one person, moving fast |
-| M | The Branch Office | `branch-office` | S, plus one team -- a team lead (`lead-team`, one seat) with its own builder pool (`builders-team`) -- and a test runner; the lead sends its readies straight to the seat that merges | 6 | two or three products |
-| L | Corporate Headquarters | `corporate-headquarters` | M, plus a PM, a team for each project under it -- two to start, `lead-team-1` and `lead-team-2`, each one lead with its own builder pool (`builders-team-1`, `builders-team-2`) -- a merge stand-in, the butler (the weekly bot) and the intern | 9 | many products, a heavy merge queue, an owner with little time |
+| Size | Preset | `id` | Seats | Room |
+| --- | --- | --- | --- | --- |
+| S | The Executive Suite | `executive-suite` | the owner, the VP of engineering (drives the work through builders) and the VP of product (reads what ships and holds the merge); a builder pool | 3 |
+| M | The Branch Office | `branch-office` | S, plus one team -- a team lead (`lead-team`, one seat) with its own builder pool (`builders-team`) -- and a test runner; the lead sends its readies straight to the seat that merges | 6 |
+| L | Corporate Headquarters | `corporate-headquarters` | M, plus a PM, a team for each project under it -- two to start, `lead-team-1` and `lead-team-2`, each one lead with its own builder pool (`builders-team-1`, `builders-team-2`) -- a merge stand-in, the butler (the weekly bot) and the intern | 9 |
 
 In every preset **the VP of product holds the merge**. The roles write the merge once, as the VP of
 engineering's by default, and let a team place it elsewhere ([the roles](../../agentic/org/README.md)); each
@@ -377,8 +377,8 @@ the schema's `#/$defs/tree`. The fields a preset uses:
 | `id` | the preset's address, and the tree's id |
 | `size` | `S`, `M` or `L`; the order they are offered in |
 | `title` | its name, and the tree's title |
-| `shortDescription` | one line: what it is and what it fits, kept for a place that names a preset briefly; the Org tab shows the description |
-| `description` | a few sentences: how the work flows, who owns what, what it fits |
+| `shortDescription` | one line: what the org is, kept for a place that names a preset briefly; the Org tab shows the description |
+| `description` | a few sentences: how the work flows and who owns what |
 | `teamSize` | the standup room it suggests, 3, 6 or 9. The Space's own `features.teamSize` decides the room; a preset sets nothing |
 | `positions` | the tree's positions, in the shape above |
 

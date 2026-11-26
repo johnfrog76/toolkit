@@ -3,8 +3,8 @@
   "id": "branch-office",
   "size": "M",
   "title": "The Branch Office",
-  "shortDescription": "One team runs the work: a team lead with their own builders, and a test runner. For two or three products.",
-  "description": "The team has a lead and the lead's own builders. The team lead takes the cards, briefs one of the team's builders for each, checks the work, and sends each finished pull request straight to the seat that merges, which here is the VP of product. The VP of engineering sets the standards the team holds and settles anything that crosses products. The test runner runs the full test suites on each change before it merges, so the lead never waits on the tests to finish. You set the direction and decide what ships. It fits two or three products worked side by side, each with its own lane.",
+  "shortDescription": "One team runs the work: a team lead with their own builders, and a test runner.",
+  "description": "The team has a lead and the lead's own builders. The team lead takes the cards, briefs one of the team's builders for each, checks the work, and sends each finished pull request straight to the seat that merges, which here is the VP of product. The VP of engineering sets the standards the team holds and settles anything that crosses products. The test runner runs the full test suites on each change before it merges, so the lead never waits on the tests to finish. You set the direction and decide what ships. The Branch Office has one team; a second team makes it Corporate Headquarters.",
   "teamSize": 6,
   "positions": [
     {
