@@ -2,14 +2,17 @@
 .SYNOPSIS
     OrgChart -- the org's tree from the hub's org file, typed (Team Agile).
 .DESCRIPTION
-    Holds the contract in docs/hub/org.md in three layers.
+    Holds the contract in docs/hub/org.md in four layers.
 
     1. The reader     Scripts/Read-OrgChart.ps1 over the shared table
                       Tests/fixtures/org/table.json -- the agent's reader reads
                       the same file. One row per input the file's rules
                       distinguish: a valid tree shaped like ours, a second
                       tree chosen by activeTree and by -Tree, the unknown keys
-                      said and the notes not, a renamed agentic folder, and
+                      said and the notes not, a renamed agentic folder, the
+                      whole shape (a title over an older name, a seat's
+                      roleTitle, session and merge, the retired keys read and
+                      not drawn, each new field by its type), and
                       every way the file can be wrong -- unreadable, no trees,
                       an entry with no id, no or unknown activeTree, a repeated
                       id (trees, positions, seats), a reportsTo that names
@@ -35,6 +38,11 @@
                       configured with no file, on with the tree's name and its
                       seats, and off with the sentence when the file is there
                       and invalid; and the sample hub's own org.json is valid.
+    4. The schema     Config/org.schema.json with Test-Json -Schema: the sample
+                      hub's org.json as a file, each preset as one tree, what it
+                      refuses and what it lets through. PowerShell 7 only:
+                      Windows PowerShell 5.1 has no Test-Json, so there it is a
+                      named SKIP, and Tests/test_org.py validates the same files.
 
     Run:  pwsh -File Tests/Test-OrgChart.ps1
     Or:   {cliPrefix}TestToolkit -OrgChart
@@ -251,7 +259,7 @@ try {
     New-Item -ItemType Directory -Path $bomHub -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $bomHub 'org.json'), '{"trees":[{"id":"a","name":"Caf' + [char]0x00E9 + '","positions":[{"id":"x"}]}]}', (New-Object System.Text.UTF8Encoding($true)))
     $bom = Read-P20OrgChart -PromptsRoot $bomHub
-    Assert-Equal 'a file with a BOM reads, and a non-ASCII name comes through' ('Caf' + [char]0x00E9) $bom.Chart.tree.name
+    Assert-Equal 'a file with a BOM reads, and a non-ASCII name comes through as the title' ('Caf' + [char]0x00E9) $bom.Chart.tree.title
     $dot = [string][char]0x00B7
     Assert-True 'the plate is the position, a middle dot, then who sits there' ((Format-P20OrgChartLines -Chart $bom.Chart)[0] -ceq "x $dot no seats")
 
@@ -284,16 +292,25 @@ try {
     $hubWithFile = Get-Snapshot $hubDir
     $typed = Invoke-OrgChart "'BEGIN:text'; tkOrgChart; 'END:text'; 'BEGIN:json'; tkOrgChart -AsJson; 'END:json'; 'BEGIN:branch'; tkOrgChart -Tree branch; 'END:branch'; 'BEGIN:branchjson'; tkOrgChart -Tree branch -AsJson; 'END:branchjson'"
     $textOut = Get-Section $typed.All 'text'
-    $wantText = "Org chart: Laptop and mini (main)`nMachines: laptop, mini`n`n" + (Read-Fixture 'text/valid.txt').TrimEnd("`n")
-    Assert-Equal 'the text: a header, then one line per seat, byte for byte' $wantText $textOut $typed.All
+    $wantText = "Org chart: Laptop and mini (main)`n`n" + (Read-Fixture 'text/valid.txt').TrimEnd("`n")
+    Assert-Equal 'the text: a header with the title (an older file''s name), then one line per seat, byte for byte -- no machine' $wantText $textOut $typed.All
     Assert-Equal 'it exits 0' '0' $typed.Exit
     $jsonDiff = Compare-Json (Read-Fixture 'charts/valid.json' | ConvertFrom-Json) ((Get-Section $typed.All 'json') | ConvertFrom-Json)
     Assert-True '-AsJson is the table''s chart' ($jsonDiff -eq '') $jsonDiff
     $branchText = Get-Section $typed.All 'branch'
-    Assert-Equal '-Tree prints the other tree and says it is not the one in use' ("Org chart: One machine (branch) -- not the tree in use (main)`nMachines: mini`n`n" + (Read-Fixture 'text/valid-tree-by-id.txt').TrimEnd("`n")) $branchText
+    Assert-Equal '-Tree prints the other tree and says it is not the one in use' ("Org chart: One machine (branch) -- not the tree in use (main)`n`n" + (Read-Fixture 'text/valid-tree-by-id.txt').TrimEnd("`n")) $branchText
     $branchDiff = Compare-Json (Read-Fixture 'charts/valid-tree-by-id.json' | ConvertFrom-Json) ((Get-Section $typed.All 'branchjson') | ConvertFrom-Json)
     Assert-True '-Tree -AsJson is the table''s chart for it' ($branchDiff -eq '') $branchDiff
     Assert-True 'the four runs wrote nothing to the hub: not a byte, not a file' ((Get-Snapshot $hubDir) -ceq $hubWithFile)
+
+    # The whole shape, typed: the title in the header, a seat's roleTitle, its session and the merge.
+    $shapeCase = $table.cases | Where-Object { $_.name -eq 'the-shape-complete' } | Select-Object -First 1
+    [System.IO.File]::WriteAllText($orgPath, (Read-Fixture $shapeCase.orgFile), $utf8)
+    $shaped = Invoke-OrgChart "'BEGIN:text'; tkOrgChart; 'END:text'"
+    Assert-Equal 'the whole shape: the title in the header, then the table''s lines' ("Org chart: The Branch Office (branch-office)`n`n" + (Read-Fixture $shapeCase.expect.text).TrimEnd("`n")) (Get-Section $shaped.All 'text') $shaped.All
+    Assert-True '  a seat''s roleTitle stands in for the position''s title, with its session' ($shaped.All.Contains("Alpha lead $([char]0x00B7) claude-opus-5-5 [alpha] (lead-session)")) $shaped.All
+    Assert-True '  and the seat that holds the merge says so' ($shaped.All.Contains("(product-session) $([char]0x00B7) merges")) $shaped.All
+    [System.IO.File]::WriteAllText($orgPath, (Read-Fixture $validCase.orgFile), $utf8)
 
     # Unknown keys: said as warnings, exit 0, the chart still printed.
     $keys = $table.cases | Where-Object { $_.name -eq 'unknown-keys-and-notes' } | Select-Object -First 1
@@ -412,6 +429,72 @@ try {
     $sampleRow = @(Get-P20OptionalSurfaces -Prefix 'tk' -PackageRoot $pkgRoot -Config ([pscustomobject]@{ PromptsRoot = (Join-Path $pkgRoot 'samples/hub'); ActiveSpace = 'github-demo'; Spaces = @() }) -Features $on) | Where-Object { $_.key -eq 'orgChart' } | Select-Object -First 1
     Assert-Equal '  the Org chart row over the sample: on, with its seats' 'on' $sampleRow.state $sampleRow.note
     Assert-Equal '  and the note counts them' 'My team, 8 seats; tkOrgChart prints it' $sampleRow.note
+
+    # -- 4. The schema: Config/org.schema.json, validated for real ----------------------
+    # docs/hub/org.md, "The schema". The sample hub's org.json is a file; each preset is one
+    # tree, validated against the schema's tree. Test-Json -Schema is PowerShell 7's; Windows
+    # PowerShell 5.1 has no Test-Json, and the agent suite (Tests/test_org.py) validates the
+    # same files there with jsonschema.
+    Write-Host ""
+    Write-Host "-- The schema, Config/org.schema.json ------------------" -ForegroundColor Cyan
+    if (-not (Get-Command Test-Json -ErrorAction SilentlyContinue)) {
+        Write-Host "  SKIP  the schema cases: Windows PowerShell $($PSVersionTable.PSVersion) has no Test-Json (Tests/test_org.py validates the same files with jsonschema)" -ForegroundColor Yellow
+    }
+    else {
+        $schemaText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Config/org.schema.json'))
+        $schema = $schemaText | ConvertFrom-Json
+        Assert-Equal 'the schema is draft 2020-12' 'https://json-schema.org/draft/2020-12/schema' $schema.'$schema'
+        foreach ($def in $schema.'$defs'.PSObject.Properties) {
+            Assert-True "  its $($def.Name) lets an unknown key through" ($def.Value.additionalProperties -eq $true)
+        }
+        # One part of the schema on its own: the file, or a tree (a preset is one tree).
+        function Get-SchemaPart([string]$Part) {
+            $one = $schemaText | ConvertFrom-Json
+            $one.PSObject.Properties.Remove('oneOf')
+            $one | Add-Member -NotePropertyName '$ref' -NotePropertyValue "#/`$defs/$Part" -Force
+            return ($one | ConvertTo-Json -Depth 40)
+        }
+        $fileSchema = Get-SchemaPart 'file'
+        $treeSchema = Get-SchemaPart 'tree'
+        function Test-AgainstSchema([string]$Json, [string]$Schema) {
+            $errs = $null
+            $ok = $Json | Test-Json -Schema $Schema -ErrorAction SilentlyContinue -ErrorVariable errs
+            return [pscustomobject]@{ Ok = [bool]$ok; Errors = (@($errs) | ForEach-Object { $_.ToString() }) -join '; ' }
+        }
+        $sampleText = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'samples/hub/org.json'))
+        $r = Test-AgainstSchema $sampleText $fileSchema
+        Assert-True 'the sample hub''s org.json is a valid file' $r.Ok $r.Errors
+        $r = Test-AgainstSchema $sampleText $schemaText
+        Assert-True '  and valid against the whole schema' $r.Ok $r.Errors
+        $presetFiles = @(Get-ChildItem -LiteralPath (Join-Path $pkgRoot 'samples/org-presets') -Filter '*.json' | Sort-Object Name)
+        Assert-Equal 'there are three presets' 3 $presetFiles.Count
+        foreach ($file in $presetFiles) {
+            $text = [System.IO.File]::ReadAllText($file.FullName)
+            $r = Test-AgainstSchema $text $treeSchema
+            Assert-True "the preset $($file.Name) is a valid tree" $r.Ok $r.Errors
+            $r = Test-AgainstSchema $text $schemaText
+            Assert-True "  and valid against the whole schema" $r.Ok $r.Errors
+        }
+        $r = Test-AgainstSchema (Read-Fixture 'docs/shape.json') $fileSchema
+        Assert-True 'the table''s whole shape is a valid file' $r.Ok $r.Errors
+        $refused = [ordered]@{
+            'no trees'                    = @('{}', $fileSchema)
+            'an empty trees'              = @('{"trees":[]}', $fileSchema)
+            'a tree with no id'           = @('{"trees":[{"positions":[]}]}', $fileSchema)
+            'a size that is not S, M, L'  = @('{"id":"t","positions":[],"size":"XL"}', $treeSchema)
+            'a teamSize that is not 3/6/9' = @('{"id":"t","positions":[],"teamSize":4}', $treeSchema)
+            'a recommend that is text'    = @('{"id":"t","positions":[{"id":"p","recommend":"opus"}]}', $treeSchema)
+            'a seat with no id'           = @('{"id":"t","positions":[{"id":"p","seats":[{"model":"m"}]}]}', $treeSchema)
+            'a merges that is text'       = @('{"id":"t","positions":[{"id":"p","seats":[{"id":"s","merges":"yes"}]}]}', $treeSchema)
+        }
+        foreach ($name in $refused.Keys) {
+            $r = Test-AgainstSchema $refused[$name][0] $refused[$name][1]
+            Assert-True "it refuses $name" (-not $r.Ok) $refused[$name][0]
+        }
+        $loose = '{"_note":"","colour":"x","trees":[{"id":"t","region":"x","machines":["a"],"positions":[{"id":"p","budget":1,"seats":[{"id":"s","badge":1,"machine":"a","active":true}]}]}]}'
+        $r = Test-AgainstSchema $loose $fileSchema
+        Assert-True 'it lets through an unknown key and a note at every level, and the retired keys' $r.Ok $r.Errors
+    }
 }
 catch {
     $script:failed++

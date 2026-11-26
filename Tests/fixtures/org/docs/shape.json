@@ -1,0 +1,34 @@
+{
+  "activeTree": "branch-office",
+  "trees": [
+    {
+      "id": "branch-office",
+      "preset": "branch-office",
+      "size": "M",
+      "title": "The Branch Office",
+      "shortDescription": "Local leads run the work: a team lead for each product, builders under the leads, and a test runner.",
+      "description": "Each product has its own team lead, who briefs a builder for each card and sends each finished pull request to the seat that merges.",
+      "teamSize": 6,
+      "positions": [
+        { "id": "owner", "title": "Owner",
+          "seats": [ { "id": "owner", "person": "Sam" } ] },
+        { "id": "vp-engineering", "title": "VP of engineering", "prompt": "vp-of-engineering.prompt.md",
+          "reportsTo": "owner", "recommend": ["opus", "fable"],
+          "seats": [ { "id": "vp-engineering", "model": "claude-opus-5-5", "session": "engineering-session" } ] },
+        { "id": "team-lead", "title": "Team lead", "prompt": "team-lead.prompt.md", "reportsTo": "vp-engineering",
+          "seats": [
+            { "id": "alpha", "roleTitle": "Alpha lead", "model": "claude-opus-5-5",
+              "session": "lead-session", "space": "alpha" },
+            { "id": "beta", "model": "a-model-the-map-does-not-know", "space": "beta" }
+          ] },
+        { "id": "builder", "title": "Builder", "reportsTo": "team-lead",
+          "defaultModel": "claude-sonnet-5-5", "seats": [] },
+        { "id": "test-runner", "title": "Test runner", "reportsTo": "vp-engineering",
+          "seats": [ { "id": "test-runner" } ] },
+        { "id": "vp-product", "title": "VP of product", "prompt": "vp-of-product.prompt.md",
+          "reportsTo": "owner", "recommend": ["opus", "fable"],
+          "seats": [ { "id": "vp-product", "model": "claude-fable-5-2", "session": "product-session", "merges": true } ] }
+      ]
+    }
+  ]
+}

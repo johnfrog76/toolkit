@@ -8,7 +8,10 @@
 # rest are floors (>=), like requirements.txt. Python 3.12 or newer.
 # httpx is not imported by the agent: fastapi.testclient imports it, and
 # without it TestClient raises at import and every file that uses it skips.
+# jsonschema is not imported by the agent either: Tests/test_org.py validates the
+# sample hub's org.json and the org presets against Config/org.schema.json with it.
 -r requirements.txt
 pytest>=9.2.0
 httpx>=0.28.1
+jsonschema>=4.26.0
 ruff==0.17.5

@@ -24,65 +24,126 @@ It is UTF-8, with or without a BOM.
 
 ## The shape
 
+This is the whole `org.json` contract. **A preset file is one tree in this same shape** ([Org presets](#org-presets)),
+so a preset and a tree in `org.json` are the same object.
+
+**One reading rule for every level: a key the tool does not read is ignored.** It is named once as a warning,
+as `hub.json` names one (`org.json: 'x' is not a key this tool reads in position 'p' of tree 't' -- ignored.`),
+and never refused. A key that starts with an underscore is a note and is never named. So a later field never
+breaks a reader that predates it. Key names are matched exactly, case included (`Title` is not `title`), and an
+id is compared character for character (`A` is not `a`); a number given as an id is read as its text.
+
+Everything is an **array of objects addressed by `id`**, never an object keyed by name, so a writer can address
+`trees.<id>.positions.<id>.seats.<id>.model` without a second shape. The words `orgs` and `activeOrg` are not
+used: they are the retired spellings of `spaces` and `activeSpace`, and an "org" here is the tree you draw,
+never a Space.
+
+### The file
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `trees` | **yes** | an array of trees, at least one |
+| `activeTree` | **when there is more than one tree** | the id of the tree in use. With one tree it may be left out, and that tree is the one |
+
+### A tree
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `id` | **yes** | the tree's address, unique among the file's trees. For a preset, its preset id (`executive-suite`) |
+| `title` | no | what the org is called ("The Branch Office"); the heading on the Org tab, and the id when absent. **It replaces `name`**: a reader takes an older file's `name` as the title when there is no `title` |
+| `size` | no | `S`, `M` or `L`, drawn as the badge beside a preset's title |
+| `shortDescription` | no | one line: what it is and what it fits |
+| `description` | no | a few sentences: how the work flows, who owns what, what it fits |
+| `teamSize` | no | the standup room the org suggests: 3, 6 or 9. A suggestion only: the Space's `features.teamSize` decides the room |
+| `preset` | no | the id of the preset the tree was started from |
+| `positions` | **yes** | the positions, in the order siblings are drawn |
+| `name` | no, **retired** | an older file's title, read when there is no `title` |
+| `machines` | no, **retired** | read without a word, never drawn: a machine is not a boundary in an org |
+
+### A position (an office)
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `id` | **yes** | unique within its tree. The same id in two trees is fine |
+| `title` | no | the office's name ("Team lead"); the id when absent |
+| `prompt` | no | the **role name**: the file name of the position's role -- its job description -- looked up in three folders, in order ([Where a position's prompt is found](#where-a-positions-prompt-is-found)). A name, not a path |
+| `reportsTo` | **on every position but the root** | the id of the position it reports to. Exactly one root |
+| `defaultModel` | no | free text: the model the office is meant to have. On a pool (no seats) it is the line drawn under the pool |
+| `recommend` | no | an array of the model families a picker offers without a "not recommended" note (`["opus", "fable"]`) |
+| `seats` | no | the seats; absent or `[]` makes the position a **pool** |
+
+### A seat
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `id` | **yes** | unique within its position |
+| `roleTitle` | no | this seat's own label, **only where it differs** from the position's title (one of two team leads called "Alpha lead"). Drawn on the plate and printed in place of the position's title |
+| `model` | no | the model sitting there: a [`Config/models.json`](../../Config/models.json) id (`claude-opus-5-5`). A reader also takes a family (`opus`, meaning the id `current.opus` names today) or any text, and **looks it up, never parses it**: the Org tab shows the map's `name` ("Opus 5.5"), and an id with no row as written |
+| `person` | no; **the owner's seat has one** | a person sitting there, in your own words: the root position is the owner, and its seat carries `person` and no `model` |
+| `session` | no | **the session's name** (`lead-session`): the address readies and messages route to, not a tool's session id |
+| `merges` | no | `true` on the seat that holds the merge. At most one per tree should; more is allowed for a stand-in while it stands in |
+| `space` | no | the Space slug the seat serves. Not checked against the hub's Spaces |
+| `machine`, `active` | no, **retired** | read without a word, never drawn |
+
+**Derived, never written:** a seat is `staffed` when it names a `model` or a `person`, and `vacant` otherwise
+([Positions, seats, and the three shapes](#positions-seats-and-the-three-shapes)). A position with no seats is a
+pool. A field of the wrong type reads as unset: `merges` only as a JSON `true` or `false`, `teamSize` only as a
+whole number, `recommend` only as an array (its text entries trimmed, the empty and the non-text left out), and the
+text fields as text (a number as its text).
+
+### One complete tree
+
+The Branch Office, staffed, after the owner has named themselves ("Sam") and a few seats are filled:
+
 ```json
 {
-  "activeTree": "main",
+  "activeTree": "branch-office",
   "trees": [
     {
-      "id": "main",
-      "name": "Laptop and mini",
-      "machines": ["laptop", "mini"],
+      "id": "branch-office",
+      "preset": "branch-office",
+      "size": "M",
+      "title": "The Branch Office",
+      "shortDescription": "Local leads run the work: a team lead for each product, builders under the leads, and a test runner.",
+      "description": "Each product has its own team lead, who briefs a builder for each card and sends each finished pull request to the seat that merges.",
+      "teamSize": 6,
       "positions": [
         { "id": "owner", "title": "Owner",
           "seats": [ { "id": "owner", "person": "Sam" } ] },
-        { "id": "vp-engineering", "title": "VP of engineering",
-          "prompt": "vp-of-engineering.prompt.md", "reportsTo": "owner", "defaultModel": "fable",
-          "seats": [ { "id": "vp-engineering", "model": "fable", "machine": "mini" } ] },
-        { "id": "team-lead", "title": "Team lead",
-          "prompt": "team-lead.prompt.md", "reportsTo": "vp-engineering", "defaultModel": "opus",
+        { "id": "vp-engineering", "title": "VP of engineering", "prompt": "vp-of-engineering.prompt.md",
+          "reportsTo": "owner", "recommend": ["opus", "fable"],
+          "seats": [ { "id": "vp-engineering", "model": "claude-opus-5-5", "session": "engineering-session" } ] },
+        { "id": "team-lead", "title": "Team lead", "prompt": "team-lead.prompt.md", "reportsTo": "vp-engineering",
           "seats": [
-            { "id": "alpha", "model": "fable", "machine": "mini", "space": "alpha" },
-            { "id": "beta",  "model": "opus",  "machine": "mini", "space": "beta" },
-            { "id": "gamma", "machine": "mini", "space": "gamma" }
+            { "id": "alpha", "roleTitle": "Alpha lead", "model": "claude-opus-5-5",
+              "session": "lead-session", "space": "alpha" },
+            { "id": "beta", "model": "claude-opus-5-5", "space": "beta" }
           ] },
         { "id": "builder", "title": "Builder", "reportsTo": "team-lead",
-          "defaultModel": "sonnet for crew cards, opus across halves", "seats": [] }
+          "defaultModel": "claude-sonnet-5-5", "seats": [] },
+        { "id": "test-runner", "title": "Test runner", "reportsTo": "vp-engineering",
+          "seats": [ { "id": "test-runner" } ] },
+        { "id": "vp-product", "title": "VP of product", "prompt": "vp-of-product.prompt.md",
+          "reportsTo": "owner", "recommend": ["opus", "fable"],
+          "seats": [ { "id": "vp-product", "model": "claude-fable-5-2", "session": "product-session", "merges": true } ] }
       ]
     }
   ]
 }
 ```
 
-Everything is an **array of objects addressed by `id`**, never an object keyed by name, so a later `Config`
-can write `trees.<id>.positions.<id>.seats.<id>.model` without a second shape. The words `orgs` and
-`activeOrg` are not used: they are the retired spellings of `spaces` and `activeSpace`, and an "org" here
-is the tree you draw, never a Space.
+### The schema
 
-| Level | Key | Required | Meaning |
-| --- | --- | --- | --- |
-| file | `activeTree` | when there is more than one tree | the id of the tree in use. With exactly one tree it may be left out and that tree is the one |
-| file | `trees` | yes | an array of at least one tree |
-| tree | `id` | yes | the tree's address; unique among trees |
-| tree | `name` | no | what it is called; the id when absent |
-| tree | `machines` | no | the machines this configuration runs on, as words you choose (`laptop`, `mini`) |
-| tree | `positions` | yes | the tree's positions, in the order you want siblings drawn |
-| position | `id` | yes | unique within its tree. The same id in two trees is fine |
-| position | `title` | no | the office's name; the id when absent |
-| position | `prompt` | no | the **file name** of the position's role -- its job description -- looked up in three folders, in order ([Where a position's prompt is found](#where-a-positions-prompt-is-found)). A name, not a path |
-| position | `reportsTo` | on every position but the root | the id of the position it reports up to |
-| position | `defaultModel` | no | free text: the model this office is meant to have, or a line about how it is staffed |
-| position | `seats` | no | an array of seats; absent or `[]` means a pool |
-| seat | `id` | yes | unique within its position |
-| seat | `model` | one of `model`, `person`, or neither | the model sitting there |
-| seat | `person` | " | a person sitting there (free text) |
-| seat | `machine` | no | where it runs, a word from the tree's `machines`. Not checked against them |
-| seat | `space` | no | the Space slug the seat serves. Not checked against the hub's Spaces |
-| seat | `active` | no | a boolean, **tolerated and never written, and not drawn in v1**: the file cannot say truthfully whether a session is running now, so a reader keeps the value and does nothing with it |
-
-A key the tool does not read is **ignored with a warning** naming where it is, as `hub.json` treats one
-(`org.json: 'x' is not a key this tool reads in position 'p' of tree 't' -- ignored.`). A key that starts
-with an underscore is a note and is not said. Key names are matched exactly, case included, and an id is
-compared character for character (`A` is not `a`); a number given as an id is read as its text.
+[`Config/org.schema.json`](../../Config/org.schema.json) is the shape above as a JSON Schema (draft 2020-12):
+the required keys, the types, `size` as `S`/`M`/`L`, `teamSize` as 3, 6 or 9, `merges` as a boolean, and
+`additionalProperties: true` at every level, so an unknown key passes. A file validates against it as a whole,
+and a preset against its `#/$defs/tree`. It cannot express the cross-field checks -- ids unique, a `reportsTo`
+naming a position in the same tree, no loop, exactly one root, a `prompt` that is a real role file -- which the
+two readers keep ([What is checked](#what-is-checked)). Both suites validate the sample hub's `org.json` and the
+three presets against it: `Tests/test_org.py` with `jsonschema` (a dev-only dependency,
+`agent/requirements-dev.txt`), and `tkTestToolkit -OrgChart` with `Test-Json -Schema` on PowerShell 7, a named
+skip on Windows PowerShell 5.1, which has no `Test-Json`. The readers do not read the schema: it is the contract a
+file is written to, and a reader stays as tolerant as the reading rule says.
 
 ## Where a position's prompt is found
 
@@ -114,12 +175,18 @@ more than once: a team lead is one office with a seat per Space.
 
 | State | When | How it reads |
 | --- | --- | --- |
-| `staffed` | the seat names a `model` or a `person` | `Team lead · fable [alpha] (mini)` |
-| `vacant` | it names neither | `Team lead · vacant [gamma] (mini)` |
+| `staffed` | the seat names a `model` or a `person` | `Team lead · claude-opus-5-5 [beta]` |
+| `vacant` | it names neither | `Team lead · vacant [gamma]` |
 
 The state is **derived**, never written. There are only these two in v1; idle and active arrive with a
 reader that can tell, not with a field someone types. If a seat names both a model and a person, the text
 prints the model and the response carries both.
+
+`OrgChart`'s line is `Position · model [space] (session)`: a seat's `roleTitle` stands in for the position's
+title, `[space]` and `(session)` are there when the seat names them, and `· merges` ends the line of the seat
+that holds the merge -- `Alpha lead · claude-opus-5-5 [alpha] (lead-session)`,
+`VP of product · claude-fable-5-2 (product-session) · merges`. The model is printed as the file writes it; the
+Org tab names it by the model map's `name`. No machine is printed or drawn.
 
 - **The owner's seat** carries `person` and no model, and the position carries no `prompt`: it is a
   person, so its line reads `Owner · Sam`.
@@ -170,48 +237,59 @@ same tolerance of an unknown key, the same derived state) is held to the same fi
 `OrgChart -AsJson` prints it, and `GET /api/ritual/org` (`consts.json` `rituals.orgRoute`) serves the same
 document: the tree in use (or the one `-Tree` / `?tree=<id>` asks for) with its positions in **tree order** -- the root, then each position's reports in the file's
 order, depth first -- each with its `level`, root 0. Every key is always there; one that is not set is
-`null` (an array that is not set is `[]`), so both halves serialise one shape.
+`null` (an array that is not set is `[]`), so both halves serialise one shape. `merges` is `true` or `false`
+where the file says so and `null` where it does not.
 
 ```json
 {
-  "activeTree": "main",
+  "activeTree": "branch-office",
   "tree": {
-    "id": "main",
-    "name": "Laptop and mini",
-    "machines": ["laptop", "mini"],
+    "id": "branch-office",
+    "title": "The Branch Office",
+    "size": "M",
+    "shortDescription": "Local leads run the work: ...",
+    "description": "Each product has its own team lead, ...",
+    "teamSize": 6,
+    "preset": "branch-office",
     "positions": [
       { "id": "owner", "title": "Owner", "prompt": null, "reportsTo": null, "defaultModel": null,
-        "level": 0,
-        "seats": [ { "id": "owner", "model": null, "person": "Sam", "machine": null, "space": null,
-                     "active": null, "state": "staffed" } ] },
+        "recommend": [], "level": 0,
+        "seats": [ { "id": "owner", "roleTitle": null, "model": null, "person": "Sam", "session": null,
+                     "merges": null, "space": null, "state": "staffed" } ] },
       { "id": "team-lead", "title": "Team lead", "prompt": "team-lead.prompt.md",
-        "reportsTo": "vp-engineering", "defaultModel": "opus", "level": 2,
-        "seats": [ { "id": "gamma", "model": null, "person": null, "machine": "mini", "space": "gamma",
-                     "active": null, "state": "vacant" } ] },
+        "reportsTo": "vp-engineering", "defaultModel": null, "recommend": [], "level": 2,
+        "seats": [ { "id": "alpha", "roleTitle": "Alpha lead", "model": "claude-opus-5-5", "person": null,
+                     "session": "lead-session", "merges": null, "space": "alpha", "state": "staffed" } ] },
       { "id": "builder", "title": "Builder", "prompt": null, "reportsTo": "team-lead",
-        "defaultModel": "sonnet for crew cards, opus across halves", "level": 3, "seats": [] }
+        "defaultModel": "claude-sonnet-5-5", "recommend": [], "level": 3, "seats": [] }
     ]
   }
 }
 ```
 
+The tree's `title` is the file's `title`, else an older file's `name`, else the id; the response has no `name`.
+The retired keys are not in it at all: no `machines`, no seat `machine` or `active`, so nothing downstream can
+draw one.
+
 `activeTree` is always the file's own choice, so a reader asked for another tree still knows which is in
 use. [`Tests/fixtures/org/charts/`](../../Tests/fixtures/org/charts/) holds the responses the table states.
 
-**The one difference between the two halves: the prompt fields.** The route adds two keys to every
-position, which `OrgChart -AsJson` does not print -- the CLI has no prompt reader, and the Studio's is the
-agent's:
+**The one difference between the two halves: the fields only the route adds.** The route adds two keys to
+every position and one to every seat, which `OrgChart -AsJson` does not print -- the CLI has no prompt reader,
+and the Studio's is the agent's; the model's name is what the Org tab draws, and the terminal prints the model as
+the file writes it:
 
 | Key | Is | From |
 | --- | --- | --- |
 | `promptTitle` | the prompt's title: its front matter's `title`, else its one `#` heading, else the file's name without `.prompt.md` | `agent/studio/prompts.py`'s `record`, the one reader every prompt goes through -- not a second parser |
 | `promptRef` | the address after `/studio/prompts/` that opens the prompt in the Studio's reading room: `yours/<name>` for the hub's copy, `<name>` for a role the toolkit ships -- the `ref` a Studio prompt row carries (the web builds the link with `promptPath(ref)`) | the same rule the Studio lists by; `null` for a file the room does not list (not `<name>.prompt.md`, or a name that is not a plain word), which still has its title |
+| `modelName` (a seat's) | what the seat's `model` is called: the model map's `name` for an id it has a row for ("Opus 5.5"); for a family the map's `current` names (`opus`), the name of the id that family is today; anything else as written; `null` with no model | `agent/core/models.py`'s `model_info` and `current_model`, the lookup the Agent line uses -- looked up, never parsed |
 
-Both are `null` on a position with no `prompt`. The file read is the one the reading room opens -- the
+The prompt fields are `null` on a position with no `prompt`. The file read is the one the reading room opens -- the
 machine's `agenticExtensionPath` copy where there is one, else the first of the
 [three folders](#where-a-positions-prompt-is-found) that has it. Everything else in the response
-is byte for byte the CLI's (`Tests/test_org.py` strips the two keys and compares the rest to the table's
-responses).
+is byte for byte the CLI's (`Tests/test_org.py` strips the three keys and compares the rest to the table's
+responses, and checks `modelName` against a row's `modelNames` where the table states them).
 
 ### What the route answers when there is no chart
 
@@ -242,7 +320,7 @@ file, an unknown `-Tree`. The inventory names the surface whether or not it is o
 | --- | --- |
 | `off` | Team Agile is off in the Space you are in -- *or* the file is there and fails its checks, in which case the note carries the sentence |
 | `not configured` | Team Agile is on and there is no `org.json` |
-| `on` | Team Agile is on and the file is valid: the tree's name and its seat count |
+| `on` | Team Agile is on and the file is valid: the tree's title and its seat count |
 
 Its question, "Who sits in which seat in my org?", is in `Config/settings-workflows.json`.
 
@@ -276,31 +354,36 @@ tree lists any: sessions talk across machines, so a machine is not a boundary in
 The test runner, the merge stand-in and the builders name no role, because none is shipped for them. L has ten seats for a room of
 nine: the room seats who has work first, and the butler is a weekly bot.
 
-A preset file is the tree's fields beside the tree's positions:
+A preset file is **one tree** in [the shape](#a-tree), read as the one tree of a file, and it validates against
+the schema's `#/$defs/tree`. The fields a preset uses:
 
 | Key | Is |
 | --- | --- |
 | `id` | the preset's address, and the tree's id |
 | `size` | `S`, `M` or `L`; the order they are offered in |
-| `title` | its name, and the tree's name |
+| `title` | its name, and the tree's title |
 | `shortDescription` | one line: what it is and what it fits, kept for a place that names a preset briefly; the Org tab shows the description |
 | `description` | a few sentences: how the work flows, who owns what, what it fits |
 | `teamSize` | the standup room it suggests, 3, 6 or 9. The Space's own `features.teamSize` decides the room; a preset sets nothing |
 | `positions` | the tree's positions, in the shape above |
 
-**A reader ignores a field it does not know**, at the top and in a position or a seat, without a word, so a
-later field (a preset's swag, its ways of working) can be added without breaking a reader that predates it.
+**A preset's reader ignores a field it does not know**, at every level, without a word (the hub's file names one
+once), so a later field (a preset's swag, its ways of working) can be added without breaking a reader that
+predates it.
 `GET /api/ritual/org/presets` (`consts.json` `rituals.orgPresetsRoute`) serves all three, S first, each with
-its `chart` in [the response](#the-response)'s shape and the two prompt fields; the tree passes every check in
+its `chart` in [the response](#the-response)'s shape and the fields only the route adds; the tree passes every check in
 [What is checked](#what-is-checked), its prompts looked up in the toolkit's `agentic/org/` alone, and a file that
 does not read as a preset is left out and said in the agent's log. `Tests/test_org.py` holds each preset to the
 checks and to the shipped roles. `OrgChart -Preset` is not built yet: the CLI does not print a preset.
 
 ## What is not in v1
 
-No writer (`Config` and a `Staff` verb come later), no way yet to start `org.json` from a preset (a preset is previewed, not written), no `active` drawn, no count of builders from the cards
-in flight, and no join with the standup's workers. The web's Org tab draws the tree the route serves
-([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui)); a vacant seat is drawn as an empty desk.
+No writer (a `Staff` verb comes later, and `Config` does not write the file), no way yet to start `org.json` from a
+preset (a preset is previewed, not written), no machine drawn (the retired `machines`, `machine` and `active` are
+read and never served), no picker reading `recommend` yet, no count of builders from the cards in flight, and no
+join with the standup's workers. `merges` is read, served and printed, and not yet drawn on the Org tab. The web's
+Org tab draws the tree the route serves ([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui)): a
+seat's `roleTitle` and its model's name on the plate, its session on hover; a vacant seat is drawn as an empty desk.
 
 ## An example to copy
 

@@ -479,7 +479,7 @@ function Get-P20OptionalSurfaces {
             $orgLine = "edit $orgFile at the hub root (docs/hub/org.md)"
             $seatWord = 'seats'
             if ($orgRead.SeatCount -eq 1) { $seatWord = 'seat' }
-            $orgNote = "$($orgRead.Chart.tree.name), $($orgRead.SeatCount) $seatWord; $($Prefix)OrgChart prints it"
+            $orgNote = "$($orgRead.Chart.tree.title), $($orgRead.SeatCount) $seatWord; $($Prefix)OrgChart prints it"
         }
         else {
             $orgNote = "$orgFile is there but not valid: $($orgRead.Message)"

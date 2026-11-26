@@ -2,11 +2,12 @@
   "activeTree": "main",
   "tree": {
     "id": "main",
-    "name": "Laptop and mini",
-    "machines": [
-      "laptop",
-      "mini"
-    ],
+    "title": "Laptop and mini",
+    "size": null,
+    "shortDescription": null,
+    "description": null,
+    "teamSize": null,
+    "preset": null,
     "positions": [
       {
         "id": "owner",
@@ -14,15 +15,17 @@
         "prompt": null,
         "reportsTo": null,
         "defaultModel": null,
+        "recommend": [],
         "level": 0,
         "seats": [
           {
             "id": "owner",
+            "roleTitle": null,
             "model": null,
             "person": "Sam",
-            "machine": null,
+            "session": null,
+            "merges": null,
             "space": null,
-            "active": null,
             "state": "staffed"
           }
         ]
@@ -33,15 +36,17 @@
         "prompt": "vp-of-product.prompt.md",
         "reportsTo": "owner",
         "defaultModel": "fable",
+        "recommend": [],
         "level": 1,
         "seats": [
           {
             "id": "vp-product",
+            "roleTitle": null,
             "model": "fable",
             "person": null,
-            "machine": "laptop",
+            "session": null,
+            "merges": null,
             "space": null,
-            "active": null,
             "state": "staffed"
           }
         ]
@@ -52,15 +57,17 @@
         "prompt": "vp-of-engineering.prompt.md",
         "reportsTo": "owner",
         "defaultModel": "fable",
+        "recommend": [],
         "level": 1,
         "seats": [
           {
             "id": "vp-engineering",
+            "roleTitle": null,
             "model": "fable",
             "person": null,
-            "machine": "mini",
+            "session": null,
+            "merges": null,
             "space": null,
-            "active": null,
             "state": "staffed"
           }
         ]
@@ -71,15 +78,17 @@
         "prompt": "pm.prompt.md",
         "reportsTo": "vp-engineering",
         "defaultModel": "opus",
+        "recommend": [],
         "level": 2,
         "seats": [
           {
             "id": "pm",
+            "roleTitle": null,
             "model": "opus",
             "person": null,
-            "machine": "laptop",
+            "session": null,
+            "merges": null,
             "space": null,
-            "active": null,
             "state": "staffed"
           }
         ]
@@ -90,33 +99,37 @@
         "prompt": "team-lead.prompt.md",
         "reportsTo": "pm",
         "defaultModel": "opus",
+        "recommend": [],
         "level": 3,
         "seats": [
           {
             "id": "alpha",
+            "roleTitle": null,
             "model": "fable",
             "person": null,
-            "machine": "mini",
+            "session": null,
+            "merges": null,
             "space": "alpha",
-            "active": null,
             "state": "staffed"
           },
           {
             "id": "beta",
+            "roleTitle": null,
             "model": "opus",
             "person": null,
-            "machine": "mini",
+            "session": null,
+            "merges": null,
             "space": "beta",
-            "active": null,
             "state": "staffed"
           },
           {
             "id": "gamma",
+            "roleTitle": null,
             "model": null,
             "person": null,
-            "machine": "mini",
+            "session": null,
+            "merges": null,
             "space": "gamma",
-            "active": null,
             "state": "vacant"
           }
         ]
@@ -127,6 +140,7 @@
         "prompt": null,
         "reportsTo": "team-lead",
         "defaultModel": "sonnet for crew cards, opus across halves, fable for art on the owner's word",
+        "recommend": [],
         "level": 4,
         "seats": []
       }

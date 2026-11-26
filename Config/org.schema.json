@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "org.json",
+  "description": "The shape of the hub's org.json, and of an org preset (docs/hub/org.md, \"The shape\"). The file is trees of positions of seats, each addressed by id. A preset file is ONE tree in the same shape, so validate a preset against \"#/$defs/tree\"; the top-level oneOf accepts either a file or a tree. Every level is additionalProperties true: a key a reader does not read is ignored (named once as a warning; a key starting with _ is a note), never refused. machines, machine and active are retired: read and kept, never written or drawn. This schema holds the required keys, the types and the enums. It cannot express the cross-field checks -- ids unique, a reportsTo naming a position in the same tree, no loop, exactly one root, activeTree naming a tree, a prompt that is a real role file -- which the two readers keep (Scripts/Read-OrgChart.ps1, agent/solitaire/org.py) and Tests/fixtures/org/table.json holds.",
+  "oneOf": [
+    { "$ref": "#/$defs/file" },
+    { "$ref": "#/$defs/tree" }
+  ],
+  "$defs": {
+    "file": {
+      "title": "The file",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["trees"],
+      "properties": {
+        "trees": {
+          "description": "The trees, at least one. A writer keeps at most three; a reader reads more.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/tree" }
+        },
+        "activeTree": {
+          "description": "The id of the tree in use. Required when there is more than one tree.",
+          "type": "string"
+        }
+      }
+    },
+    "tree": {
+      "title": "A tree (an org, or a preset)",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "positions"],
+      "properties": {
+        "id": { "description": "The tree's address, unique among the file's trees; a preset's id.", "type": "string" },
+        "title": { "description": "What the org is called. Replaces name: a reader takes name as the title when there is no title.", "type": "string" },
+        "name": { "description": "An older file's title, read when there is no title. Never written.", "type": "string" },
+        "size": { "description": "The badge beside the title.", "enum": ["S", "M", "L"] },
+        "shortDescription": { "description": "One line: what it is and what it fits.", "type": "string" },
+        "description": { "description": "A few sentences: how the work flows, who owns what, what it fits.", "type": "string" },
+        "teamSize": { "description": "The standup room the org suggests. The Space's features.teamSize decides.", "enum": [3, 6, 9] },
+        "preset": { "description": "The id of the preset the tree was started from.", "type": "string" },
+        "positions": {
+          "description": "The positions, in the order siblings are drawn.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/position" }
+        },
+        "machines": { "description": "Retired: read and kept, never written or drawn." }
+      }
+    },
+    "position": {
+      "title": "A position (an office)",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id"],
+      "properties": {
+        "id": { "description": "Unique within its tree.", "type": "string" },
+        "title": { "description": "The office's name; the id when absent.", "type": "string" },
+        "prompt": { "description": "The role name: a role file's name, looked up in the hub's agentic/org/, the hub's agentic/, then the toolkit's agentic/org/.", "type": "string" },
+        "reportsTo": { "description": "The id of the position it reports to; absent on the one root.", "type": "string" },
+        "defaultModel": { "description": "Free text: the model the office is meant to have; a pool's line.", "type": "string" },
+        "recommend": {
+          "description": "The model families the picker offers without a not-recommended note.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "seats": {
+          "description": "The seats; absent or [] makes the position a pool.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/seat" }
+        }
+      }
+    },
+    "seat": {
+      "title": "A seat",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id"],
+      "properties": {
+        "id": { "description": "Unique within its position.", "type": "string" },
+        "roleTitle": { "description": "This seat's own label, where it differs from the position's title.", "type": "string" },
+        "model": { "description": "The model sitting there: a models.json id, a family, or any text. Looked up, never parsed.", "type": "string" },
+        "person": { "description": "A person sitting there, in the user's own words. The owner's seat always has one.", "type": "string" },
+        "session": { "description": "The session's name: the address readies and messages route to.", "type": "string" },
+        "merges": { "description": "True on the seat that holds the merge.", "type": "boolean" },
+        "space": { "description": "The Space slug the seat serves.", "type": "string" },
+        "machine": { "description": "Retired: read and kept, never written or drawn." },
+        "active": { "description": "Retired: read and kept, never written or drawn." }
+      }
+    }
+  }
+}

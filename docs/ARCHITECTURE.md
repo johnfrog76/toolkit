@@ -139,7 +139,7 @@ with no reachable GitHub tracker still answers 200 with the ritual and the reaso
 `GET /api/ritual/milestones` is the Releases tab's read, the ado core's milestone reader and its one
 reached rule under the same gate, kept a minute, against `Tests/fixtures/rituals/milestones.json`.
 `GET /api/ritual/org` is the org chart's read: the hub's `org.json` through `agent/solitaire/org.py`, a mirror of the CLI's reader held to
-`Tests/fixtures/org/table.json`, under the same gate, with each position's prompt title and reading-room ref from the Studio's prompt record.
+`Tests/fixtures/org/table.json`, under the same gate, with each position's prompt title and reading-room ref from the Studio's prompt record and each seat's model by its model-map name.
 `GET /api/ritual/org/presets` serves the org presets the package ships in `samples/org-presets/`, each read by the same reader and served in the same shape, for the Org tab to preview; it needs no hub and writes nothing.
 `GET /api/ritual/triage` (V1) is the same shape for triage, against `Tests/fixtures/rituals/triage.json`;
 its answers are the CLI's `Route`, which the web runs only as `POST /api/cmd/Route` -- the module's

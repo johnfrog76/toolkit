@@ -37,7 +37,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from ..core import log_writer
+from ..core import log_writer, models
 from ..core.config import API_PREFIX, ORG_PRESETS_DIR, hub_configured, hub_folder, hub_root
 from ..core.consts import org_file, org_roles_folder, rituals_org_presets_route, rituals_org_route
 from ..studio import prompts
@@ -51,12 +51,26 @@ KIND_NO_HUB = "no-hub"
 KIND_MISSING = "missing"
 KIND_UNKNOWN_TREE = "unknown-tree"
 
-# What a key may be, level by level: anything else is said and ignored.
+# What a key may be, level by level: anything else is said and ignored. The
+# retired keys -- a tree's ``name`` (read as its title when there is no
+# ``title``), ``machines``, a seat's ``machine`` and ``active`` -- are known, so
+# an older file reads without a word, and none of the last three is served.
 _KNOWN_KEYS = {
     "top": ("activeTree", "trees"),
-    "tree": ("id", "name", "machines", "positions"),
-    "position": ("id", "title", "prompt", "reportsTo", "defaultModel", "seats"),
-    "seat": ("id", "model", "person", "machine", "space", "active"),
+    "tree": (
+        "id",
+        "title",
+        "name",
+        "size",
+        "shortDescription",
+        "description",
+        "teamSize",
+        "preset",
+        "positions",
+        "machines",
+    ),
+    "position": ("id", "title", "prompt", "reportsTo", "defaultModel", "recommend", "seats"),
+    "seat": ("id", "roleTitle", "model", "person", "session", "merges", "space", "machine", "active"),
 }
 
 _PATH_SEPARATOR = re.compile(r"[\\/]")
@@ -107,6 +121,22 @@ def _items(value: Any) -> list:
     return value if isinstance(value, list) else []
 
 
+def _texts(value: Any) -> list[str]:
+    """A JSON array field as its elements' text, each read as ``_text`` reads
+    one, the empty ones left out; a field that is not an array holds none."""
+    return [t for t in (_text(x) for x in _items(value)) if t]
+
+
+def _flag(value: Any) -> bool | None:
+    """A JSON boolean as itself; anything else (absent, a string, a number) is None."""
+    return value if isinstance(value, bool) else None
+
+
+def _whole(value: Any) -> int | None:
+    """A JSON whole number as itself; anything else (a boolean, a fraction, text) is None."""
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
 # -- Reading the document ------------------------------------------------------
 
 
@@ -144,7 +174,6 @@ def _model(data: dict) -> tuple[list[dict] | None, tuple[str, str] | None]:
         tree_id = _text(_field(tree, "id"))
         if not tree_id:
             return None, ("missing-id", f"Tree {t_index} has no id.")
-        machines = [m for m in (_text(x) for x in _items(_field(tree, "machines"))) if m]
         positions: list[dict] = []
         for p_index, position in enumerate(_items(_field(tree, "positions")), start=1):
             position_id = _text(_field(position, "id"))
@@ -158,15 +187,15 @@ def _model(data: dict) -> tuple[list[dict] | None, tuple[str, str] | None]:
                         "missing-id",
                         f"Seat {s_index} of position '{position_id}' in tree '{tree_id}' has no id.",
                     )
-                raw_active = _field(seat, "active")
                 seats.append(
                     {
                         "id": seat_id,
+                        "roleTitle": _text(_field(seat, "roleTitle")),
                         "model": _text(_field(seat, "model")),
                         "person": _text(_field(seat, "person")),
-                        "machine": _text(_field(seat, "machine")),
+                        "session": _text(_field(seat, "session")),
+                        "merges": _flag(_field(seat, "merges")),
                         "space": _text(_field(seat, "space")),
-                        "active": raw_active if isinstance(raw_active, bool) else None,
                     }
                 )
             positions.append(
@@ -176,14 +205,20 @@ def _model(data: dict) -> tuple[list[dict] | None, tuple[str, str] | None]:
                     "prompt": _text(_field(position, "prompt")),
                     "reportsTo": _text(_field(position, "reportsTo")),
                     "defaultModel": _text(_field(position, "defaultModel")),
+                    "recommend": _texts(_field(position, "recommend")),
                     "seats": seats,
                 }
             )
         trees.append(
             {
                 "id": tree_id,
-                "name": _text(_field(tree, "name")) or tree_id,
-                "machines": machines,
+                # An older file's ``name`` is the title when there is no ``title``.
+                "title": _text(_field(tree, "title")) or _text(_field(tree, "name")) or tree_id,
+                "size": _text(_field(tree, "size")),
+                "shortDescription": _text(_field(tree, "shortDescription")),
+                "description": _text(_field(tree, "description")),
+                "teamSize": _whole(_field(tree, "teamSize")),
+                "preset": _text(_field(tree, "preset")),
                 "positions": positions,
             }
         )
@@ -289,11 +324,12 @@ def _chart(tree: dict, active_tree: str) -> dict:
         seats = [
             {
                 "id": s["id"],
+                "roleTitle": s["roleTitle"] or None,
                 "model": s["model"] or None,
                 "person": s["person"] or None,
-                "machine": s["machine"] or None,
+                "session": s["session"] or None,
+                "merges": s["merges"],
                 "space": s["space"] or None,
-                "active": s["active"],
                 "state": "staffed" if (s["model"] or s["person"]) else "vacant",
             }
             for s in position["seats"]
@@ -305,6 +341,7 @@ def _chart(tree: dict, active_tree: str) -> dict:
                 "prompt": position["prompt"] or None,
                 "reportsTo": position["reportsTo"] or None,
                 "defaultModel": position["defaultModel"] or None,
+                "recommend": list(position["recommend"]),
                 "level": level,
                 "seats": seats,
             }
@@ -313,7 +350,16 @@ def _chart(tree: dict, active_tree: str) -> dict:
             stack.append((child, level + 1))
     return {
         "activeTree": active_tree,
-        "tree": {"id": tree["id"], "name": tree["name"], "machines": list(tree["machines"]), "positions": ordered},
+        "tree": {
+            "id": tree["id"],
+            "title": tree["title"],
+            "size": tree["size"] or None,
+            "shortDescription": tree["shortDescription"] or None,
+            "description": tree["description"] or None,
+            "teamSize": tree["teamSize"],
+            "preset": tree["preset"] or None,
+            "positions": ordered,
+        },
     }
 
 
@@ -473,11 +519,28 @@ def prompt_fields(file_name: str) -> tuple[str | None, str | None]:
     return title or name, ref
 
 
+def model_name(model: str | None) -> str | None:
+    """What a seat's ``model`` is called (docs/hub/org.md, "The response"): the
+    model map's ``name`` for an id it has a row for; for a family it names in
+    ``current`` (``opus``), the name of the id that family is today; anything
+    else as written. Looked up, never parsed; None for a seat with no model."""
+    if not model:
+        return None
+    info = models.model_info(model)
+    if info["known"]:
+        return info["name"]
+    current = models.current_model(model)
+    return models.model_info(current)["name"] if current else model
+
+
 def with_prompts(chart: dict) -> dict:
-    """The chart with ``promptTitle`` and ``promptRef`` on every position: both
-    null for a position with no prompt."""
+    """The chart with the fields only the route adds: ``promptTitle`` and
+    ``promptRef`` on every position (both null for a position with no prompt),
+    and ``modelName`` on every seat (``model_name``)."""
     for position in chart["tree"]["positions"]:
         position["promptTitle"], position["promptRef"] = prompt_fields(position["prompt"] or "")
+        for seat in position["seats"]:
+            seat["modelName"] = model_name(seat["model"])
     return chart
 
 
@@ -535,9 +598,9 @@ PRESET_FIELDS = ("id", "size", "title", "shortDescription", "description", "team
 def read_preset(text: str, prompt_exists: Callable[[str], bool], file_name: str = "") -> dict | None:
     """One preset file's text as ``{id, size, title, shortDescription,
     description, teamSize, chart}``, or None when it is not a preset whose tree
-    passes every check ``read_org_chart`` makes. The tree is the preset's
-    ``positions`` under its ``id``, named by its ``title``; a position's or a
-    seat's unknown key is ignored, as the hub's file has it."""
+    passes every check ``read_org_chart`` makes. A preset IS one tree in the
+    file's shape (docs/hub/org.md, "The shape"), so it is read as the one tree
+    of a file; its unknown keys are ignored without a word, at every level."""
     try:
         data = json.loads(text.lstrip("\ufeff"), parse_constant=_no_constant)
     except ValueError:
@@ -545,19 +608,17 @@ def read_preset(text: str, prompt_exists: Callable[[str], bool], file_name: str 
     if not isinstance(data, dict):
         return None
     preset_id = _text(_field(data, "id"))
-    title = _text(_field(data, "title")) or preset_id
-    team_size = _field(data, "teamSize")
-    tree = {"id": preset_id, "name": title, "positions": _items(_field(data, "positions"))}
-    result = read_org_chart(json.dumps({"trees": [tree]}), prompt_exists, file_name=file_name or f"{preset_id}.json")
+    result = read_org_chart(json.dumps({"trees": [data]}), prompt_exists, file_name=file_name or f"{preset_id}.json")
     if not preset_id or result.status != "ok" or result.chart is None:
         return None
+    tree = result.chart["tree"]
     return {
         "id": preset_id,
-        "size": _text(_field(data, "size")),
-        "title": title,
-        "shortDescription": _text(_field(data, "shortDescription")),
-        "description": _text(_field(data, "description")),
-        "teamSize": team_size if isinstance(team_size, int) and not isinstance(team_size, bool) else None,
+        "size": tree["size"] or "",
+        "title": tree["title"],
+        "shortDescription": tree["shortDescription"] or "",
+        "description": tree["description"] or "",
+        "teamSize": tree["teamSize"],
         "chart": result.chart,
     }
 

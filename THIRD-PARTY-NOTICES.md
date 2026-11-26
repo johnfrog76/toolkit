@@ -390,8 +390,8 @@ From `agent/requirements.txt`, with the packages they pull in: 27 packages, as r
 
 The agent's test dependencies (`agent/requirements-dev.txt`) are not installed for a user: `pytest`, `pluggy`,
 `iniconfig` and `colorama` (MIT or BSD), `packaging` (Apache-2.0 or BSD-2-Clause), `Pygments` (BSD-2-Clause),
-`httpx` and `httpcore` (BSD-3-Clause), and `certifi` (MPL-2.0, which is used unmodified and is not
-redistributed with the project).
+`httpx` and `httpcore` (BSD-3-Clause), `jsonschema`, `jsonschema-specifications`, `referencing`, `rpds-py` and
+`attrs` (MIT), and `certifi` (MPL-2.0, which is used unmodified and is not redistributed with the project).
 
 ## Fonts, artwork and audio
 

@@ -2,10 +2,12 @@
   "activeTree": "branch",
   "tree": {
     "id": "branch",
-    "name": "One machine",
-    "machines": [
-      "mini"
-    ],
+    "title": "One machine",
+    "size": null,
+    "shortDescription": null,
+    "description": null,
+    "teamSize": null,
+    "preset": null,
     "positions": [
       {
         "id": "owner",
@@ -13,15 +15,17 @@
         "prompt": null,
         "reportsTo": null,
         "defaultModel": null,
+        "recommend": [],
         "level": 0,
         "seats": [
           {
             "id": "owner",
+            "roleTitle": null,
             "model": null,
             "person": "Sam",
-            "machine": null,
+            "session": null,
+            "merges": null,
             "space": null,
-            "active": null,
             "state": "staffed"
           }
         ]
@@ -32,15 +36,17 @@
         "prompt": "team-lead.prompt.md",
         "reportsTo": "owner",
         "defaultModel": "opus",
+        "recommend": [],
         "level": 1,
         "seats": [
           {
             "id": "alpha",
+            "roleTitle": null,
             "model": "opus",
             "person": null,
-            "machine": "mini",
+            "session": null,
+            "merges": null,
             "space": "alpha",
-            "active": true,
             "state": "staffed"
           }
         ]

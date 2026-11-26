@@ -950,7 +950,8 @@ the CLI, the agent and the web all read it from. `hub.json` stays as it is (orgs
 `storeSync`, "and nothing else"): positions and seats are not a Space's declaration, so they have a file of
 their own rather than a key a manifest would have to learn. It is found where the hub is (`PROMPTS_ROOT`,
 else `promptsRoot`), is read as UTF-8, and is validated whole before anything is drawn. Its shape, each
-field, the states and the checks are [`docs/hub/org.md`](hub/org.md); `OrgChart` prints it, and it is read
+field, the states and the checks are [`docs/hub/org.md`](hub/org.md), and its JSON Schema is
+[`Config/org.schema.json`](../Config/org.schema.json); `OrgChart` prints it, and it is read
 only where Team Agile is on ([the scope](hub/org.md#the-scope----where-it-is-and-is-not-there)). No key in
 any config file turns it on: a file at the hub root is all it takes, and the inventory names it either way
 (`tkEnv`, the **Org chart** row).

@@ -2,8 +2,12 @@
   "activeTree": "a",
   "tree": {
     "id": "a",
-    "name": "a",
-    "machines": [],
+    "title": "a",
+    "size": null,
+    "shortDescription": null,
+    "description": null,
+    "teamSize": null,
+    "preset": null,
     "positions": [
       {
         "id": "x",
@@ -11,6 +15,7 @@
         "prompt": null,
         "reportsTo": null,
         "defaultModel": null,
+        "recommend": [],
         "level": 0,
         "seats": []
       }

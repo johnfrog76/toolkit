@@ -9,9 +9,11 @@ route -- and the chart compares as JSON to the response the table states, key
 order aside. A failure's ``kind`` is the contract; its sentence is the CLI's.
 
 Beyond the table: the route's gate (off is 404, not 403), what a failed read
-answers, the two fields each position carries for the web (``promptTitle`` and
-``promptRef``, through the Studio's one prompt record), and that nothing in the
-hub is written.
+answers, the fields only the route adds for the web (``promptTitle`` and
+``promptRef`` on each position, through the Studio's one prompt record, and
+``modelName`` on each seat, through the model map), that nothing in the hub is
+written, and the schema (Config/org.schema.json) validating the sample hub's file
+and the presets with ``jsonschema``.
 
 No network: the route reads one file and calls nothing.
 
@@ -227,12 +229,23 @@ class TheSharedTable(OrgBase):
                     refs = {p["id"]: p["promptRef"] for p in body["tree"]["positions"]}
                     for pid, ref in want.get("promptRefs", {}).items():
                         self.assertEqual(refs.get(pid), ref, pid)
+                    # What each seat's model is called, where the table states it ("position.seat").
+                    names = {
+                        f"{p['id']}.{s['id']}": s.get("modelName", "absent")
+                        for p in body["tree"]["positions"]
+                        for s in p["seats"]
+                    }
+                    for where, name in want.get("modelNames", {}).items():
+                        self.assertEqual(names.get(where, "no such seat"), name, where)
                     for position in body["tree"]["positions"]:
-                        # the two fields the web needs; the table's response is the shared part
+                        # the fields only the route adds; the table's response is the shared part
                         self.assertEqual(
                             set(position) & {"promptTitle", "promptRef"}, {"promptTitle", "promptRef"}, position
                         )
                         del position["promptTitle"], position["promptRef"]
+                        for seat in position["seats"]:
+                            self.assertIn("modelName", seat, seat)
+                            del seat["modelName"]
                     chart = json.loads((FIXTURES / want["chart"]).read_text(encoding="utf-8"))
                     self.assertTrue(same_json(body, chart), json.dumps(body, indent=1))
                 else:
@@ -274,7 +287,7 @@ class TheReaderAlone(unittest.TestCase):
     def test_key_names_are_matched_exactly(self):
         got = self.read(json.dumps({"Trees": [], "trees": [{"id": "t", "Name": "x", "positions": [{"id": "r"}]}]}))
         self.assertEqual(got.status, "ok")
-        self.assertEqual(got.chart["tree"]["name"], "t")
+        self.assertEqual(got.chart["tree"]["title"], "t")
         self.assertEqual(
             got.warnings,
             [
@@ -377,7 +390,7 @@ class TheRoute(OrgBase):
         }
         self.put(doc)
         body = self.client.get(ROUTE + "?tree=b").json()
-        self.assertEqual((body["activeTree"], body["tree"]["id"], body["tree"]["name"]), ("a", "b", "Branch"))
+        self.assertEqual((body["activeTree"], body["tree"]["id"], body["tree"]["title"]), ("a", "b", "Branch"))
         self.assertEqual(self.client.get(ROUTE).json()["tree"]["id"], "a")
         # the CLI trims -Tree, so the agent does
         self.assertEqual(self.client.get(ROUTE + "?tree=%20b%20").json()["tree"]["id"], "b")
@@ -439,7 +452,7 @@ class TheRoute(OrgBase):
             res = self.client.get(ROUTE)
         self.assertEqual(res.status_code, 200, res.text)
         body = res.json()
-        self.assertEqual((body["activeTree"], body["tree"]["name"]), ("mine", "My team"))
+        self.assertEqual((body["activeTree"], body["tree"]["title"]), ("mine", "My team"))
         positions = body["tree"]["positions"]
         self.assertEqual(
             [(p["id"], p["level"]) for p in positions],
@@ -553,7 +566,7 @@ class ThePresets(unittest.TestCase):
                 for key in ("title", "shortDescription", "description"):
                     self.assertTrue(p[key], key)
                 self.assertEqual(p["chart"]["tree"]["id"], p["id"])
-                self.assertEqual(p["chart"]["tree"]["name"], p["title"])
+                self.assertEqual(p["chart"]["tree"]["title"], p["title"])
 
     def test_each_names_only_roles_the_toolkit_ships(self):
         for p in self.presets:
@@ -588,9 +601,12 @@ class ThePresets(unittest.TestCase):
         words = ("machine", "laptop", "mini", " pc")
         for p in self.presets:
             with self.subTest(p["id"]):
-                self.assertEqual(p["chart"]["tree"]["machines"], [])
+                # machines and machine are retired: no preset file carries one at any level.
+                raw = json.loads((org.ORG_PRESETS_DIR / f"{p['id']}.json").read_text(encoding="utf-8"))
+                self.assertNotIn("machines", raw)
+                for position in raw["positions"]:
+                    self.assertFalse([s for s in position.get("seats", []) if "machine" in s], position["id"])
                 for position in p["chart"]["tree"]["positions"]:
-                    self.assertTrue(all(s["machine"] is None for s in position["seats"]), position["id"])
                     self.assertFalse(any(w in (position["defaultModel"] or "").lower() for w in words))
                 text = f"{p['shortDescription']} {p['description']}".lower()
                 self.assertFalse([w for w in words if w in text])
@@ -689,6 +705,128 @@ class ThePresetsFlagOff(OrgBase):
             res = self.client.get(PRESETS_ROUTE)
         self.assertEqual(res.status_code, 404)
         read.assert_not_called()
+
+
+# -- The schema: Config/org.schema.json, validated for real --------------------------
+#
+# docs/hub/org.md, "The schema". The sample hub's org.json is a file; each preset is
+# one tree, validated against the schema's tree. jsonschema is a dev-only dependency
+# (agent/requirements-dev.txt); without it these cases skip, by name.
+
+SCHEMA_PATH = REPO_ROOT / "Config" / "org.schema.json"
+try:
+    import jsonschema
+except ImportError:  # pragma: no cover - a venv without the dev requirements
+    jsonschema = None
+_NO_JSONSCHEMA = "jsonschema is not installed (agent/requirements-dev.txt)"
+
+
+@unittest.skipUnless(jsonschema, _NO_JSONSCHEMA)
+class TheSchema(unittest.TestCase):
+    def setUp(self):
+        self.schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+
+    def validator(self, part: str | None = None):
+        """The schema's validator; ``part`` ('file' or 'tree') validates against that $def alone."""
+        schema = self.schema
+        if part:
+            schema = {"$schema": self.schema["$schema"], "$defs": self.schema["$defs"], "$ref": f"#/$defs/{part}"}
+        return jsonschema.Draft202012Validator(schema)
+
+    def errors(self, doc, part: str | None = None) -> list[str]:
+        return [e.message for e in self.validator(part).iter_errors(doc)]
+
+    def test_it_is_a_valid_draft_2020_12_schema(self):
+        self.assertEqual(self.schema["$schema"], "https://json-schema.org/draft/2020-12/schema")
+        jsonschema.Draft202012Validator.check_schema(self.schema)
+
+    def test_every_level_lets_an_unknown_key_through(self):
+        for name, part in self.schema["$defs"].items():
+            self.assertIs(part.get("additionalProperties"), True, name)
+
+    def test_it_says_what_it_cannot_express(self):
+        for words in ("loop", "one root", "role file"):
+            self.assertIn(words, self.schema["description"])
+
+    def test_the_sample_hubs_org_file_is_valid(self):
+        doc = json.loads((REPO_ROOT / "samples" / "hub" / "org.json").read_text(encoding="utf-8"))
+        self.assertEqual(self.errors(doc, "file"), [])
+        self.assertEqual(self.errors(doc), [])
+
+    def test_every_preset_is_a_valid_tree(self):
+        files = sorted(config.ORG_PRESETS_DIR.glob("*.json"))
+        self.assertEqual(len(files), 3)
+        for path in files:
+            with self.subTest(path.name):
+                doc = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual(self.errors(doc, "tree"), [])
+                self.assertEqual(self.errors(doc), [])
+
+    def test_the_tables_whole_shape_is_valid(self):
+        doc = json.loads((FIXTURES / "docs" / "shape.json").read_text(encoding="utf-8"))
+        self.assertEqual(self.errors(doc, "file"), [])
+
+    def test_what_it_refuses(self):
+        seat = {"id": "s"}
+        tree = {"id": "t", "positions": [{"id": "p", "seats": [seat]}]}
+        rows = [
+            ({}, "file", "'trees' is a required property"),
+            ({"trees": []}, "file", "should be non-empty"),
+            ({"trees": [{"positions": []}]}, "file", "'id' is a required property"),
+            ({"trees": [{"id": "t"}]}, "file", "'positions' is a required property"),
+            ({**tree, "size": "XL"}, "tree", "'XL' is not one of"),
+            ({**tree, "teamSize": 4}, "tree", "4 is not one of"),
+            ({**tree, "positions": [{"title": "x"}]}, "tree", "'id' is a required property"),
+            ({**tree, "positions": [{"id": "p", "recommend": "opus"}]}, "tree", "is not of type 'array'"),
+            ({**tree, "positions": [{"id": "p", "seats": [{"model": "m"}]}]}, "tree", "'id' is a required property"),
+            (
+                {**tree, "positions": [{"id": "p", "seats": [{"id": "s", "merges": "yes"}]}]},
+                "tree",
+                "is not of type 'boolean'",
+            ),
+        ]
+        for doc, part, words in rows:
+            with self.subTest(doc=doc):
+                found = self.errors(doc, part)
+                self.assertTrue(any(words in e for e in found), found)
+        # And what it lets through: an unknown key and a note at every level, the retired keys.
+        loose = {
+            "_note": "",
+            "colour": "x",
+            "trees": [
+                {
+                    **tree,
+                    "region": "x",
+                    "machines": ["a"],
+                    "positions": [
+                        {"id": "p", "budget": 1, "seats": [{"id": "s", "badge": 1, "machine": "a", "active": True}]}
+                    ],
+                }
+            ],
+        }
+        self.assertEqual(self.errors(loose, "file"), [])
+
+
+class TheModelName(unittest.TestCase):
+    """A seat's ``modelName``: the model map's name, looked up and never parsed."""
+
+    def test_an_id_with_a_row_is_its_name(self):
+        self.assertEqual(org.model_name("claude-opus-5-5"), "Opus 5.5")
+
+    def test_a_family_is_the_name_of_the_id_it_is_today(self):
+        from agent.core import models
+
+        for family in ("opus", "fable", "sonnet", "haiku"):
+            with self.subTest(family):
+                today = models.current_model(family)
+                self.assertTrue(today)
+                self.assertEqual(org.model_name(family), models.model_info(today)["name"])
+
+    def test_anything_else_is_as_written_and_no_model_is_none(self):
+        self.assertEqual(org.model_name("sonnet for crew cards"), "sonnet for crew cards")
+        self.assertEqual(org.model_name("claude-opus-9-9"), "claude-opus-9-9")
+        self.assertIsNone(org.model_name(None))
+        self.assertIsNone(org.model_name(""))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,24 @@
+{
+  "activeTree": "t",
+  "tree": {
+    "id": "t",
+    "title": "An older file",
+    "size": null,
+    "shortDescription": null,
+    "description": null,
+    "teamSize": null,
+    "preset": null,
+    "positions": [
+      {
+        "id": "root",
+        "title": "root",
+        "prompt": null,
+        "reportsTo": null,
+        "defaultModel": null,
+        "recommend": [],
+        "level": 0,
+        "seats": []
+      }
+    ]
+  }
+}

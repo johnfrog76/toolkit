@@ -1,0 +1,3 @@
+root · m
+  child · Sam
+  other · no seats

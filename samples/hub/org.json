@@ -4,8 +4,7 @@
   "trees": [
     {
       "id": "mine",
-      "name": "My team",
-      "machines": ["this-machine"],
+      "title": "My team",
       "positions": [
         {
           "id": "owner",
@@ -21,7 +20,7 @@
           "reportsTo": "owner",
           "defaultModel": "opus",
           "seats": [
-            { "id": "vp-product", "model": "opus", "machine": "this-machine" }
+            { "id": "vp-product", "model": "opus" }
           ]
         },
         {
@@ -31,7 +30,7 @@
           "reportsTo": "vp-product",
           "defaultModel": "haiku",
           "seats": [
-            { "id": "butler", "model": "haiku", "machine": "this-machine" }
+            { "id": "butler", "model": "haiku" }
           ]
         },
         {
@@ -41,7 +40,7 @@
           "reportsTo": "owner",
           "defaultModel": "opus",
           "seats": [
-            { "id": "vp-engineering", "model": "opus", "machine": "this-machine" }
+            { "id": "vp-engineering", "model": "opus" }
           ]
         },
         {
@@ -51,7 +50,7 @@
           "reportsTo": "owner",
           "defaultModel": "opus",
           "seats": [
-            { "id": "pm", "model": "opus", "machine": "this-machine" }
+            { "id": "pm", "model": "opus" }
           ]
         },
         {
@@ -61,8 +60,8 @@
           "reportsTo": "pm",
           "defaultModel": "opus",
           "seats": [
-            { "id": "demo", "model": "opus", "machine": "this-machine", "space": "demo" },
-            { "id": "github-demo", "machine": "this-machine", "space": "github-demo" }
+            { "id": "demo", "model": "opus", "space": "demo" },
+            { "id": "github-demo", "space": "github-demo" }
           ]
         },
         {
@@ -79,7 +78,7 @@
           "reportsTo": "pm",
           "defaultModel": "haiku",
           "seats": [
-            { "id": "intern", "model": "haiku", "machine": "this-machine" }
+            { "id": "intern", "model": "haiku" }
           ]
         }
       ]

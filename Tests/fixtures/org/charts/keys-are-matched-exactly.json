@@ -1,0 +1,35 @@
+{
+  "activeTree": "t",
+  "tree": {
+    "id": "t",
+    "title": "t",
+    "size": null,
+    "shortDescription": null,
+    "description": null,
+    "teamSize": null,
+    "preset": null,
+    "positions": [
+      {
+        "id": "root",
+        "title": "root",
+        "prompt": null,
+        "reportsTo": null,
+        "defaultModel": null,
+        "recommend": [],
+        "level": 0,
+        "seats": [
+          {
+            "id": "a",
+            "roleTitle": null,
+            "model": null,
+            "person": "Sam",
+            "session": null,
+            "merges": null,
+            "space": null,
+            "state": "staffed"
+          }
+        ]
+      }
+    ]
+  }
+}
