@@ -585,7 +585,9 @@ def org_presets(folder: Path | None = None) -> list[dict]:
             text = ""
         preset = read_preset(text, prompt_exists, path.name)
         if preset is None:
-            log_writer.write_log("ERR", f"agent{PRESETS_ROUTE}", f"{path.name} is not a preset this tool reads -- left out.")
+            log_writer.write_log(
+                "ERR", f"agent{PRESETS_ROUTE}", f"{path.name} is not a preset this tool reads -- left out."
+            )
             continue
         found.append(preset)
 
