@@ -444,6 +444,8 @@ EXPECTED = {
     ("org", "file"): "org.json",
     # The role prompts' folder inside an agentic folder: read through org_roles_folder().
     ("org", "rolesFolder"): "org",
+    # Where the package keeps the org presets: config.ORG_PRESETS_DIR is read through org_presets_folder().
+    ("org", "presetsFolder"): "samples/org-presets",
     # The model map a card's Agent id is looked up in: the agent reads it through models_file().
     ("models", "file"): "Config/models.json",
     # The order a card's agent is worked out in: the agent reads it through model_agent_sources().
@@ -658,6 +660,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.usage_readings_folder(), EXPECTED[("usage", "readingsFolder")])
         self.assertEqual(C.org_file(), EXPECTED[("org", "file")])
         self.assertEqual(C.org_roles_folder(), EXPECTED[("org", "rolesFolder")])
+        self.assertEqual(C.org_presets_folder(), EXPECTED[("org", "presetsFolder")])
         self.assertEqual(C.models_file(), EXPECTED[("models", "file")])
         self.assertEqual(C.model_agent_sources(), tuple(EXPECTED[("models", "agentSources")]))
         self.assertEqual(C.model_not_models(), tuple(EXPECTED[("models", "notModels")]))

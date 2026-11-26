@@ -19,8 +19,9 @@ resolved" is not "a hub was configured", so with no hub named anywhere `OrgChart
 read a folder nobody chose. A hub that is not there (an unplugged drive) is refused with the hub's own
 sentence.
 
-It is **hand-edited** and the tool only reads it. `Config` does not write it; `Staff` is a later verb.
-It is UTF-8, with or without a BOM.
+It has **one writer**, [`Staff`](#the-one-writer-staff), and hand edits keep working beside it: `Staff` reads
+the file, changes only what it was asked to and keeps everything else. `Config` does not write it. It is UTF-8,
+with or without a BOM.
 
 ## The shape
 
@@ -338,8 +339,9 @@ even though the file is. That is the module rule, not a fault; to see the chart 
 A team starting out should not have to draw an org from an empty file. The toolkit ships three **presets**,
 each one tree in this file's shape that names only the roles the toolkit ships, in
 [`samples/org-presets/`](../../samples/org-presets/) -- beside the sample hub, read from the package and never
-copied into a hub. The Org tab previews them ([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui));
-nothing writes one into `org.json`, which stays the hub's, hand-edited.
+never used in place. The Org tab previews them ([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui)),
+and [`Staff -Preset`](#the-one-writer-staff) saves a copy of one as a tree of `org.json`; the folder is
+`consts.json` `org.presetsFolder`.
 
 | Size | Preset | `id` | Seats | Room | Fits |
 | --- | --- | --- | --- | --- | --- |
@@ -376,10 +378,57 @@ its `chart` in [the response](#the-response)'s shape and the fields only the rou
 does not read as a preset is left out and said in the agent's log. `Tests/test_org.py` holds each preset to the
 checks and to the shipped roles. `OrgChart -Preset` is not built yet: the CLI does not print a preset.
 
+## The one writer: Staff
+
+`Staff` rides Team Agile like `OrgChart`, so it is there exactly where the chart is ([the scope](#the-scope----where-it-is-and-is-not-there)),
+and it writes `org.json` and nothing else. Two forms:
+
+```text
+Staff -Preset S|M|L [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-WhatIf]
+Staff -Activate <tree-id> [-WhatIf]
+```
+
+- **`-Preset` saves a tree** from the [preset](#org-presets) of that size, creating the file when there is none.
+  The tree is the preset's, key for key, under its new id, with `preset` set to the preset's id (the preset file's
+  own `_` notes describe the preset and are not copied). `-Title` names it in place of the preset's title, and
+  `-Owner` names the owner -- the root's seat, a person and never a model -- in place of the preset's `You`.
+- **The default models are filled in**, each stored as a [`Config/models.json`](../../Config/models.json) id: a
+  family resolves through the map's `current` block, an id passes through, and nothing is parsed. A name that is
+  neither is refused.
+
+  | Position | Its seats start with |
+  | --- | --- |
+  | `vp-engineering` | Opus, or `-VpEngineering <model>` |
+  | `vp-product` | Fable, or `-VpProduct <model>`, and `merges: true` |
+  | `team-lead` | Opus, every seat |
+  | `intern`, `butler` | Haiku |
+  | `builder` (the pool) | its `defaultModel` line becomes Sonnet's id |
+  | `pm`, `test-runner`, `merge-stand-in`, and any other | vacant |
+
+- **A saved tree is a draft.** `-Preset` never changes the tree in use; `-Activate <tree-id>` is the one way to
+  choose it, and it does not go with `-Preset`. The first tree of a new file is the only one, so by the reading
+  rule it is the one in use, and the file is written without `activeTree`. Adding a second tree to a file that names
+  none sets `activeTree` to the tree that was in use -- never the draft -- so the file stays valid, and the output
+  says which stays active.
+- **A tree is never overwritten.** Its id is `-Tree`, else the preset's id, then `<id>-2` and `<id>-3`; an id that
+  is already a tree is refused, and so is a fourth tree, naming the three. `-Activate` with an id that is not a tree
+  is refused, listing the trees.
+- **Every write** reads the file, changes only what the command names, and keeps every other tree, key and note in
+  its order. A file that fails [its checks](#what-is-checked) is refused before anything changes, and the result is
+  checked with the reader's own checks (`Read-P20OrgText`, the same as `OrgChart`'s) before it lands. It is written
+  as two-space JSON -- one text on PowerShell 7 and Windows PowerShell 5.1, non-ASCII as itself -- UTF-8 with no
+  BOM, through `Write-CardText`: a created file is LF, an edited one keeps its own line ending. Reformatting is the
+  writer's: a hand-written file comes back in its layout, not yours.
+- **It never prompts.** A refusal is a stated one (`exit 2`, one sentence and a hint) and writes nothing; `-WhatIf`
+  prints the file it would write and writes nothing. `POST /api/cmd/Staff` runs it through the bridge.
+
+`tkTestToolkit -OrgChart` types it in a fresh shell over a scratch copy of the sample hub, and
+`Tests/test_bridge.py` runs it through the bridge.
+
 ## What is not in v1
 
-No writer (a `Staff` verb comes later, and `Config` does not write the file), no way yet to start `org.json` from a
-preset (a preset is previewed, not written), no machine drawn (the retired `machines`, `machine` and `active` are
+No seat editor yet (`Staff` adds a tree and chooses the one in use; editing one seat is a later form of it), no
+way to start from a preset on the Org tab (the page previews; `Staff -Preset` saves), no machine drawn (the retired `machines`, `machine` and `active` are
 read and never served), no picker reading `recommend` yet, no count of builders from the cards in flight, and no
 join with the standup's workers. `merges` is read, served and printed, and not yet drawn on the Org tab. The web's
 Org tab draws the tree the route serves ([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui)): a

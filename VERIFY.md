@@ -39,8 +39,8 @@ halves talking to each other, and the flag that makes a whole module appear and 
 three halves at once. A check that can be automated belongs in a suite; one that cannot is a gate here,
 or it is not verified.
 
-Every verb `config.default.json` defines is in the table below -- 49 always-on, and the 16 the modules
-contribute through `Config/*.commands.psd1` (65 in all; `docs/CLI.md` prints both counts) -- with the
+Every verb `config.default.json` defines is in the table below -- 49 always-on, and the 17 the modules
+contribute through `Config/*.commands.psd1` (66 in all; `docs/CLI.md` prints both counts) -- with the
 suite that types it and the gate that walks it. `Tests/Test-DocCounts.ps1` reads the table back, so a
 verb added without a row fails a suite. **A row that says "neither" is a verb nothing verifies**; it is
 left in the table rather than dropped, because a verb the reader cannot see in it is indistinguishable
@@ -118,6 +118,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Route` | `Triage` (typed, with `gh` stubbed -- the exact argv per switch, never a real write) | 12 (one real write against a GitHub Space) |
 | `StartWork` | `StartWork` (typed, the block byte for byte; `gh` stubbed for an issue) | 12 (the cold-agent walk) |
 | `OrgChart` | `OrgChart` (typed in a fresh shell over a scratch copy of `samples/hub`: off means no verb, the text and `-AsJson` against `Tests/fixtures/org/`, every refusal exit 2 writing nothing) | 12 (Windows PowerShell 5.1: the row under "Rows added by a fix") |
+| `Staff` | `OrgChart` (typed in a fresh shell over a scratch copy of `samples/hub`: off means no verb, the file created and added to with the defaults resolved through `Config/models.json`, a draft never put in use, hand edits and line endings kept, every refusal exit 2 writing nothing); `Tests/test_bridge.py` (through `POST /api/cmd/Staff`) | 12 (Windows PowerShell 5.1, the same bytes as 7: the row under "Rows added by a fix") |
 
 Gate numbers are this file's `## Gate N` headings (8c is gate 8c). The four `Test*` verbs after
 `Test` are the CLI runner itself, so their rows say what covers the runner.
@@ -1377,6 +1378,15 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   still read, and a session still saves. `python -m pytest Tests/test_file_in_folder.py Tests/test_manager.py
   Tests/test_growth.py Tests/test_pr_comments.py` passes, its link rows run or skipped by name. The macOS host proved
   the rule and the routes; a Windows path is this row's.
+- [ ] **Staff writes the same `org.json` under Windows PowerShell 5.1 as under 7 (Refs #603).** On the Windows PC, in
+  `powershell` (5.1), run `tkTestToolkit -OrgChart`: green, its serializer rows among the passes and the schema half a
+  named `SKIP` (5.1 has no `Test-Json`). Then, in a Space answered `agents` with `features.solitaireAgile` on and
+  `PROMPTS_ROOT` at a scratch hub with no `org.json`: `tkStaff -Preset M -Owner Zoë` prints `Saved 'branch-office'`
+  and `it is the only org, so it is the one in use.`; copy the file aside, delete it, and run the same command in
+  `pwsh`: the two files are byte for byte the same (`fc /b`), no BOM, LF, two spaces a level, `Zoë` as itself and never
+  `\u00eb`. `tkStaff -Preset S` then says `as a draft; 'branch-office' stays active.`, and `tkOrgChart` still prints the
+  Branch Office. The macOS host proved the verb, the serializer and the bytes under 7; 5.1's `ConvertFrom-Json` and
+  its number and array shapes are this row's.
 
 ## Recording a run
 

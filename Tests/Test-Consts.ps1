@@ -306,6 +306,8 @@ $expected = [ordered]@{
     'org.file'                  = 'org.json'
     # The role prompts' folder inside an agentic folder: Read-OrgChart.ps1 reads (Get-P20Consts).org.rolesFolder.
     'org.rolesFolder'           = 'org'
+    # Where the package keeps the org presets: Set-Staff.ps1 reads (Get-P20Consts).org.presetsFolder.
+    'org.presetsFolder'         = 'samples/org-presets'
     # The model map a card's Agent id is looked up in: Get-P20ModelInfo reads (Get-P20Consts).models.file.
     'models.file'               = 'Config/models.json'
     # The order a card's agent is worked out in: Resolve-P20CardAgent reads (Get-P20Consts).models.agentSources.

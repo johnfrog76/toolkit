@@ -394,9 +394,35 @@ function Read-P20OrgChart {
         return (New-P20OrgResult -Status 'missing' -Path $path -Kind 'missing' -Message "There is no $fileName in the hub.")
     }
 
+    $text = $null
+    try { $text = Get-Content -LiteralPath $path -Raw -ErrorAction Stop -Encoding UTF8 }
+    catch {
+        return (New-P20OrgResult -Status 'invalid' -Path $path -Kind 'unreadable' -Message "$fileName is not readable ($($_.Exception.Message)).")
+    }
+    return (Read-P20OrgText -Text ([string]$text) -PromptsRoot $PromptsRoot -PackageRoot $PackageRoot -TreeId $TreeId -Path $path)
+}
+
+function Read-P20OrgText {
+    <#
+      The same reading as Read-P20OrgChart, over a document's TEXT rather than the
+      file: every check, in the same order, with the same result. The org file's
+      one writer (Staff, Scripts/Set-Staff.ps1) checks what it is about to write
+      through this, so a write can never land a file the reader refuses.
+      -PromptsRoot is the hub the prompts are looked up in; -Path is only echoed.
+    #>
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()][string]$Text,
+        [string]$PromptsRoot,
+        [string]$PackageRoot = '',
+        [string]$TreeId = '',
+        [string]$Path = ''
+    )
+    $fileName = Get-P20OrgFileName
+    $path = $Path
     $data = $null
     try {
-        $data = Get-Content -LiteralPath $path -Raw -ErrorAction Stop -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        $data = $Text | ConvertFrom-Json -ErrorAction Stop
     }
     catch {
         return (New-P20OrgResult -Status 'invalid' -Path $path -Kind 'unreadable' -Message "$fileName is not valid JSON ($($_.Exception.Message)).")

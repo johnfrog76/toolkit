@@ -1,0 +1,1 @@
+- A new `Staff` verb starts your org chart from one of the three presets: `Staff -Preset S|M|L` saves the org into your hub's `org.json` with sensible default models in each seat (and your own name on the owner's), as a draft beside the org you already use, and `Staff -Activate <id>` puts a saved org in use. Your hand edits to the file are kept.

@@ -1,5 +1,5 @@
 # The Solitaire Agile add-on's wrappers: Standup (M0), Triage and Route (V1),
-# StartWork (AR-1), OrgChart.
+# StartWork (AR-1), OrgChart, Staff.
 #
 # Dot-sourced by the module-command loader, and only when the top-level
 # features.solitaireAgile is true -- so a switched-off module defines no
@@ -106,4 +106,28 @@ function global:Get-P20OrgChart {
     if ($Help) { Show-CommandHelp 'OrgChart'; return }
     Invoke-ToolkitScript -Path (Join-Path $global:P20SolitaireAgileRoot 'Scripts/Get-OrgChart.ps1') `
         -Parameters $PSBoundParameters -Name "$(Get-CliPrefix)OrgChart" -Prefix (Get-CliPrefix)
+}
+
+# Staff: the org file's one writer. -Preset adds a tree from a preset with the
+# default models, -Activate chooses the tree in use; it writes org.json and
+# nothing else.
+
+function global:Set-P20Staff {
+    <# Staff -- save a tree in the hub's org file from a preset (a draft), or choose the tree in use. #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0)]
+        [string]$Tree,
+        [string]$Preset,
+        [string]$Title,
+        [string]$Owner,
+        [string]$VpEngineering,
+        [string]$VpProduct,
+        [switch]$Activate,
+        [switch]$WhatIf,
+        [switch]$Help
+    )
+    if ($Help) { Show-CommandHelp 'Staff'; return }
+    Invoke-ToolkitScript -Path (Join-Path $global:P20SolitaireAgileRoot 'Scripts/Set-Staff.ps1') `
+        -Parameters $PSBoundParameters -Name "$(Get-CliPrefix)Staff" -Prefix (Get-CliPrefix)
 }

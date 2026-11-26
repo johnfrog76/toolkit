@@ -509,10 +509,13 @@ export const USAGE = consts.usage as {
  * reads it; the agent serves it and the web will draw what the agent serves.
  * `rolesFolder` is the folder inside an agentic folder that holds the org's role
  * prompts; the CLI and the agent look a position's prompt up through it.
+ * `presetsFolder` is where the package keeps the org presets (the agent serves
+ * them; Staff -Preset copies one into the hub).
  */
 export const ORG = consts.org as {
   file: string;
   rolesFolder: string;
+  presetsFolder: string;
 };
 
 /**

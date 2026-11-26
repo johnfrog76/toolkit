@@ -53,6 +53,7 @@ try:
     from agent.ado import bridge
     from agent.app import app
     from agent.core import config, hosts
+    from agent.core import consts as C
 except Exception as e:  # pragma: no cover - environment without the deps
     skip_module(f"cannot import the app ({type(e).__name__}: {e})")
 
@@ -465,24 +466,16 @@ class CreatePrRunsInTheCardsOwnCheckout(unittest.TestCase):
         self.assertNotIn("toolkit-branch", out)
 
 
-class StartWorkThroughTheBridge(unittest.TestCase):
-    """Team Agile's hand-off block (AR-1 of the agent in the room): the web's one
-    call is ``POST /api/cmd/StartWork`` and no native route builds the block
-    (D-AR6). So the verb is in the table exactly when Team Agile is on -- the
-    flag AND the Space's ``howIWork`` answer -- refused (``rejected``) when it is
-    off, and through the bridge it prints the shared fixture's block byte for
-    byte (``Tests/fixtures/start-work/``, the same file ``tkTestToolkit -StartWork``
-    compares). A refusal reaches the page as ``status: error`` with the verb's
-    own sentence. Run for real in a scratch package over a scratch hub; the
-    card path never asks ``gh``.
-    """
+class TeamAgileScratchPackage(unittest.TestCase):
+    """A scratch package over a scratch hub with Team Agile's switch in reach:
+    the set-up StartWork's and Staff's bridge cases share. No test of its own."""
 
     FIXTURES = PKG_ROOT / "Tests" / "fixtures" / "start-work"
     CARD = "Task23A3-route-the-remaining-raw-git-calls.prompt.md"
 
     def setUp(self):
         if not HAVE_PWSH:
-            self.skipTest("needs pwsh to run StartWork for real")
+            self.skipTest("needs pwsh to run a Team Agile verb for real")
         self._tmp = tempfile.TemporaryDirectory()
         root = Path(self._tmp.name)
         self.pkg = root / "pkg"
@@ -535,6 +528,19 @@ class StartWorkThroughTheBridge(unittest.TestCase):
         }
         (self.pkg / "config.local.json").write_text(json.dumps(local), encoding="utf-8")
 
+
+class StartWorkThroughTheBridge(TeamAgileScratchPackage):
+    """Team Agile's hand-off block (AR-1 of the agent in the room): the web's one
+    call is ``POST /api/cmd/StartWork`` and no native route builds the block
+    (D-AR6). So the verb is in the table exactly when Team Agile is on -- the
+    flag AND the Space's ``howIWork`` answer -- refused (``rejected``) when it is
+    off, and through the bridge it prints the shared fixture's block byte for
+    byte (``Tests/fixtures/start-work/``, the same file ``tkTestToolkit -StartWork``
+    compares). A refusal reaches the page as ``status: error`` with the verb's
+    own sentence. Run for real in a scratch package over a scratch hub; the
+    card path never asks ``gh``.
+    """
+
     def test_off_the_verb_is_not_in_the_table_and_is_refused(self):
         self._config(False)
         self.assertNotIn("StartWork", bridge.command_map(force=True))
@@ -559,6 +565,44 @@ class StartWorkThroughTheBridge(unittest.TestCase):
         body = client.post("/api/cmd/StartWork", json={"params": ["X9X9"]}).json()
         self.assertEqual(body["status"], "error", body)
         self.assertIn("No card with id 'X9X9' in current/.", body.get("error") or "")
+
+
+class StaffThroughTheBridge(TeamAgileScratchPackage):
+    """Staff, the org file's one writer, through ``POST /api/cmd/Staff``: in the
+    table exactly where Team Agile is on, ``rejected`` where it is off, and run
+    for real -- the same scratch package (with the org presets) over the same
+    scratch hub. ``-WhatIf`` prints the file and writes nothing; a real call
+    writes ``org.json``, and a refusal is ``status: error`` with its sentence."""
+
+    def setUp(self):
+        super().setUp()
+        presets = C.org_presets_folder()
+        shutil.copytree(PKG_ROOT / presets, self.pkg / presets)
+
+    def test_off_the_verb_is_not_in_the_table_and_is_refused(self):
+        self._config(False)
+        self.assertNotIn("Staff", bridge.command_map(force=True))
+        body = client.post("/api/cmd/Staff", json={"params": ["-Preset", "S"]}).json()
+        self.assertEqual(body["status"], "rejected", body)
+        self.assertFalse((self.hub / C.org_file()).exists())
+
+    def test_on_whatif_prints_the_file_and_writes_nothing(self):
+        self._config(True)
+        self.assertEqual(bridge.command_map(force=True).get("Staff"), "Set-P20Staff")
+        body = client.post("/api/cmd/Staff", json={"params": ["-Preset", "S", "-WhatIf"]}).json()
+        self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+        self.assertIn('"preset": "executive-suite"', body["output"])
+        self.assertFalse((self.hub / C.org_file()).exists())
+
+    def test_on_it_writes_the_file_and_a_refusal_is_an_error(self):
+        self._config(True)
+        body = client.post("/api/cmd/Staff", json={"params": ["-Preset", "S", "-Owner", "Sam"]}).json()
+        self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+        doc = json.loads((self.hub / C.org_file()).read_text("utf-8"))
+        self.assertEqual([t["id"] for t in doc["trees"]], ["executive-suite"])
+        body = client.post("/api/cmd/Staff", json={"params": ["-Activate", "nope"]}).json()
+        self.assertEqual(body["status"], "error", body)
+        self.assertIn("-Activate names 'nope', which is not a tree in org.json.", body.get("error") or "")
 
 
 class ParametersTravelAsArgv(unittest.TestCase):

@@ -98,7 +98,7 @@ foreach ($warning in @($read.Warnings)) {
 
 if ($read.Status -eq 'missing') {
     Write-CliError -Message "There is no $fileName in the hub: $($read.Path) would hold the org chart." `
-        -Hint "Create it at the hub root, beside hub.json. docs/hub/org.md has the shape and an example; samples/hub/$fileName is a small one to copy."
+        -Hint "Start one with '${p}Staff -Preset S|M|L', or create it at the hub root, beside hub.json. docs/hub/org.md has the shape and an example; samples/hub/$fileName is a small one to copy."
     exit 2  # stated refusal
 }
 if ($read.Status -ne 'ok') {

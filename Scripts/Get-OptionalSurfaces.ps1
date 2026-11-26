@@ -469,14 +469,14 @@ function Get-P20OptionalSurfaces {
         $orgRoot = ''
         if ($Config -and $Config.PromptsRoot) { $orgRoot = [string]$Config.PromptsRoot }
         $orgRead = Read-P20OrgChart -PromptsRoot $orgRoot -PackageRoot $PackageRoot
-        $orgLine = "add $orgFile at the hub root, beside hub.json (docs/hub/org.md)"
+        $orgLine = "$($Prefix)Staff -Preset S|M|L, or add $orgFile at the hub root by hand (docs/hub/org.md)"
         if ($orgRead.Status -eq 'missing') {
             $orgState = $states.Unset
-            $orgNote = "no $orgFile in the hub; samples/hub/$orgFile is one to copy"
+            $orgNote = "no $orgFile in the hub; $($Prefix)Staff -Preset S|M|L starts one"
         }
         elseif ($orgRead.Status -eq 'ok') {
             $orgState = $states.On
-            $orgLine = "edit $orgFile at the hub root (docs/hub/org.md)"
+            $orgLine = "$($Prefix)Staff -Preset S|M|L adds a tree, $($Prefix)Staff -Activate <tree-id> chooses one (docs/hub/org.md)"
             $seatWord = 'seats'
             if ($orgRead.SeatCount -eq 1) { $seatWord = 'seat' }
             $orgNote = "$($orgRead.Chart.tree.title), $($orgRead.SeatCount) $seatWord; $($Prefix)OrgChart prints it"

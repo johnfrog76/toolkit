@@ -206,6 +206,11 @@ try {
     New-Item -ItemType Directory -Path $pkgDir, $logDir, $casesDir -Force | Out-Null
     foreach ($file in @('utilities.psm1', 'config.default.json', 'consts.json')) { Copy-Item (Join-Path $pkgRoot $file) $pkgDir -Force }
     foreach ($folder in @('Scripts', 'Config', 'Prompt20Toolkit', 'templates', 'agentic')) { Copy-Item (Join-Path $pkgRoot $folder) $pkgDir -Recurse -Force }
+    # The org presets Staff -Preset copies from (consts.json org.presetsFolder).
+    . (Join-Path $pkgRoot 'Scripts/Get-Consts.ps1')
+    $presetsRel = [string](Get-P20Consts).org.presetsFolder
+    New-Item -ItemType Directory -Path (Split-Path (Join-Path $pkgDir $presetsRel) -Parent) -Force | Out-Null
+    Copy-Item (Join-Path $pkgRoot $presetsRel) (Join-Path $pkgDir $presetsRel) -Recurse -Force
     Copy-Item (Join-Path $pkgRoot 'samples/hub') $hubDir -Recurse -Force
     # The GitHub demo Space answered "with agents": Team Agile is on where the answer and the switch agree.
     $hubJsonPath = Join-Path $hubDir 'hub.json'
@@ -290,7 +295,7 @@ try {
         [System.IO.File]::WriteAllText((Join-Path $hubDir "agentic/$name"), '', $utf8)
     }
     $hubWithFile = Get-Snapshot $hubDir
-    $typed = Invoke-OrgChart "'BEGIN:text'; tkOrgChart; 'END:text'; 'BEGIN:json'; tkOrgChart -AsJson; 'END:json'; 'BEGIN:branch'; tkOrgChart -Tree branch; 'END:branch'; 'BEGIN:branchjson'; tkOrgChart -Tree branch -AsJson; 'END:branchjson'"
+    $typed = Invoke-OrgChart "'BEGIN:text'; tkOrgChart; 'END:text'; 'BEGIN:json'; tkOrgChart -AsJson; 'END:json'; 'BEGIN:branch'; tkOrgChart -Tree branch 3>`$null; 'END:branch'; 'BEGIN:branchjson'; tkOrgChart -Tree branch -AsJson; 'END:branchjson'"
     $textOut = Get-Section $typed.All 'text'
     $wantText = "Org chart: Laptop and mini (main)`n`n" + (Read-Fixture 'text/valid.txt').TrimEnd("`n")
     Assert-Equal 'the text: a header with the title (an older file''s name), then one line per seat, byte for byte -- no machine' $wantText $textOut $typed.All
@@ -496,6 +501,161 @@ try {
         $r = Test-AgainstSchema $loose $fileSchema
         Assert-True 'it lets through an unknown key and a note at every level, and the retired keys' $r.Ok $r.Errors
     }
+
+    # -- 5. Staff: the org file's one writer, typed ---------------------------------------
+    # docs/hub/org.md, "The one writer". Every case types the verb in a fresh shell over
+    # the scratch copy of samples/hub, and reads the file back as bytes.
+    Write-Host ""
+    Write-Host "-- Staff, the one writer, typed in a fresh shell -------" -ForegroundColor Cyan
+    . (Join-Path $pkgRoot 'Scripts/Write-ConfigJson.ps1')
+    # The serializer Staff writes with, over a table: one text on 5.1 and 7 alike.
+    $serial = @(
+        @{ Name = 'null, booleans, numbers'; Value = [ordered]@{ a = $null; b = $true; c = $false; d = 6; e = 6.5 }; Want = "{`n  `"a`": null,`n  `"b`": true,`n  `"c`": false,`n  `"d`": 6,`n  `"e`": 6.5`n}" }
+        @{ Name = 'empty array and object'; Value = [ordered]@{ a = @(); b = [ordered]@{} }; Want = "{`n  `"a`": [],`n  `"b`": {}`n}" }
+        @{ Name = 'nesting, two spaces a level, the order given'; Value = [ordered]@{ z = @([ordered]@{ y = 'x' }); a = 1 }; Want = "{`n  `"z`": [`n    {`n      `"y`": `"x`"`n    }`n  ],`n  `"a`": 1`n}" }
+        @{ Name = 'non-ASCII as itself, not \u-escaped'; Value = ('Caf' + [char]0x00E9 + ' ' + [char]0x00B7); Want = ('"Caf' + [char]0x00E9 + ' ' + [char]0x00B7 + '"') }
+        @{ Name = 'quote, backslash, newline, tab and a control escaped'; Value = ("a`"b\c`nd`te" + [char]1); Want = '"a\"b\\c\nd\te\u0001"' }
+        @{ Name = 'a one-element array stays an array'; Value = [ordered]@{ a = @('x') }; Want = "{`n  `"a`": [`n    `"x`"`n  ]`n}" }
+    )
+    foreach ($row in $serial) { Assert-Equal "the serializer: $($row.Name)" $row.Want (ConvertTo-P20ConfigJson $row.Value) }
+    $roundTrip = '{"_note":"2026-11-26T10:00:00Z","n":[1,2],"o":{"k":"v"}}'
+    $parsed = $null
+    if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey('DateKind')) { $parsed = $roundTrip | ConvertFrom-Json -DateKind String } else { $parsed = $roundTrip | ConvertFrom-Json }
+    Assert-Equal 'the serializer: a parsed file comes back the same, a timestamp note as its text' "{`n  `"_note`": `"2026-11-26T10:00:00Z`",`n  `"n`": [`n    1,`n    2`n  ],`n  `"o`": {`n    `"k`": `"v`"`n  }`n}" (ConvertTo-P20ConfigJson $parsed)
+
+    $map = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'Config/models.json')) | ConvertFrom-Json
+    $idOf = @{ opus = [string]$map.current.opus; fable = [string]$map.current.fable; sonnet = [string]$map.current.sonnet; haiku = [string]$map.current.haiku }
+    function Read-Org { return ([System.IO.File]::ReadAllText($orgPath) | ConvertFrom-Json) }
+    function Get-OrgTree($Doc, [string]$Id) { return (@($Doc.trees) | Where-Object { $_.id -ceq $Id } | Select-Object -First 1) }
+    function Get-OrgSeat($TreeObj, [string]$PositionId) { return (@(@($TreeObj.positions | Where-Object { $_.id -ceq $PositionId } | Select-Object -First 1).seats)) }
+    function Get-OrgBytes { if (Test-Path -LiteralPath $orgPath) { return [System.IO.File]::ReadAllBytes($orgPath) } return @() }
+    function Test-SameBytes($A, $B) { return ((@($A) -join ',') -ceq (@($B) -join ',')) }
+    Remove-Item -LiteralPath $orgPath -Force -ErrorAction SilentlyContinue
+
+    # Off means absent: with Team Agile off there is no Staff verb.
+    Write-Config $false
+    $staffOff = Invoke-OrgChart "if (Get-Command tkStaff -ErrorAction SilentlyContinue) { 'VERB=present' } else { 'VERB=absent' }; 'MAP=' + ((Get-P20CommandMap) -match 'Staff')"
+    Assert-True 'Team Agile off: there is no Staff verb' ($staffOff.All -match 'VERB=absent') $staffOff.All
+    Assert-True '  and none in the bridge''s command table' ($staffOff.All -match 'MAP=False') $staffOff.All
+    Write-Config $true
+    $staffReg = Invoke-OrgChart "'MAP=' + (Get-P20CommandMap); tkStaff -Help"
+    Assert-True 'Staff is in the command table the bridge reads' ($staffReg.All -match '"Staff":\s*"Set-P20Staff"') $staffReg.All
+    Assert-True '  and -Help prints its usage' ($staffReg.All.Contains('tkStaff [-Preset <S|M|L>] [-Tree <id>]')) $staffReg.All
+
+    # -WhatIf with no file: the file it would write, and nothing on disk.
+    $snap = Get-Snapshot $hubDir
+    $dry = Invoke-OrgChart "tkStaff -Preset S -Owner Sam -WhatIf"
+    Assert-Equal '-WhatIf: exit 0' '0' $dry.Exit $dry.All
+    Assert-True '  says what it would write' ($dry.All.Contains('What if: Staff would write') -and $dry.All.Contains('"preset": "executive-suite"')) $dry.All
+    Assert-True '  and writes nothing' ((Get-Snapshot $hubDir) -ceq $snap)
+
+    # Create the file.
+    $made = Invoke-OrgChart "tkStaff -Preset S -Owner Sam; 'BEGIN:chart'; tkOrgChart; 'END:chart'"
+    Assert-Equal 'Staff -Preset S with no org.json: exit 0' '0' $made.Exit $made.All
+    Assert-True '  it says what it saved, and that the only org is the one in use' ($made.All.Contains("Wrote $orgPath") -and $made.All.Contains("Saved 'executive-suite'") -and $made.All.Contains('it is the only org, so it is the one in use.')) $made.All
+    $bytes = Get-OrgBytes
+    Assert-True '  the file is there, UTF-8 with no BOM' ($bytes.Length -gt 3 -and -not ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF))
+    $made1 = [System.Text.Encoding]::UTF8.GetString($bytes)
+    Assert-True '  LF on create, ending in one newline' (-not $made1.Contains("`r") -and $made1.EndsWith("}`n") -and -not $made1.EndsWith("`n`n"))
+    Assert-True '  two-space JSON' ($made1.StartsWith("{`n  `"trees`": [`n    {`n      `"id`": `"executive-suite`",`n      `"preset`": `"executive-suite`",")) $made1
+    $doc = Read-Org
+    Assert-True '  one tree and no activeTree: the one tree is the one in use' (@($doc.trees).Count -eq 1 -and -not $doc.PSObject.Properties['activeTree'])
+    $t = Get-OrgTree $doc 'executive-suite'
+    Assert-Equal '  the tree names its preset' 'executive-suite' $t.preset
+    Assert-True '  the preset file''s own note is not copied' (-not $t.PSObject.Properties['_comment'])
+    Assert-Equal '  the owner is the person -Owner named, and no model' 'Sam|' ("$((Get-OrgSeat $t 'owner')[0].person)|$((Get-OrgSeat $t 'owner')[0].model)")
+    Assert-Equal '  the VP of engineering: current.opus, as an id' $idOf.opus (Get-OrgSeat $t 'vp-engineering')[0].model
+    Assert-Equal '  the VP of product: current.fable, as an id' $idOf.fable (Get-OrgSeat $t 'vp-product')[0].model
+    Assert-True '  and the VP of product''s seat holds the merge' ((Get-OrgSeat $t 'vp-product')[0].merges -eq $true)
+    Assert-Equal '  the builder pool''s line: current.sonnet, as an id' $idOf.sonnet (@($t.positions | Where-Object { $_.id -eq 'builder' })[0].defaultModel)
+    Assert-True '  and the result is a chart OrgChart reads' ((Get-Section $made.All 'chart').Contains("VP of product $dot $($idOf.fable) $dot merges")) $made.All
+
+    # Hand edits survive, and an edited file keeps its own line ending.
+    $hand = $made1.Replace("{`n  `"trees`"", "{`n  `"_note`": `"mine`",`n  `"trees`"").Replace("`"preset`": `"executive-suite`",", "`"preset`": `"executive-suite`",`n      `"colour`": `"teal`",").Replace("`n", "`r`n")
+    [System.IO.File]::WriteAllText($orgPath, $hand, $utf8)
+    $second = Invoke-OrgChart "tkStaff -Preset S -Title 'A second suite' 3>`$null"
+    Assert-Equal 'a second tree from the same preset: exit 0' '0' $second.Exit $second.All
+    $text2 = [System.IO.File]::ReadAllText($orgPath)
+    Assert-True '  the edited CRLF file stays CRLF, with no bare LF' ($text2.Contains("`r`n") -and -not ($text2.Replace("`r`n", '').Contains("`n"))) $text2
+    $doc = Read-Org
+    Assert-Equal '  its id is the preset''s, then -2' 'executive-suite,executive-suite-2' (@($doc.trees | ForEach-Object { $_.id }) -join ',')
+    Assert-Equal '  -Title names it' 'A second suite' (Get-OrgTree $doc 'executive-suite-2').title
+    Assert-Equal '  the owner is the preset''s You without -Owner' 'You' (Get-OrgSeat (Get-OrgTree $doc 'executive-suite-2') 'owner')[0].person
+    Assert-Equal '  two trees now, so activeTree names the first, and comes first; the note and the rest keep their order' 'activeTree,_note,trees' (@($doc.PSObject.Properties.Name) -join ',')
+    Assert-Equal '  the first tree is still the one in use: the new one is a draft' 'executive-suite' $doc.activeTree
+    Assert-True '  and the output says so' ($second.All.Contains("Saved 'executive-suite-2'") -and $second.All.Contains("as a draft; 'executive-suite' stays active.")) $second.All
+    Assert-Equal '  a hand-made key in the first tree is kept' 'teal' (Get-OrgTree $doc 'executive-suite').colour
+
+    # An id that is already a tree is refused, never overwritten.
+    $before = Get-OrgBytes
+    $dup = Invoke-OrgChart "tkStaff -Preset M -Tree executive-suite"
+    Assert-Equal 'an existing tree id: exit 2' '2' $dup.Exit $dup.All
+    Assert-True '  says why, naming the trees' ($dup.All.Contains("'executive-suite' is already a tree in org.json, and a tree is never overwritten. Trees: executive-suite, executive-suite-2.")) $dup.All
+    Assert-True '  and writes nothing' (Test-SameBytes $before (Get-OrgBytes))
+
+    # A third tree, with the VPs given: still a draft, and the tree in use stays.
+    $third = Invoke-OrgChart "tkStaff -Preset M -Tree branch -VpEngineering claude-sonnet-5-5 -VpProduct opus 3>`$null; 'BEGIN:branch'; tkOrgChart -Tree branch 3>`$null; 'END:branch'"
+    Assert-Equal 'a third tree: exit 0' '0' $third.Exit $third.All
+    $doc = Read-Org
+    $b3 = Get-OrgTree $doc 'branch'
+    Assert-Equal '  the tree in use stays as it was' 'executive-suite' $doc.activeTree
+    Assert-Equal '  -VpEngineering takes a model id as it is' 'claude-sonnet-5-5' (Get-OrgSeat $b3 'vp-engineering')[0].model
+    Assert-Equal '  -VpProduct takes a family, stored as its id' $idOf.opus (Get-OrgSeat $b3 'vp-product')[0].model
+    Assert-Equal '  every team lead seat is current.opus' "$($idOf.opus),$($idOf.opus)" (@((Get-OrgSeat $b3 'team-lead') | ForEach-Object { $_.model }) -join ',')
+    Assert-True '  the test runner starts vacant' (-not (Get-OrgSeat $b3 'test-runner')[0].PSObject.Properties['model'])
+    Assert-True '  OrgChart -Tree prints the draft, not the tree in use' ((Get-Section $third.All 'branch').StartsWith('Org chart: The Branch Office (branch) -- not the tree in use (executive-suite)')) $third.All
+
+    # A fourth tree is refused, naming the three.
+    $before = Get-OrgBytes
+    $fourth = Invoke-OrgChart "tkStaff -Preset L"
+    Assert-Equal 'a fourth tree: exit 2' '2' $fourth.Exit $fourth.All
+    Assert-True '  names the three' ($fourth.All.Contains('org.json already holds 3 trees (executive-suite, executive-suite-2, branch): a file holds at most 3')) $fourth.All
+    Assert-True '  and writes nothing' (Test-SameBytes $before (Get-OrgBytes))
+
+    # -Activate alone.
+    $act = Invoke-OrgChart "tkStaff -Activate executive-suite-2"
+    Assert-Equal '-Activate <tree-id>: exit 0' '0' $act.Exit $act.All
+    Assert-Equal '  it is the tree in use' 'executive-suite-2' (Read-Org).activeTree
+    $before = Get-OrgBytes
+    $again = Invoke-OrgChart "tkStaff -Activate executive-suite-2"
+    Assert-True '  again: already in use, nothing written' ($again.Exit -eq '0' -and $again.All.Contains('nothing was written') -and (Test-SameBytes $before (Get-OrgBytes))) $again.All
+    $actDry = Invoke-OrgChart "tkStaff -Activate branch -WhatIf"
+    Assert-True '  -WhatIf: says so, and writes nothing' ($actDry.Exit -eq '0' -and $actDry.All.Contains('What if:') -and (Test-SameBytes $before (Get-OrgBytes))) $actDry.All
+
+    # Refusals: exit 2, the sentence, nothing written.
+    $staffRefusals = [ordered]@{
+        'no switch'                          = @('tkStaff', 'Nothing to do: give -Preset S|M|L')
+        'an unknown -Activate tree'          = @('tkStaff -Activate nope', "-Activate names 'nope', which is not a tree in org.json. Trees: executive-suite, executive-suite-2, branch.")
+        'a size that is not a preset'        = @('tkStaff -Preset XL', "-Preset 'XL' is not a preset size. The presets are: S, M, L.")
+        'a model that is not in the map'     = @('tkStaff -Preset S -Tree x -VpProduct gpt-9', "-VpProduct 'gpt-9' is not a model id or a family in Config/models.json.")
+        '-Owner without -Preset'             = @('tkStaff -Activate branch -Owner Sam', '-Owner goes with -Preset')
+        '-Activate with -Preset'             = @('tkStaff -Preset S -Tree x -Activate', '-Activate does not go with -Preset: a saved tree is a draft')
+    }
+    foreach ($name in $staffRefusals.Keys) {
+        $before = Get-OrgBytes
+        $ran = Invoke-OrgChart $staffRefusals[$name][0]
+        Assert-Equal "Staff refused ($name): exit 2" '2' $ran.Exit $ran.All
+        Assert-True "  says why, once" (([regex]::Matches($ran.All, [regex]::Escape($staffRefusals[$name][1]))).Count -eq 1) $ran.All
+        Assert-True "  and writes nothing" (Test-SameBytes $before (Get-OrgBytes))
+    }
+    # An invalid file is refused before anything is changed.
+    [System.IO.File]::WriteAllText($orgPath, ($cycleRow.org | ConvertTo-Json -Depth 20), $utf8)
+    $before = Get-OrgBytes
+    $bad = Invoke-OrgChart "tkStaff -Activate a"
+    Assert-Equal 'Staff over an invalid file: exit 2' '2' $bad.Exit $bad.All
+    Assert-True '  says the file is not valid now, with the reader''s sentence' ($bad.All.Contains('is not valid now, so nothing was written') -and $bad.All.Contains($cycleRow.expect.message)) $bad.All
+    Assert-True '  and writes nothing' (Test-SameBytes $before (Get-OrgBytes))
+
+    # The L preset's defaults, in a file of its own.
+    Remove-Item -LiteralPath $orgPath -Force
+    $large = Invoke-OrgChart "tkStaff -Preset L -Tree hq"
+    Assert-Equal 'Staff -Preset L: exit 0' '0' $large.Exit $large.All
+    $hq = Get-OrgTree (Read-Org) 'hq'
+    Assert-Equal '  the intern and the butler: current.haiku' "$($idOf.haiku),$($idOf.haiku)" ("$((Get-OrgSeat $hq 'intern')[0].model),$((Get-OrgSeat $hq 'butler')[0].model)")
+    Assert-True '  the PM, the test runner and the merge stand-in start vacant' (@('pm', 'test-runner', 'merge-stand-in' | ForEach-Object { (Get-OrgSeat $hq $_)[0].PSObject.Properties['model'] } | Where-Object { $_ }).Count -eq 0)
+    Assert-Equal '  the preset''s own id is kept as its preset' 'corporate-headquarters' $hq.preset
+    $sampleAfter = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'samples/hub/org.json'))
+    Assert-True 'samples/hub is never written: the package''s sample is what git has' ($sampleAfter -ceq [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'samples/hub/org.json')))
 }
 catch {
     $script:failed++
