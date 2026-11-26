@@ -55,8 +55,10 @@ import { VacantSeat } from "./VacantSeat";
 // presets"): the starting orgs the toolkit ships, served by GET
 // /api/ritual/org/presets. Picking one makes its title the heading, with its
 // size as a badge beside it, puts its description under the title, and draws
-// its chart with the same offices. Nothing is written: org.json stays the
-// hub's, hand-edited.
+// its chart with the same offices. The page itself writes nothing: org.json's
+// one writer is the CLI's Staff verb (docs/hub/org.md, "The one writer: Staff"),
+// which saves a preset as a tree, and a page that writes will reach it through
+// the bridge (POST /api/cmd/Staff), never a route of its own. Hand edits work too.
 
 const useStyles = makeStyles({
   body: { display: "flex", flexDirection: "column", minWidth: 0 },

@@ -531,6 +531,10 @@ try {
     function Get-OrgBytes { if (Test-Path -LiteralPath $orgPath) { return [System.IO.File]::ReadAllBytes($orgPath) } return @() }
     function Test-SameBytes($A, $B) { return ((@($A) -join ',') -ceq (@($B) -join ',')) }
     Remove-Item -LiteralPath $orgPath -Force -ErrorAction SilentlyContinue
+    # What Staff must never write: the package's sample hub and presets (the real tree's,
+    # and the scratch package's presets, which are the ones the verb reads), snapshot now.
+    $neverWritten = @((Join-Path $pkgRoot 'samples/hub'), (Join-Path $pkgRoot $presetsRel), (Join-Path $pkgDir $presetsRel))
+    $neverBefore = @($neverWritten | ForEach-Object { Get-Snapshot $_ })
 
     # Off means absent: with Team Agile off there is no Staff verb.
     Write-Config $false
@@ -654,8 +658,9 @@ try {
     Assert-Equal '  the intern and the butler: current.haiku' "$($idOf.haiku),$($idOf.haiku)" ("$((Get-OrgSeat $hq 'intern')[0].model),$((Get-OrgSeat $hq 'butler')[0].model)")
     Assert-True '  the PM, the test runner and the merge stand-in start vacant' (@('pm', 'test-runner', 'merge-stand-in' | ForEach-Object { (Get-OrgSeat $hq $_)[0].PSObject.Properties['model'] } | Where-Object { $_ }).Count -eq 0)
     Assert-Equal '  the preset''s own id is kept as its preset' 'corporate-headquarters' $hq.preset
-    $sampleAfter = [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'samples/hub/org.json'))
-    Assert-True 'samples/hub is never written: the package''s sample is what git has' ($sampleAfter -ceq [System.IO.File]::ReadAllText((Join-Path $pkgRoot 'samples/hub/org.json')))
+    for ($i = 0; $i -lt $neverWritten.Count; $i++) {
+        Assert-True "Staff never wrote $($neverWritten[$i].Replace($root, '<scratch>').Replace($pkgRoot, '<package>')): every file the same bytes as before its cases" ((Get-Snapshot $neverWritten[$i]) -ceq $neverBefore[$i])
+    }
 }
 catch {
     $script:failed++
