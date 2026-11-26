@@ -477,7 +477,7 @@ A dropdown at the right of the panel's header previews the **org presets** (`GET
 [Org presets](../hub/org.md#org-presets)): **Your org**, the hub's own chart and the default, then
 **Executive Suite (S)**, **Branch Office (M)** and **Corporate Headquarters (L)** -- a preset is named by its
 title without a leading "The", and its size. The panel's heading is the org shown: the hub's tree's name for
-Your org (`Org chart` while there is no chart), or the picked preset's title with its size beside it as a badge,
+Your org (`Org chart` while there is no chart), or the picked preset's title with its size beside it as a badge in words (`Small`, `Medium`, `Large`, from the file's `S`, `M`, `L` by one mapping),
 the one badge the page draws -- the heading in the panel headings' own `Subtitle2`. Under a preset's title is its
 description in Fluent's `Body2` (16px, the step at 1rem), its lines kept near 78 characters; then its chart, in the same offices and art, its open seats as empty desks. Picking Your org
 draws the hub's chart again. A preview writes nothing: `org.json` stays the hub's, hand-edited. With no

@@ -7,6 +7,7 @@ import {
   UNKNOWN_TREE_DETAIL,
   YOUR_ORG_LABEL,
   presetLabel,
+  presetSizeWord,
 } from "./OrgPage";
 import { orgResponse } from "./orgFixture";
 
@@ -286,6 +287,10 @@ describe("the presets", () => {
     presetsResponse = { isLoading: false, data: { presets: PRESETS } };
   });
 
+  it("says a size on the badge as a word, and a size it does not know as written", () => {
+    expect(["S", "M", "L", "XL"].map(presetSizeWord)).toEqual(["Small", "Medium", "Large", "XL"]);
+  });
+
   it("names a preset by its title without a leading The, and its size", () => {
     expect(PRESETS.map(presetLabel)).toEqual([
       "Executive Suite (S)",
@@ -325,7 +330,7 @@ describe("the presets", () => {
       "The Executive Suite, at length.",
     );
     expect(screen.getByTestId("org-heading").textContent).toBe("The Executive Suite");
-    expect(screen.getByTestId("org-preset-size").textContent).toBe("S");
+    expect(screen.getByTestId("org-preset-size").textContent).toBe("Small");
   });
 
   it("picking your org again draws the hub's chart", () => {

@@ -354,6 +354,18 @@ export const YOUR_ORG = "";
 /** What the dropdown calls the hub's own chart. */
 export const YOUR_ORG_LABEL = "Your org";
 
+/** A preset's size as its badge says it: the one mapping from the file's letter
+ *  to the word. A size it does not know is shown as written. */
+export const PRESET_SIZE_WORDS: Readonly<Record<string, string>> = {
+  S: "Small",
+  M: "Medium",
+  L: "Large",
+};
+
+export function presetSizeWord(size: string): string {
+  return PRESET_SIZE_WORDS[size] ?? size;
+}
+
 /** A preset as the dropdown names it: its title without a leading "The", and
  *  its size -- "Executive Suite (S)". */
 export function presetLabel(preset: Pick<OrgPreset, "title" | "size">): string {
@@ -423,7 +435,7 @@ export function OrgPage() {
             </Subtitle2>
             {picked?.size ? (
               <Badge appearance="tint" color="subtle" size="medium" data-testid="org-preset-size">
-                {picked.size}
+                {presetSizeWord(picked.size)}
               </Badge>
             ) : null}
           </>
