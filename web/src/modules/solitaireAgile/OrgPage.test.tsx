@@ -355,6 +355,19 @@ describe("the presets", () => {
     expect(screen.queryByTestId("org-preset-size")).toBeNull();
   });
 
+  it("puts the zoom controls in the header, just left of the dropdown", () => {
+    draw();
+    const zoom = screen.getByTestId("org-zoom");
+    const select = screen.getByTestId("org-preset-select");
+    expect(zoom.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Both sit in the panel's header, before the chart's box.
+    const chartBox = screen.getByTestId("org-chart-box");
+    expect(zoom.compareDocumentPosition(chartBox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      select.compareDocumentPosition(chartBox) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("offers your org, then the presets smallest first", () => {
     draw();
     fireEvent.click(screen.getByTestId("org-preset-select"));

@@ -479,7 +479,7 @@ terminal's (the page asks for no tree today, so it meets this only if that chang
 tree, draws no `active` state or merge, and writes nothing. `OrgPage.test.tsx` and `orgChart.test.ts` draw the shared
 table's charts (`Tests/fixtures/org/charts/`).
 
-**Zoom.** At the top right of the content area, over the chart -- the dropdown stays in the header -- a small
+**Zoom.** In the panel's header, just left of the org dropdown and 1rem from it, a small
 Fluent `Toolbar` of real buttons, **Zoom out**, **Zoom in** and **Fit to width**, with the percentage beside them in
 a polite live region (`Zoom 75%`), the way a map's zoom control and a design tool's percentage sit over their
 canvas. Zoom scales only the chart's own layer, a CSS `transform: scale()` on its inner box from its top left; the

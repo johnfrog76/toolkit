@@ -80,16 +80,24 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground2,
   },
   select: { minWidth: "260px" },
-  // The zoom controls: the top right of the content area, over the chart.
+  // The header's right side: the zoom controls, then the org dropdown, 1rem apart
+  // (spacingHorizontalL is 16px).
+  headerControls: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: tokens.spacingHorizontalL,
+  },
+  // The zoom controls: the toolbar and its percentage, together.
   zoomBar: {
     display: "flex",
-    justifyContent: "flex-end",
     alignItems: "center",
-    columnGap: tokens.spacingHorizontalS,
-    marginTop: tokens.spacingVerticalS,
+    columnGap: tokens.spacingHorizontalXS,
   },
+  // Right-aligned in a fixed width, so the gap to the dropdown stays 1rem and a
+  // changing number never shifts the buttons.
   zoomLevel: {
     minWidth: "6.5em",
+    textAlign: "right",
     color: tokens.colorNeutralForeground2,
     fontVariantNumeric: "tabular-nums",
   },
@@ -378,63 +386,80 @@ function noChart(error: unknown, icon: EmptyMessage["icon"]): EmptyMessage {
  *  scroll area is the scaled size, so it pans on both axes and the page never
  *  scrolls sideways. It opens fitted to the box's width, capped at 100%, and
  *  keeps fitting as the box resizes until the person zooms by hand. */
-function ChartDrawing({ positions }: { positions: OrgPosition[] }) {
-  const styles = useStyles();
-  const layout = layoutChart(positions);
+function useChartZoom(layoutWidth: number, chartKey: string) {
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  const [byHand, setByHand] = useState(false);
+  // Zoomed by hand on which chart: a different chart starts fitted again.
+  const [handOn, setHandOn] = useState<string | null>(null);
+  const byHand = handOn === chartKey;
 
   // Measured before paint, so the first frame is already at its fitted scale.
   useLayoutEffect(() => {
     const el = box.current;
     if (!el || byHand) return;
-    const fit = () => setScale(fitScale(el.clientWidth, layout.width));
+    const fit = () => setScale(fitScale(el.clientWidth, layoutWidth));
     fit();
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(fit);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [byHand, layout.width]);
+  }, [byHand, layoutWidth, chartKey]);
 
   const zoom = (next: number) => {
-    setByHand(true);
+    setHandOn(chartKey);
     setScale(next);
   };
   const fitToWidth = () => {
-    setByHand(false);
-    setScale(fitScale(box.current?.clientWidth ?? 0, layout.width));
+    setHandOn(null);
+    setScale(fitScale(box.current?.clientWidth ?? 0, layoutWidth));
   };
+  return { box, scale, zoom, fitToWidth };
+}
+
+type ChartZoom = ReturnType<typeof useChartZoom>;
+
+/** The zoom controls, in the header's right side, left of the org dropdown. */
+function ZoomControls({ zoom: z }: { zoom: ChartZoom }) {
+  const styles = useStyles();
+  const { scale, zoom, fitToWidth } = z;
+  return (
+    <div className={styles.zoomBar}>
+      <Toolbar aria-label="Zoom" size="small" data-testid="org-zoom">
+        <ToolbarButton
+          aria-label="Zoom out"
+          icon={<ZoomOutRegular />}
+          disabled={!canZoomOut(scale)}
+          onClick={() => zoom(zoomOut(scale))}
+        />
+        <ToolbarButton
+          aria-label="Zoom in"
+          icon={<ZoomInRegular />}
+          disabled={!canZoomIn(scale)}
+          onClick={() => zoom(zoomIn(scale))}
+        />
+        <ToolbarButton icon={<ZoomFitRegular />} onClick={fitToWidth}>
+          Fit to width
+        </ToolbarButton>
+      </Toolbar>
+      <Caption1
+        className={styles.zoomLevel}
+        role="status"
+        aria-live="polite"
+        data-testid="org-zoom-level"
+      >
+        {zoomLabel(scale)}
+      </Caption1>
+    </div>
+  );
+}
+
+function ChartDrawing({ positions, zoom }: { positions: OrgPosition[]; zoom: ChartZoom }) {
+  const styles = useStyles();
+  const layout = layoutChart(positions);
+  const { box, scale } = zoom;
 
   return (
     <>
-      <div className={styles.zoomBar}>
-        <Toolbar aria-label="Zoom" size="small" data-testid="org-zoom">
-          <ToolbarButton
-            aria-label="Zoom out"
-            icon={<ZoomOutRegular />}
-            disabled={!canZoomOut(scale)}
-            onClick={() => zoom(zoomOut(scale))}
-          />
-          <ToolbarButton
-            aria-label="Zoom in"
-            icon={<ZoomInRegular />}
-            disabled={!canZoomIn(scale)}
-            onClick={() => zoom(zoomIn(scale))}
-          />
-          <ToolbarButton icon={<ZoomFitRegular />} onClick={fitToWidth}>
-            Fit to width
-          </ToolbarButton>
-        </Toolbar>
-        <Caption1
-          className={styles.zoomLevel}
-          role="status"
-          aria-live="polite"
-          data-testid="org-zoom-level"
-        >
-          {zoomLabel(scale)}
-        </Caption1>
-      </div>
       <div ref={box} className={styles.scroller} data-testid="org-chart-box">
         <div
           className={styles.sizer}
@@ -532,6 +557,8 @@ export function OrgPage() {
   // With no preset to offer, the page is the hub's chart alone, as it always was.
   const empty = presets.length === 0 ? noOrg : undefined;
   const title = picked ? picked.title : (ours?.tree.title ?? ORG_PAGE_TITLE);
+  const shown = picked ? picked.chart.tree.positions : ours?.tree.positions;
+  const chartZoom = useChartZoom(shown ? layoutChart(shown).width : 0, picked?.id ?? YOUR_ORG);
 
   return (
     <div className={styles.body}>
@@ -553,8 +580,13 @@ export function OrgPage() {
           </>
         }
         headerRight={
-          presets.length > 0 ? (
-            <PresetSelect presets={presets} picked={picked} onPick={setPickedId} />
+          shown || presets.length > 0 ? (
+            <div className={styles.headerControls}>
+              {shown ? <ZoomControls zoom={chartZoom} /> : null}
+              {presets.length > 0 ? (
+                <PresetSelect presets={presets} picked={picked} onPick={setPickedId} />
+              ) : null}
+            </div>
           ) : undefined
         }
       >
@@ -563,10 +595,10 @@ export function OrgPage() {
             <Body2 as="p" className={styles.description} data-testid="org-preset-description">
               {picked.description}
             </Body2>
-            <ChartDrawing positions={picked.chart.tree.positions} />
+            <ChartDrawing positions={picked.chart.tree.positions} zoom={chartZoom} />
           </>
         ) : ours ? (
-          <ChartDrawing positions={ours.tree.positions} />
+          <ChartDrawing positions={ours.tree.positions} zoom={chartZoom} />
         ) : (
           (noOrg ?? null)
         )}
