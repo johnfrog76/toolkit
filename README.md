@@ -100,6 +100,7 @@ This file is the front door. Each subject has one document that owns it; the oth
 | **[Testing](docs/TESTING.md)** | `tkSetup`, the four runners, every suite, where the counts live, one toolkit per shell |
 | **[The agent and the web UI](docs/ARCHITECTURE.md)** | How the three halves fit, and the overview of the other two: routes, `/env`, the bridge, the shell, Docker, the repo layout |
 | **[The modules](docs/modules/README.md)** | The add-ons -- Azure DevOps, growth, communication, organize, Team Agile, deck, lounge -- and the Studio, which is core; what each one's document must contain, "off means absent", how a module contributes commands (D-CM) |
+| **[The org](docs/ORG.md)** | Who does what when you work with agents: the three starting orgs, saving one and choosing the one in use, seats and models, and where it is going |
 | **[Known gaps](docs/KNOWN-GAPS.md)** | What it does not do, what you see if you try, where you meet it, and the issue that carries each |
 | [`agent/README.md`](agent/README.md) | The agent in detail: layout, tier, identity, the route table, the bridge contract |
 | [`web/README.md`](web/README.md) | The web UI in detail: the `ToolkitModule` interface, cards and writes, the smoke test, production |

@@ -78,7 +78,7 @@ question "How do you want to work in \<Space>?": `Team Agile module  on (chosen:
 `not configured` for a GitHub Space nobody has answered -- each with the line that changes it.
 
 **The org chart rides this switch, and that has a consequence worth saying plainly.** `OrgChart`
-([`docs/hub/org.md`](../hub/org.md)) reads one hub file, `org.json`, which is the engineer's and sits at the
+([The org](../ORG.md); its file, [`docs/hub/org.md`](../hub/org.md)) reads one hub file, `org.json`, which is the engineer's and sits at the
 hub root -- but the view of it is Team Agile's, so in a Space where Team Agile is off (the switch is off, or the Space is
 answered `alone`, or it is on Azure DevOps or has no tracker) there is **no `OrgChart` verb**, even with a
 valid `org.json` in the hub. That is the module rule working, not a missing file: to see the chart from a

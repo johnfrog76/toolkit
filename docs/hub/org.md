@@ -1,5 +1,7 @@
 # The org chart -- `org.json`
 
+> What the org is, and how you use it: [The org](../ORG.md). This page is the file's reference.
+
 An org is a shared understanding of how a team works together: which roles there are, who each one
 reports to, and who -- a person or a model -- fills each one today. `org.json` is that structure written
 down, as a file anyone can read as it is: a tree of **positions** (an office, not whoever sits in it) and
