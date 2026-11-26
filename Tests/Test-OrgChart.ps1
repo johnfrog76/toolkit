@@ -658,6 +658,50 @@ try {
     Assert-Equal '  the intern and the butler: current.haiku' "$($idOf.haiku),$($idOf.haiku)" ("$((Get-OrgSeat $hq 'intern')[0].model),$((Get-OrgSeat $hq 'butler')[0].model)")
     Assert-True '  the PM, the test runner and the merge stand-in start vacant' (@('pm', 'test-runner', 'merge-stand-in' | ForEach-Object { (Get-OrgSeat $hq $_)[0].PSObject.Properties['model'] } | Where-Object { $_ }).Count -eq 0)
     Assert-Equal '  the preset''s own id is kept as its preset' 'corporate-headquarters' $hq.preset
+
+    # -Activate on a one-tree file with no activeTree: that tree is already in use.
+    $before = Get-OrgBytes
+    $lone = Invoke-OrgChart "tkStaff -Activate hq"
+    Assert-True '-Activate on the only tree of a file with no activeTree: already in use, exit 0, nothing written' (
+        $lone.Exit -eq '0' -and $lone.All.Contains("'hq' is already the tree in use") -and $lone.All.Contains('nothing was written') -and (Test-SameBytes $before (Get-OrgBytes))) $lone.All
+    # A -Tree that is not a plain word is refused, so the printed -Activate hint always types.
+    $badId = Invoke-OrgChart "tkStaff -Preset S -Tree 'our org!'"
+    Assert-True 'a -Tree that is not a plain word: exit 2, the sentence, nothing written' (
+        $badId.Exit -eq '2' -and $badId.All.Contains("-Tree 'our org!' is not a plain word: a tree id is letters, digits, - and _.") -and (Test-SameBytes $before (Get-OrgBytes))) $badId.All
+    # A VP's model given by id needs no default: a map whose current names no fable still saves it.
+    $mapPath = Join-Path $pkgDir 'Config/models.json'
+    $mapText = [System.IO.File]::ReadAllText($mapPath)
+    $noFable = $mapText | ConvertFrom-Json
+    $noFable.current.PSObject.Properties.Remove('fable')
+    [System.IO.File]::WriteAllText($mapPath, ($noFable | ConvertTo-Json -Depth 10), $utf8)
+    try {
+        $given = Invoke-OrgChart "tkStaff -Preset S -Tree given -VpProduct claude-opus-5-5"
+        Assert-Equal 'a VP model given, with no default for it in the map: exit 0' '0' $given.Exit $given.All
+        Assert-Equal '  and the given model is the one stored' 'claude-opus-5-5' (Get-OrgSeat (Get-OrgTree (Read-Org) 'given') 'vp-product')[0].model
+        $before = Get-OrgBytes
+        $none = Invoke-OrgChart "tkStaff -Preset S -Tree none"
+        Assert-True '  with none given, the missing default is refused, nothing written' ($none.Exit -eq '2' -and $none.All.Contains("the default 'fable' is not a model id or a family") -and (Test-SameBytes $before (Get-OrgBytes))) $none.All
+    }
+    finally { [System.IO.File]::WriteAllText($mapPath, $mapText, $utf8) }
+    # A write that fails leaves the old file as it was: a hub folder nobody may write to.
+    if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+        Write-Host "  SKIP  a failed write leaving org.json intact: a read-only folder does not refuse a new file on Windows; the macOS and Linux runs prove it" -ForegroundColor Yellow
+    }
+    else {
+        $before = Get-OrgBytes
+        & chmod 555 $hubDir
+        try { $locked = Invoke-OrgChart "tkStaff -Activate given" }
+        finally { & chmod 755 $hubDir }
+        Assert-Equal 'a write that fails: exit 2' '2' $locked.Exit $locked.All
+        Assert-True '  says it could not write, and that the file is as it was' ($locked.All.Contains("Could not write $orgPath") -and $locked.All.Contains('the file is as it was')) $locked.All
+        Assert-True '  the old file is intact, byte for byte' (Test-SameBytes $before (Get-OrgBytes))
+        Assert-True '  and no temp file is left beside it' (-not (Test-Path -LiteralPath "$orgPath.p20tmp"))
+    }
+    # -Activate with no org.json is refused, and creates nothing.
+    Remove-Item -LiteralPath $orgPath -Force
+    $noFile = Invoke-OrgChart "tkStaff -Activate hq"
+    Assert-True '-Activate with no org.json: exit 2, the sentence, no file made' (
+        $noFile.Exit -eq '2' -and $noFile.All.Contains('There is no org.json in the hub, so there is no tree to put in use.') -and -not (Test-Path -LiteralPath $orgPath)) $noFile.All
     for ($i = 0; $i -lt $neverWritten.Count; $i++) {
         Assert-True "Staff never wrote $($neverWritten[$i].Replace($root, '<scratch>').Replace($pkgRoot, '<package>')): every file the same bytes as before its cases" ((Get-Snapshot $neverWritten[$i]) -ceq $neverBefore[$i])
     }

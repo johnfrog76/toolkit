@@ -33,7 +33,8 @@
     other tree, key and note in its order, checks the result with the reader's
     own checks (Scripts/Read-OrgChart.ps1), and writes it as two-space JSON,
     UTF-8 with no BOM, through Write-CardText: a created file is LF, an edited
-    one keeps its own line ending. -WhatIf prints the file it would write and
+    one keeps its own line ending. The bytes go to a temp file beside it and
+    are renamed over it, so a write that fails leaves the file as it was. -WhatIf prints the file it would write and
     writes nothing. It never prompts.
 
 .PARAMETER Tree
@@ -203,6 +204,9 @@ elseif (-not $creating) {
 $treeIds = @($trees | ForEach-Object { Get-P20OrgText (Get-P20OrgField $_ 'id') })
 $activeBefore = ''
 if ($data) { $activeBefore = Get-P20OrgText (Get-P20OrgField $data 'activeTree') }
+# The tree in use as the reader sees it: the file's activeTree, or its one tree.
+$inUseBefore = ''
+if ($exists) { $inUseBefore = [string]$before.ActiveTree }
 
 # -- The tree -Preset adds ---------------------------------------------------------------
 
@@ -236,10 +240,11 @@ if ($creating) {
         Stop-Staff "$Switch '$want' is not a model id or a family in $([string](Get-P20Consts).models.file). Families: $($families -join ', ')." `
             'Give a family (opus) or a model id the map has a row for (claude-opus-5-5).'
     }
-    $vpEngModel = & $resolve 'opus' 'the default'
+    # A given model is resolved on its own: a default is looked up only where none was given.
     if ($PSBoundParameters.ContainsKey('VpEngineering')) { $vpEngModel = & $resolve $VpEngineering '-VpEngineering' }
-    $vpProdModel = & $resolve 'fable' 'the default'
+    else { $vpEngModel = & $resolve $seatDefaults['vp-engineering'] 'the default' }
     if ($PSBoundParameters.ContainsKey('VpProduct')) { $vpProdModel = & $resolve $VpProduct '-VpProduct' }
+    else { $vpProdModel = & $resolve $seatDefaults['vp-product'] 'the default' }
     if ($PSBoundParameters.ContainsKey('Owner') -and -not ([string]$Owner).Trim()) { Stop-Staff '-Owner needs a name: the owner is a person, in your own words.' }
     if ($PSBoundParameters.ContainsKey('Title') -and -not ([string]$Title).Trim()) { Stop-Staff '-Title needs the words to call the tree.' }
 
@@ -250,6 +255,11 @@ if ($creating) {
     }
     $newId = $Tree
     if ($newId) {
+        # A plain word, so the 'Staff -Activate <id>' this prints always types as it reads.
+        if ($newId -cnotmatch '^[A-Za-z0-9_-]+$') {
+            Stop-Staff "-Tree '$newId' is not a plain word: a tree id is letters, digits, - and _." `
+                'Give an id such as branch or our-org-2.'
+        }
         if ($treeIds -ccontains $newId) {
             Stop-Staff "'$newId' is already a tree in $fileName, and a tree is never overwritten. Trees: $($treeIds -join ', ')." `
                 "Give another id with -Tree, or choose that tree with '${p}Staff -Activate $newId'."
@@ -318,7 +328,7 @@ if ($creating) { $allTrees = @($trees) + @($newTree) }
 # in use, by the reader's rule) names that tree -- never the draft.
 if (-not $active -and $allTrees.Count -gt 1) { $active = $treeIds[0] }
 
-if (-not $creating -and $active -ceq $activeBefore) {
+if (-not $creating -and $Tree -ceq $inUseBefore) {
     Write-Output "'$Tree' is already the tree in use in $orgPath; nothing was written."
     return
 }
@@ -364,7 +374,26 @@ if ($WhatIf) {
     return
 }
 
-if ($exists) { Write-CardText -Path $orgPath -Content $text }
-else { Write-CardText -Path $orgPath -Content $text -New }
+# Crash-safe: the new bytes go to a sibling temp file, through Write-CardText,
+# and are renamed over org.json, as Write-ConfigJson replaces a config file. An
+# edit starts the temp as a copy of the file, so Write-CardText reads the file's
+# own line ending there; a create is -New (LF). A write that fails removes the
+# temp and leaves org.json as it was.
+$temp = "$orgPath.p20tmp"
+try {
+    if ($exists) {
+        Copy-Item -LiteralPath $orgPath -Destination $temp -Force -ErrorAction Stop
+        Write-CardText -Path $temp -Content $text
+    }
+    else { Write-CardText -Path $temp -Content $text -New }
+    Move-Item -LiteralPath $temp -Destination $orgPath -Force -ErrorAction Stop
+}
+catch {
+    Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+    $was = 'there is still no file'
+    if ($exists) { $was = 'the file is as it was' }
+    Stop-Staff "Could not write $orgPath ($($_.Exception.Message)); $was." `
+        "Check that the hub's folder can be written, then run ${p}Staff again."
+}
 Write-Output $what
 Write-Output "Wrote $orgPath. ${p}OrgChart prints the tree in use; ${p}OrgChart -Tree $targetId prints this one."

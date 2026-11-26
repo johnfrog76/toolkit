@@ -1,9 +1,12 @@
 # The org chart -- `org.json`
 
-`org.json` is the hub's picture of an organisation as a tree: the **positions** it has (an office, not
-whoever sits in it), who each one reports to, and which model or person sits in each **seat** today. One
-file, one reader, and nothing in it is derived from the cards: it is what you say your org is, and the
-tool draws it back so a change in who sits where is something you can see.
+An org is a shared understanding of how a team works together: which roles there are, who each one
+reports to, and who -- a person or a model -- fills each one today. `org.json` is that structure written
+down, as a file anyone can read as it is: a tree of **positions** (an office, not whoever sits in it) and
+the **seats** in each. Nothing in it is derived from the cards; it is what you say your org is. The
+[Org tab](../modules/solitaire-agile.md#the-web-ui) draws the tree back, so you can see it and read about the
+org and the role behind each office; and as your attention moves from one project to another, you change it
+through [`Staff`](#the-one-writer-staff), the file's one writer (a hand edit works too).
 
 It rides [Team Agile](../modules/solitaire-agile.md): `OrgChart` and `GET /api/ritual/org` read it, and where
 Team Agile is off in the Space you are in there is no verb and the route is a 404, so the chart is absent there -- see
@@ -21,7 +24,7 @@ sentence.
 
 It has **one writer**, [`Staff`](#the-one-writer-staff), and hand edits keep working beside it: `Staff` reads
 the file, changes only what it was asked to and keeps everything else. `Config` does not write it. It is UTF-8,
-with or without a BOM.
+with or without a BOM; a file `Staff` writes has none.
 
 ## The shape
 
@@ -410,14 +413,17 @@ Staff -Activate <tree-id> [-WhatIf]
   rule it is the one in use, and the file is written without `activeTree`. Adding a second tree to a file that names
   none sets `activeTree` to the tree that was in use -- never the draft -- so the file stays valid, and the output
   says which stays active.
-- **A tree is never overwritten.** Its id is `-Tree`, else the preset's id, then `<id>-2` and `<id>-3`; an id that
-  is already a tree is refused, and so is a fourth tree, naming the three. `-Activate` with an id that is not a tree
-  is refused, listing the trees.
+- **A tree is never overwritten.** Its id is `-Tree`, else the preset's id, then `<id>-2` and `<id>-3`. A `-Tree`
+  must be a plain word -- letters, digits, `-` and `_` -- so the `Staff -Activate <id>` the output prints always types
+  as it reads. An id that is already a tree is refused, and so is a fourth tree, naming the three. `-Activate` with an
+  id that is not a tree is refused, listing the trees; `-Activate` on the tree already in use (the file's `activeTree`,
+  or its one tree) writes nothing.
 - **Every write** reads the file, changes only what the command names, and keeps every other tree, key and note in
   its order. A file that fails [its checks](#what-is-checked) is refused before anything changes, and the result is
   checked with the reader's own checks (`Read-P20OrgText`, the same as `OrgChart`'s) before it lands. It is written
   as two-space JSON -- one text on PowerShell 7 and Windows PowerShell 5.1, non-ASCII as itself -- UTF-8 with no
-  BOM, through `Write-CardText`: a created file is LF, an edited one keeps its own line ending. Reformatting is the
+  BOM, through `Write-CardText`: a created file is LF, an edited one keeps its own line ending. The bytes go to a
+  temp file beside `org.json` and are renamed over it, so a write that fails leaves the file as it was. Reformatting is the
   writer's: a hand-written file comes back in its layout, not yours.
 - **It never prompts.** A refusal is a stated one (`exit 2`, one sentence and a hint) and writes nothing; `-WhatIf`
   prints the file it would write and writes nothing. `POST /api/cmd/Staff` runs it through the bridge.
