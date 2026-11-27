@@ -1,0 +1,53 @@
+{
+  "clips": {
+    "cut-it-twice": {
+      "en-US-BrianNeural": "0bb027e9b6f8a9ce7b7a0f2c523a75305f65151bd113912995577333a04dc34e",
+      "en-US-JennyNeural": "0bb027e9b6f8a9ce7b7a0f2c523a75305f65151bd113912995577333a04dc34e"
+    },
+    "it-ships": {
+      "en-US-BrianNeural": "8982a4df16c62e8d89ba24f824a8d00dc0d4e066ee1e80d289e3cb3223d45316",
+      "en-US-JennyNeural": "8982a4df16c62e8d89ba24f824a8d00dc0d4e066ee1e80d289e3cb3223d45316"
+    },
+    "read-aloud": {
+      "en-US-BrianNeural": "8647fcbca762f49caf2a60d28e13f1106238281203d2bc4b80317828b22e3b7e",
+      "en-US-JennyNeural": "8647fcbca762f49caf2a60d28e13f1106238281203d2bc4b80317828b22e3b7e"
+    },
+    "the-band-set": {
+      "en-US-BrianNeural": "de8a7106e20e540a5680907f308cf228d37ef0f5a427d5230c6b87b3ceb872fa",
+      "en-US-JennyNeural": "de8a7106e20e540a5680907f308cf228d37ef0f5a427d5230c6b87b3ceb872fa"
+    },
+    "the-basement-opens": {
+      "en-US-BrianNeural": "52ff1c77f5e0af3257e2641455ece71b85ae7f79b66ac96ca4433870eb7a5650",
+      "en-US-JennyNeural": "52ff1c77f5e0af3257e2641455ece71b85ae7f79b66ac96ca4433870eb7a5650"
+    },
+    "the-card": {
+      "en-US-BrianNeural": "3f9ba1bce0c9b55cb68016f37247bd20ff890c1c738bc6f1205f1166fe166b67",
+      "en-US-JennyNeural": "3f9ba1bce0c9b55cb68016f37247bd20ff890c1c738bc6f1205f1166fe166b67"
+    },
+    "the-craft-plainly": {
+      "en-US-BrianNeural": "7a0247b58dfd013dca554b60af377848635f1e0d6006beb555b7293afdb4ac9d",
+      "en-US-JennyNeural": "7a0247b58dfd013dca554b60af377848635f1e0d6006beb555b7293afdb4ac9d"
+    },
+    "the-held-breath": {
+      "en-US-BrianNeural": "79b51e52ce13d6499d48148134f9e4755763f513086e70c76bd8e922d459406a",
+      "en-US-JennyNeural": "79b51e52ce13d6499d48148134f9e4755763f513086e70c76bd8e922d459406a"
+    },
+    "the-reply": {
+      "en-US-BrianNeural": "aa594eaacb9b9bc515ecedb878376dbfcb6ebd51c2c21d5e02715d60096681c7",
+      "en-US-JennyNeural": "aa594eaacb9b9bc515ecedb878376dbfcb6ebd51c2c21d5e02715d60096681c7"
+    },
+    "the-room-snaps-back": {
+      "en-US-BrianNeural": "6c681457a11e47578ca66f18df1b1bc0b247aff07686f9d39191d570a72f0e43",
+      "en-US-JennyNeural": "6c681457a11e47578ca66f18df1b1bc0b247aff07686f9d39191d570a72f0e43"
+    },
+    "the-slip-arrives": {
+      "en-US-BrianNeural": "fa199615347569a9eec3b1480bb59058ddb716d823ced02f185f211e6da342c8",
+      "en-US-JennyNeural": "fa199615347569a9eec3b1480bb59058ddb716d823ced02f185f211e6da342c8"
+    },
+    "the-van-at-dawn": {
+      "en-US-BrianNeural": "f389cd98674921f52ab57884e57f8bc767053b286064c565ff37488a380ecfbf",
+      "en-US-JennyNeural": "f389cd98674921f52ab57884e57f8bc767053b286064c565ff37488a380ecfbf"
+    }
+  },
+  "scheme": "sha256-utf8-hex"
+}
