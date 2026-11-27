@@ -101,6 +101,7 @@ export function UseOrgDialog({
   preset,
   activeTitle,
   run,
+  busy = false,
   onSaved,
   onClose,
 }: {
@@ -109,6 +110,9 @@ export function UseOrgDialog({
   activeTitle: string | null;
   /** Runs Staff through the bridge; resolves to its answer, rejects when the agent is away. */
   run: (params: string[]) => Promise<CommandResponse>;
+  /** A Staff write is in flight on the page (an Active pick): Save waits for it.
+   *  Staff takes no lock, so the page runs one write at a time. */
+  busy?: boolean;
   onSaved: () => void;
   onClose: () => void;
 }) {
@@ -116,12 +120,17 @@ export function UseOrgDialog({
   const [owner, setOwner] = useState(ORG.steps.owner);
   const [vpEngineering, setVpEngineering] = useState(ORG.steps.vpEngineering);
   const [vpProduct, setVpProduct] = useState(ORG.steps.vpProduct);
-  const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // While this save, or any other Staff write of the page's, is in flight,
+  // nothing leaves or saves: Cancel, Escape and Close wait, so "Cancel leaves
+  // with nothing written" stays true.
+  const locked = saving || busy;
   const [refusal, setRefusal] = useState<string | null>(null);
   const [away, setAway] = useState(false);
 
   const save = async () => {
-    setBusy(true);
+    if (locked) return;
+    setSaving(true);
     setRefusal(null);
     setAway(false);
     try {
@@ -133,15 +142,15 @@ export function UseOrgDialog({
     } catch {
       setAway(true);
     } finally {
-      setBusy(false);
+      setSaving(false);
     }
   };
 
   return (
-    <Dialog open onOpenChange={(_e, d) => !d.open && onClose()}>
+    <Dialog open onOpenChange={(_e, d) => !d.open && !locked && onClose()}>
       <DialogSurface className={styles.surface} data-testid="org-use-dialog">
         <DialogBody>
-          <DialogTitle action={<DialogDismiss />}>Use {preset.title}</DialogTitle>
+          <DialogTitle action={<DialogDismiss disabled={locked} />}>Use {preset.title}</DialogTitle>
           <DialogContent className={styles.content}>
             <Body1 className={styles.lead}>
               Every answer is filled in: change any of them, or save as it is.{" "}
@@ -166,11 +175,14 @@ export function UseOrgDialog({
               value={vpProduct}
               onChange={setVpProduct}
             />
-            {refusal ? (
-              <Body1 className={styles.refusal} role="status" data-testid="org-use-refusal">
-                {refusal}
-              </Body1>
-            ) : null}
+            {/* The refusal's status region stays mounted, its text swapped in. */}
+            <div role="status" data-testid="org-use-refusal-region">
+              {refusal ? (
+                <Body1 className={styles.refusal} data-testid="org-use-refusal">
+                  {refusal}
+                </Body1>
+              ) : null}
+            </div>
             {away ? (
               <MessageBar intent="error" data-testid="org-use-away">
                 <MessageBarBody>Could not reach the agent. Nothing was saved.</MessageBarBody>
@@ -178,9 +190,16 @@ export function UseOrgDialog({
             ) : null}
           </DialogContent>
           <DialogActions>
-            <Button onClick={onClose}>Cancel</Button>
-            <Button appearance="primary" onClick={save} disabled={busy} data-testid="org-use-save">
-              {busy ? "Saving..." : "Save"}
+            <Button onClick={onClose} disabled={locked}>
+              Cancel
+            </Button>
+            <Button
+              appearance="primary"
+              onClick={save}
+              disabled={locked}
+              data-testid="org-use-save"
+            >
+              {saving ? "Saving..." : "Save"}
             </Button>
           </DialogActions>
         </DialogBody>

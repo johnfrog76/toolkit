@@ -730,6 +730,14 @@ try {
     Assert-True 'a tree added beside an unstamped tree in use: the old tree is stamped, the new one is a draft' (
         $beside.Exit -eq '0' -and (Get-OrgTree $old 'old').activatedAt -eq $today -and -not (Get-OrgTree $old 'executive-suite').PSObject.Properties['activatedAt'] -and $old.activeTree -eq 'old') $beside.All
 
+    # -Activate taking an unstamped tree out of use stamps it, so it reads inactive, not draft.
+    [System.IO.File]::WriteAllText($orgPath, '{"activeTree":"a","trees":[{"id":"a","positions":[{"id":"root"}]},{"id":"b","positions":[{"id":"root"}]}]}', $utf8)
+    $swap = Invoke-OrgChart "tkStaff -Activate b; 'BEGIN:trees'; tkOrgChart; 'END:trees'"
+    $swapped = Read-Org
+    Assert-True '-Activate taking an unstamped tree out of use stamps it, and the tree it puts in use' (
+        $swap.Exit -eq '0' -and (Get-OrgTree $swapped 'a').activatedAt -eq $today -and (Get-OrgTree $swapped 'b').activatedAt -eq $today -and $swapped.activeTree -eq 'b') $swap.All
+    Assert-True '  so OrgChart reads the one taken out of use as inactive' ((Get-Section $swap.All 'trees').Contains('Trees: a (inactive), b (active)')) $swap.All
+
     # -Activate with no org.json is refused, and creates nothing.
     Remove-Item -LiteralPath $orgPath -Force
     $noFile = Invoke-OrgChart "tkStaff -Activate hq"

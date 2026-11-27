@@ -11,6 +11,7 @@ import {
   presetSizeWord,
 } from "./OrgPage";
 import { modelNameOf, orgResponse } from "./orgFixture";
+import { UseOrgDialog } from "./UseOrgDialog";
 
 // The Org tab (docs/modules/solitaire-agile.md, "The web UI"): the tree the
 // agent serves, drawn as offices by level, each seat a card with its plate.
@@ -25,6 +26,8 @@ let presetsResponse: { data?: { presets: OrgPreset[] }; isLoading: boolean } = {
 /** What the next Staff call through the bridge answers; a thrown value is the agent away. */
 let staffAnswer: () => Promise<CommandResponse> = () =>
   Promise.resolve({ status: "success", output: "", error: "", duration: 1 } as CommandResponse);
+/** Whether a Staff write is in flight, as the mutation hook says. */
+let staffWriting = false;
 const runStaff = jest.fn((arg: { params: string[] }) => ({ unwrap: () => staffAnswer(), arg }));
 /** What a refetch of the active read answers (after a save). */
 let refetched: ChartRead = { isLoading: false };
@@ -41,7 +44,7 @@ jest.mock("./api.solitaireAgile", () => ({
         ? (treeResponses[tree] ?? { isLoading: true })
         : { ...response, refetch },
   useGetOrgPresetsQuery: () => presetsResponse,
-  useRunStaffMutation: () => [runStaff, { isLoading: false }],
+  useRunStaffMutation: () => [runStaff, { isLoading: staffWriting }],
 }));
 
 function Where() {
@@ -75,6 +78,7 @@ beforeEach(() => {
   treeResponses = {};
   presetsResponse = { isLoading: false };
   runStaff.mockClear();
+  staffWriting = false;
   refetch.mockClear();
   staffAnswer = () =>
     Promise.resolve({ status: "success", output: "", error: "", duration: 1 } as CommandResponse);
@@ -777,5 +781,134 @@ describe("an org's state: active, draft, inactive", () => {
     draw();
     fireEvent.click(screen.getByTestId("org-active-select"));
     expect(options()).toEqual(["Laptop and mini", "One machine", "A draft org"]);
+  });
+});
+
+describe("one Staff write at a time (Staff takes no lock)", () => {
+  beforeEach(() => {
+    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+    response = { isLoading: false, data: withTrees(TWO) };
+  });
+
+  it("while a write is in flight, Use this org and Active are disabled", () => {
+    staffWriting = true;
+    draw();
+    expect(screen.getByRole("combobox", { name: "Active" }).hasAttribute("disabled")).toBe(true);
+    pick("Executive Suite (S)");
+    expect((screen.getByTestId("org-use") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("the dialog's Save, Cancel and Close wait for a write already in flight on the page", () => {
+    render(
+      <UseOrgDialog
+        preset={PRESETS[0]}
+        activeTitle="Laptop and mini"
+        run={() => Promise.resolve({ status: "success" } as CommandResponse)}
+        busy
+        onSaved={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    const dialog = screen.getByTestId("org-use-dialog");
+    expect((within(dialog).getByTestId("org-use-save") as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (within(dialog).getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(
+      (within(dialog).getByRole("button", { name: "Close" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it("while its save runs, Save says so, and Cancel and Close wait", async () => {
+    let finish: (r: CommandResponse) => void = () => {};
+    staffAnswer = () => new Promise<CommandResponse>((resolve) => (finish = resolve));
+    draw();
+    pick("Executive Suite (S)");
+    fireEvent.click(screen.getByTestId("org-use"));
+    const dialog = screen.getByTestId("org-use-dialog");
+    fireEvent.click(within(dialog).getByTestId("org-use-save"));
+    await waitFor(() =>
+      expect(within(dialog).getByTestId("org-use-save").textContent).toBe("Saving..."),
+    );
+    expect(
+      (within(dialog).getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(
+      (within(dialog).getByRole("button", { name: "Close" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.getByTestId("org-use-dialog")).toBeTruthy();
+    finish({ status: "error", output: "", error: "Refused.", duration: 1 } as CommandResponse);
+    await waitFor(() =>
+      expect(within(dialog).getByTestId("org-use-save").textContent).toBe("Save"),
+    );
+    expect(
+      (within(dialog).getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+});
+
+describe("the live regions stay mounted", () => {
+  it("the line under the heading sits in a polite region that is there on the active org too", () => {
+    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+    response = { isLoading: false, data: withTrees(TWO) };
+    draw();
+    const region = screen.getByTestId("org-not-active-region");
+    expect(region.getAttribute("aria-live")).toBe("polite");
+    expect(region.textContent).toBe("");
+    pick("Branch Office (M)");
+    expect(screen.getByTestId("org-not-active-region")).toBe(region);
+    expect(region.textContent).toContain("A preview.");
+  });
+
+  it("the refusal's status regions are there before anything is said", () => {
+    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+    response = { isLoading: false, data: withTrees(TWO) };
+    draw();
+    expect(screen.getByTestId("org-note-region").getAttribute("role")).toBe("status");
+    pick("Executive Suite (S)");
+    fireEvent.click(screen.getByTestId("org-use"));
+    expect(screen.getByTestId("org-use-refusal-region").getAttribute("role")).toBe("status");
+  });
+});
+
+describe("a saved org read by its own ?tree= read", () => {
+  const INACTIVE = [
+    { id: "main", title: "Laptop and mini", active: true, state: "active" as const },
+    {
+      id: "branch",
+      title: "One machine",
+      active: false,
+      state: "inactive" as const,
+      activatedAt: "2026-11-01",
+    },
+  ];
+  beforeEach(() => {
+    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+    response = { isLoading: false, data: withTrees(INACTIVE) };
+  });
+
+  it("an inactive org says it is loading while its read runs", () => {
+    treeResponses = { branch: { isLoading: true } };
+    draw();
+    pick("One machine Inactive");
+    expect(screen.getByText("Reading the org chart...")).toBeTruthy();
+  });
+
+  it("a read that fails says why, plainly, with the page's own words", () => {
+    treeResponses = {
+      branch: {
+        isLoading: false,
+        error: {
+          status: 422,
+          data: { detail: { kind: "unknown-tree", message: "-Tree names 'branch'." } },
+        },
+      },
+    };
+    draw();
+    pick("One machine Inactive");
+    expect(screen.getByText("That org chart is not in the file")).toBeTruthy();
+    expect(screen.getByText(UNKNOWN_TREE_DETAIL)).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

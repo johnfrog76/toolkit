@@ -191,6 +191,49 @@
           "b": "draft"
         }
       }
+    },
+    {
+      "name": "a-stamp-that-is-not-a-date",
+      "why": "An activatedAt that is not a date -- words, or a number -- is still a stamp: the readers do not parse it, so the tree reads inactive. The stamp only says the tree has been in use; the schema refuses the shape, and a reader stays as tolerant as the reading rule says.",
+      "org": {
+        "activeTree": "a",
+        "trees": [
+          {
+            "id": "a",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ],
+            "activatedAt": "2026-11-20"
+          },
+          {
+            "id": "b",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ],
+            "activatedAt": "26 November"
+          },
+          {
+            "id": "c",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ],
+            "activatedAt": 20261126
+          }
+        ]
+      },
+      "expect": {
+        "states": {
+          "a": "active",
+          "b": "inactive",
+          "c": "inactive"
+        }
+      }
     }
   ]
 }

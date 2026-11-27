@@ -507,8 +507,9 @@ preset served there is no dropdown and the page is the hub's chart alone, as bef
 
 **Use this org**, beside the line on a preset, opens the steps (`UseOrgDialog.tsx`): a Fluent `Dialog` with three
 questions, each already answered with its default, so any can be skipped, none comes before another, and Cancel
-leaves with nothing written -- who you are (the owner's name, `You`), the VP of engineering's model (Opus; Fable;
-Sonnet marked `not recommended`) and the VP of product's (Fable; Opus; Sonnet `not recommended`). The choices and
+leaves with nothing written -- who you are (the owner's name, `You`), the VP of engineering's model and the VP of product's,
+each offering Opus, Fable and Sonnet in that order, Sonnet marked `not recommended`, with Opus chosen for the VP of
+engineering and Fable for the VP of product. The choices and
 defaults are `consts.json` `org.steps`, which `Staff -Preset` fills with too. A dialog and not a wizard because every
 question is in view at once: there is no order to follow and no step to be held at. **Save** is the page's one
 write of a tree: `Staff -Preset <S|M|L> -Owner ... -VpEngineering ... -VpProduct ...` through the bridge. It saves a
@@ -516,7 +517,12 @@ write of a tree: `Staff -Preset <S|M|L> -Owner ... -VpEngineering ... -VpProduct
 one in use, and the dialog says that instead. The page then reads the file again and shows the saved org. A write
 the verb refuses (`status: error`) is shown as the verb's own sentence, plainly -- in the dialog for a save, under
 the heading for Active; the agent away is the one error. The page itself has no route that writes: every write is
-`Staff`'s.
+`Staff`'s. `Staff` takes no lock, so the page runs one write at a time: while a save or an Active pick is in
+flight, **Use this org**, the dialog's **Save** and **Active** are all disabled, and the dialog's Cancel, Close and
+Escape wait for its save to finish, so Cancel never leaves a save half-asked. A saved org other than the active one
+is read by its own `?tree=` read, a draft or an inactive org alike: while it loads the page says so, and a read that
+fails says why in the page's own words. The line under the heading sits in a polite live region, and each refusal in
+a status region, both always mounted, so a change is announced.
 
 ### The page
 

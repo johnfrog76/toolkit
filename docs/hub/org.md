@@ -168,7 +168,10 @@ Each tree of the file has a state, **derived and never stored**, so it can never
 `Staff -Activate` stamps the tree it puts in use; `Staff -Preset` stamps a new file's first tree, which is in use
 from the moment it is saved; and whenever `Staff` adds a tree beside, or `-Activate` takes out of use, a tree in use
 that has no stamp, it stamps that tree too, so it reads inactive rather than draft. `-Activate` on the tree already
-in use writes nothing. Both readers derive the state the same way -- the CLI's `Get-P20OrgTreeState`, the agent's
+in use writes nothing. **A stamp written that way records the day `Staff` first knew the tree had been in use**,
+not the day it was first used, so read `activatedAt` as "in use by this day", never as a first-use date. A stamp
+that is not a date (`26 November`, a number) is still a stamp: the readers do not parse it, so its tree reads
+inactive, and the schema refuses its shape. Both readers derive the state the same way -- the CLI's `Get-P20OrgTreeState`, the agent's
 `tree_state` -- from one shared table, [`Tests/fixtures/org/state.json`](../../Tests/fixtures/org/state.json),
 asserted by `tkTestToolkit -OrgChart` and `Tests/test_org.py`. `OrgChart` lists a file's trees with their states
 (`Trees: main (active), branch (draft)`) when it has more than one, and the route's `trees` carries each one's

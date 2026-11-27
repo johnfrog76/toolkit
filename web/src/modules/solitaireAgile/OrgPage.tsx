@@ -67,8 +67,7 @@ import { VacantSeat } from "./VacantSeat";
 //
 // An office with a prompt is a link to it in the Studio's reading room
 // (promptPath of the position's promptRef); the owner and the pool have none,
-// and are not links. The page is a READ: it chooses no tree, draws no active
-// state, and writes nothing.
+// and are not links.
 //
 // Two dropdowns at the header's right keep looking apart from the org's state
 // (docs/modules/solitaire-agile.md, "The web UI"). View picks the org shown:
@@ -80,9 +79,11 @@ import { VacantSeat } from "./VacantSeat";
 // the simplest; with one, on the active org. When the org shown is not the
 // active one, one line under the heading says so. On a preview, "Use this org"
 // opens the steps (UseOrgDialog.tsx), which save it as a draft through
-// Staff -Preset. The page itself writes nothing: org.json's one writer is the
-// CLI's Staff verb (docs/hub/org.md, "The one writer: Staff"), reached through
-// the bridge, never a route of its own. Hand edits work too.
+// Staff -Preset. Those two are the page's only writes, and both are Staff's:
+// org.json's one writer is the CLI's verb (docs/hub/org.md, "The one writer:
+// Staff"), reached through the bridge, never a route of its own. Staff takes no
+// lock, so the page runs one write at a time: while one is in flight, Use this
+// org, the dialog's Save and Active are all disabled. Hand edits work too.
 
 const useStyles = makeStyles({
   body: { display: "flex", flexDirection: "column", minWidth: 0 },
@@ -628,7 +629,11 @@ export function OrgPage() {
       : "active";
   const line = notActiveLine(shown, active?.title ?? null);
 
-  const loading = ours.isLoading || (shown === "draft" && other.isLoading);
+  // A saved org other than the active one is read by its own ?tree= read: while
+  // it loads the page says so, and a read that fails says why, plainly.
+  const readsOther = shown === "draft" || shown === "inactive";
+  const loading = ours.isLoading || (readsOther && other.isLoading);
+  const otherFailed = readsOther && !other.isLoading && !!other.error;
   const noOrg =
     ours.isLoading || oursData ? undefined : <EmptyState {...noChart(ours.error, icon)} />;
   // With no preset to offer, the page is the hub's chart alone, as it always was.
@@ -702,48 +707,59 @@ export function OrgPage() {
           ) : undefined
         }
       >
-        {line || preset || note ? (
-          <div className={styles.lineRow}>
+        <div className={styles.lineRow}>
+          {/* A polite live region that stays mounted, so a change of line is announced. */}
+          <div aria-live="polite" data-testid="org-not-active-region">
             {line ? (
               <Body1 className={styles.notActive} data-testid="org-not-active">
                 {line}
               </Body1>
             ) : null}
-            {preset ? (
-              <Button
-                appearance="primary"
-                size="small"
-                onClick={() => setUseOpen(true)}
-                data-testid="org-use"
-              >
-                Use this org
-              </Button>
-            ) : null}
           </div>
-        ) : null}
-        {note ? (
-          note.away ? (
-            <MessageBar intent="error" data-testid="org-note">
-              <MessageBarBody>{note.text}</MessageBarBody>
-            </MessageBar>
-          ) : (
-            <Body1 className={styles.refusal} role="status" data-testid="org-note">
+          {preset ? (
+            <Button
+              appearance="primary"
+              size="small"
+              onClick={() => setUseOpen(true)}
+              disabled={writing}
+              data-testid="org-use"
+            >
+              Use this org
+            </Button>
+          ) : null}
+        </div>
+        {/* The refusal's status region stays mounted, its text swapped in. */}
+        <div role="status" data-testid="org-note-region">
+          {note && !note.away ? (
+            <Body1 className={styles.refusal} data-testid="org-note">
               {note.text}
             </Body1>
-          )
+          ) : null}
+        </div>
+        {note?.away ? (
+          <MessageBar intent="error" data-testid="org-note">
+            <MessageBarBody>{note.text}</MessageBarBody>
+          </MessageBar>
         ) : null}
         {description ? (
           <Body2 as="p" className={styles.description} data-testid="org-preset-description">
             {description}
           </Body2>
         ) : null}
-        {chart ? <ChartDrawing positions={chart.tree.positions} /> : (noOrg ?? null)}
+        {chart ? (
+          <ChartDrawing positions={chart.tree.positions} />
+        ) : otherFailed ? (
+          <EmptyState {...noChart(other.error, icon)} />
+        ) : (
+          (noOrg ?? null)
+        )}
       </PanelFrame>
       {useOpen && preset ? (
         <UseOrgDialog
           preset={preset}
           activeTitle={active?.title ?? null}
           run={saveRun}
+          busy={writing}
           onSaved={afterSave}
           onClose={() => setUseOpen(false)}
         />
