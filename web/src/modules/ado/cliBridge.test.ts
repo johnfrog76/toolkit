@@ -25,6 +25,7 @@ import {
   buildStaffPresetParams,
   buildStaffSeatParams,
   staffValue,
+  buildStaffVacateParams,
   buildMoveDesignParams,
   buildCoverParams,
   splitHubUnsets,
@@ -1036,6 +1037,27 @@ describe("buildStaffSeatParams: the seat dialog's Save", () => {
       ]);
     },
   );
+
+  it.each(["-", "\u2013", "\u2014", "\u2015"])(
+    "joins a seat address that starts with %s to -Seat, as every other value",
+    (dash) => {
+      expect(
+        buildStaffSeatParams({ tree: "t", position: `${dash}p`, seat: "s", session: "x" }),
+      ).toEqual([`-Seat:${dash}p.s`, "-Tree", "t", "-Session", "x"]);
+      expect(buildStaffVacateParams({ tree: "t", position: `${dash}WhatIf`, seat: "s" })).toEqual([
+        `-Seat:${dash}WhatIf.s`,
+        "-Tree",
+        "t",
+        "-Vacate",
+      ]);
+    },
+  );
+
+  it("vacates a seat with -Vacate and the etag, and nothing else", () => {
+    expect(
+      buildStaffVacateParams({ tree: "t", position: "p", seat: "s", ifMatch: "a".repeat(64) }),
+    ).toEqual(["-Seat", "p.s", "-Tree", "t", "-Vacate", "-IfMatch", "a".repeat(64)]);
+  });
 
   it("joins a value that starts with a dash to its name, so the binder reads it as the value", () => {
     expect(staffValue("-Person", "-WhatIf")).toEqual(["-Person:-WhatIf"]);

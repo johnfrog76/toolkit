@@ -106,7 +106,9 @@ it as a choice of its own, chosen, until you pick another. A VP's seat offers Op
 "not recommended". A team lead's seat also asks which Space the team serves; the owner's seat asks only for
 your name. **Use a different title** opens the role title's field, for when the office should be called
 something else; it is open already where it is. **View**, above each office, opens the role in the
-Studio's reading room. A starting org you are only previewing has View and nothing else.
+Studio's reading room. A starting org you are only previewing has View and nothing else. A staffed seat's
+dialog also has **Vacate this seat**, beside **Use a different title**: it empties the seat, taking its model and
+its session away and nothing else. The owner's seat has no such link, and a vacant seat has nothing to take away.
 
 In the terminal, `tkStaff -Seat` does the same:
 
@@ -114,9 +116,19 @@ In the terminal, `tkStaff -Seat` does the same:
 tkStaff -Seat vp-engineering.vp-engineering -Model opus -Session desk-one
 tkStaff -Seat lead-team-1.lead -Tree corporate-headquarters -Session lead-alpha -Space toolkit
 tkStaff -Seat owner.owner -Person "Sam"
+tkStaff -Seat vp-product -Model fable     # a position with one seat: its id alone
+tkStaff -Seat vp-engineering -Vacate      # empty the seat: its model and session go
+tkOrgChart                                # who sits where, ending staffed: <n> of <seats>
 ```
 
-- **A seat is `<position>.<seat>`**, and without `-Tree` it is a seat of the org in use.
+- **A seat is `<position>.<seat>`**, or the position's id alone where the position has exactly one seat, as every
+  office of every starting org has. A position of several seats needs the whole address, and says so, naming its
+  seats. Without `-Tree` it is a seat of the org in use.
+- **Vacating takes the model and the session, and nothing else.** The seat's Space, its own title, whether it
+  holds the merge, and a person named in it all stay, so a seat a person holds still reads staffed. The owner's
+  seat is never vacated.
+- **`tkOrgChart` ends with a count**, `staffed: 4 of 10`: every seat of every office, the owner's included, a
+  builder pool counting none, and a seat staffed where a model or a person sits in it.
 - **The role name and title belong to the position,** so changing them changes every seat of it.
 - **Nothing is written over.** The page sends what it read, and if `org.json` has changed since, the save is
   refused and the page offers to reload. Each change prints one line, what the seat was and what it is.

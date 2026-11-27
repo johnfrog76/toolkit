@@ -219,7 +219,17 @@ prints the model and the response carries both.
 title, `[space]` and `(session)` are there when the seat names them, and `· merges` ends the line of the seat
 that holds the merge -- `Alpha lead · claude-opus-5-5 [alpha] (lead-session)`,
 `VP of product · claude-fable-5-2 (product-session) · merges`. The model is printed as the file writes it; the
-Org tab names it by the model map's `name`. No machine is printed or drawn.
+Org tab names it by the model map's `name`. No machine is printed or drawn. A vacant seat that names a session
+prints it too: `PM · vacant (desk-one)`.
+
+**The count.** `OrgChart`'s text ends with an empty line and one count, `staffed: 4 of 10`. A **seat** is an entry
+in a position's `seats` -- an office's seats, the owner's seat among them -- and a pool has none, so it counts
+nothing however many builders it stands for. A seat is **staffed** when its state is: it names a `model` or a
+`person`. That is the state the Org tab draws a vacant desk from, so the count is the page's staffed seats over
+its seats. `OrgChart -AsJson` and the route carry the same facts -- each seat's `state` and `session` -- and no
+count of their own. The rows that pin it are `tkTestToolkit -OrgChart`'s, one per shape: an office of several
+seats, a person's seat, a pool, a seat with a session and nothing else (vacant), and a tree of pools
+(`staffed: 0 of 0`).
 
 - **The owner's seat** carries `person` and no model, and the position carries no `prompt`: it is a
   person, so its line reads `Owner · Sam`.
@@ -427,8 +437,9 @@ and it writes `org.json` and nothing else. Three forms:
 
 ```text
 Staff -Preset S|M|L [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-WhatIf]
-Staff -Seat <position>.<seat> [-Tree <id>] [-Model <model>] [-Person <name>] [-Session <name>] [-Space <slug>]
+Staff -Seat <position>[.<seat>] [-Tree <id>] [-Model <model>] [-Person <name>] [-Session <name>] [-Space <slug>]
       [-RoleName <file>] [-RoleTitle <text>] [-Merges] [-IfMatch <sha256>] [-WhatIf]
+Staff -Seat <position>[.<seat>] -Vacate [-Tree <id>] [-IfMatch <sha256>] [-WhatIf]
 Staff -Activate <tree-id> [-WhatIf]
 ```
 
@@ -456,7 +467,15 @@ Staff -Activate <tree-id> [-WhatIf]
 
 - **`-Seat` staffs one seat** of a saved tree, active or a draft: the tree in use, or the one `-Tree` names. The
   seat is `<position>.<seat>`, the two ids with a dot between (an id may hold a dot itself; the split that names a real
-  seat is the one taken). `-Model` takes a family or an id and stores the id, as `-Preset` does; `-Person`, `-Session`
+  seat is the one taken), or **the position's id alone where the position has exactly one seat** -- `Staff -Seat
+  vp-product -Model fable`; every office of every preset has one. The two-part reading comes first, so an address
+  that named a seat before names the same one now: only where no split names a real seat is the whole address read
+  as a position's id. A position of several seats is refused by its id alone, naming its seats (`'team-lead' is a
+  position of 2 seats in the tree 'mine', so it does not say which. Its seats: team-lead.demo, team-lead.github-demo.`),
+  and a pool as having none. An address that starts with a dash and names no seat is refused like any other unknown
+  seat; typed bare after `-Seat` the binder takes it for a switch and refuses the missing address, and the page sends
+  the address joined to its switch, as it sends every value. The change line names the seat by its whole address,
+  however it was typed. `-Model` takes a family or an id and stores the id, as `-Preset` does; `-Person`, `-Session`
   (the session's name, the address readies go to) and `-Merges` (sets `merges: true`, and clears no other seat's: a
   stand-in may hold it too) are the seat's own. `-Space` is a team lead's -- a seat whose position's role is
   `consts.json` `org.roles.teamLead` -- and must be a Space the toolkit knows; any other seat's is refused, naming
@@ -469,6 +488,15 @@ Staff -Activate <tree-id> [-WhatIf]
   `roleTitle` before it), the model and the person, `[space]`, `(session)`, `· merges`, and `{role file}` where
   `-RoleName` was given -- so every field the call set shows as a change; a call that changes nothing writes
   nothing and exits 0. No tree is stamped by a seat's edit.
+- **`-Vacate` empties a seat:** it takes the seat's `model` and `session` away, and **nothing else**. The seat's
+  `space`, its own `roleTitle`, its `merges`, a `person`, its notes and every other key stay, each in its place, so
+  the file differs by those two lines. A `person` is kept because the seat is a person's as much as a model's: a seat
+  a person holds still reads staffed after `-Vacate`, and `-Person ''` is how the person leaves. It goes alone:
+  `-Model`, `-Person` or `-Session` with it is refused as a contradiction, and `-Space`, `-RoleName`, `-RoleTitle` or
+  `-Merges` beside it as a second change. The owner's seat is never vacated (`The owner's seat cannot be vacated:
+  the owner is a person, and the seat always has one.`). It follows every rule above: the change line, `-WhatIf`,
+  `-IfMatch`, the crash-safe write and the same bytes on both hosts; a seat with no model and no session writes
+  nothing and exits 0.
 - **`-IfMatch <sha256>`** is the SHA-256 of `org.json`'s bytes as the caller read them -- the route's `etag`. A file
   whose bytes have changed since is refused, `org.json changed since you read it; reload and try again.` (the words
   are `consts.json` `org.changedSince`), and nothing is written; the hash is checked again just before the rename, so a
@@ -511,7 +539,7 @@ Staff -Activate <tree-id> [-WhatIf]
 No machine drawn (the retired `machines`, `machine` and `active` are
 read and never served), no count of builders from the cards in flight, and no
 join with the standup's workers. `merges` is read, served and printed, and not yet drawn on the Org tab. The web's
-Org tab draws the tree the route serves and staffs a seat through `Staff -Seat` ([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui)): an
+Org tab draws the tree the route serves and staffs a seat through `Staff -Seat` (and empties one through `Staff -Seat -Vacate`) ([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui)): an
 office's title on its sign, a seat's model's name on its plate, its session on hover; a vacant seat is drawn as an empty desk.
 
 ## An example to copy

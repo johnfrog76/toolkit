@@ -1,1 +1,3 @@
 x · no seats
+
+staffed: 0 of 0

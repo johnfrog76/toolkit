@@ -21,7 +21,7 @@ import {
 } from "@fluentui/react-components";
 import { useEffect, useRef, useState } from "react";
 import { DialogDismiss } from "../../shared/DialogDismiss";
-import { buildStaffSeatParams } from "../ado/cliBridge";
+import { buildStaffSeatParams, buildStaffVacateParams } from "../ado/cliBridge";
 import type { StaffSeatFields } from "../ado/cliBridge";
 import type { CommandResponse } from "../ado/api.ado";
 import type { OrgPosition, OrgSeat } from "./api.solitaireAgile";
@@ -49,12 +49,16 @@ import {
 // the chart's etag as -IfMatch, so a file changed since the page read it is
 // refused and the dialog offers a reload instead of writing over it. Only what
 // changed is sent; a Save that changes nothing closes with nothing written.
+// A staffed seat's Change dialog also offers Vacate this seat, a quiet link
+// beside the title's: Staff -Seat ... -Vacate -IfMatch <etag>, the same one
+// write with the same conflict handling, which takes the seat's model and
+// session away and nothing else. Never on a vacant seat or the owner's.
 
 const useStyles = makeStyles({
   surface: { maxWidth: "480px" },
   content: { display: "flex", flexDirection: "column", rowGap: tokens.spacingVerticalM },
   note: { color: tokens.colorNeutralForeground2 },
-  titleRow: { display: "flex" },
+  titleRow: { display: "flex", justifyContent: "space-between", flexWrap: "wrap" },
   // The choices wrap as a row, each name kept whole on one line, never its version under its word.
   models: { flexWrap: "wrap" },
   choice: { whiteSpace: "nowrap" },
@@ -90,6 +94,17 @@ export function sharedRoleNote(position: OrgPosition): string | null {
   return n > 1
     ? `${position.title} has ${n} seats: its role name and title change for all of them.`
     : null;
+}
+
+/** The quiet control that empties a staffed seat: Staff -Seat ... -Vacate. */
+export const VACATE_WORD = "Vacate this seat";
+
+/** Whether the dialog offers Vacate: a staffed seat, not the owner's, with a model or a
+ *  session to take away (a seat a person holds alone has nothing -Vacate would change). */
+export function canVacate(position: OrgPosition, seat: OrgSeat): boolean {
+  return (
+    !isOwnerPosition(position) && seat.state === "staffed" && Boolean(seat.model || seat.session)
+  );
 }
 
 /** The control that opens the role title's field in place. */
@@ -208,6 +223,23 @@ export function SeatDialog({
     ...(seat.space && !spaces.some((s) => s.slug === seat.space) ? [seat.space] : []),
   ];
 
+  // The one write, Save's or Vacate's: one at a time, a conflict offers a reload.
+  const write = async (params: string[]) => {
+    setSaving(true);
+    setRefusal(null);
+    setConflict(false);
+    setAway(false);
+    try {
+      const result = await run(params);
+      if (result.status === "success") onSaved();
+      else if (isChangedSince(result.error) || isChangedSince(result.output)) setConflict(true);
+      else setRefusal(refusalText(result));
+    } catch {
+      setAway(true);
+    } finally {
+      setSaving(false);
+    }
+  };
   const save = async () => {
     if (locked) return;
     const changes = seatChanges(
@@ -220,20 +252,13 @@ export function SeatDialog({
       onClose();
       return;
     }
-    setSaving(true);
-    setRefusal(null);
-    setConflict(false);
-    setAway(false);
-    try {
-      const result = await run(buildStaffSeatParams({ ...changes, tree: treeId, ifMatch: etag }));
-      if (result.status === "success") onSaved();
-      else if (isChangedSince(result.error) || isChangedSince(result.output)) setConflict(true);
-      else setRefusal(refusalText(result));
-    } catch {
-      setAway(true);
-    } finally {
-      setSaving(false);
-    }
+    await write(buildStaffSeatParams({ ...changes, tree: treeId, ifMatch: etag }));
+  };
+  const vacate = async () => {
+    if (locked) return;
+    await write(
+      buildStaffVacateParams({ tree: treeId, position: position.id, seat: seat.id, ifMatch: etag }),
+    );
   };
 
   return (
@@ -308,6 +333,18 @@ export function SeatDialog({
                   >
                     {OTHER_TITLE}
                   </Button>
+                  {canVacate(position, seat) ? (
+                    <Button
+                      appearance="transparent"
+                      size="small"
+                      className={styles.titleLink}
+                      onClick={vacate}
+                      disabled={locked || conflict}
+                      data-testid="org-seat-vacate"
+                    >
+                      {VACATE_WORD}
+                    </Button>
+                  ) : null}
                 </div>
                 {titleOpen ? (
                   <>

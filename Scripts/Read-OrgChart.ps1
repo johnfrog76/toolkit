@@ -513,9 +513,15 @@ function Format-P20OrgChartLines {
     # merge. A seat's roleTitle stands in for the position's title. A vacant seat
     # says vacant; an owner's seat shows its person; a position with no seats is
     # a pool, shown once with its default-model line. No machine is printed.
+    # It ends with an empty line and the count, "staffed: <n> of <seats>": every
+    # seat of every position is a seat (the owner's too) and a pool has none; a
+    # seat is staffed when its state is -- a model or a person named -- the same
+    # state the Org tab draws a vacant desk from.
     param($Chart)
     $dot = [string][char]0x00B7
     $lines = New-Object System.Collections.Generic.List[string]
+    $seatTotal = 0
+    $staffedTotal = 0
     foreach ($position in $Chart.tree.positions) {
         $indent = ('  ' * [int]$position.level)
         $seats = @($position.seats)
@@ -525,6 +531,8 @@ function Format-P20OrgChartLines {
             continue
         }
         foreach ($seat in $seats) {
+            $seatTotal++
+            if ($seat.state -eq 'staffed') { $staffedTotal++ }
             $who = 'vacant'
             if ($seat.model) { $who = [string]$seat.model }
             elseif ($seat.person) { $who = [string]$seat.person }
@@ -537,5 +545,49 @@ function Format-P20OrgChartLines {
             $lines.Add($line)
         }
     }
+    $lines.Add('')
+    $lines.Add("staffed: $staffedTotal of $seatTotal")
     return , @($lines.ToArray())
+}
+
+function Resolve-P20OrgSeatAddress {
+    <#
+      The seat a Staff -Seat address names, in one tree's positions as the file
+      holds them (docs/hub/org.md, "The one writer: Staff"). <position>.<seat>
+      first: an id may hold a dot, so every dot is tried as the one between the
+      two, and the first split that names a real seat is the seat. Only where no
+      split does is the whole address read as a position's id, which stands for
+      its seat where it has exactly one. So a two-part address means what it
+      always meant. Ids are compared exactly, case included.
+
+      Returns @{ Kind; Position; Seat; Seats }: Kind is `ok` (Position and Seat
+      are the file's own objects, to edit in place), `several-seats` (Seats is
+      the position's addresses, <position>.<seat> each), `pool` (the position has
+      no seats) or `unknown`.
+    #>
+    param($Positions, [string]$Address)
+    $result = { param($Kind, $Position, $Seat, $Seats) return [pscustomobject]@{ Kind = $Kind; Position = $Position; Seat = $Seat; Seats = @($Seats) } }
+    $positions = Get-P20OrgItems $Positions
+    $at = $Address.IndexOf('.')
+    while ($at -ge 0) {
+        $wantPosition = $Address.Substring(0, $at)
+        $wantSeat = $Address.Substring($at + 1)
+        foreach ($position in $positions) {
+            if ((Get-P20OrgText (Get-P20OrgField $position 'id')) -cne $wantPosition) { continue }
+            foreach ($candidate in (Get-P20OrgItems (Get-P20OrgField $position 'seats'))) {
+                if ((Get-P20OrgText (Get-P20OrgField $candidate 'id')) -ceq $wantSeat) { return (& $result 'ok' $position $candidate @()) }
+            }
+        }
+        $at = $Address.IndexOf('.', $at + 1)
+    }
+    foreach ($position in $positions) {
+        $positionId = Get-P20OrgText (Get-P20OrgField $position 'id')
+        if ($positionId -cne $Address) { continue }
+        $seats = Get-P20OrgItems (Get-P20OrgField $position 'seats')
+        if ($seats.Count -eq 1) { return (& $result 'ok' $position $seats[0] @()) }
+        if ($seats.Count -eq 0) { return (& $result 'pool' $position $null @()) }
+        $names = @($seats | ForEach-Object { "$positionId.$(Get-P20OrgText (Get-P20OrgField $_ 'id'))" })
+        return (& $result 'several-seats' $position $null $names)
+    }
+    return (& $result 'unknown' $null $null @())
 }

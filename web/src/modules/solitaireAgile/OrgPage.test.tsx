@@ -11,7 +11,7 @@ import {
   presetSizeWord,
 } from "./OrgPage";
 import { FAMILIES, FAMILY_NAMES, TEST_ETAG, modelNameOf, orgResponse } from "./orgFixture";
-import { CHANGED_SINCE_TEXT, SeatDialog } from "./SeatDialog";
+import { CHANGED_SINCE_TEXT, SeatDialog, VACATE_WORD, canVacate } from "./SeatDialog";
 import { UseOrgDialog } from "./UseOrgDialog";
 
 // The Org tab (docs/modules/solitaire-agile.md, "The web UI"): the tree the
@@ -1422,7 +1422,93 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
     });
   });
 
-  it("Save, Cancel and Close wait for a write already in flight on the page", () => {
+  it("Vacate this seat is offered on a staffed seat's Change, never on a vacant seat or the owner's", () => {
+    draw();
+    let dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
+    expect(within(dialog).getByTestId("org-seat-vacate").textContent).toBe(VACATE_WORD);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    dialog = open("team-lead", "Assign Team lead");
+    expect(within(dialog).queryByTestId("org-seat-vacate")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    dialog = open("owner", "Change Owner, Sam");
+    expect(within(dialog).queryByTestId("org-seat-vacate")).toBeNull();
+  });
+
+  it("Vacate this seat runs Staff -Seat ... -Vacate with the etag, and focus lands on the seat's Assign", async () => {
+    const after = orgResponse("valid");
+    const pmSeat = after.tree.positions.find((p) => p.id === "pm")!.seats[0];
+    Object.assign(pmSeat, {
+      model: null,
+      modelName: null,
+      modelFamily: null,
+      session: null,
+      state: "vacant",
+    });
+    staffAnswer = () => {
+      response = { isLoading: false, data: { ...after, etag: "c".repeat(64) } };
+      return Promise.resolve({
+        status: "success",
+        output: "",
+        error: "",
+        duration: 1,
+      } as CommandResponse);
+    };
+    draw();
+    const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
+    fireEvent.click(within(dialog).getByTestId("org-seat-vacate"));
+    await waitFor(() => expect(screen.queryByTestId("org-seat-dialog")).toBeNull());
+    expect(runStaff).toHaveBeenCalledTimes(1);
+    expect(lastParams()).toEqual([
+      "-Seat",
+      "pm.pm",
+      "-Tree",
+      TREE(),
+      "-Vacate",
+      "-IfMatch",
+      TEST_ETAG,
+    ]);
+    await waitFor(() => {
+      const button = seatButton("pm", "pm");
+      expect(button.textContent).toBe("Assign");
+      expect(document.activeElement).toBe(button);
+    });
+  });
+
+  it("Vacate on a file changed since the page read it: the same conflict and Reload", async () => {
+    staffAnswer = () =>
+      Promise.resolve({
+        status: "error",
+        output: "",
+        error: "org.json changed since you read it; reload and try again.",
+        duration: 1,
+      } as CommandResponse);
+    draw();
+    const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
+    fireEvent.click(within(dialog).getByTestId("org-seat-vacate"));
+    expect((await within(dialog).findByTestId("org-seat-conflict")).textContent).toContain(
+      CHANGED_SINCE_TEXT,
+    );
+    expect((within(dialog).getByTestId("org-seat-vacate") as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect((within(dialog).getByTestId("org-seat-save") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("canVacate: a seat a person holds alone has nothing to take away", () => {
+    const data = orgResponse("valid");
+    const pm = data.tree.positions.find((p) => p.id === "pm")!;
+    const owner = data.tree.positions.find((p) => p.id === "owner")!;
+    expect(canVacate(pm, pm.seats[0])).toBe(true);
+    expect(canVacate(pm, { ...pm.seats[0], model: null, session: null, person: "Kim" })).toBe(
+      false,
+    );
+    expect(
+      canVacate(pm, { ...pm.seats[0], model: null, session: "desk-one", state: "vacant" }),
+    ).toBe(false);
+    expect(canVacate(owner, owner.seats[0])).toBe(false);
+  });
+
+  it("Save, Vacate, Cancel and Close wait for a write already in flight on the page", () => {
     const data = orgResponse("valid");
     const pm = data.tree.positions.find((p) => p.id === "pm")!;
     render(
@@ -1441,7 +1527,7 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
       />,
     );
     const dialog = screen.getByTestId("org-seat-dialog");
-    for (const name of ["Save", "Cancel", "Close"]) {
+    for (const name of ["Save", VACATE_WORD, "Cancel", "Close"]) {
       expect((within(dialog).getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(
         true,
       );

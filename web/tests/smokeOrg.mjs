@@ -173,6 +173,41 @@ export async function runOrg({ repoRoot, agentPort, webPort, python }) {
       (await lead.getByRole("button", { name: /^Change Team lead, Opus/ }).count()) === 2,
     );
 
+    // Vacate the same seat from its Change: the model and the session go, its Space stays.
+    const spaceBefore = seatOf(staffed)?.space;
+    await lead
+      .locator(`[data-testid="org-seat-action"][data-seat="team-lead.${VACANT_SEAT}"]`)
+      .click();
+    await dialog.waitFor();
+    await sleep(1000);
+    const withVacate = await blocking();
+    check(
+      "org: axe on the Change dialog with Vacate this seat finds nothing serious or critical",
+      withVacate.length === 0,
+      withVacate.join(" | "),
+    );
+    await page.getByTestId("org-seat-vacate").click();
+    const emptied = await waitForOrg(orgPath, (d) => seatOf(d) && !seatOf(d).model);
+    check(
+      "org: Vacate ran Staff -Seat -Vacate: the model and the session gone, the Space kept",
+      Boolean(emptied) &&
+        !("model" in seatOf(emptied)) &&
+        !("session" in seatOf(emptied)) &&
+        seatOf(emptied).space === spaceBefore,
+      JSON.stringify(emptied && seatOf(emptied)),
+    );
+    const backOnAssign = await page
+      .waitForFunction(
+        (seat) =>
+          document.activeElement?.getAttribute("data-seat") === seat &&
+          document.activeElement?.textContent === "Assign",
+        `team-lead.${VACANT_SEAT}`,
+        { timeout: 30000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    check("org: after Vacate, focus is on the seat's Assign button", backOnAssign);
+
     // Save Small: the preview, the steps, Save.
     await pick(page, "org-preset-select", SMALL);
     check(

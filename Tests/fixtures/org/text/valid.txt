@@ -6,3 +6,5 @@ Owner · Sam
       Team lead · opus [beta]
       Team lead · vacant [gamma]
         Builder · pool: sonnet for crew cards, opus across halves, fable for art on the owner's word
+
+staffed: 6 of 7

@@ -1403,6 +1403,15 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   page sends `-Session` and an empty argument, `-Space` and an empty argument; if 5.1 drops the empty argument the
   verb answers `Missing an argument` instead, and that is this row failing). The same with `-Person:–WhatIf`, an en
   dash. The macOS host proved the verb, the conflict, the empty argument and both argument forms under 7.
+- [ ] **Staff -Seat -Vacate and the short address write the same bytes under Windows PowerShell 5.1 (Refs #617).**
+  On the Windows PC, in `powershell` (5.1), with the same scratch hub after the rows above: `tkStaff -Seat
+  vp-engineering -Vacate` prints `vp-engineering.vp-engineering: ... -> VP of engineering · vacant` (the whole
+  address, though the short one was typed), and the seat in `org.json` has lost `model` and `session` and kept every
+  other key; run it again and it says `nothing changed, so nothing was written.`. Copy the file aside, put the earlier
+  copy back, run the same command in `pwsh`, and compare: byte for byte the same (`fc /b`), no BOM, LF. Then
+  `tkOrgChart` ends with an empty line and `staffed: <n> of <seats>`, one fewer staffed than before. Then
+  `tkStaff -Seat:–WhatIf -Model opus` (an en dash) exits 2 with `is not a seat of the tree` and writes nothing.
+  The macOS host proved the verb, the bytes and every refusal under 7.
 
 ## Recording a run
 

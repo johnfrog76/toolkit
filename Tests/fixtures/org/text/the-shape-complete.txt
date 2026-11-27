@@ -5,3 +5,5 @@ Owner · Sam
       Builder · pool: claude-sonnet-5-5
     Test runner · vacant
   VP of product · claude-fable-5-2 (product-session) · merges
+
+staffed: 5 of 6

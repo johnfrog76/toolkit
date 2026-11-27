@@ -1,3 +1,5 @@
 root · m
   child · Sam
   other · no seats
+
+staffed: 2 of 2
