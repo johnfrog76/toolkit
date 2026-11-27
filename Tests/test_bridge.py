@@ -659,6 +659,16 @@ class StaffThroughTheBridge(TeamAgileScratchPackage):
                 self.assertEqual(body["status"], "success", body.get("error") or body["output"])
                 self.assertEqual(self._seat_of("vp-engineering")["session"], f"{dash}Model")
 
+    def test_an_empty_argument_takes_the_key_away(self):
+        # How the seat dialog clears a session or a Space: the switch, then an empty argument.
+        self._config(True)
+        self.assertEqual(self._post_preset(), "success")
+        body = self._seat("vp-engineering.vp-engineering", "-Session", "desk-one")
+        self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+        body = self._seat("vp-engineering.vp-engineering", "-Session", "")
+        self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+        self.assertNotIn("session", self._seat_of("vp-engineering"))
+
     def _post_preset(self) -> str:
         return client.post("/api/cmd/Staff", json={"params": ["-Preset", "S"]}).json()["status"]
 

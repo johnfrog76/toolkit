@@ -461,14 +461,19 @@ Staff -Activate <tree-id> [-WhatIf]
   `consts.json` `org.roles.teamLead` -- and must be a Space the toolkit knows; any other seat's is refused, naming
   the position. **`-RoleName` (the position's `prompt`) and `-RoleTitle` (its `title`) belong to the position**, so
   they change every seat of it; a seat's own `roleTitle` is left as it is. An empty value takes that key away (an
-  empty `-Space` on any seat). **The owner's seat** -- the root's -- takes `-Person` only, and never an empty one:
-  `-Model` on it is refused, because the owner is a person. It prints one line,
-  `<position>.<seat>: <before> -> <after>`, each side the seat as `OrgChart` prints it; a call that changes nothing
-  writes nothing and exits 0. No tree is stamped by a seat's edit.
+  empty `-Space` on any seat). A typed value is one line: a newline, a tab or any other control character in it is
+  refused, naming the switch, and nothing is stored. **The owner's seat** -- the root's -- takes `-Person` only, and
+  never an empty one: `-Model` on it is refused, because the owner is a person. It prints one line,
+  `<position>.<seat>: <before> -> <after>`, each side the whole seat -- the position's title (a seat's own
+  `roleTitle` before it), the model and the person, `[space]`, `(session)`, `· merges`, and `{role file}` where
+  `-RoleName` was given -- so every field the call set shows as a change; a call that changes nothing writes
+  nothing and exits 0. No tree is stamped by a seat's edit.
 - **`-IfMatch <sha256>`** is the SHA-256 of `org.json`'s bytes as the caller read them -- the route's `etag`. A file
   whose bytes have changed since is refused, `org.json changed since you read it; reload and try again.` (the words
   are `consts.json` `org.changedSince`), and nothing is written; the hash is checked again just before the rename, so a
-  change made while the verb ran is refused too. Without `-IfMatch`, `-Seat` edits the file as it is now: a person
+  change made while the verb ran is refused too. A file that is not there at all is refused as that, first (`There is
+  no org.json in the hub, so there is no seat to staff.`). [`Tests/fixtures/org/etag.json`](../../Tests/fixtures/org/etag.json)
+  holds both halves to one hash: a file with a BOM, with CRLF, with a trailing newline and without. Without `-IfMatch`, `-Seat` edits the file as it is now: a person
   typing the verb is looking at the current file.
 - **A saved tree is a draft.** `-Preset` never changes the tree in use; `-Activate <tree-id>` is the one way to
   choose it, and it does not go with `-Preset`. The first tree of a new file is the only one, so by the reading
@@ -485,12 +490,17 @@ Staff -Activate <tree-id> [-WhatIf]
   checked with the reader's own checks (`Read-P20OrgText`, the same as `OrgChart`'s) before it lands. It is written
   as two-space JSON -- one text on PowerShell 7 and Windows PowerShell 5.1, non-ASCII as itself -- UTF-8 with no
   BOM, through `Write-CardText`: a created file is LF, an edited one keeps its own line ending. The bytes go to a
-  temp file beside `org.json` and are renamed over it, so a write that fails leaves the file as it was. Reformatting is the
-  writer's: a hand-written file comes back in its layout, not yours.
+  temp file beside `org.json` and are renamed over it, so a write that fails leaves the file as it was. **The writer
+  owns the file's layout:** the first write through `Staff` -- a `-Seat` edit included -- reformats a hand-written
+  file to that layout, one-line seat objects and all, and keeps every key, note and tree, each in its order; an edit
+  that changes nothing writes nothing. **A BOM is dropped:** a file saved with one is read as UTF-8, the BOM not part
+  of the text (it still counts in the `etag`, which hashes the raw bytes), and written back without it, by the card
+  writer's byte contract -- UTF-8 with no BOM -- while its own line ending is kept.
 - **It never prompts.** A refusal is a stated one (`exit 2`, one sentence and a hint) and writes nothing; `-WhatIf`
   prints the file it would write and writes nothing. `POST /api/cmd/Staff` runs it through the bridge. A value that
   starts with a dash and names one of the verb's own switches (an owner called `-WhatIf`) would be read as that
-  switch, so the page sends such a value joined to its name, `-Person:-WhatIf`.
+  switch -- and the binder reads the en dash, the em dash and the horizontal bar as a dash too -- so the page sends
+  a value starting with any of the four joined to its name, `-Person:-WhatIf`.
 
 `tkTestToolkit -OrgChart` types it in a fresh shell over a scratch copy of the sample hub, and
 `Tests/test_bridge.py` runs it through the bridge.

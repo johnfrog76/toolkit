@@ -130,7 +130,8 @@ room.
 ## Editing it by hand
 
 `org.json` is a plain file at the hub's root, and a hand edit works. `tkStaff` is its one writer, and it
-keeps every tree, key and note it was not asked to change. Fields the tool does not know are kept and
+keeps every tree, key and note it was not asked to change, each in its order. The layout is the writer's: the
+first time `tkStaff` writes a file you formatted by hand, it comes back as two-space JSON, with nothing in it lost. Fields the tool does not know are kept and
 named once as a warning, never refused. [`Config/org.schema.json`](../Config/org.schema.json) is the
 schema, and `tkOrgChart` says plainly what is wrong with a file that fails its checks.
 

@@ -1397,8 +1397,12 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   Then the bridge on 5.1 -- a machine with no `pwsh`, or with the agent started under `powershell.exe` -- from the Org
   tab, Change on the owner's seat, name `-WhatIf`, Save: the plate reads `-WhatIf` and `org.json`'s owner `person` is
   `"-WhatIf"` (the page sends `-Person:-WhatIf`, the joined form, which 7 binds as the value and `Tests/test_bridge.py`
-  proves there; 5.1's `-File` argument binding is this row's). The macOS host proved the verb, the conflict and both
-  argument forms under 7.
+  proves there; 5.1's `-File` argument binding is this row's). Then an empty argument through 5.1's `-File`, the way
+  the dialog clears a field: on a seat with a session and a team lead's seat with a Space, open Change, empty the
+  Session name and set the Space to None, Save: `org.json`'s seat has no `session` key and the lead's no `space` (the
+  page sends `-Session` and an empty argument, `-Space` and an empty argument; if 5.1 drops the empty argument the
+  verb answers `Missing an argument` instead, and that is this row failing). The same with `-Person:–WhatIf`, an en
+  dash. The macOS host proved the verb, the conflict, the empty argument and both argument forms under 7.
 
 ## Recording a run
 
