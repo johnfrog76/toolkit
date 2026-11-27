@@ -22,6 +22,7 @@ import { ORG } from "../../shell/consts";
 import { buildStaffPresetParams } from "../ado/cliBridge";
 import type { CommandResponse } from "../ado/api.ado";
 import type { OrgPreset } from "./api.solitaireAgile";
+import { NOT_RECOMMENDED, familyLabel } from "./orgChart";
 
 // "Use this org" (docs/modules/solitaire-agile.md, "The web UI"): the steps that
 // save a preset as a tree of the hub's org.json. Three questions, each already
@@ -43,13 +44,8 @@ const useStyles = makeStyles({
   refusal: { color: tokens.colorNeutralForeground1, whiteSpace: "pre-wrap" },
 });
 
-/** A family as the steps name it: its word, with a capital first letter. */
-export function familyLabel(family: string): string {
-  return family ? family[0].toUpperCase() + family.slice(1) : family;
-}
-
-/** The note a family carries in a VP question: none when it is recommended. */
-export const NOT_RECOMMENDED = "not recommended";
+// A family's word and the "not recommended" note are the org's rules (orgChart.ts).
+export { familyLabel, NOT_RECOMMENDED } from "./orgChart";
 
 export function familyChoice(family: string): string {
   return ORG.steps.recommended.includes(family)

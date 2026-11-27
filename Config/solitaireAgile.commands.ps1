@@ -109,11 +109,11 @@ function global:Get-P20OrgChart {
 }
 
 # Staff: the org file's one writer. -Preset adds a tree from a preset with the
-# default models, -Activate chooses the tree in use; it writes org.json and
-# nothing else.
+# default models, -Seat staffs one seat, -Activate chooses the tree in use; it
+# writes org.json and nothing else.
 
 function global:Set-P20Staff {
-    <# Staff -- save a tree in the hub's org file from a preset (a draft), or choose the tree in use. #>
+    <# Staff -- save a tree in the hub's org file from a preset (a draft), staff one seat, or choose the tree in use. #>
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)]
@@ -123,6 +123,15 @@ function global:Set-P20Staff {
         [string]$Owner,
         [string]$VpEngineering,
         [string]$VpProduct,
+        [string]$Seat,
+        [string]$Model,
+        [string]$Person,
+        [string]$Session,
+        [string]$Space,
+        [string]$RoleName,
+        [string]$RoleTitle,
+        [switch]$Merges,
+        [string]$IfMatch,
         [switch]$Activate,
         [switch]$WhatIf,
         [switch]$Help

@@ -23,6 +23,8 @@ import {
   buildRouteParams,
   buildStaffActivateParams,
   buildStaffPresetParams,
+  buildStaffSeatParams,
+  staffValue,
   buildMoveDesignParams,
   buildCoverParams,
   splitHubUnsets,
@@ -961,6 +963,90 @@ describe("buildEditWorkItemParams -- the pin", () => {
       "100",
       "-AddTag",
       "sev2",
+    ]);
+  });
+});
+
+describe("buildStaffSeatParams: the seat dialog's Save", () => {
+  it("is -Seat and -Tree, each field given in the param() block's order, then -IfMatch", () => {
+    expect(
+      buildStaffSeatParams({
+        tree: "hq",
+        position: "lead-team-1",
+        seat: "lead",
+        model: "opus",
+        person: " Kim ",
+        session: "lead-alpha",
+        space: "toolkit",
+        roleTitle: "Toolkit lead",
+        ifMatch: "a".repeat(64),
+      }),
+    ).toEqual([
+      "-Seat",
+      "lead-team-1.lead",
+      "-Tree",
+      "hq",
+      "-Model",
+      "opus",
+      "-Person",
+      "Kim",
+      "-Session",
+      "lead-alpha",
+      "-Space",
+      "toolkit",
+      "-RoleTitle",
+      "Toolkit lead",
+      "-IfMatch",
+      "a".repeat(64),
+    ]);
+  });
+
+  it("leaves an undefined field out, so the seat keeps it, and sends an empty one, which takes it away", () => {
+    expect(buildStaffSeatParams({ tree: "t", position: "p", seat: "s", session: "" })).toEqual([
+      "-Seat",
+      "p.s",
+      "-Tree",
+      "t",
+      "-Session",
+      "",
+    ]);
+  });
+
+  it.each(["-", "\u2013", "\u2014", "\u2015"])(
+    "joins a value that starts with %s -- a dash the binder reads -- to its name, for every typed field",
+    (dash) => {
+      expect(staffValue("-Person", `${dash}WhatIf`)).toEqual([`-Person:${dash}WhatIf`]);
+      expect(
+        buildStaffSeatParams({
+          tree: "t",
+          position: "p",
+          seat: "s",
+          person: `${dash}a`,
+          session: `${dash}b`,
+          roleTitle: `${dash}c`,
+        }),
+      ).toEqual([
+        "-Seat",
+        "p.s",
+        "-Tree",
+        "t",
+        `-Person:${dash}a`,
+        `-Session:${dash}b`,
+        `-RoleTitle:${dash}c`,
+      ]);
+    },
+  );
+
+  it("joins a value that starts with a dash to its name, so the binder reads it as the value", () => {
+    expect(staffValue("-Person", "-WhatIf")).toEqual(["-Person:-WhatIf"]);
+    expect(staffValue("-Person", "Sam")).toEqual(["-Person", "Sam"]);
+    expect(
+      buildStaffSeatParams({ tree: "t", position: "owner", seat: "owner", person: "-Sam" }),
+    ).toEqual(["-Seat", "owner.owner", "-Tree", "t", "-Person:-Sam"]);
+    expect(buildStaffPresetParams({ size: "S", owner: "-Sam" })).toEqual([
+      "-Preset",
+      "S",
+      "-Owner:-Sam",
     ]);
   });
 });

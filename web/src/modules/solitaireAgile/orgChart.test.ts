@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { FACE_IDS } from "../../shared/refinedFaces";
-import type { OrgPosition } from "./api.solitaireAgile";
+import type { OrgPosition, OrgSeat } from "./api.solitaireAgile";
+import { ORG } from "../../shell/consts";
 import type { PlacedOffice } from "./orgChart";
 import {
   LEVEL_FACES,
@@ -12,8 +13,17 @@ import {
   layoutChart,
   levelWall,
   officeWidth,
+  isChangedSince,
   plateTitle,
+  plateWhere,
   plateWho,
+  seatActionLabel,
+  HELD_MODEL,
+  isHeldModel,
+  seatChoices,
+  seatModelDefault,
+  signTitle,
+  viewLabel,
   positionFaces,
   seatFace,
   seatWhere,
@@ -251,4 +261,148 @@ describe("the layout of a team: one lead, its own pool", () => {
       }
     },
   );
+});
+
+describe("the seat dialog's rules", () => {
+  const position = (over: Partial<OrgPosition> = {}): OrgPosition => ({
+    id: "p",
+    title: "P",
+    prompt: null,
+    reportsTo: "owner",
+    defaultModel: null,
+    recommend: [],
+    level: 1,
+    seats: [],
+    promptTitle: null,
+    promptRef: null,
+    defaultModelName: null,
+    defaultModelFamily: null,
+    ...over,
+  });
+  const seat = (over: Partial<OrgSeat> = {}): OrgSeat => ({
+    id: "s",
+    roleTitle: null,
+    model: null,
+    modelName: null,
+    modelFamily: null,
+    person: null,
+    session: null,
+    merges: null,
+    space: null,
+    state: "vacant",
+    ...over,
+  });
+
+  it("a vacant seat starts on its position's defaultModel, else its role's, else none", () => {
+    expect(seatModelDefault(position({ defaultModelFamily: "haiku" }), seat())).toBe("haiku");
+    expect(seatModelDefault(position({ prompt: ORG.roles.vpEngineering }), seat())).toBe(
+      ORG.steps.vpEngineering,
+    );
+    expect(seatModelDefault(position({ prompt: ORG.roles.vpProduct }), seat())).toBe(
+      ORG.steps.vpProduct,
+    );
+    for (const [role, family] of Object.entries(ORG.roleDefaults)) {
+      expect(seatModelDefault(position({ prompt: role }), seat())).toBe(family);
+    }
+    expect(seatModelDefault(position({ prompt: "pm.prompt.md" }), seat())).toBe("");
+  });
+
+  it("a person in a seat with no model starts on no model", () => {
+    const vp = position({ prompt: ORG.roles.vpEngineering });
+    expect(seatModelDefault(vp, seat({ person: "Kim", state: "staffed" }))).toBe("");
+  });
+
+  const NAMES = { fable: "Fable 5.2", opus: "Opus 5.5", sonnet: "Sonnet 5.5", haiku: "Haiku 5.5" };
+  const ALL = ["fable", "opus", "sonnet", "haiku"];
+
+  it("a VP is offered three choices by their current models' names, Sonnet not recommended, no Haiku", () => {
+    const vp = position({ prompt: ORG.roles.vpEngineering, recommend: ["opus", "fable"] });
+    expect(seatChoices(vp, seat(), ALL, NAMES)).toEqual([
+      { value: "opus", label: "Opus 5.5" },
+      { value: "fable", label: "Fable 5.2" },
+      { value: "sonnet", label: "Sonnet 5.5 (not recommended)" },
+    ]);
+  });
+
+  it("any other seat is offered the four current families, by name", () => {
+    expect(seatChoices(position(), seat(), ALL, NAMES).map((c) => c.label)).toEqual([
+      "Fable 5.2",
+      "Opus 5.5",
+      "Sonnet 5.5",
+      "Haiku 5.5",
+    ]);
+  });
+
+  it("a seat holding a model that is not its family's current one keeps it as a choice of its own, chosen", () => {
+    const older = seat({
+      model: "claude-opus-5",
+      modelName: "Opus 5",
+      modelFamily: "opus",
+      state: "staffed",
+    });
+    expect(isHeldModel(older, NAMES)).toBe(true);
+    expect(seatChoices(position(), older, ALL, NAMES)[0]).toEqual({
+      value: HELD_MODEL,
+      label: "Opus 5",
+    });
+    expect(seatModelDefault(position(), older, NAMES)).toBe(HELD_MODEL);
+    // Another provider's, or one the map does not know: as written, held the same way.
+    const unknown = seat({ model: "x-model", modelName: "x-model", state: "staffed" });
+    expect(seatChoices(position(), unknown, ALL, NAMES)[0]).toEqual({
+      value: HELD_MODEL,
+      label: "x-model",
+    });
+    expect(seatModelDefault(position(), unknown, NAMES)).toBe(HELD_MODEL);
+    // The current model, or its family's word, is no held model.
+    const current = seat({
+      model: "claude-opus-5-5",
+      modelName: "Opus 5.5",
+      modelFamily: "opus",
+      state: "staffed",
+    });
+    const word = seat({
+      model: "opus",
+      modelName: "Opus 5.5",
+      modelFamily: "opus",
+      state: "staffed",
+    });
+    for (const s of [current, word]) {
+      expect(isHeldModel(s, NAMES)).toBe(false);
+      expect(seatModelDefault(position(), s, NAMES)).toBe("opus");
+      expect(seatChoices(position(), s, ALL, NAMES)).toHaveLength(4);
+    }
+  });
+
+  it("the sign is the one seat's label, a room's position title; a room's plate carries a seat's own label", () => {
+    const one = position({
+      title: "Team lead",
+      seats: [seat({ roleTitle: "Toolkit lead", space: "toolkit" })],
+    });
+    expect(signTitle(one)).toBe("Toolkit lead");
+    expect(plateWhere(one, one.seats[0])).toBe("toolkit");
+    const room = position({
+      title: "Team lead",
+      seats: [seat({ id: "a", roleTitle: "A lead", space: "a" }), seat({ id: "b" })],
+    });
+    expect(signTitle(room)).toBe("Team lead");
+    expect(plateWhere(room, room.seats[0])).toBe("A lead · a");
+    expect(plateWhere(room, room.seats[1])).toBe("");
+  });
+
+  it("the button's name: Assign the seat, or Change it naming who sits there", () => {
+    const vp = position({ title: "VP of engineering" });
+    expect(seatActionLabel(vp, seat())).toBe("Assign VP of engineering");
+    expect(seatActionLabel(vp, seat({ model: "m", modelName: "Opus 5.5", state: "staffed" }))).toBe(
+      "Change VP of engineering, Opus 5.5",
+    );
+    expect(viewLabel(position({ title: "PM", promptTitle: "The PM" }))).toBe(
+      "View the The PM role",
+    );
+  });
+
+  it("finds Staff's -IfMatch refusal by its words", () => {
+    expect(isChangedSince(`org.json ${ORG.changedSince}; reload and try again.`)).toBe(true);
+    expect(isChangedSince("Some other refusal.")).toBe(false);
+    expect(isChangedSince(null)).toBe(false);
+  });
 });

@@ -307,8 +307,8 @@ draw one.
 `activeTree` is always the file's own choice, so a reader asked for another tree still knows which is in
 use. [`Tests/fixtures/org/charts/`](../../Tests/fixtures/org/charts/) holds the responses the table states.
 
-**The one difference between the two halves: the fields only the route adds.** The route adds three keys to
-every position, one to every seat and one to the document, which `OrgChart -AsJson` does not print -- the CLI has no prompt reader,
+**The one difference between the two halves: the fields only the route adds.** The route adds four keys to
+every position, two to every seat and four to the document, which `OrgChart -AsJson` does not print -- the CLI has no prompt reader,
 and the Studio's is the agent's; the model's name is what the Org tab draws, and the terminal prints the model as
 the file writes it:
 
@@ -316,8 +316,13 @@ the file writes it:
 | --- | --- | --- |
 | `promptTitle` | the prompt's title: its front matter's `title`, else its one `#` heading, else the file's name without `.prompt.md` | `agent/studio/prompts.py`'s `record`, the one reader every prompt goes through -- not a second parser |
 | `promptRef` | the address after `/studio/prompts/` that opens the prompt in the Studio's reading room: `yours/<name>` for the hub's copy, `<name>` for a role the toolkit ships -- the `ref` a Studio prompt row carries (the web builds the link with `promptPath(ref)`) | the same rule the Studio lists by; `null` for a file the room does not list (not `<name>.prompt.md`, or a name that is not a plain word), which still has its title |
+| `defaultModelFamily` (a position's) | the family of its `defaultModel` line by the same lookup as `modelFamily`; `null` where the map does not know it | the same as `modelFamily` |
 | `defaultModelName` (a position's) | its `defaultModel` line by the same lookup as `modelName`: a pool's line that `Staff` wrote as an id reads as the model's name ("Sonnet 5.5"); words read as written; `null` with no line | the same as `modelName` |
 | `trees` (the document's) | every tree of the file, in its order, as the Org tab's View and Active dropdowns list them: `{ "id", "title", "size", "preset", "active", "state", "activatedAt" }` -- `state` is [the tree's state](#an-orgs-state), `active` true on the active one alone -- each read as that tree's own chart reads it (`title`, `size`, `preset` and `activatedAt` `null` where unset) -- the same list whichever tree `?tree=` asks for | `agent/solitaire/org.py`'s `tree_summaries`, over the trees the reader has already checked |
+| `etag` (the document's) | the SHA-256 of `org.json`'s bytes as this read saw them, lowercase hex -- the same whichever tree `?tree=` asks for. The seat dialog sends it back as `Staff -Seat -IfMatch`, so a file changed since the page read it is refused rather than written over | `agent/solitaire/org.py`'s `find_org_chart`, over the bytes it parsed |
+| `families` (the document's) | the model families a seat can be staffed with: the keys of the model map's `current` block, in its order -- what the seat dialog offers a seat that is not a VP's | `agent/core/models.py`'s `read_model_current` |
+| `familyNames` (the document's) | each of `families` by the name of the model it resolves to today ("Opus 5.5"): the model map's `name` for the `current` id, looked up, never parsed -- the seat dialog's labels, so the page types no version | `agent/solitaire/org.py`'s `family_names` |
+| `modelFamily` (a seat's) | the family of the seat's `model`: the map's `family` for an id it has a row for, the family itself for one `current` names, `null` otherwise -- the choice the seat dialog starts on | `agent/solitaire/org.py`'s `model_family`, looked up, never parsed |
 | `modelName` (a seat's) | what the seat's `model` is called: the model map's `name` for an id it has a row for ("Opus 5.5"); for a family the map's `current` names (`opus`), the name of the id that family is today; anything else as written; `null` with no model | `agent/core/models.py`'s `model_info` and `current_model`, the lookup the Agent line uses -- looked up, never parsed |
 
 The prompt fields are `null` on a position with no `prompt`. The file read is the one the reading room opens -- the
@@ -418,10 +423,12 @@ checks and to the shipped roles. `OrgChart -Preset` is not built yet: the CLI do
 ## The one writer: Staff
 
 `Staff` rides Team Agile like `OrgChart`, so it is there exactly where the chart is ([the scope](#the-scope----where-it-is-and-is-not-there)),
-and it writes `org.json` and nothing else. Two forms:
+and it writes `org.json` and nothing else. Three forms:
 
 ```text
 Staff -Preset S|M|L [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-WhatIf]
+Staff -Seat <position>.<seat> [-Tree <id>] [-Model <model>] [-Person <name>] [-Session <name>] [-Space <slug>]
+      [-RoleName <file>] [-RoleTitle <text>] [-Merges] [-IfMatch <sha256>] [-WhatIf]
 Staff -Activate <tree-id> [-WhatIf]
 ```
 
@@ -435,7 +442,8 @@ Staff -Activate <tree-id> [-WhatIf]
   tab's "Use this org" steps show, so the page and the verb agree.
 
   The defaults are keyed by the **role** a position names -- its `prompt` -- not by its id, so every team's lead
-  starts staffed whatever its office is called:
+  starts staffed whatever its office is called. The role files and their families are `consts.json`'s
+  (`org.roles`, `org.roleDefaults`, and `org.steps` for the two VPs), which the seat dialog fills a vacant seat from too:
 
   | A position whose role is | Its seats start with |
   | --- | --- |
@@ -446,6 +454,28 @@ Staff -Activate <tree-id> [-WhatIf]
   | any pool (no seats: the builders, each team's own) | its `defaultModel` line becomes Sonnet's id |
   | anything else -- the PM, the test runner, the merge stand-in | vacant |
 
+- **`-Seat` staffs one seat** of a saved tree, active or a draft: the tree in use, or the one `-Tree` names. The
+  seat is `<position>.<seat>`, the two ids with a dot between (an id may hold a dot itself; the split that names a real
+  seat is the one taken). `-Model` takes a family or an id and stores the id, as `-Preset` does; `-Person`, `-Session`
+  (the session's name, the address readies go to) and `-Merges` (sets `merges: true`, and clears no other seat's: a
+  stand-in may hold it too) are the seat's own. `-Space` is a team lead's -- a seat whose position's role is
+  `consts.json` `org.roles.teamLead` -- and must be a Space the toolkit knows; any other seat's is refused, naming
+  the position. **`-RoleName` (the position's `prompt`) and `-RoleTitle` (its `title`) belong to the position**, so
+  they change every seat of it; a seat's own `roleTitle` is left as it is. An empty value takes that key away (an
+  empty `-Space` on any seat). A typed value is one line: a newline, a tab or any other control character in it is
+  refused, naming the switch, and nothing is stored. **The owner's seat** -- the root's -- takes `-Person` only, and
+  never an empty one: `-Model` on it is refused, because the owner is a person. It prints one line,
+  `<position>.<seat>: <before> -> <after>`, each side the whole seat -- the position's title (a seat's own
+  `roleTitle` before it), the model and the person, `[space]`, `(session)`, `· merges`, and `{role file}` where
+  `-RoleName` was given -- so every field the call set shows as a change; a call that changes nothing writes
+  nothing and exits 0. No tree is stamped by a seat's edit.
+- **`-IfMatch <sha256>`** is the SHA-256 of `org.json`'s bytes as the caller read them -- the route's `etag`. A file
+  whose bytes have changed since is refused, `org.json changed since you read it; reload and try again.` (the words
+  are `consts.json` `org.changedSince`), and nothing is written; the hash is checked again just before the rename, so a
+  change made while the verb ran is refused too. A file that is not there at all is refused as that, first (`There is
+  no org.json in the hub, so there is no seat to staff.`). [`Tests/fixtures/org/etag.json`](../../Tests/fixtures/org/etag.json)
+  holds both halves to one hash: a file with a BOM, with CRLF, with a trailing newline and without. Without `-IfMatch`, `-Seat` edits the file as it is now: a person
+  typing the verb is looking at the current file.
 - **A saved tree is a draft.** `-Preset` never changes the tree in use; `-Activate <tree-id>` is the one way to
   choose it, and it does not go with `-Preset`. The first tree of a new file is the only one, so by the reading
   rule it is the one in use, and the file is written without `activeTree`. Adding a second tree to a file that names
@@ -461,22 +491,28 @@ Staff -Activate <tree-id> [-WhatIf]
   checked with the reader's own checks (`Read-P20OrgText`, the same as `OrgChart`'s) before it lands. It is written
   as two-space JSON -- one text on PowerShell 7 and Windows PowerShell 5.1, non-ASCII as itself -- UTF-8 with no
   BOM, through `Write-CardText`: a created file is LF, an edited one keeps its own line ending. The bytes go to a
-  temp file beside `org.json` and are renamed over it, so a write that fails leaves the file as it was. Reformatting is the
-  writer's: a hand-written file comes back in its layout, not yours.
+  temp file beside `org.json` and are renamed over it, so a write that fails leaves the file as it was. **The writer
+  owns the file's layout:** the first write through `Staff` -- a `-Seat` edit included -- reformats a hand-written
+  file to that layout, one-line seat objects and all, and keeps every key, note and tree, each in its order; an edit
+  that changes nothing writes nothing. **A BOM is dropped:** a file saved with one is read as UTF-8, the BOM not part
+  of the text (it still counts in the `etag`, which hashes the raw bytes), and written back without it, by the card
+  writer's byte contract -- UTF-8 with no BOM -- while its own line ending is kept.
 - **It never prompts.** A refusal is a stated one (`exit 2`, one sentence and a hint) and writes nothing; `-WhatIf`
-  prints the file it would write and writes nothing. `POST /api/cmd/Staff` runs it through the bridge.
+  prints the file it would write and writes nothing. `POST /api/cmd/Staff` runs it through the bridge. A value that
+  starts with a dash and names one of the verb's own switches (an owner called `-WhatIf`) would be read as that
+  switch -- and the binder reads the en dash, the em dash and the horizontal bar as a dash too -- so the page sends
+  a value starting with any of the four joined to its name, `-Person:-WhatIf`.
 
 `tkTestToolkit -OrgChart` types it in a fresh shell over a scratch copy of the sample hub, and
 `Tests/test_bridge.py` runs it through the bridge.
 
 ## What is not in v1
 
-No seat editor yet (`Staff` adds a tree and chooses the one in use; editing one seat is a later form of it), no
-way to start from a preset on the Org tab (the page previews; `Staff -Preset` saves), no machine drawn (the retired `machines`, `machine` and `active` are
-read and never served), no picker reading `recommend` yet, no count of builders from the cards in flight, and no
+No machine drawn (the retired `machines`, `machine` and `active` are
+read and never served), no count of builders from the cards in flight, and no
 join with the standup's workers. `merges` is read, served and printed, and not yet drawn on the Org tab. The web's
-Org tab draws the tree the route serves ([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui)): a
-seat's `roleTitle` and its model's name on the plate, its session on hover; a vacant seat is drawn as an empty desk.
+Org tab draws the tree the route serves and staffs a seat through `Staff -Seat` ([Team Agile, the web UI](../modules/solitaire-agile.md#the-web-ui)): an
+office's title on its sign, a seat's model's name on its plate, its session on hover; a vacant seat is drawn as an empty desk.
 
 ## An example to copy
 

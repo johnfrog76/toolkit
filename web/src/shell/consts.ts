@@ -526,6 +526,13 @@ export const ORG = consts.org as {
     families: string[];
     recommended: string[];
   };
+  /** The role files (a position's prompt) asked about by name: each VP seat's,
+   *  keyed as `steps` keys its default, and the team lead's, whose seat has a Space. */
+  roles: { vpEngineering: string; vpProduct: string; teamLead: string };
+  /** Every other role's default family, by its role file. A role in neither starts vacant. */
+  roleDefaults: Record<string, string>;
+  /** The words of Staff -Seat's -IfMatch refusal: the org file changed since it was read. */
+  changedSince: string;
 };
 
 /**
