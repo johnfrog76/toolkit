@@ -67,7 +67,7 @@ are a chunk the browser fetches when a deck is shown, never part of the first lo
 
 ## What ships
 
-Two decks:
+Three decks:
 
 - **Trailer -- The Connected Deck Universe** (19 slides, about four minutes), with 38 baked voice files
   in two voices, Jenny and Brian. It plays with sound, no key and no server.
@@ -87,6 +87,15 @@ Two decks:
   studio's re-bake, and until it lands slide 1 plays its previous lines and slides 5 and 6 play silent.
   The deck, its figures file and its voices are maintained in the studio and carried here by
   `goShipDeck`, byte-identical; a change made here is a bug. <!-- portability-ok: the Wasteland studio's own verb, named on purpose -- it is the carrier, not a command of ours -->
+
+- **The Prompt Poet Works the Board** (twelve slides, Complete), made for an Azure DevOps Space's first run (its wiring is a change of its own): the basement
+  coffee house of The Prompt Poet, where the slips on the poet's table are Azure DevOps work items. One
+  card, one prompt: the poet writes the poem on the card, the card carries what the pull request needs,
+  and the poem only counts when it rhymes with the card. It is built in the Wasteland studio to the same
+  review and QA loop as the commercial, and shares its slide art, `toolkit-figures.tsx`. It has
+  **24 baked voice files** under `voices/the-prompt-poet-works-the-board/`, Jenny and Brian, so it plays
+  with sound, no key and no server. The deck, its figures file and its voices are maintained in the studio
+  and carried here by `goShipDeck`, byte-identical; a change made here is a bug. <!-- portability-ok: the Wasteland studio's own verb, named on purpose -- it is the carrier, not a command of ours -->
 
 Kit's draft tour, **Meet the Toolkit**, is not shipped here: it is maintained in the Wasteland studio
 (a private repository, `src/decks/meet-the-toolkit.tsx`), where Kit's full guided tour grows from it.

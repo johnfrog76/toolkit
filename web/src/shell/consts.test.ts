@@ -788,6 +788,9 @@ describe("no half retypes a contract literal", () => {
     "shell/consts.ts",
     "shell/consts.test.ts",
     "modules/deck/decks/toolkit-figures.tsx",
+    // Studio-made art that pictures a card, as toolkit-figures.tsx is: its card is
+    // drawn with a "PR URL:" line. A played copy is never edited.
+    "modules/deck/decks/the-prompt-poet-works-the-board.tsx",
   ]);
 
   function walk(dir: string, out: string[] = []): string[] {
