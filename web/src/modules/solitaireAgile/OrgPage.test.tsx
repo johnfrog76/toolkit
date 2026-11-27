@@ -1422,7 +1422,7 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
     });
   });
 
-  it("Vacate this seat is offered on a staffed seat's Change, never on a vacant seat or the owner's", () => {
+  it("Vacate this seat is offered on a staffed seat's Change, never on an empty seat or the owner's", () => {
     draw();
     let dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
     expect(within(dialog).getByTestId("org-seat-vacate").textContent).toBe(VACATE_WORD);
@@ -1434,7 +1434,59 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
     expect(within(dialog).queryByTestId("org-seat-vacate")).toBeNull();
   });
 
-  it("Vacate this seat runs Staff -Seat ... -Vacate with the etag, and focus lands on the seat's Assign", async () => {
+  /** The seat dialog's Vacate, asked: the link, then the question in its place. */
+  const askVacate = (dialog: HTMLElement) => {
+    fireEvent.click(within(dialog).getByTestId("org-seat-vacate"));
+    return within(dialog).getByTestId("org-seat-vacate-question");
+  };
+
+  it("one click on Vacate this seat writes nothing: the same row asks, naming the seat, with Vacate and Keep", async () => {
+    draw();
+    const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
+    const question = askVacate(dialog);
+    expect(runStaff).not.toHaveBeenCalled();
+    expect(within(dialog).queryByTestId("org-seat-vacate")).toBeNull();
+    expect(question.textContent).toContain("Vacate PM?");
+    expect(within(question).getByRole("button", { name: "Vacate PM" })).toBeTruthy();
+    const keep = within(question).getByRole("button", { name: "Keep PM staffed" });
+    await waitFor(() => expect(document.activeElement).toBe(keep));
+    // The title link shares the row; the question takes the link's place, not a row of its own.
+    expect(question.closest('[data-testid="org-seat-title-row"]')).toBeTruthy();
+    // The fields are as they were typed.
+    expect(screen.getByTestId("org-seat-dialog")).toBe(dialog);
+  });
+
+  it("Keep puts the link back and the focus on it, and writes nothing", async () => {
+    draw();
+    const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
+    fireEvent.change(within(dialog).getByTestId("org-seat-session"), {
+      target: { value: "typed-before" },
+    });
+    const question = askVacate(dialog);
+    fireEvent.click(within(question).getByRole("button", { name: "Keep PM staffed" }));
+    const link = within(dialog).getByTestId("org-seat-vacate");
+    await waitFor(() => expect(document.activeElement).toBe(link));
+    expect(within(dialog).queryByTestId("org-seat-vacate-question")).toBeNull();
+    expect((within(dialog).getByTestId("org-seat-session") as HTMLInputElement).value).toBe(
+      "typed-before",
+    );
+    expect(runStaff).not.toHaveBeenCalled();
+  });
+
+  it("Escape while asking puts the link back and the focus on it; the dialog stays open", async () => {
+    draw();
+    const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
+    const question = askVacate(dialog);
+    fireEvent.keyDown(within(question).getByRole("button", { name: "Keep PM staffed" }), {
+      key: "Escape",
+    });
+    const link = await within(dialog).findByTestId("org-seat-vacate");
+    await waitFor(() => expect(document.activeElement).toBe(link));
+    expect(screen.getByTestId("org-seat-dialog")).toBeTruthy();
+    expect(runStaff).not.toHaveBeenCalled();
+  });
+
+  it("Vacate runs Staff -Seat ... -Vacate once, with the etag, Save never saying Saving, and focus lands on the seat's Assign", async () => {
     const after = orgResponse("valid");
     const pmSeat = after.tree.positions.find((p) => p.id === "pm")!.seats[0];
     Object.assign(pmSeat, {
@@ -1444,18 +1496,30 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
       session: null,
       state: "vacant",
     });
-    staffAnswer = () => {
-      response = { isLoading: false, data: { ...after, etag: "c".repeat(64) } };
-      return Promise.resolve({
-        status: "success",
-        output: "",
-        error: "",
-        duration: 1,
-      } as CommandResponse);
-    };
+    let release: () => void = () => {};
+    staffAnswer = () =>
+      new Promise((resolve) => {
+        release = () => {
+          response = { isLoading: false, data: { ...after, etag: "c".repeat(64) } };
+          resolve({ status: "success", output: "", error: "", duration: 1 } as CommandResponse);
+        };
+      });
     draw();
     const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
-    fireEvent.click(within(dialog).getByTestId("org-seat-vacate"));
+    const question = askVacate(dialog);
+    const confirm = within(question).getByRole("button", { name: "Vacate PM" });
+    fireEvent.click(confirm);
+    // In flight: the confirming button is busy, Save does not say Saving, nothing closes.
+    await waitFor(() => expect(confirm.textContent).toBe("Vacating..."));
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    const save = within(dialog).getByTestId("org-seat-save");
+    expect(save.textContent).toBe("Save");
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (within(dialog).getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    fireEvent.click(confirm);
+    release();
     await waitFor(() => expect(screen.queryByTestId("org-seat-dialog")).toBeNull());
     expect(runStaff).toHaveBeenCalledTimes(1);
     expect(lastParams()).toEqual([
@@ -1484,17 +1548,25 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
       } as CommandResponse);
     draw();
     const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
-    fireEvent.click(within(dialog).getByTestId("org-seat-vacate"));
+    fireEvent.click(within(askVacate(dialog)).getByRole("button", { name: "Vacate PM" }));
     expect((await within(dialog).findByTestId("org-seat-conflict")).textContent).toContain(
       CHANGED_SINCE_TEXT,
-    );
-    expect((within(dialog).getByTestId("org-seat-vacate") as HTMLButtonElement).disabled).toBe(
-      true,
     );
     expect((within(dialog).getByTestId("org-seat-save") as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("canVacate: a seat a person holds alone has nothing to take away", () => {
+  it("a vacant seat that still holds a session offers Vacate, so the session can go", () => {
+    const data = response.data!;
+    const gamma = data.tree.positions
+      .find((p) => p.id === "team-lead")!
+      .seats.find((x) => x.id === "gamma")!;
+    Object.assign(gamma, { session: "desk-one" });
+    draw();
+    const dialog = open("team-lead", "Assign Team lead");
+    expect(within(dialog).getByTestId("org-seat-vacate").textContent).toBe(VACATE_WORD);
+  });
+
+  it("canVacate: a model or a session to take away, never on the owner's seat", () => {
     const data = orgResponse("valid");
     const pm = data.tree.positions.find((p) => p.id === "pm")!;
     const owner = data.tree.positions.find((p) => p.id === "owner")!;
@@ -1504,8 +1576,12 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
     );
     expect(
       canVacate(pm, { ...pm.seats[0], model: null, session: "desk-one", state: "vacant" }),
-    ).toBe(false);
+    ).toBe(true);
+    expect(canVacate(pm, { ...pm.seats[0], model: null, session: null, state: "vacant" })).toBe(
+      false,
+    );
     expect(canVacate(owner, owner.seats[0])).toBe(false);
+    expect(canVacate(owner, { ...owner.seats[0], session: "desk-one" })).toBe(false);
   });
 
   it("Save, Vacate, Cancel and Close wait for a write already in flight on the page", () => {

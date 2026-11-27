@@ -187,6 +187,14 @@ export async function runOrg({ repoRoot, agentPort, webPort, python }) {
       withVacate.join(" | "),
     );
     await page.getByTestId("org-seat-vacate").click();
+    await page.getByTestId("org-seat-vacate-question").waitFor();
+    const asking = await blocking();
+    check(
+      "org: axe on Vacate's question finds nothing serious or critical",
+      asking.length === 0,
+      asking.join(" | "),
+    );
+    await page.getByTestId("org-seat-vacate-confirm").click();
     const emptied = await waitForOrg(orgPath, (d) => seatOf(d) && !seatOf(d).model);
     check(
       "org: Vacate ran Staff -Seat -Vacate: the model and the session gone, the Space kept",

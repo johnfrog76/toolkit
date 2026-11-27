@@ -49,16 +49,26 @@ import {
 // the chart's etag as -IfMatch, so a file changed since the page read it is
 // refused and the dialog offers a reload instead of writing over it. Only what
 // changed is sent; a Save that changes nothing closes with nothing written.
-// A staffed seat's Change dialog also offers Vacate this seat, a quiet link
-// beside the title's: Staff -Seat ... -Vacate -IfMatch <etag>, the same one
-// write with the same conflict handling, which takes the seat's model and
-// session away and nothing else. Never on a vacant seat or the owner's.
+// A seat with a model or a session to take away also offers Vacate this seat,
+// a quiet link beside the title's. It asks first, in its own place on the same
+// row -- "Vacate PM?", Vacate and Keep -- and only Vacate writes: Staff -Seat
+// ... -Vacate -IfMatch <etag>, the same one write with the same conflict
+// handling, which takes the seat's model and session away and nothing else.
+// Keep and Escape put the link back. Never on the owner's seat.
 
 const useStyles = makeStyles({
   surface: { maxWidth: "480px" },
   content: { display: "flex", flexDirection: "column", rowGap: tokens.spacingVerticalM },
   note: { color: tokens.colorNeutralForeground2 },
-  titleRow: { display: "flex", justifyContent: "space-between", flexWrap: "wrap" },
+  titleRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    columnGap: tokens.spacingHorizontalM,
+  },
+  // Vacate's question, in the link's place on the same row: the words, then Vacate and Keep.
+  ask: { display: "flex", alignItems: "center", columnGap: tokens.spacingHorizontalS },
   // The choices wrap as a row, each name kept whole on one line, never its version under its word.
   models: { flexWrap: "wrap" },
   choice: { whiteSpace: "nowrap" },
@@ -99,12 +109,11 @@ export function sharedRoleNote(position: OrgPosition): string | null {
 /** The quiet control that empties a staffed seat: Staff -Seat ... -Vacate. */
 export const VACATE_WORD = "Vacate this seat";
 
-/** Whether the dialog offers Vacate: a staffed seat, not the owner's, with a model or a
- *  session to take away (a seat a person holds alone has nothing -Vacate would change). */
+/** Whether the dialog offers Vacate: a seat that is not the owner's with a model or a
+ *  session to take away -- a vacant seat that still names a session among them (a seat a
+ *  person holds alone has nothing -Vacate would change). */
 export function canVacate(position: OrgPosition, seat: OrgSeat): boolean {
-  return (
-    !isOwnerPosition(position) && seat.state === "staffed" && Boolean(seat.model || seat.session)
-  );
+  return !isOwnerPosition(position) && Boolean(seat.model || seat.session);
 }
 
 /** The control that opens the role title's field in place. */
@@ -203,10 +212,30 @@ export function SeatDialog({
     else setFocusTitle(true);
     setTitleOpen(!titleOpen);
   };
-  const [saving, setSaving] = useState(false);
-  // While this save, or any other Staff write of the page's, is in flight,
+  // Which of the dialog's writes is in flight, so only its own button says so.
+  const [writing, setWriting] = useState<"save" | "vacate" | null>(null);
+  // While this write, or any other Staff write of the page's, is in flight,
   // nothing leaves or saves: Cancel, Escape and Close wait.
-  const locked = saving || busy;
+  const locked = writing !== null || busy;
+  // Vacate asks first, in the link's place; Keep and Escape put the link back.
+  const [asking, setAsking] = useState(false);
+  const [vacateFocus, setVacateFocus] = useState<"keep" | "link" | null>(null);
+  const keepButton = useRef<HTMLButtonElement>(null);
+  const vacateLink = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (vacateFocus === "keep" && asking) keepButton.current?.focus();
+    else if (vacateFocus === "link" && !asking) vacateLink.current?.focus();
+    else return;
+    setVacateFocus(null);
+  }, [vacateFocus, asking]);
+  const ask = () => {
+    setAsking(true);
+    setVacateFocus("keep");
+  };
+  const keep = () => {
+    setAsking(false);
+    setVacateFocus("link");
+  };
   const [refusal, setRefusal] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const [away, setAway] = useState(false);
@@ -224,8 +253,8 @@ export function SeatDialog({
   ];
 
   // The one write, Save's or Vacate's: one at a time, a conflict offers a reload.
-  const write = async (params: string[]) => {
-    setSaving(true);
+  const write = async (which: "save" | "vacate", params: string[]) => {
+    setWriting(which);
     setRefusal(null);
     setConflict(false);
     setAway(false);
@@ -237,7 +266,7 @@ export function SeatDialog({
     } catch {
       setAway(true);
     } finally {
-      setSaving(false);
+      setWriting(null);
     }
   };
   const save = async () => {
@@ -252,17 +281,26 @@ export function SeatDialog({
       onClose();
       return;
     }
-    await write(buildStaffSeatParams({ ...changes, tree: treeId, ifMatch: etag }));
+    await write("save", buildStaffSeatParams({ ...changes, tree: treeId, ifMatch: etag }));
   };
   const vacate = async () => {
     if (locked) return;
     await write(
+      "vacate",
       buildStaffVacateParams({ tree: treeId, position: position.id, seat: seat.id, ifMatch: etag }),
     );
   };
 
   return (
-    <Dialog open onOpenChange={(_e, d) => !d.open && !locked && onClose()}>
+    <Dialog
+      open
+      onOpenChange={(_e, d) => {
+        if (d.open || locked) return;
+        // Escape while Vacate asks answers the question, not the dialog.
+        if (asking && d.type === "escapeKeyDown") keep();
+        else onClose();
+      }}
+    >
       <DialogSurface className={styles.surface} data-testid="org-seat-dialog">
         <DialogBody>
           <DialogTitle action={<DialogDismiss disabled={locked} />}>
@@ -321,7 +359,7 @@ export function SeatDialog({
                     </Dropdown>
                   </Field>
                 ) : null}
-                <div className={styles.titleRow}>
+                <div className={styles.titleRow} data-testid="org-seat-title-row">
                   <Button
                     appearance="transparent"
                     size="small"
@@ -333,12 +371,36 @@ export function SeatDialog({
                   >
                     {OTHER_TITLE}
                   </Button>
-                  {canVacate(position, seat) ? (
+                  {canVacate(position, seat) && asking ? (
+                    <div className={styles.ask} data-testid="org-seat-vacate-question">
+                      <Body1>Vacate {title}?</Body1>
+                      <Button
+                        size="small"
+                        aria-label={`Vacate ${title}`}
+                        onClick={vacate}
+                        disabled={locked || conflict}
+                        data-testid="org-seat-vacate-confirm"
+                      >
+                        {writing === "vacate" ? "Vacating..." : "Vacate"}
+                      </Button>
+                      <Button
+                        size="small"
+                        ref={keepButton}
+                        aria-label={`Keep ${title} staffed`}
+                        onClick={keep}
+                        disabled={locked}
+                        data-testid="org-seat-vacate-keep"
+                      >
+                        Keep
+                      </Button>
+                    </div>
+                  ) : canVacate(position, seat) ? (
                     <Button
                       appearance="transparent"
                       size="small"
                       className={styles.titleLink}
-                      onClick={vacate}
+                      ref={vacateLink}
+                      onClick={ask}
                       disabled={locked || conflict}
                       data-testid="org-seat-vacate"
                     >
@@ -397,7 +459,7 @@ export function SeatDialog({
               disabled={locked || conflict}
               data-testid="org-seat-save"
             >
-              {saving ? "Saving..." : "Save"}
+              {writing === "save" ? "Saving..." : "Save"}
             </Button>
           </DialogActions>
         </DialogBody>

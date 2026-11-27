@@ -106,9 +106,11 @@ it as a choice of its own, chosen, until you pick another. A VP's seat offers Op
 "not recommended". A team lead's seat also asks which Space the team serves; the owner's seat asks only for
 your name. **Use a different title** opens the role title's field, for when the office should be called
 something else; it is open already where it is. **View**, above each office, opens the role in the
-Studio's reading room. A starting org you are only previewing has View and nothing else. A staffed seat's
-dialog also has **Vacate this seat**, beside **Use a different title**: it empties the seat, taking its model and
-its session away and nothing else. The owner's seat has no such link, and a vacant seat has nothing to take away.
+Studio's reading room. A starting org you are only previewing has View and nothing else. A seat's
+dialog also has **Vacate this seat**, beside **Use a different title**, wherever the seat has a model or a session:
+it asks `Vacate PM?` in the same place, and **Vacate** empties the seat, taking its model and its session away and
+nothing else, while **Keep** leaves it as it is. A vacant seat that still names a session has the link too, so the
+session can go. The owner's seat has no such link.
 
 In the terminal, `tkStaff -Seat` does the same:
 

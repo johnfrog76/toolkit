@@ -551,12 +551,17 @@ all of them. The owner's seat asks for the **name** alone. **Save** sends only w
 `Staff -Seat <position>.<seat> -Tree <id> ... -IfMatch <etag>` through the bridge, the tree the page shows and the
 route's `etag` -- and a Save that changes nothing closes with nothing written. A value that starts with a dash
 travels joined to its name (`-Person:-Sam`), so the binder never reads it as a switch -- the seat's address too
-(`-Seat:-p.s`), since a hand-written file may start an id with a dash. On a staffed seat that is not the owner's
-and has a model or a session to take away, the row of **Use a different title** also holds **Vacate this seat**, the
-same quiet link-style button at its right: it runs `Staff -Seat <position>.<seat> -Tree <id> -Vacate -IfMatch <etag>`,
-the same one write with the same conflict, refusal and away handling, takes the seat's model and session away and
-nothing else, and the focus lands on the seat's button, Assign now. It is not drawn on a vacant seat, on the
-owner's, or on a seat a person holds alone. When the file changed since
+(`-Seat:-p.s`), since a hand-written file may start an id with a dash. On a seat that is not the owner's and has a
+model or a session to take away -- a vacant seat that still names a session among them -- the row of **Use a
+different title** also holds **Vacate this seat**, the same quiet link-style button at its right. It asks before it
+writes, in its own place on that row: `Vacate PM?` with two small buttons, **Vacate** (named `Vacate PM`) and
+**Keep** (named `Keep PM staffed`), which takes the focus. Keep, or Escape, puts the link back with the focus on it,
+and whatever was typed in the dialog stays. Vacate runs `Staff -Seat <position>.<seat> -Tree <id> -Vacate -IfMatch
+<etag>`, the same one write with the same conflict, refusal and away handling: while it is in flight that button
+reads `Vacating...`, Save keeps its word, and nothing closes. It takes the seat's model and session away and nothing
+else, and the focus lands on the seat's button, Assign now. It is drawn in the neutral ink, never the danger
+colour: emptying a seat is a choice. It is not drawn on the owner's seat, or on a seat a person holds alone. When
+the file changed since
 the page read it, the verb refuses (`org.changedSince`), and the dialog says `The org changed since you opened it.
 Reload to see it.`, plainly, with a **Reload** button that reads the org again and closes the dialog; any other
 refusal is the verb's sentence, plainly; the agent away is the one error. It is one of the page's Staff writes, so
