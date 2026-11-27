@@ -160,7 +160,7 @@ export function plateHover(line: string, where?: string, session?: string): stri
 }
 
 /** The plate: who sits there -- vacant, the model, the person, or pool -- and
- *  the seat's button beside it (`vacant · Assign`, `Opus 5.5 · Change`), where
+ *  the seat's button beside it (`vacant · Assign`, a model's name and `Change`), where
  *  the seat serves under it, and the whole of it, the position's title first,
  *  with the seat's session, on hover. The title itself is the sign's. */
 export function Plate({

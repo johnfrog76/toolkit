@@ -128,7 +128,7 @@ its one worker, and an active GitHub Space reads its cards beside its issues, jo
 | Agent | `agent/solitaire/standup.py` and `triage.py` -- one gated router, with `suggest.py` the suggestion's rule beside them, `GET /api/ritual/standup` and `GET /api/ritual/triage`, **reads only**; `org.py`, `GET /api/ritual/org`, the org chart's reader (a mirror of `Read-OrgChart.ps1`) on the same router, which reads the hub's `org.json` and no tracker; a triage answer reaches the tracker only as `POST /api/cmd/Route`, the bridge | `space_scope` in `agent/ado/accounting.py`, the `?space=` rule `/issue-report` uses; `card_id` and the state rule in `agent/core/parsers.py` |
 | Web | `web/src/modules/solitaireAgile/` -- the descriptor, the Standup \| Triage strip (`RitualPage.tsx`), the standup page, the Triage page, the hand-off's copy box (`StartWorkBox.tsx`, a `lazyPart`), the suggestion's dismiss (`suggestDismiss.ts`), and `stage/`: the cast's scenes, drawn in the refined cast (`cast.tsx`, `refined.tsx`), the room (`seats.ts`), the empty desk (`RefinedDesk.tsx`, its eight drinks and their deal in `EmptyDesk.tsx`), the generated deck and the played route | the shell; the deck engine (`web/src/modules/deck/engine/`) and its second resolver `GeneratedDeckHost.tsx`, which the played view borrows |
 | Data | `Config/ceremonies.json` (the standup's slots, queue kinds, registers and `kinds` -- the bug and feature kinds a dressed sentence may count by; triage's three question slots, its severities `sev1`-`sev3`, its `deepWaterLabel` and the words of its text) and `Config/standup-vocabulary.json` (`phrasebook`, `nothing`, `nothingToday`, `excuses`, `fakeWork`, and `verbs`, the standup register's words offered to the model), read by both halves, never typed in code (D-SA2) | the model profile, `agent/core/model.py` (`ai.model`, `ANTHROPIC_API_KEY`), which the dress calls through and the PR review and the notes tidy-up share |
-| Contract | `consts.json` `org.file`, the org chart's file name (read by all three halves), `org.rolesFolder`, the roles folder a position's prompt is looked up in (`agentic/org/`, the CLI and the agent), and `org.presetsFolder`, where the package keeps the org presets (the agent serves them, `Staff -Preset` copies one), and `rituals.orgRoute`; `consts.json` `rituals`: the route, `triageRoute`, the two data files, `workerLabelPrefix`, `walkLabel`, `labelWidth`, every fixed word of the text (the suggestion's among them, `rituals.text.suggest*`, with `rituals.suggestShapes` and `rituals.suggestExclusions`); `consts.json` `features.spaceScoped`'s `suggestions` and `teamSize`; `consts.json` `rituals.teamSizes` (3, 6, 9) and `rituals.teamSizeDefault` (9); `consts.json` `startWork.text`: the hand-off block's head line and three section headings | -- |
+| Contract | `consts.json` `org.file`, the org chart's file name (read by all three halves), `org.rolesFolder`, the roles folder a position's prompt is looked up in (`agentic/org/`, the CLI and the agent), and `org.presetsFolder`, where the package keeps the org presets (the agent serves them, `Staff -Preset` copies one); `org.steps`, `org.roles` and `org.roleDefaults`, the default models `Staff` fills with and the seat dialog starts a vacant seat on, and `org.changedSince`, the words of `Staff -Seat`'s `-IfMatch` refusal the dialog finds; and `rituals.orgRoute`; `consts.json` `rituals`: the route, `triageRoute`, the two data files, `workerLabelPrefix`, `walkLabel`, `labelWidth`, every fixed word of the text (the suggestion's among them, `rituals.text.suggest*`, with `rituals.suggestShapes` and `rituals.suggestExclusions`); `consts.json` `features.spaceScoped`'s `suggestions` and `teamSize`; `consts.json` `rituals.teamSizes` (3, 6, 9) and `rituals.teamSizeDefault` (9); `consts.json` `startWork.text`: the hand-off block's head line and three section headings | -- |
 | Configuration | `config.default.json` `startWork.prompts`: which `agentic/` prompt the hand-off carries for each kind, set with `Config -Set startWork.prompts.<kind>=<path>` | the prompts themselves, `agentic/`, which are the package's -- the org's roles among them, `agentic/org/` ([the roles](../../agentic/org/README.md)): the PM, the team lead, the VP of engineering (which holds the merge duty), the VP of product, the intern, which fetches the tracker's milestones and drafts milestones, breakdowns, close-outs and severities for the seat it assists, and the butler, which stamps the designs once a week and reports the finished-looking ones for its seat to archive -- listed in the Studio only where Team Agile is on |
 | Hub | one file -- `Staff` WRITES `org.json` at the hub root, and no other verb writes to the hub; `Route` writes to the TRACKER; a local Space's standup READS its `current/` and `archive/`; `StartWork` READS a card in `current/` and the Space's `agentic/how-we-work.md` when it has one -- the Studio's `HowWeWork` writes it; `OrgChart` READS `org.json` at the hub root and, to check a `prompt`, the hub's `agentic/org/`, the hub's agentic folder and the toolkit's `agentic/org/`, in that order ([where a position's prompt is found](../hub/org.md#where-a-positions-prompt-is-found)); `Staff` writes `org.json` and nothing else ([the one writer](../hub/org.md#the-one-writer-staff)) | the cards, which are the card verbs' |
 
@@ -455,21 +455,26 @@ where Team Agile is on. It reads `GET /api/ritual/org` (`rituals.orgRoute`; [the
 and draws the tree it is given, in the refined cast: one office a position, a row a level from the owner down,
 each position centred over the ones that report to it, joined by lines. The office walls are coloured by level,
 the cast-skin mock's five colours (owner, the VPs, the PM, the leads, the builders; a deeper level takes the
-builders'). Each seat is a card -- a bust in the office's door and a plate under it, `POSITION · model`, with
-the Space the seat serves under it when the file says. `POSITION` is the seat's own `roleTitle` where it has one
-(`Alpha lead`), else the position's title; the model is named by the model map's `name` (`Opus 5.5`), which the
-agent looks up and serves as the seat's `modelName` -- never parsed from the id, and an id with no row shown as
-written. The seat's session is on hover, in the plate's tooltip (`... Session: lead-session`), never in its text.
+builders'). Each office reads, top to bottom: its **sign**, the office's title -- the one seat's own `roleTitle`
+where it has one (`Alpha lead`), else the position's title; a room of seats or a pool, the position's -- with **View**
+beside it where the position has a role; the **card**, a bust in the office's door, a picture and never a link; and
+the **plate** under it, who sits there -- the model by the model map's `name` (`Opus 5.5`), which the agent looks up
+and serves as the seat's `modelName`, never parsed from the id and an id with no row shown as written -- with the
+Space the seat serves under it when the file says (in a room of seats, a seat's own `roleTitle` first). The sign
+and the plate keep their heights on every view, and every plate one least width, so nothing moves when a seat is
+staffed or emptied; a long title clamps with an ellipsis, the whole of it in the tooltip, before View would wrap.
+The seat's session is on hover, in the plate's tooltip (`POSITION · model, space. Session: lead-session`), never in its text.
 No machine is ever drawn: the file's retired `machines`, `machine` and `active` are not served. The heading is the
 tree's title (an older file's `name`). A position with several seats, the team
 lead's, is a row of cards in one office; a position with no seats is a pool, one wider card with a few faces,
-`POSITION · pool` and its default-model line; the owner's seat is a person, `Owner · <name>`, with no model. A
-staffed seat is in colour; a vacant one reads `POSITION · vacant` and has an empty desk in its door
+`pool` on its plate and its default-model line; the owner's seat is a person, its plate the name, with no model. A
+staffed seat is in colour; a vacant one's plate reads `vacant` and it has an empty desk in its door
 (`stage/EmptyDesk.tsx`, the desk the standup's room drew before it took the refined cast)
 -- the chair pushed back, the desk and a steaming mug, on the level's wall dimmed -- the size of a staffed card,
-its mug picked from the seat's id so the same seat always has the same one. Over an office with a prompt is the prompt's title (`promptTitle`),
-and the office is a link to the prompt in the Studio's reading room (`promptPath(promptRef)`); the owner, the
-pool and a prompt the room does not list are not links. The faces are the web's choice, never the file's:
+its mug picked from the seat's id so the same seat always has the same one. **View** -- a small subtle Fluent
+`Button`, a link, named `View the <role> role` by the prompt's title (`promptTitle`) -- opens the prompt in the
+Studio's reading room (`promptPath(promptRef)`), on every office with a role, previews included; the owner, the
+pool and a prompt the room does not list have none. Nothing else on the chart is a link. The faces are the web's choice, never the file's:
 `orgChart.ts` maps a position's id to its faces, as the mock staffs it, and a position it does not name takes
 its level's. With no `org.json` the page says `No org chart yet` and the agent's sentence; a file that fails its
 checks (409) is said plainly too, `The org chart could not be read` and its sentence; a tree the file does not have (422, `unknown-tree`) is said plainly in
@@ -523,6 +528,28 @@ Escape wait for its save to finish, so Cancel never leaves a save half-asked. A 
 is read by its own `?tree=` read, a draft or an inactive org alike: while it loads the page says so, and a read that
 fails says why in the page's own words. The line under the heading sits in a polite live region, and each refusal in
 a status region, both always mounted, so a change is announced.
+
+**The seat dialog.** On a saved org -- active, a draft or inactive, never a preview -- each seat's plate carries
+a small subtle button beside who sits there: **Assign** on a vacant seat (`vacant · Assign`), **Change** on a
+staffed one (`Opus 5.5 · Change`), named for the seat (`Assign VP of engineering`, `Change VP of engineering, Opus
+5.5`, `Change Owner, Sam`). It opens the seat dialog (`SeatDialog.tsx`), a Fluent `Dialog` that asks the fewest
+questions, each already answered: the **model**, as a choice of families -- a VP's offers `consts.json`
+`org.steps`' families, those outside the position's `recommend` marked `not recommended`; any other seat every
+family the route serves (`families`) -- starting on the seat's own (`modelFamily`), or on a vacant seat on its
+position's default: the `defaultModel` line where the file states one, else its role's (`org.steps` for the VPs,
+`org.roleDefaults` for the rest, by `org.roles`), else none; the **session name**; the **role title**, the
+position's; and on a team lead's seat (`org.roles.teamLead`) a **Space**, a dropdown of the Spaces `/env` lists,
+`None` first. Where a position has several seats the dialog says that its role name and title change for all of
+them. The owner's seat asks for the **name** alone. **Save** sends only what differs from the file --
+`Staff -Seat <position>.<seat> -Tree <id> ... -IfMatch <etag>` through the bridge, the tree the page shows and the
+route's `etag` -- and a Save that changes nothing closes with nothing written. A value that starts with a dash
+travels joined to its name (`-Person:-Sam`), so the binder never reads it as a switch. When the file changed since
+the page read it, the verb refuses (`org.changedSince`), and the dialog says `The org changed since you opened it.
+Reload to see it.`, plainly, with a **Reload** button that reads the org again and closes the dialog; any other
+refusal is the verb's sentence, plainly; the agent away is the one error. It is one of the page's Staff writes, so
+it waits on the same flag: while a write is in flight, Assign and Change are disabled, and the dialog's Save,
+Cancel, Close and Escape wait. `OrgPage.test.tsx`, "the seat dialog", holds it; `npm run smoke:org` Assigns a seat
+in a browser and reads `org.json` back, and runs axe over the saved org and the dialog.
 
 **Zoom.** In the panel's header, just left of the View dropdown and 1rem from it, a small
 Fluent `Toolbar` of real buttons, **Zoom out**, **Zoom in** and **Fit to width**, with the percentage beside them in

@@ -118,7 +118,7 @@ present when its flag is on and absent when it is off, and nothing it does.
 | `Route` | `Triage` (typed, with `gh` stubbed -- the exact argv per switch, never a real write) | 12 (one real write against a GitHub Space) |
 | `StartWork` | `StartWork` (typed, the block byte for byte; `gh` stubbed for an issue) | 12 (the cold-agent walk) |
 | `OrgChart` | `OrgChart` (typed in a fresh shell over a scratch copy of `samples/hub`: off means no verb, the text and `-AsJson` against `Tests/fixtures/org/`, every refusal exit 2 writing nothing) | 12 (Windows PowerShell 5.1: the row under "Rows added by a fix") |
-| `Staff` | `OrgChart` (typed in a fresh shell over a scratch copy of `samples/hub`: off means no verb, the file created and added to with the defaults resolved through `Config/models.json`, a draft never put in use, hand edits and line endings kept, every refusal exit 2 writing nothing); `Tests/test_bridge.py` (through `POST /api/cmd/Staff`) | 12 (Windows PowerShell 5.1, the same bytes as 7: the row under "Rows added by a fix") |
+| `Staff` | `OrgChart` (typed in a fresh shell over a scratch copy of `samples/hub`: off means no verb, the file created and added to with the defaults resolved through `Config/models.json`, a draft never put in use, a seat staffed by `-Seat` and refused by `-IfMatch` with a stale hash, hand edits and line endings kept, every refusal exit 2 writing nothing); `Tests/test_bridge.py` (through `POST /api/cmd/Staff`, `-Seat` with the etag and a dash-led name among it) | 12 (Windows PowerShell 5.1, the same bytes as 7: the row under "Rows added by a fix") |
 
 Gate numbers are this file's `## Gate N` headings (8c is gate 8c). The four `Test*` verbs after
 `Test` are the CLI runner itself, so their rows say what covers the runner.
@@ -1387,6 +1387,18 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
   `\u00eb`. `tkStaff -Preset S` then says `as a draft; 'branch-office' stays active.`, and `tkOrgChart` still prints the
   Branch Office. The macOS host proved the verb, the serializer and the bytes under 7; 5.1's `ConvertFrom-Json` and
   its number and array shapes are this row's.
+- [ ] **Staff -Seat writes the same bytes under Windows PowerShell 5.1, and a dash-led name binds through the
+  bridge on 5.1 (Refs #603).** On the Windows PC, in `powershell` (5.1), with the same scratch hub after the row above:
+  `tkStaff -Seat owner.owner -Person Zoë` prints `owner.owner: Owner · You -> Owner · Zoë` (or the name the row above
+  left), and `tkStaff -Seat vp-engineering.vp-engineering -Session mac-opus-vp` prints its one change line; copy the
+  file aside, put the earlier copy back, run the same two commands in `pwsh`, and compare: byte for byte the same
+  (`fc /b`), no BOM, LF, `Zoë` as itself. Then `-IfMatch` with a stale hash: `tkStaff -Seat pm.pm -Model opus -IfMatch`
+  followed by 64 zeros exits 2 with `org.json changed since you read it; reload and try again.` and writes nothing.
+  Then the bridge on 5.1 -- a machine with no `pwsh`, or with the agent started under `powershell.exe` -- from the Org
+  tab, Change on the owner's seat, name `-WhatIf`, Save: the plate reads `-WhatIf` and `org.json`'s owner `person` is
+  `"-WhatIf"` (the page sends `-Person:-WhatIf`, the joined form, which 7 binds as the value and `Tests/test_bridge.py`
+  proves there; 5.1's `-File` argument binding is this row's). The macOS host proved the verb, the conflict and both
+  argument forms under 7.
 
 ## Recording a run
 

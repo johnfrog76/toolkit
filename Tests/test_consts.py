@@ -454,7 +454,8 @@ EXPECTED = {
         "families": ["opus", "fable", "sonnet"],
         "recommended": ["opus", "fable"],
     },
-    # The role files asked about by name, and every other role's default family: Staff fills with them, the web's seat dialog too.
+    # The role files asked about by name, and every other role's default family:
+    # Staff fills with them, the web's seat dialog too.
     ("org", "roles"): {
         "vpEngineering": "vp-of-engineering.prompt.md",
         "vpProduct": "vp-of-product.prompt.md",

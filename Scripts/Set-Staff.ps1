@@ -27,7 +27,7 @@
 
     -Seat edits one seat of a saved tree, active or not: the tree in use, or
     the one -Tree names. -Model (a family or an id, stored as the id), -Person,
-    -Session, -Space (a Space the toolkit knows) and -Merges are the seat's own;
+    -Session, -Space (a team lead's seat only; a Space the toolkit knows) and -Merges are the seat's own;
     -RoleName (the role file) and -RoleTitle belong to the POSITION, so they
     change every seat of it. The owner's seat (the root's) takes -Person only.
     An empty -Model, -Person, -Session, -Space or -RoleTitle takes that key

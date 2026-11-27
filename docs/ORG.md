@@ -75,8 +75,8 @@ An org is made of **positions**, the offices, and the **seats** in each:
 
 - **You are the owner.** The owner's seat is a person, never a model, and **its name is yours to choose
   and to change.** You name it when you save an org (`tkStaff -Preset S -Owner "Sam"`), and a starting org
-  calls it `You` until you do. To rename it on an org you have already saved, change the owner seat's
-  `person` in `org.json`. The page's seat dialog will make that a button (see "Where it is going").
+  calls it `You` until you do. To rename it on an org you have already saved, use the owner's **Change**
+  button on the Org tab, or `tkStaff -Seat owner.owner -Person "Sam"`.
 - **Every other seat** holds a model and, if you like, the name of the session that sits there: the name
   other sessions use to reach it. A seat with neither is **vacant**, and the Org tab draws it as an empty
   desk.
@@ -96,6 +96,27 @@ An org is made of **positions**, the offices, and the **seats** in each:
   A seat starts with its default by the role it holds, so every team's lead starts at Opus whatever its
   office is called. A model is stored as its id from [`Config/models.json`](../Config/models.json), and the page shows its
   name ("Opus 5.5") by looking it up, never by reading the id.
+
+## Staffing a seat
+
+On the Org tab, each seat of a saved org, active or a draft, has a button on its plate: **Assign** on a
+vacant seat, **Change** on a staffed one. It opens the seat dialog, already filled in: the model (the seat's
+own, or its role's default), the session's name, and the role title. A team lead's seat also asks which Space
+the team serves; the owner's seat asks only for your name. **View**, above each office, opens the role in the
+Studio's reading room. A starting org you are only previewing has View and nothing else.
+
+In the terminal, `tkStaff -Seat` does the same:
+
+```powershell
+tkStaff -Seat vp-engineering.vp-engineering -Model opus -Session mac-opus-vp
+tkStaff -Seat lead-team-1.lead -Tree corporate-headquarters -Session mini-lead -Space toolkit
+tkStaff -Seat owner.owner -Person "Sam"
+```
+
+- **A seat is `<position>.<seat>`**, and without `-Tree` it is a seat of the org in use.
+- **The role name and title belong to the position,** so changing them changes every seat of it.
+- **Nothing is written over.** The page sends what it read, and if `org.json` has changed since, the save is
+  refused and the page offers to reload. Each change prints one line, what the seat was and what it is.
 
 ## How it fits orchestration
 
@@ -128,13 +149,10 @@ schema, and `tkOrgChart` says plainly what is wrong with a file that fails its c
 ## Where it is going
 
 **Not built yet.** This section describes what is planned, so that you can see where the org is heading.
-None of it works today. [Known gaps](KNOWN-GAPS.md#seats-are-staffed-by-hand-not-yet-from-the-page) lists it too.
+None of it works today.
 
 **The next steps:**
 
-- **The seat dialog.** Each seat of a saved org gets an **Assign** or **Change** button. It sets the
-  seat's model and session, and for a team lead its Space. The owner's seat has a **Change** button for
-  your name too.
 - **Adding a team.** A team is a team lead assigned to one Space, with builders under it. The org grows
   with your projects, one team for each: Small has no team, adding the first team makes it the Branch
   Office, and adding a second makes it Corporate Headquarters.
