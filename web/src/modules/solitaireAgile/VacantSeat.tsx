@@ -20,11 +20,13 @@ export function VacantSeat({
   position,
   level,
   where,
+  session,
 }: {
   seatId: string;
   position: string;
   level: number;
   where?: string;
+  session?: string;
 }) {
   const { wall, shade } = levelWall(level);
   return (
@@ -42,7 +44,7 @@ export function VacantSeat({
           </div>
         </foreignObject>
       </OfficeDoor>
-      <Plate position={position} who={VACANT_WORD} where={where} />
+      <Plate position={position} who={VACANT_WORD} where={where} session={session} />
     </SeatCell>
   );
 }

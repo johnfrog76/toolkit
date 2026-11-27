@@ -2,8 +2,12 @@
   "activeTree": "t",
   "tree": {
     "id": "t",
-    "name": "t",
-    "machines": [],
+    "title": "t",
+    "size": null,
+    "shortDescription": null,
+    "description": null,
+    "teamSize": null,
+    "preset": null,
     "positions": [
       {
         "id": "root",
@@ -11,24 +15,27 @@
         "prompt": null,
         "reportsTo": null,
         "defaultModel": null,
+        "recommend": [],
         "level": 0,
         "seats": [
           {
             "id": "a",
+            "roleTitle": null,
             "model": "opus",
             "person": null,
-            "machine": null,
+            "session": null,
+            "merges": null,
             "space": null,
-            "active": true,
             "state": "staffed"
           },
           {
             "id": "b",
+            "roleTitle": null,
             "model": null,
             "person": null,
-            "machine": null,
+            "session": null,
+            "merges": null,
             "space": null,
-            "active": false,
             "state": "vacant"
           }
         ]

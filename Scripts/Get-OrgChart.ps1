@@ -6,9 +6,12 @@
     Prints the tree in use from the hub's org file (consts.json org.file, at the
     hub root beside hub.json; docs/hub/org.md): the positions the org has, who
     each reports to, and which model or person sits in each seat. One line per
-    seat, "Position . model [space] (machine)", indented by level; a vacant
-    seat says vacant, the owner's line shows the person, and a position with no
-    seats is a pool, one line with its default-model text.
+    seat, "Position . model [space] (session)", indented by level, with
+    ". merges" after the seat that holds the merge; a seat's own roleTitle
+    stands in for the position's title, a vacant seat says vacant, the owner's
+    line shows the person, and a position with no seats is a pool, one line with
+    its default-model text. No machine is printed: a machine is not a boundary
+    in an org.
 
     -AsJson prints the response the agent serves, as one JSON document:
     docs/hub/org.md, "The response".
@@ -95,7 +98,7 @@ foreach ($warning in @($read.Warnings)) {
 
 if ($read.Status -eq 'missing') {
     Write-CliError -Message "There is no $fileName in the hub: $($read.Path) would hold the org chart." `
-        -Hint "Create it at the hub root, beside hub.json. docs/hub/org.md has the shape and an example; samples/hub/$fileName is a small one to copy."
+        -Hint "Start one with '${p}Staff -Preset S|M|L', or create it at the hub root, beside hub.json. docs/hub/org.md has the shape and an example; samples/hub/$fileName is a small one to copy."
     exit 2  # stated refusal
 }
 if ($read.Status -ne 'ok') {
@@ -110,9 +113,8 @@ if ($AsJson) {
 }
 
 $chart = $read.Chart
-$header = "Org chart: $($chart.tree.name) ($($chart.tree.id))"
+$header = "Org chart: $($chart.tree.title) ($($chart.tree.id))"
 if ($chart.tree.id -ne $chart.activeTree) { $header += " -- not the tree in use ($($chart.activeTree))" }
 Write-Output $header
-if (@($chart.tree.machines).Count -gt 0) { Write-Output "Machines: $(@($chart.tree.machines) -join ', ')" }
 Write-Output ''
 foreach ($line in (Format-P20OrgChartLines -Chart $chart)) { Write-Output $line }

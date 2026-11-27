@@ -61,6 +61,33 @@ function Get-P20OrgItems {
     return , @()
 }
 
+function Get-P20OrgTexts {
+    # A JSON array field as its elements' text, each read as Get-P20OrgText reads
+    # one, the empty ones left out; a field that is not an array holds none.
+    param($Value)
+    $list = New-Object System.Collections.Generic.List[string]
+    foreach ($item in (Get-P20OrgItems $Value)) {
+        $text = Get-P20OrgText $item
+        if ($text) { $list.Add($text) }
+    }
+    return , @($list.ToArray())
+}
+
+function Get-P20OrgFlag {
+    # A JSON boolean as itself; anything else (absent, a string, a number) is $null.
+    param($Value)
+    if ($Value -is [bool]) { return [bool]$Value }
+    return $null
+}
+
+function Get-P20OrgWhole {
+    # A JSON whole number as itself; anything else (a boolean, a fraction, text) is $null.
+    # ConvertFrom-Json reads one as [int] on 5.1 and [long] on 7.
+    param($Value)
+    if ($Value -is [int] -or $Value -is [long]) { return [long]$Value }
+    return $null
+}
+
 function New-P20OrgResult {
     param(
         [string]$Status,
@@ -86,13 +113,16 @@ function New-P20OrgResult {
 
 function Get-P20OrgWarnings {
     # An unknown key is tolerated, like hub.json's: ignored, and said once. A key
-    # that starts with an underscore is a note and is never said.
+    # that starts with an underscore is a note and is never said. The retired keys
+    # -- a tree's name (read as its title when there is no title), machines, a
+    # seat's machine and active -- are known, so an older file reads without a
+    # word, and none of the last three is in the response.
     param($Data, [string]$FileName)
     $known = @{
         top      = @('activeTree', 'trees')
-        tree     = @('id', 'name', 'machines', 'positions')
-        position = @('id', 'title', 'prompt', 'reportsTo', 'defaultModel', 'seats')
-        seat     = @('id', 'model', 'person', 'machine', 'space', 'active')
+        tree     = @('id', 'title', 'name', 'size', 'shortDescription', 'description', 'teamSize', 'preset', 'positions', 'machines')
+        position = @('id', 'title', 'prompt', 'reportsTo', 'defaultModel', 'recommend', 'seats')
+        seat     = @('id', 'roleTitle', 'model', 'person', 'session', 'merges', 'space', 'machine', 'active')
     }
     $found = New-Object System.Collections.Generic.List[string]
     $check = {
@@ -130,13 +160,10 @@ function ConvertTo-P20OrgModel {
         $index++
         $treeId = Get-P20OrgText (Get-P20OrgField $tree 'id')
         if (-not $treeId) { return @{ Trees = $null; Failure = @{ Kind = 'missing-id'; Message = "Tree $index has no id." } } }
-        $machines = New-Object System.Collections.Generic.List[string]
-        foreach ($m in (Get-P20OrgItems (Get-P20OrgField $tree 'machines'))) {
-            $text = Get-P20OrgText $m
-            if ($text) { $machines.Add($text) }
-        }
-        $name = Get-P20OrgText (Get-P20OrgField $tree 'name')
-        if (-not $name) { $name = $treeId }
+        # An older file's name is the title when there is no title.
+        $title = Get-P20OrgText (Get-P20OrgField $tree 'title')
+        if (-not $title) { $title = Get-P20OrgText (Get-P20OrgField $tree 'name') }
+        if (-not $title) { $title = $treeId }
         $positions = New-Object System.Collections.Generic.List[object]
         $pIndex = 0
         foreach ($position in (Get-P20OrgItems (Get-P20OrgField $tree 'positions'))) {
@@ -149,30 +176,38 @@ function ConvertTo-P20OrgModel {
                 $sIndex++
                 $seatId = Get-P20OrgText (Get-P20OrgField $seat 'id')
                 if (-not $seatId) { return @{ Trees = $null; Failure = @{ Kind = 'missing-id'; Message = "Seat $sIndex of position '$positionId' in tree '$treeId' has no id." } } }
-                $active = $null
-                $rawActive = Get-P20OrgField $seat 'active'
-                if ($rawActive -is [bool]) { $active = [bool]$rawActive }
                 $seats.Add([pscustomobject]@{
-                        Id      = $seatId
-                        Model   = Get-P20OrgText (Get-P20OrgField $seat 'model')
-                        Person  = Get-P20OrgText (Get-P20OrgField $seat 'person')
-                        Machine = Get-P20OrgText (Get-P20OrgField $seat 'machine')
-                        Space   = Get-P20OrgText (Get-P20OrgField $seat 'space')
-                        Active  = $active
+                        Id        = $seatId
+                        RoleTitle = Get-P20OrgText (Get-P20OrgField $seat 'roleTitle')
+                        Model     = Get-P20OrgText (Get-P20OrgField $seat 'model')
+                        Person    = Get-P20OrgText (Get-P20OrgField $seat 'person')
+                        Session   = Get-P20OrgText (Get-P20OrgField $seat 'session')
+                        Merges    = Get-P20OrgFlag (Get-P20OrgField $seat 'merges')
+                        Space     = Get-P20OrgText (Get-P20OrgField $seat 'space')
                     })
             }
-            $title = Get-P20OrgText (Get-P20OrgField $position 'title')
-            if (-not $title) { $title = $positionId }
+            $positionTitle = Get-P20OrgText (Get-P20OrgField $position 'title')
+            if (-not $positionTitle) { $positionTitle = $positionId }
             $positions.Add([pscustomobject]@{
                     Id           = $positionId
-                    Title        = $title
+                    Title        = $positionTitle
                     Prompt       = Get-P20OrgText (Get-P20OrgField $position 'prompt')
                     ReportsTo    = Get-P20OrgText (Get-P20OrgField $position 'reportsTo')
                     DefaultModel = Get-P20OrgText (Get-P20OrgField $position 'defaultModel')
+                    Recommend    = Get-P20OrgTexts (Get-P20OrgField $position 'recommend')
                     Seats        = $seats.ToArray()
                 })
         }
-        $trees.Add([pscustomobject]@{ Id = $treeId; Name = $name; Machines = $machines.ToArray(); Positions = $positions.ToArray() })
+        $trees.Add([pscustomobject]@{
+                Id               = $treeId
+                Title            = $title
+                Size             = Get-P20OrgText (Get-P20OrgField $tree 'size')
+                ShortDescription = Get-P20OrgText (Get-P20OrgField $tree 'shortDescription')
+                Description      = Get-P20OrgText (Get-P20OrgField $tree 'description')
+                TeamSize         = Get-P20OrgWhole (Get-P20OrgField $tree 'teamSize')
+                Preset           = Get-P20OrgText (Get-P20OrgField $tree 'preset')
+                Positions        = $positions.ToArray()
+            })
     }
     return @{ Trees = $trees.ToArray(); Failure = $null }
 }
@@ -296,13 +331,14 @@ function ConvertTo-P20OrgChart {
             $state = 'vacant'
             if ($seat.Model -or $seat.Person) { $state = 'staffed' }
             $seats.Add([ordered]@{
-                    id      = $seat.Id
-                    model   = $(if ($seat.Model) { $seat.Model } else { $null })
-                    person  = $(if ($seat.Person) { $seat.Person } else { $null })
-                    machine = $(if ($seat.Machine) { $seat.Machine } else { $null })
-                    space   = $(if ($seat.Space) { $seat.Space } else { $null })
-                    active  = $seat.Active
-                    state   = $state
+                    id        = $seat.Id
+                    roleTitle = $(if ($seat.RoleTitle) { $seat.RoleTitle } else { $null })
+                    model     = $(if ($seat.Model) { $seat.Model } else { $null })
+                    person    = $(if ($seat.Person) { $seat.Person } else { $null })
+                    session   = $(if ($seat.Session) { $seat.Session } else { $null })
+                    merges    = $seat.Merges
+                    space     = $(if ($seat.Space) { $seat.Space } else { $null })
+                    state     = $state
                 })
         }
         $ordered.Add([ordered]@{
@@ -311,6 +347,7 @@ function ConvertTo-P20OrgChart {
                 prompt       = $(if ($Position.Prompt) { $Position.Prompt } else { $null })
                 reportsTo    = $(if ($Position.ReportsTo) { $Position.ReportsTo } else { $null })
                 defaultModel = $(if ($Position.DefaultModel) { $Position.DefaultModel } else { $null })
+                recommend    = @($Position.Recommend)
                 level        = $Level
                 seats        = $seats.ToArray()
             })
@@ -322,10 +359,14 @@ function ConvertTo-P20OrgChart {
     return [ordered]@{
         activeTree = $ActiveTree
         tree       = [ordered]@{
-            id        = $Tree.Id
-            name      = $Tree.Name
-            machines  = @($Tree.Machines)
-            positions = $ordered.ToArray()
+            id               = $Tree.Id
+            title            = $Tree.Title
+            size             = $(if ($Tree.Size) { $Tree.Size } else { $null })
+            shortDescription = $(if ($Tree.ShortDescription) { $Tree.ShortDescription } else { $null })
+            description      = $(if ($Tree.Description) { $Tree.Description } else { $null })
+            teamSize         = $Tree.TeamSize
+            preset           = $(if ($Tree.Preset) { $Tree.Preset } else { $null })
+            positions        = $ordered.ToArray()
         }
     }
 }
@@ -353,9 +394,35 @@ function Read-P20OrgChart {
         return (New-P20OrgResult -Status 'missing' -Path $path -Kind 'missing' -Message "There is no $fileName in the hub.")
     }
 
+    $text = $null
+    try { $text = Get-Content -LiteralPath $path -Raw -ErrorAction Stop -Encoding UTF8 }
+    catch {
+        return (New-P20OrgResult -Status 'invalid' -Path $path -Kind 'unreadable' -Message "$fileName is not readable ($($_.Exception.Message)).")
+    }
+    return (Read-P20OrgText -Text ([string]$text) -PromptsRoot $PromptsRoot -PackageRoot $PackageRoot -TreeId $TreeId -Path $path)
+}
+
+function Read-P20OrgText {
+    <#
+      The same reading as Read-P20OrgChart, over a document's TEXT rather than the
+      file: every check, in the same order, with the same result. The org file's
+      one writer (Staff, Scripts/Set-Staff.ps1) checks what it is about to write
+      through this, so a write can never land a file the reader refuses.
+      -PromptsRoot is the hub the prompts are looked up in; -Path is only echoed.
+    #>
+    [CmdletBinding()]
+    param(
+        [AllowEmptyString()][string]$Text,
+        [string]$PromptsRoot,
+        [string]$PackageRoot = '',
+        [string]$TreeId = '',
+        [string]$Path = ''
+    )
+    $fileName = Get-P20OrgFileName
+    $path = $Path
     $data = $null
     try {
-        $data = Get-Content -LiteralPath $path -Raw -ErrorAction Stop -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        $data = $Text | ConvertFrom-Json -ErrorAction Stop
     }
     catch {
         return (New-P20OrgResult -Status 'invalid' -Path $path -Kind 'unreadable' -Message "$fileName is not valid JSON ($($_.Exception.Message)).")
@@ -415,10 +482,11 @@ function Read-P20OrgChart {
 }
 
 function Format-P20OrgChartLines {
-    # The tree as text, one line per seat: "Position . model [space] (machine)",
-    # indented two spaces a level. A vacant seat says vacant; an owner's seat
-    # shows its person; a position with no seats is a pool, shown once with its
-    # default-model line.
+    # The tree as text, one line per seat: "Position . model [space] (session)",
+    # indented two spaces a level, and ". merges" after the seat that holds the
+    # merge. A seat's roleTitle stands in for the position's title. A vacant seat
+    # says vacant; an owner's seat shows its person; a position with no seats is
+    # a pool, shown once with its default-model line. No machine is printed.
     param($Chart)
     $dot = [string][char]0x00B7
     $lines = New-Object System.Collections.Generic.List[string]
@@ -434,9 +502,12 @@ function Format-P20OrgChartLines {
             $who = 'vacant'
             if ($seat.model) { $who = [string]$seat.model }
             elseif ($seat.person) { $who = [string]$seat.person }
-            $line = "$indent$($position.title) $dot $who"
+            $label = $position.title
+            if ($seat.roleTitle) { $label = $seat.roleTitle }
+            $line = "$indent$label $dot $who"
             if ($seat.space) { $line += " [$($seat.space)]" }
-            if ($seat.machine) { $line += " ($($seat.machine))" }
+            if ($seat.session) { $line += " ($($seat.session))" }
+            if ($seat.merges -eq $true) { $line += " $dot merges" }
             $lines.Add($line)
         }
     }

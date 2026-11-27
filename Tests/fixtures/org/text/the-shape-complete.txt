@@ -1,0 +1,7 @@
+Owner · Sam
+  VP of engineering · claude-opus-5-5 (engineering-session)
+    Alpha lead · claude-opus-5-5 [alpha] (lead-session)
+    Team lead · a-model-the-map-does-not-know [beta]
+      Builder · pool: claude-sonnet-5-5
+    Test runner · vacant
+  VP of product · claude-fable-5-2 (product-session) · merges

@@ -2,8 +2,12 @@
   "activeTree": "solo",
   "tree": {
     "id": "solo",
-    "name": "solo",
-    "machines": [],
+    "title": "solo",
+    "size": null,
+    "shortDescription": null,
+    "description": null,
+    "teamSize": null,
+    "preset": null,
     "positions": [
       {
         "id": "boss",
@@ -11,15 +15,17 @@
         "prompt": null,
         "reportsTo": null,
         "defaultModel": null,
+        "recommend": [],
         "level": 0,
         "seats": [
           {
             "id": "boss",
+            "roleTitle": null,
             "model": null,
             "person": "Sam",
-            "machine": null,
+            "session": null,
+            "merges": null,
             "space": null,
-            "active": null,
             "state": "staffed"
           }
         ]

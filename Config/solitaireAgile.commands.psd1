@@ -25,6 +25,10 @@
     (docs/hub/org.md). It rides Team Agile, so it is absent wherever Team
     Agile is off, and it writes nothing.
 
+    Staff is the org file's one writer: -Preset saves a tree from one of the
+    package's presets, with the default models filled in, as a draft;
+    -Activate chooses the tree in use. It rides Team Agile like OrgChart, and writes only org.json.
+
     Commands is a PLAIN hashtable: Import-PowerShellDataFile, the only reader
     the loader uses, refuses a type cast such as [ordered].
 #>
@@ -37,8 +41,9 @@
         'Route'   = 'Set-P20Route'
         'StartWork' = 'Get-P20StartWork'
         'OrgChart' = 'Get-P20OrgChart'
+        'Staff'    = 'Set-P20Staff'
     }
-    Order = @('Standup', 'Triage', 'Route', 'StartWork', 'OrgChart')
+    Order = @('Standup', 'Triage', 'Route', 'StartWork', 'OrgChart', 'Staff')
 
     Help     = @{
         'Standup' = @{
@@ -124,15 +129,31 @@
             category    = 'rituals'
             description = 'The org''s tree: who sits in each seat'
             notes       = @(
-                'One line per seat -- the position, a middle dot, the model, then [space] and (machine) -- indented by level. A vacant seat says vacant; the owner''s line shows the person and no model; a position with no seats is a pool, one line with its default-model text. The positions are the hub''s org file (org.json at the hub root, beside hub.json; docs/hub/org.md), one tree of it in use.',
-                '-Tree <id> prints another tree of the file by id. -AsJson prints the tree as the agent serves it: the active tree''s id, and the tree with its machines and its positions in tree order, each with its level, prompt, reports-to, default model and seats, a seat''s state derived (staffed when a model or a person is named, vacant when neither is).',
-                'Reads one file and writes nothing. The file is checked first -- a duplicate id, a reportsTo that names no position, a loop, not exactly one root, a prompt that is not a file in the hub''s agentic folder -- and a file that fails is a stated refusal naming what is wrong. No hub configured, or no org file in it, is refused too. A key the tool does not read is ignored with a warning.'
+                'One line per seat -- the position (or the seat''s own roleTitle), a middle dot, the model as the file writes it, then [space] and (session), and a middle dot and merges on the seat that holds the merge -- indented by level. A vacant seat says vacant; the owner''s line shows the person and no model; a position with no seats is a pool, one line with its default-model text. No machine is printed. The positions are the hub''s org file (org.json at the hub root, beside hub.json; docs/hub/org.md), one tree of it in use.',
+                '-Tree <id> prints another tree of the file by id. -AsJson prints the tree as the agent serves it, less the fields only the agent adds: the active tree''s id, and the tree with its title, size, descriptions, room and preset and its positions in tree order, each with its level, prompt, reports-to, default model, recommend and seats, a seat''s state derived (staffed when a model or a person is named, vacant when neither is).',
+                'Reads one file and writes nothing; Staff is the file''s writer. The file is checked first -- a duplicate id, a reportsTo that names no position, a loop, not exactly one root, a prompt that is not a file in the hub''s agentic folder -- and a file that fails is a stated refusal naming what is wrong. No hub configured, or no org file in it, is refused too. A key the tool does not read is ignored with a warning.'
             )
             usage       = '{cliPrefix}OrgChart [-Tree <id>] [-AsJson] [-Help]'
             examples    = @(
                 '{cliPrefix}OrgChart',
                 '{cliPrefix}OrgChart -AsJson',
                 '{cliPrefix}OrgChart -Tree branch'
+            )
+        }
+        'Staff' = @{
+            category    = 'rituals'
+            description = 'Save an org from a preset, or choose the one in use'
+            notes       = @(
+                '-Preset S|M|L saves a tree in the hub''s org file (org.json at the hub root; docs/hub/org.md) from the preset of that size, creating the file when there is none. The tree carries preset: <the preset''s id>, and the default models, each stored as a model id from Config/models.json (a family resolves through its current block): the VP of engineering and the team leads Opus, the VP of product Fable with merges: true on its seat, the intern and the butler Haiku, and every builder pool''s line Sonnet (each default by the role a position names, not its id). The PM, the test runner and the merge stand-in start vacant.',
+                '-VpEngineering and -VpProduct put another model in those two seats (a family or a model id). -Owner names the owner, the root''s seat, a person and never a model ("You" otherwise). -Title names the tree in place of the preset''s title.',
+                'The tree''s id is -Tree, else the preset''s id, then <id>-2 and <id>-3. An id that is already a tree is refused, never overwritten, and so is a fourth tree. A saved tree is a draft: -Preset never changes the tree in use, and -Activate <tree-id> is the one way to choose it (not with -Preset). The first tree of a new file is the only one, so it is the one in use; adding a second to a file that names none in use names the one that was, never the draft.',
+                'Every write keeps every other tree, key and note in its order, is checked with OrgChart''s own checks before it lands, and goes out as two-space JSON, UTF-8 with no BOM -- a created file LF, an edited one with its own line ending. -WhatIf prints the file it would write and writes nothing. A refusal writes nothing. Hand edits to the file keep working.'
+            )
+            usage       = '{cliPrefix}Staff [-Preset <S|M|L>] [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-Activate] [-WhatIf] [-Help]'
+            examples    = @(
+                '{cliPrefix}Staff -Preset S -Owner Sam',
+                '{cliPrefix}Staff -Preset M -Tree branch -VpProduct opus -WhatIf',
+                '{cliPrefix}Staff -Activate branch'
             )
         }
     }

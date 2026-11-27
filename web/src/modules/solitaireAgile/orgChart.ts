@@ -36,10 +36,20 @@ export const LEVEL_FACES: readonly (readonly FaceId[])[] = [
   ["minimalist", "new-hire", "vibemancer", "qa"],
 ];
 
+/** A position the map does not name by id takes its role's faces: a team lead's
+ *  office is a lead whatever it is called (lead-team-1), and a pool is builders. */
+export const ROLE_FACES: Readonly<Record<string, string>> = {
+  "team-lead.prompt.md": "team-lead",
+};
+export const POOL_FACES = "builder";
+
 /** The faces a position's seats take in turn. `order` is the position's place
  *  among its level's positions, so two unnamed positions on one level differ. */
 export function positionFaces(position: OrgPosition, order = 0): readonly FaceId[] {
-  const named = POSITION_FACES[position.id];
+  const named =
+    POSITION_FACES[position.id] ??
+    (position.prompt ? POSITION_FACES[ROLE_FACES[position.prompt] ?? ""] : undefined) ??
+    (position.seats.length === 0 ? POSITION_FACES[POOL_FACES] : undefined);
   if (named) return named;
   const level = LEVEL_FACES[Math.min(Math.max(position.level, 0), LEVEL_FACES.length - 1)];
   return [...level.slice(order % level.length), ...level.slice(0, order % level.length)];
@@ -77,16 +87,21 @@ export const VACANT_WORD = "vacant";
 /** The word after the position on a pool's plate. */
 export const POOL_WORD = "pool";
 
-/** The plate's second word: the model, the person (the owner), or vacant. */
-export function plateWho(seat: OrgSeat): string {
-  if (seat.state === "vacant") return VACANT_WORD;
-  return seat.person ?? seat.model ?? VACANT_WORD;
+/** The plate's first word: the seat's own roleTitle where it has one, else the position's title. */
+export function plateTitle(position: OrgPosition, seat: OrgSeat): string {
+  return seat.roleTitle ?? position.title;
 }
 
-/** Where a seat sits, where the file says: "toolkit on mini", "on laptop", or "". */
+/** The plate's second word: the person (the owner), the model by its models.json
+ *  name (the agent looks it up; a model with no row is as written), or vacant. */
+export function plateWho(seat: OrgSeat): string {
+  if (seat.state === "vacant") return VACANT_WORD;
+  return seat.person ?? seat.modelName ?? seat.model ?? VACANT_WORD;
+}
+
+/** Where a seat sits: the Space it serves, or "". No machine is ever drawn. */
 export function seatWhere(seat: OrgSeat): string {
-  const on = seat.machine ? `on ${seat.machine}` : "";
-  return [seat.space ?? "", on].filter(Boolean).join(" ");
+  return seat.space ?? "";
 }
 
 /**

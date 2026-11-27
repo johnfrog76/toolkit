@@ -13,6 +13,16 @@ links to it; what that add-on does on purpose sits under that section's "True by
 
 ## Known gaps
 
+### The org is set up from the terminal, not yet from the page
+
+**What you see:** The Org tab previews the three starting orgs and draws the org in use, but it cannot
+save one, choose the org in use, or staff a seat. `tkStaff -Preset` and `tkStaff -Activate` do that today.
+Seats are staffed by editing `org.json` by hand.
+
+**Where you meet it:** [The org](ORG.md#where-it-is-going), "Where it is going"
+
+**Issue:** [#603](https://github.com/johnfrog76/toolkit/issues/603)
+
 ### Create PR on Azure DevOps needs the branch pushed
 
 **What you see:** On an Azure DevOps board, *Create PR* in the browser runs in the Toolkit's own folder,

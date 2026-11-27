@@ -27,6 +27,7 @@ import {
   SIZE,
   layoutChart,
   levelWall,
+  plateTitle,
   plateWho,
   positionFaces,
   seatFace,
@@ -40,7 +41,10 @@ import { VacantSeat } from "./VacantSeat";
 // by level, the walls coloured by level, each position centred over the ones
 // that report to it, each seat a card with a bust and a plate. A staffed seat is
 // in colour; a vacant one is VacantSeat; a position with no seats is a pool,
-// one card with its default-model line; the owner's seat is a person.
+// one card with its default-model line; the owner's seat is a person. A plate
+// names the seat's own roleTitle where it has one, else the position's title,
+// then the model by its models.json name (the agent's modelName) or the person;
+// the seat's session is on hover. No machine is ever drawn.
 //
 // An office with a prompt is a link to it in the Studio's reading room
 // (promptPath of the position's promptRef); the owner and the pool have none,
@@ -51,8 +55,10 @@ import { VacantSeat } from "./VacantSeat";
 // presets"): the starting orgs the toolkit ships, served by GET
 // /api/ritual/org/presets. Picking one makes its title the heading, with its
 // size as a badge beside it, puts its description under the title, and draws
-// its chart with the same offices. Nothing is written: org.json stays the
-// hub's, hand-edited.
+// its chart with the same offices. The page itself writes nothing: org.json's
+// one writer is the CLI's Staff verb (docs/hub/org.md, "The one writer: Staff"),
+// which saves a preset as a tree, and a page that writes will reach it through
+// the bridge (POST /api/cmd/Staff), never a route of its own. Hand edits work too.
 
 const useStyles = makeStyles({
   body: { display: "flex", flexDirection: "column", minWidth: 0 },
@@ -156,7 +162,12 @@ function StaffedSeat({
           y={bustY(BUST_W)}
         />
       </OfficeDoor>
-      <Plate position={position.title} who={plateWho(seat)} where={where || undefined} />
+      <Plate
+        position={plateTitle(position, seat)}
+        who={plateWho(seat)}
+        where={where || undefined}
+        session={seat.session ?? undefined}
+      />
     </SeatCell>
   );
 }
@@ -185,7 +196,7 @@ function PoolSeat({ position, order }: { position: OrgPosition; order: number })
       <Plate position={position.title} who={POOL_WORD} />
       {position.defaultModel ? (
         <Caption1 className={styles.poolLine} data-testid="org-pool-line">
-          {position.defaultModel}
+          {position.defaultModelName ?? position.defaultModel}
         </Caption1>
       ) : null}
     </SeatCell>
@@ -216,9 +227,10 @@ function Office({ office }: { office: PlacedOffice }) {
               <VacantSeat
                 key={seat.id}
                 seatId={seat.id}
-                position={p.title}
+                position={plateTitle(p, seat)}
                 level={p.level}
                 where={seatWhere(seat) || undefined}
+                session={seat.session ?? undefined}
               />
             ) : (
               <StaffedSeat key={seat.id} position={p} seatIndex={i} order={office.order} />
@@ -404,7 +416,7 @@ function PresetSelect({
 }
 
 /** What the page is called: the picked preset's title, else the hub's tree's
- *  name, else the page's own name while there is no chart. */
+ *  title (an older file's name), else the page's own name while there is no chart. */
 export const ORG_PAGE_TITLE = "Org chart";
 
 export function OrgPage() {
@@ -419,7 +431,7 @@ export function OrgPage() {
   const noOrg = isLoading || ours ? undefined : <EmptyState {...noChart(error, icon)} />;
   // With no preset to offer, the page is the hub's chart alone, as it always was.
   const empty = presets.length === 0 ? noOrg : undefined;
-  const title = picked ? picked.title : (ours?.tree.name ?? ORG_PAGE_TITLE);
+  const title = picked ? picked.title : (ours?.tree.title ?? ORG_PAGE_TITLE);
 
   return (
     <div className={styles.body}>

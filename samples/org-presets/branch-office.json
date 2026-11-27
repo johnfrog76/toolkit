@@ -3,8 +3,8 @@
   "id": "branch-office",
   "size": "M",
   "title": "The Branch Office",
-  "shortDescription": "Local leads run the work: a team lead for each product, builders under the leads, and a test runner. For two or three products.",
-  "description": "Each product has its own team lead, who takes the cards for that product, briefs a builder for each, checks the work, and sends each finished pull request straight to the seat that merges, which here is the VP of product. The VP of engineering sets the standards every lane holds and settles anything that crosses products. The test runner runs the full test suites on each change before it merges, so no lead waits on the tests to finish. You set the direction and decide what ships. It fits two or three products worked side by side, each with its own lane.",
+  "shortDescription": "One team runs the work: a team lead with their own builders, and a test runner. For two or three products.",
+  "description": "The team has a lead and the lead's own builders. The team lead takes the cards, briefs one of the team's builders for each, checks the work, and sends each finished pull request straight to the seat that merges, which here is the VP of product. The VP of engineering sets the standards the team holds and settles anything that crosses products. The test runner runs the full test suites on each change before it merges, so the lead never waits on the tests to finish. You set the direction and decide what ships. It fits two or three products worked side by side, each with its own lane.",
   "teamSize": 6,
   "positions": [
     {
@@ -20,16 +20,16 @@
       "seats": [{ "id": "vp-engineering" }]
     },
     {
-      "id": "team-lead",
+      "id": "lead-team",
       "title": "Team lead",
       "prompt": "team-lead.prompt.md",
       "reportsTo": "vp-engineering",
-      "seats": [{ "id": "product-one" }, { "id": "product-two" }]
+      "seats": [{ "id": "lead" }]
     },
     {
-      "id": "builder",
+      "id": "builders-team",
       "title": "Builder",
-      "reportsTo": "team-lead",
+      "reportsTo": "lead-team",
       "defaultModel": "one per card, briefed by the lead",
       "seats": []
     },

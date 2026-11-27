@@ -1,0 +1,70 @@
+{
+  "activeTree": "t",
+  "tree": {
+    "id": "t",
+    "title": "t",
+    "size": "XL",
+    "shortDescription": null,
+    "description": null,
+    "teamSize": null,
+    "preset": null,
+    "positions": [
+      {
+        "id": "root",
+        "title": "root",
+        "prompt": null,
+        "reportsTo": null,
+        "defaultModel": null,
+        "recommend": [
+          "opus",
+          "3",
+          "fable"
+        ],
+        "level": 0,
+        "seats": [
+          {
+            "id": "a",
+            "roleTitle": null,
+            "model": "m",
+            "person": null,
+            "session": null,
+            "merges": false,
+            "space": null,
+            "state": "staffed"
+          }
+        ]
+      },
+      {
+        "id": "child",
+        "title": "child",
+        "prompt": null,
+        "reportsTo": "root",
+        "defaultModel": null,
+        "recommend": [],
+        "level": 1,
+        "seats": [
+          {
+            "id": "b",
+            "roleTitle": null,
+            "model": null,
+            "person": "Sam",
+            "session": null,
+            "merges": null,
+            "space": null,
+            "state": "staffed"
+          }
+        ]
+      },
+      {
+        "id": "other",
+        "title": "other",
+        "prompt": null,
+        "reportsTo": "root",
+        "defaultModel": null,
+        "recommend": [],
+        "level": 1,
+        "seats": []
+      }
+    ]
+  }
+}

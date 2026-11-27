@@ -787,6 +787,13 @@ def org_roles_folder() -> str:
     return consts()["org"]["rolesFolder"]
 
 
+def org_presets_folder() -> str:
+    """``samples/org-presets`` -- where the package keeps the org presets, relative
+    to the package root (docs/hub/org.md, "Org presets"). The agent serves them;
+    the CLI's ``Staff -Preset`` copies one into the hub's org file."""
+    return consts()["org"]["presetsFolder"]
+
+
 def models_file() -> str:
     """``Config/models.json`` -- the model map, relative to the package root: every
     reader of a card's ``**Agent:**`` line takes provider, family and display name from it."""

@@ -4,7 +4,7 @@
   "size": "L",
   "title": "Corporate Headquarters",
   "shortDescription": "The full org, with seats for the process: a PM, a merge stand-in, the butler and the intern. For many products and an owner with little time.",
-  "description": "The PM plans the work and keeps the record: it turns your direction into a queue for each team lead, passes each finished pull request to the seat that merges, and records what merged on the cards and the tracker. Team leads run their products with builders under them, and the test runner runs the full test suites on each change before it merges. The VP of product holds the merge, and the merge stand-in covers it when that seat is away, so a heavy queue keeps moving. The VP of engineering holds the standards across the lanes. The butler runs weekly as a bot, giving each new design note its id and reporting which designs look finished; the intern fetches the milestones and drafts proposals for the PM to decide. It fits many products, a heavy merge queue, and an owner who has little time and wants to be asked only what is theirs to decide.",
+  "description": "The PM plans the work and keeps the record: it turns your direction into a queue for each team lead, passes each finished pull request to the seat that merges, and records what merged on the cards and the tracker. There is a team for each project, each lead with their own builders, and the test runner runs the full test suites on each change before it merges. The VP of product holds the merge, and the merge stand-in covers it when that seat is away, so a heavy queue keeps moving. The VP of engineering holds the standards across the lanes. The butler runs weekly as a bot, giving each new design note its id and reporting which designs look finished; the intern fetches the milestones and drafts proposals for the PM to decide. It fits many products, a heavy merge queue, and an owner who has little time and wants to be asked only what is theirs to decide.",
   "teamSize": 9,
   "positions": [
     {
@@ -34,16 +34,30 @@
       "seats": [{ "id": "pm" }]
     },
     {
-      "id": "team-lead",
+      "id": "lead-team-1",
       "title": "Team lead",
       "prompt": "team-lead.prompt.md",
       "reportsTo": "pm",
-      "seats": [{ "id": "product-one" }, { "id": "product-two" }]
+      "seats": [{ "id": "lead" }]
     },
     {
-      "id": "builder",
+      "id": "builders-team-1",
       "title": "Builder",
-      "reportsTo": "team-lead",
+      "reportsTo": "lead-team-1",
+      "defaultModel": "one per card, briefed by the lead",
+      "seats": []
+    },
+    {
+      "id": "lead-team-2",
+      "title": "Team lead",
+      "prompt": "team-lead.prompt.md",
+      "reportsTo": "pm",
+      "seats": [{ "id": "lead" }]
+    },
+    {
+      "id": "builders-team-2",
+      "title": "Builder",
+      "reportsTo": "lead-team-2",
       "defaultModel": "one per card, briefed by the lead",
       "seats": []
     },

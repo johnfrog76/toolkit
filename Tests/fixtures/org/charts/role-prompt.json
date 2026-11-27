@@ -2,8 +2,12 @@
   "activeTree": "t",
   "tree": {
     "id": "t",
-    "name": "t",
-    "machines": [],
+    "title": "t",
+    "size": null,
+    "shortDescription": null,
+    "description": null,
+    "teamSize": null,
+    "preset": null,
     "positions": [
       {
         "id": "root",
@@ -11,15 +15,17 @@
         "prompt": "role.prompt.md",
         "reportsTo": null,
         "defaultModel": null,
+        "recommend": [],
         "level": 0,
         "seats": [
           {
             "id": "r",
+            "roleTitle": null,
             "model": "haiku",
             "person": null,
-            "machine": null,
+            "session": null,
+            "merges": null,
             "space": null,
-            "active": null,
             "state": "staffed"
           }
         ]

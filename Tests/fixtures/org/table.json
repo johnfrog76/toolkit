@@ -199,6 +199,215 @@
       }
     },
     {
+      "name": "the-shape-complete",
+      "why": "A tree in the whole shape (docs/hub/org.md, \"The shape\"): a title, a preset, a size, both descriptions and a room; positions with recommend; a seat's own roleTitle, its session, the seat that merges, a model by its id and one the model map does not know. No key is warned.",
+      "orgFile": "docs/shape.json",
+      "expect": {
+        "status": "ok",
+        "activeTree": "branch-office",
+        "chart": "charts/the-shape-complete.json",
+        "text": "text/the-shape-complete.txt",
+        "seatCount": 6,
+        "warnings": [],
+        "modelNames": {
+          "owner.owner": null,
+          "vp-engineering.vp-engineering": "Opus 5.5",
+          "team-lead.alpha": "Opus 5.5",
+          "team-lead.beta": "a-model-the-map-does-not-know",
+          "test-runner.test-runner": null,
+          "vp-product.vp-product": "Fable 5.2"
+        }
+      }
+    },
+    {
+      "name": "title-over-name",
+      "why": "A tree with both title and name: the title is the title; name is still a key this tool reads, so nothing is warned.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "title": "The new title",
+            "name": "The old name",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/title-over-name.json",
+        "text": "text/title-over-name.txt",
+        "seatCount": 0,
+        "warnings": []
+      }
+    },
+    {
+      "name": "name-alone",
+      "why": "An older file's tree with name and no title: the name is the title.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "name": "An older file",
+            "positions": [
+              {
+                "id": "root"
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/name-alone.json",
+        "text": "text/name-alone.txt",
+        "seatCount": 0,
+        "warnings": []
+      }
+    },
+    {
+      "name": "retired-keys-kept-not-drawn",
+      "why": "The retired keys -- a tree's machines, a seat's machine and active -- are read without a warning and are not in the response, and no machine is printed.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "machines": [
+              "laptop",
+              "mini"
+            ],
+            "positions": [
+              {
+                "id": "root",
+                "seats": [
+                  {
+                    "id": "a",
+                    "model": "m",
+                    "machine": "mini",
+                    "active": true,
+                    "session": "s1"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/retired-keys-kept-not-drawn.json",
+        "text": "text/retired-keys-kept-not-drawn.txt",
+        "seatCount": 1,
+        "warnings": []
+      }
+    },
+    {
+      "name": "keys-are-matched-exactly",
+      "why": "A new key spelled in another case is not that key: Title, Recommend, RoleTitle and Session are warned and ignored, so the tree's title is its id and the seat has no session.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "Title": "Not read",
+            "positions": [
+              {
+                "id": "root",
+                "Recommend": [
+                  "opus"
+                ],
+                "seats": [
+                  {
+                    "id": "a",
+                    "person": "Sam",
+                    "RoleTitle": "Not read",
+                    "Session": "not-read"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/keys-are-matched-exactly.json",
+        "text": "text/keys-are-matched-exactly.txt",
+        "seatCount": 1,
+        "warnings": [
+          "org.json: 'Title' is not a key this tool reads in tree 't' -- ignored.",
+          "org.json: 'Recommend' is not a key this tool reads in position 'root' of tree 't' -- ignored.",
+          "org.json: 'RoleTitle' is not a key this tool reads in seat 'a' of position 'root' in tree 't' -- ignored.",
+          "org.json: 'Session' is not a key this tool reads in seat 'a' of position 'root' in tree 't' -- ignored."
+        ]
+      }
+    },
+    {
+      "name": "field-types",
+      "why": "Each new field read by its type: merges only as a JSON boolean (false is kept, \"yes\" is null), teamSize only as a whole number (the text \"6\" is null), recommend's text entries trimmed with the empty and the non-text left out (a number reads as its text) and a recommend that is not an array as none, a blank roleTitle as null, and a size the schema refuses carried as written -- the reader keeps what the file says, the schema says what a file may say.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "size": "XL",
+            "teamSize": "6",
+            "positions": [
+              {
+                "id": "root",
+                "recommend": [
+                  "opus",
+                  3,
+                  "",
+                  "  fable  ",
+                  null,
+                  true
+                ],
+                "seats": [
+                  {
+                    "id": "a",
+                    "model": "m",
+                    "merges": false,
+                    "roleTitle": "   "
+                  }
+                ]
+              },
+              {
+                "id": "child",
+                "reportsTo": "root",
+                "recommend": "opus",
+                "seats": [
+                  {
+                    "id": "b",
+                    "person": "Sam",
+                    "merges": "yes"
+                  }
+                ]
+              },
+              {
+                "id": "other",
+                "reportsTo": "root",
+                "seats": []
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/field-types.json",
+        "text": "text/field-types.txt",
+        "seatCount": 2,
+        "warnings": []
+      }
+    },
+    {
       "name": "no-file",
       "why": "No org file in the hub root.",
       "expect": {

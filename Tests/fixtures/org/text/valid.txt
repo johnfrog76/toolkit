@@ -1,8 +1,8 @@
 Owner · Sam
-  VP of product · fable (laptop)
-  VP of engineering · fable (mini)
-    PM · opus (laptop)
-      Team lead · fable [alpha] (mini)
-      Team lead · opus [beta] (mini)
-      Team lead · vacant [gamma] (mini)
+  VP of product · fable
+  VP of engineering · fable
+    PM · opus
+      Team lead · fable [alpha]
+      Team lead · opus [beta]
+      Team lead · vacant [gamma]
         Builder · pool: sonnet for crew cards, opus across halves, fable for art on the owner's word

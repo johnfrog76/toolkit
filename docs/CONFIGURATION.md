@@ -43,7 +43,7 @@ Three files, and the split is the whole of it:
 
 A fourth file sits beside `hub.json` and is **not configuration**: `<promptsRoot>/org.json`, the hub's
 org chart -- positions, who reports to whom, which model or person sits in each seat. It is data the
-tool reads, hand-edited, and `Config` does not write it; see [The org chart in the hub](#the-org-chart-in-the-hub).
+tool reads, written by `Staff` or by hand, and `Config` does not write it; see [The org chart in the hub](#the-org-chart-in-the-hub).
 
 `config.default.json` ships a **template** org, not a real one -- no ADO URL, no tenant, no
 email. Nothing that identifies a person or an organisation is committed. Your real values go in
@@ -950,7 +950,8 @@ the CLI, the agent and the web all read it from. `hub.json` stays as it is (orgs
 `storeSync`, "and nothing else"): positions and seats are not a Space's declaration, so they have a file of
 their own rather than a key a manifest would have to learn. It is found where the hub is (`PROMPTS_ROOT`,
 else `promptsRoot`), is read as UTF-8, and is validated whole before anything is drawn. Its shape, each
-field, the states and the checks are [`docs/hub/org.md`](hub/org.md); `OrgChart` prints it, and it is read
+field, the states and the checks are [`docs/hub/org.md`](hub/org.md), and its JSON Schema is
+[`Config/org.schema.json`](../Config/org.schema.json); `OrgChart` prints it, `Staff` is its one writer (hand edits keep working), and it is read
 only where Team Agile is on ([the scope](hub/org.md#the-scope----where-it-is-and-is-not-there)). No key in
 any config file turns it on: a file at the hub root is all it takes, and the inventory names it either way
 (`tkEnv`, the **Org chart** row).

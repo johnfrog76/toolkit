@@ -9,7 +9,7 @@ import {
   presetLabel,
   presetSizeWord,
 } from "./OrgPage";
-import { orgResponse } from "./orgFixture";
+import { modelNameOf, orgResponse } from "./orgFixture";
 
 // The Org tab (docs/modules/solitaire-agile.md, "The web UI"): the tree the
 // agent serves, drawn as offices by level, each seat a card with its plate.
@@ -79,17 +79,28 @@ describe("the chart, over the table's tree shaped like ours", () => {
     const lead = office("team-lead");
     const seats = within(lead).getAllByTestId("org-seat");
     expect(seats.map((s) => s.dataset.state)).toEqual(["staffed", "staffed", "vacant"]);
-    expect(plates(lead)).toEqual(["Team lead · fable", "Team lead · opus", "Team lead · vacant"]);
-    expect(wheres(lead)).toEqual(["alpha on mini", "beta on mini", "gamma on mini"]);
+    expect(plates(lead)).toEqual([
+      `Team lead · ${modelNameOf("fable")}`,
+      `Team lead · ${modelNameOf("opus")}`,
+      "Team lead · vacant",
+    ]);
+    expect(wheres(lead)).toEqual(["alpha", "beta", "gamma"]);
   });
 
-  it("a staffed seat: a bust in colour and POSITION · model, with its machine", () => {
+  it("a staffed seat: a bust in colour and POSITION · the model's name, and no machine", () => {
     draw();
     const vp = office("vp-product");
     expect(within(vp).getByTestId("org-seat").dataset.state).toBe("staffed");
     expect(vp.querySelector('svg[data-refined="designer"]')).toBeTruthy();
-    expect(plates(vp)).toEqual(["VP of product · fable"]);
-    expect(wheres(vp)).toEqual(["on laptop"]);
+    expect(plates(vp)).toEqual([`VP of product · ${modelNameOf("fable")}`]);
+    expect(wheres(vp)).toEqual([]);
+    // The older file puts a machine on every seat; none is drawn, in the text or on hover.
+    for (const word of ["laptop", "mini"]) {
+      expect(screen.getByTestId("org-chart").textContent).not.toContain(word);
+      for (const plate of screen.getAllByTestId("org-plate")) {
+        expect(plate.getAttribute("title")).not.toContain(word);
+      }
+    }
   });
 
   it("a vacant seat: the empty desk in the door's opening, its mug by the seat, no bust", () => {
@@ -137,6 +148,16 @@ describe("the chart, over the table's tree shaped like ours", () => {
     );
   });
 
+  it("a pool line written as a model id reads as the model's name", () => {
+    const data = orgResponse("valid");
+    const builder = data.tree.positions.find((p) => p.id === "builder")!;
+    builder.defaultModel = "claude-sonnet-5-5";
+    builder.defaultModelName = "Sonnet 5.5";
+    response = { isLoading: false, data };
+    draw();
+    expect(within(office("builder")).getByTestId("org-pool-line").textContent).toBe("Sonnet 5.5");
+  });
+
   it("an office with a prompt is a link into the reading room, under its prompt's title", () => {
     draw();
     const pm = office("pm");
@@ -166,6 +187,32 @@ describe("the chart, over the table's tree shaped like ours", () => {
     draw();
     expect(office("pm").tagName).toBe("DIV");
     expect(within(office("pm")).getByText("Notes")).toBeTruthy();
+  });
+
+  it("a seat's own roleTitle stands in for the position's title, and its session is on hover", () => {
+    response = { isLoading: false, data: orgResponse("the-shape-complete") };
+    draw();
+    expect(screen.getByTestId("org-heading").textContent).toBe("The Branch Office");
+    const lead = office("team-lead");
+    expect(plates(lead)).toEqual([
+      "Alpha lead · Opus 5.5",
+      "Team lead · a-model-the-map-does-not-know",
+    ]);
+    const [alpha, beta] = within(lead).getAllByTestId("org-plate");
+    expect(alpha.getAttribute("title")).toBe("Alpha lead · Opus 5.5, alpha. Session: lead-session");
+    expect(beta.getAttribute("title")).toBe("Team lead · a-model-the-map-does-not-know, beta");
+    expect(plates(office("vp-product"))).toEqual(["VP of product · Fable 5.2"]);
+    expect(within(office("vp-product")).getByTestId("org-plate").getAttribute("title")).toBe(
+      "VP of product · Fable 5.2. Session: product-session",
+    );
+    // A session is said on hover, never in the plate's text.
+    expect(screen.getByTestId("org-chart").textContent).not.toContain("lead-session");
+  });
+
+  it("the heading is an older file's name where the tree has no title", () => {
+    response = { isLoading: false, data: orgResponse("name-alone") };
+    draw();
+    expect(screen.getByTestId("org-heading").textContent).toBe("An older file");
   });
 
   it("draws the table's other trees too: a lone root, and a pool alone", () => {
@@ -257,7 +304,7 @@ describe("when there is no chart", () => {
 /** A preset over one of the table's charts: the page draws whatever tree it is given. */
 function preset(id: string, size: string, title: string, chart: string): OrgPreset {
   const c = orgResponse(chart);
-  c.tree.name = title;
+  c.tree.title = title;
   return {
     id,
     size,
