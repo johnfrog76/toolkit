@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import type { CommandResponse } from "../ado/api.ado";
 import type { OrgPreset, OrgResponse, OrgTreeSummary } from "./api.solitaireAgile";
@@ -384,6 +384,19 @@ describe("the presets", () => {
     expect(positions()).toContain("pm");
     expect(screen.queryByTestId("org-preset-description")).toBeNull();
     expect(screen.queryByTestId("org-preset-size")).toBeNull();
+  });
+
+  it("puts the zoom controls in the header, just left of the dropdown", () => {
+    draw();
+    const zoom = screen.getByTestId("org-zoom");
+    const select = screen.getByTestId("org-preset-select");
+    expect(zoom.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Both sit in the panel's header, before the chart's box.
+    const chartBox = screen.getByTestId("org-chart-box");
+    expect(zoom.compareDocumentPosition(chartBox) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      select.compareDocumentPosition(chartBox) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("offers the saved orgs, then the presets smallest first", () => {
@@ -912,3 +925,103 @@ describe("a saved org read by its own ?tree= read", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
+
+// -- Zoom (card 6b) ----------------------------------------------------------------
+
+describe("the zoom", () => {
+  /** The chart box's width, as the browser would measure it. */
+  let boxWidth = 0;
+  let widthSpy: jest.SpyInstance;
+  beforeEach(() => {
+    boxWidth = 0;
+    widthSpy = jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return this.dataset.testid === "org-chart-box" ? boxWidth : 0;
+    });
+  });
+  afterEach(() => widthSpy.mockRestore());
+
+  const level = () => screen.getByTestId("org-zoom-level");
+  const chart = () => screen.getByTestId("org-chart");
+  const zoomButton = (name: string) => screen.getByRole("button", { name });
+
+  it("is a toolbar of three real buttons over the chart, the percentage in a polite live region", () => {
+    draw();
+    const bar = screen.getByRole("toolbar", { name: "Zoom" });
+    expect(
+      within(bar)
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label") ?? b.textContent),
+    ).toEqual(["Zoom out", "Zoom in", "Fit to width"]);
+    expect(level().getAttribute("aria-live")).toBe("polite");
+    expect(level().textContent).toBe("Zoom 100%");
+  });
+
+  it("a tree that fits opens at 100%, as it always looked", () => {
+    boxWidth = 5000;
+    draw();
+    expect(level().textContent).toBe("Zoom 100%");
+    expect(chart().style.transform).toBe("scale(1)");
+  });
+
+  it("a tree wider than its box opens fitted to the box's width", () => {
+    draw();
+    const width = parseFloat(chart().style.width);
+    boxWidth = Math.round(width / 2);
+    cleanupAndDraw();
+    expect(level().textContent).toBe(`Zoom ${Math.round((boxWidth / width) * 100)}%`);
+  });
+
+  it("only the chart's own layer scales: the scroll area is its scaled size, nothing else moves", () => {
+    draw();
+    const width = parseFloat(chart().style.width);
+    const height = parseFloat(chart().style.height);
+    fireEvent.click(zoomButton("Zoom in"));
+    expect(level().textContent).toBe("Zoom 110%");
+    expect(chart().style.transform).toBe("scale(1.1)");
+    // The chart keeps its own size; its box's scroll area is the scaled one.
+    expect(parseFloat(chart().style.width)).toBe(width);
+    const sizer = chart().parentElement!;
+    expect(parseFloat(sizer.style.width)).toBeCloseTo(width * 1.1);
+    expect(parseFloat(sizer.style.height)).toBeCloseTo(height * 1.1);
+    // The heading, the dropdown and the zoom bar are outside the scaled layer.
+    expect(chart().contains(screen.getByTestId("org-heading"))).toBe(false);
+    expect(chart().contains(screen.getByRole("toolbar", { name: "Zoom" }))).toBe(false);
+    expect(
+      screen.getByTestId("org-chart-box").contains(screen.getByRole("toolbar", { name: "Zoom" })),
+    ).toBe(false);
+  });
+
+  it("steps by 10% and stops at 25% and 200%, each button disabled at its end", () => {
+    draw();
+    for (let i = 0; i < 12; i++) fireEvent.click(zoomButton("Zoom in"));
+    expect(level().textContent).toBe("Zoom 200%");
+    expect((zoomButton("Zoom in") as HTMLButtonElement).disabled).toBe(true);
+    for (let i = 0; i < 20; i++) fireEvent.click(zoomButton("Zoom out"));
+    expect(level().textContent).toBe("Zoom 25%");
+    expect((zoomButton("Zoom out") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("Fit to width goes back to the fit", () => {
+    boxWidth = 5000;
+    draw();
+    fireEvent.click(zoomButton("Zoom out"));
+    expect(level().textContent).toBe("Zoom 90%");
+    fireEvent.click(zoomButton("Fit to width"));
+    expect(level().textContent).toBe("Zoom 100%");
+  });
+
+  it("the offices inside the scaled chart are still links", () => {
+    draw();
+    fireEvent.click(zoomButton("Zoom out"));
+    fireEvent.click(office("pm"));
+    expect(screen.getByTestId("where").textContent).toBe("/studio/prompts/yours/pm");
+  });
+});
+
+/** Draw again from nothing, so the next first frame measures the new width. */
+function cleanupAndDraw() {
+  cleanup();
+  draw();
+}

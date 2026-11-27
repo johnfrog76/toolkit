@@ -524,6 +524,19 @@ is read by its own `?tree=` read, a draft or an inactive org alike: while it loa
 fails says why in the page's own words. The line under the heading sits in a polite live region, and each refusal in
 a status region, both always mounted, so a change is announced.
 
+**Zoom.** In the panel's header, just left of the View dropdown and 1rem from it, a small
+Fluent `Toolbar` of real buttons, **Zoom out**, **Zoom in** and **Fit to width**, with the percentage beside them in
+a polite live region (`Zoom 75%`), the way a map's zoom control and a design tool's percentage sit over their
+canvas. Zoom scales only the chart's own layer, a CSS `transform: scale()` on its inner box from its top left; the
+box's scroll area is the scaled size, so the box pans on both axes and the page never scrolls sideways. The box is
+at most 70% of the window's height, so the header, the org's line and the controls stay in view over a pan. The
+chart opens at the scale that fits its box's width, capped at 100% -- a tree that fits looks exactly as it did, and
+a Large tree opens whole -- and keeps fitting as the window resizes until you zoom by hand; **Fit to width** goes
+back to that. The buttons step by 10% between 25% and 200% (a fitted 73% steps to 80% or 70%), each disabled at
+its end. The controls are always there, the same on every tree. There are no zoom keys: Ctrl and Cmd with + and -
+stay the browser's. The rules are `orgZoom.ts`, pure, held by `orgZoom.test.ts`; `OrgPage.test.tsx`, "the zoom",
+draws them.
+
 ### The page
 
 The Team Agile page opens on **the Agenda**: the standup's two questions -- what moved, and what is
