@@ -240,6 +240,14 @@ if ($seating) {
     if ($asked.Count -eq 0) {
         Stop-Staff "Nothing to change in '$Seat': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle or -Merges."
     }
+    # A typed value is one line of text: a newline, a tab or any other control
+    # character is refused, never stored.
+    foreach ($name in @('Person', 'Session', 'RoleTitle', 'Space', 'Model', 'RoleName')) {
+        if ($PSBoundParameters.ContainsKey($name) -and ([string]$PSBoundParameters[$name]) -match '[\x00-\x1F\x7F]') {
+            Stop-Staff "-$name holds a control character (a newline, a tab or another): it is one line of text, so nothing was written." `
+                "Give -$name as one line, with no tab."
+        }
+    }
     if ($PSBoundParameters.ContainsKey('IfMatch') -and ([string]$IfMatch).Trim() -notmatch '^[0-9A-Fa-f]{64}$') {
         Stop-Staff "-IfMatch '$IfMatch' is not a SHA-256: 64 hex digits, the hash of $fileName's bytes as you read them." `
             'The Org page sends the etag GET /api/ritual/org served; typed by hand, leave it out.'
@@ -295,7 +303,8 @@ $data = $null
 $trees = @()
 $readHash = ''
 if ($exists) { $readHash = Get-StaffHash (Get-StaffBytes) }
-if ($seating -and $PSBoundParameters.ContainsKey('IfMatch') -and $readHash -ne ([string]$IfMatch).Trim().ToLowerInvariant()) {
+# A file that is not there is said as that, below, not as a change.
+if ($exists -and $seating -and $PSBoundParameters.ContainsKey('IfMatch') -and $readHash -ne ([string]$IfMatch).Trim().ToLowerInvariant()) {
     Stop-Staff $conflict $conflictHint
 }
 if ($exists) {
@@ -518,12 +527,14 @@ else {
     function Get-StaffSeatLine($Position, $SeatObj, [bool]$WithRole) {
         # The seat as OrgChart prints it -- its label, who sits there, [space],
         # (session), and merges -- and the role file where the role was asked about.
+        # Every field -Seat can set is in it, so a change always shows: a seat's own
+        # roleTitle with the position's title after it, and a model and a person both.
         $dot = [string][char]0x00B7
-        $label = Get-P20OrgText (Get-P20OrgField $SeatObj 'roleTitle')
-        if (-not $label) { $label = Get-P20OrgText (Get-P20OrgField $Position 'title') }
+        $label = Get-P20OrgText (Get-P20OrgField $Position 'title')
         if (-not $label) { $label = Get-P20OrgText (Get-P20OrgField $Position 'id') }
-        $who = Get-P20OrgText (Get-P20OrgField $SeatObj 'model')
-        if (-not $who) { $who = Get-P20OrgText (Get-P20OrgField $SeatObj 'person') }
+        $own = Get-P20OrgText (Get-P20OrgField $SeatObj 'roleTitle')
+        if ($own) { $label = "$own ($label)" }
+        $who = @(@((Get-P20OrgText (Get-P20OrgField $SeatObj 'model')), (Get-P20OrgText (Get-P20OrgField $SeatObj 'person'))) | Where-Object { $_ }) -join ', '
         if (-not $who) { $who = 'vacant' }
         $line = "$label $dot $who"
         $where = Get-P20OrgText (Get-P20OrgField $SeatObj 'space')

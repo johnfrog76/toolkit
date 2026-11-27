@@ -869,6 +869,126 @@ try {
     $keptBytes = Get-OrgBytes
     Assert-True '  and the bytes are UTF-8 with no BOM' (-not ($keptBytes[0] -eq 0xEF -and $keptBytes[1] -eq 0xBB -and $keptBytes[2] -eq 0xBF))
 
+
+    # -- 7. Staff -Seat: what the review asked of it -------------------------------------
+    Write-Host ""
+    Write-Host "-- Staff -Seat: etag, change line, control characters, layout --" -ForegroundColor Cyan
+    function Get-ChangeLine([string]$All, [string]$SeatName) {
+        $m = [regex]::Match($All, "(?m)^$([regex]::Escape($SeatName)): (.*) -> (.*)$")
+        if (-not $m.Success) { return $null }
+        return @($m.Groups[1].Value.TrimEnd("`r"), $m.Groups[2].Value.TrimEnd("`r"))
+    }
+
+    # The etag rows both halves assert (Tests/fixtures/org/etag.json): -IfMatch takes the row's
+    # hash for the row's bytes, and refuses any other row's.
+    $etagTable = Read-Fixture 'etag.json' | ConvertFrom-Json
+    $etagRows = @($etagTable.rows)
+    foreach ($row in $etagRows) {
+        $text = ([string]$etagTable.text).Replace("`r`n", "`n")
+        if ($row.trailingNewline) { $text += "`n" }
+        if ($row.lineEnding -eq 'crlf') { $text = $text.Replace("`n", "`r`n") }
+        $bytes = New-Object System.Collections.Generic.List[byte]
+        if ($row.bom) { $bytes.AddRange([byte[]](0xEF, 0xBB, 0xBF)) }
+        $bytes.AddRange($utf8.GetBytes($text))
+        [System.IO.File]::WriteAllBytes($orgPath, $bytes.ToArray())
+        Assert-Equal "etag ($($row.name)): the fixture's hash is the SHA-256 of the row's bytes" $row.sha256 (Get-OrgHash)
+        $other = @($etagRows | Where-Object { $_.name -ne $row.name })[0].sha256
+        $took = Invoke-OrgChart "tkStaff -Seat owner.owner -Person Kim -IfMatch $($row.sha256) -WhatIf 3>`$null"
+        Assert-Equal "  -IfMatch with it: exit 0" '0' $took.Exit $took.All
+        $wrong = Invoke-OrgChart "tkStaff -Seat owner.owner -Person Kim -IfMatch $other 3>`$null"
+        Assert-True "  -IfMatch with another row's hash: exit 2, changed since you read it" ($wrong.Exit -eq '2' -and $wrong.All.Contains('changed since you read it')) $wrong.All
+        if ($row.bom -or $row.lineEnding -eq 'crlf') {
+            $wrote = Invoke-OrgChart "tkStaff -Seat owner.owner -Person Kim -IfMatch $($row.sha256) 3>`$null"
+            $after = [System.IO.File]::ReadAllBytes($orgPath)
+            $afterText = [System.Text.Encoding]::UTF8.GetString($after)
+            Assert-True "  an edit writes no BOM (the card byte contract) and keeps the line ending" (
+                $wrote.Exit -eq '0' -and -not ($after[0] -eq 0xEF -and $after[1] -eq 0xBB -and $after[2] -eq 0xBF) -and
+                ($afterText.Contains("`r`n") -eq ($row.lineEnding -eq 'crlf'))) $wrote.All
+        }
+    }
+
+    # -IfMatch with no file: the no-file refusal comes first.
+    Remove-Item -LiteralPath $orgPath -Force
+    $gone = Invoke-OrgChart "tkStaff -Seat owner.owner -Person Kim -IfMatch $('0' * 64) 3>`$null"
+    Assert-True '-IfMatch with no org.json: exit 2, says there is no file, not that it changed' (
+        $gone.Exit -eq '2' -and $gone.All.Contains('There is no org.json in the hub, so there is no seat to staff.') -and -not $gone.All.Contains('changed since')) $gone.All
+
+    # The change line shows every field the verb can set.
+    Copy-Item (Join-Path $pkgRoot 'samples/hub/org.json') $orgPath -Force
+    $withOwn = Read-Org
+    foreach ($seatObj in @(@($withOwn.trees[0].positions | Where-Object { $_.id -eq 'team-lead' })[0].seats)) {
+        if ($seatObj.id -eq 'demo') { $seatObj | Add-Member -NotePropertyName roleTitle -NotePropertyValue 'Demo lead' }
+    }
+    [System.IO.File]::WriteAllText($orgPath, ($withOwn | ConvertTo-Json -Depth 20), $utf8)
+    $lineRows = @(
+        @{ Field = 'model';      Seat = 'pm.pm';          Args = '-Model sonnet';            Want = $idOf.sonnet }
+        @{ Field = 'person';     Seat = 'pm.pm';          Args = '-Person Kim';              Want = 'Kim' }
+        @{ Field = 'session';    Seat = 'pm.pm';          Args = '-Session desk-pm';         Want = '(desk-pm)' }
+        @{ Field = 'space';      Seat = 'team-lead.demo'; Args = '-Space github-demo';       Want = '[github-demo]' }
+        @{ Field = 'role name';  Seat = 'pm.pm';          Args = '-RoleName intern.prompt.md'; Want = 'intern.prompt.md' }
+        @{ Field = 'role title'; Seat = 'team-lead.demo'; Args = "-RoleTitle 'Team captain'"; Want = 'Team captain' }
+        @{ Field = 'merges';     Seat = 'pm.pm';          Args = '-Merges';                  Want = "$dot merges" }
+    )
+    foreach ($row in $lineRows) {
+        $ran = Invoke-OrgChart "tkStaff -Seat $($row.Seat) $($row.Args) 3>`$null"
+        $pair = Get-ChangeLine $ran.All $row.Seat
+        Assert-True "the change line shows a change of $($row.Field): before and after differ, the new value in the after" (
+            $ran.Exit -eq '0' -and $pair -and $pair[0] -cne $pair[1] -and $pair[1].Contains($row.Want) -and -not $pair[0].Contains($row.Want)) $ran.All
+    }
+
+    # A typed value with a control character is refused, naming the field.
+    $controls = @(
+        @{ Name = 'a newline'; Expr = '"a$([char]10)b"' }
+        @{ Name = 'a tab'; Expr = '"a$([char]9)b"' }
+        @{ Name = 'another control character'; Expr = '"a$([char]1)b"' }
+    )
+    $fields = @(
+        @{ Switch = 'Person'; Seat = 'owner.owner' }
+        @{ Switch = 'Session'; Seat = 'pm.pm' }
+        @{ Switch = 'RoleTitle'; Seat = 'pm.pm' }
+    )
+    foreach ($f in $fields) {
+        foreach ($c in $controls) {
+            $before = Get-OrgBytes
+            $ran = Invoke-OrgChart "tkStaff -Seat $($f.Seat) -$($f.Switch) $($c.Expr) 3>`$null"
+            Assert-True "-$($f.Switch) with $($c.Name): exit 2, naming the field, nothing written" (
+                $ran.Exit -eq '2' -and $ran.All.Contains("-$($f.Switch) holds a control character") -and (Test-SameBytes $before (Get-OrgBytes))) $ran.All
+        }
+    }
+
+    # Every character the binder reads as a dash, quoted, is a name.
+    foreach ($code in @(0x2D, 0x2013, 0x2014, 0x2015)) {
+        $ran = Invoke-OrgChart "tkStaff -Seat owner.owner -Person ([string][char]$code + 'WhatIf') 3>`$null"
+        Assert-True ("a name that starts with U+{0:X4}, quoted, is the owner's name" -f $code) (
+            $ran.Exit -eq '0' -and (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'owner')[0].person -ceq ([string][char]$code + 'WhatIf')) $ran.All
+    }
+
+    # The writer owns the layout: a hand-formatted file comes back in the writer's, with every
+    # key, note, tree and order kept; a second identical edit writes nothing.
+    $handText = "{ `"_note`": `"mine`", `"activeTree`": `"mine`", `"zKey`": 1,`n  `"trees`": [ { `"id`": `"mine`", `"_tree`": `"x`", `"positions`": [`n" +
+        "    { `"id`": `"owner`", `"title`": `"Owner`", `"seats`": [ { `"id`": `"owner`", `"person`": `"You`", `"badge`": 2 } ] },`n" +
+        "    { `"id`": `"pm`", `"title`": `"PM`", `"reportsTo`": `"owner`", `"budget`": 3, `"seats`": [ { `"_s`": `"n`", `"id`": `"pm`", `"model`": `"opus`" } ] }`n" +
+        "  ], `"colour`": `"teal`" } ] }`n"
+    [System.IO.File]::WriteAllText($orgPath, $handText, $utf8)
+    function Get-KeyPaths($Value, [string]$At = '$') {
+        $out = New-Object System.Collections.Generic.List[string]
+        if ($Value -is [System.Management.Automation.PSCustomObject]) {
+            foreach ($prop in $Value.PSObject.Properties) { $out.Add("$At.$($prop.Name)"); foreach ($x in (Get-KeyPaths $prop.Value "$At.$($prop.Name)")) { $out.Add($x) } }
+        }
+        elseif ($Value -is [System.Array]) { for ($i = 0; $i -lt $Value.Count; $i++) { foreach ($x in (Get-KeyPaths $Value[$i] "$At[$i]")) { $out.Add($x) } } }
+        return , @($out.ToArray())
+    }
+    $keysBefore = (Get-KeyPaths ($handText | ConvertFrom-Json)) -join '|'
+    $laid = Invoke-OrgChart "tkStaff -Seat pm.pm -Session desk-pm 3>`$null"
+    $laidDoc = Read-Org
+    $keysAfter = (Get-KeyPaths $laidDoc) -join '|'
+    Assert-True 'the first -Seat edit of a hand-formatted file: exit 0, in the writer''s layout' ($laid.Exit -eq '0' -and [System.IO.File]::ReadAllText($orgPath).Contains("`n  `"trees`": [`n    {")) $laid.All
+    Assert-Equal '  every key and note kept, in its order, and only the session added' ($keysBefore.Replace('$.trees[0].positions[1].seats[0].model', '$.trees[0].positions[1].seats[0].model|$.trees[0].positions[1].seats[0].session')) $keysAfter
+    Assert-Equal '  the notes and unknown keys hold their values' 'mine|x|n|2|3|teal|1' ("$($laidDoc._note)|$($laidDoc.trees[0]._tree)|$($laidDoc.trees[0].positions[1].seats[0]._s)|$($laidDoc.trees[0].positions[0].seats[0].badge)|$($laidDoc.trees[0].positions[1].budget)|$($laidDoc.trees[0].colour)|$($laidDoc.zKey)")
+    $before = Get-OrgBytes
+    $again = Invoke-OrgChart "tkStaff -Seat pm.pm -Session desk-pm 3>`$null"
+    Assert-True '  the same edit again writes nothing' ($again.Exit -eq '0' -and $again.All.Contains('nothing changed') -and (Test-SameBytes $before (Get-OrgBytes))) $again.All
+
     for ($i = 0; $i -lt $neverWritten.Count; $i++) {
         Assert-True "Staff never wrote $($neverWritten[$i].Replace($root, '<scratch>').Replace($pkgRoot, '<package>')): every file the same bytes as before its cases" ((Get-Snapshot $neverWritten[$i]) -ceq $neverBefore[$i])
     }
