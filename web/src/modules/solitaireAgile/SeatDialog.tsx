@@ -55,6 +55,9 @@ const useStyles = makeStyles({
   content: { display: "flex", flexDirection: "column", rowGap: tokens.spacingVerticalM },
   note: { color: tokens.colorNeutralForeground2 },
   titleRow: { display: "flex" },
+  // The choices wrap as a row, each name kept whole: "Opus 5.5", never "Opus" over "5.5".
+  models: { flexWrap: "wrap" },
+  choice: { whiteSpace: "nowrap" },
   // A link to look at, a real button underneath: no padding to push it off the fields' edge.
   titleLink: {
     minWidth: "auto",
@@ -255,10 +258,15 @@ export function SeatDialog({
                     value={model}
                     onChange={(_, d) => setModel(d.value)}
                     layout="horizontal"
+                    className={styles.models}
                     data-testid="org-seat-model"
                   >
                     {choices.map((c) => (
-                      <Radio key={c.value} value={c.value} label={c.label} />
+                      <Radio
+                        key={c.value}
+                        value={c.value}
+                        label={{ children: c.label, className: styles.choice }}
+                      />
                     ))}
                   </RadioGroup>
                 </Field>
