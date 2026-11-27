@@ -957,7 +957,9 @@ class TheAgentListensOnTheLoopbackOnly(unittest.TestCase):
         shipped = json.loads((PKG_ROOT / "config.default.json").read_text(encoding="utf-8"))
         slug = C.azure_demo_space()
         match = [sp for sp in shipped["spaces"] if sp.get("slug") == slug]
-        self.assertEqual(len(match), 1, f"consts.json spaces.azureDemo is '{slug}', which config.default.json does not declare")
+        self.assertEqual(
+            len(match), 1, f"consts.json spaces.azureDemo is '{slug}', which config.default.json does not declare"
+        )
         self.assertIs(match[0].get("example"), True)
         self.assertEqual(match[0].get("status"), "local")
         self.assertFalse(match[0].get("org"))
