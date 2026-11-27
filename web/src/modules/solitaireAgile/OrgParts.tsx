@@ -1,6 +1,6 @@
 import { useId } from "react";
 import type { ReactNode } from "react";
-import { makeStyles, mergeClasses } from "@fluentui/react-components";
+import { Button, makeStyles, mergeClasses } from "@fluentui/react-components";
 import { SIZE } from "./orgChart";
 
 // The pieces every seat on the Org page is built from: the office door with its
@@ -33,6 +33,9 @@ const useStyles = makeStyles({
     position: "relative",
     marginTop: `-${SIZE.plateLift}px`,
     height: `${SIZE.plate}px`,
+    // One width for every plate a seat can have -- vacant with Assign, a model
+    // with Change, a preview's with neither -- so nothing moves when it changes.
+    minWidth: `${SIZE.plateWidth}px`,
     maxWidth: "100%",
     boxSizing: "border-box",
     paddingLeft: "12px",
@@ -50,15 +53,36 @@ const useStyles = makeStyles({
     fontFamily: `-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`,
     whiteSpace: "nowrap",
   },
+  // Who sits there, and the seat's button: one line, as tall as the button
+  // whether or not there is one, so a preview's plate and a saved org's match.
   line: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    columnGap: "6px",
+    minHeight: "24px",
+    maxWidth: "100%",
     fontSize: "12px",
     lineHeight: "16px",
     fontWeight: 700,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    maxWidth: "100%",
   },
-  who: { fontWeight: 500, color: PLATE_SOFT },
+  who: { overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 },
+  dot: { color: PLATE_SOFT, flexShrink: 0 },
+  // A small subtle button in the plate's own ink: the plate is cream in every theme.
+  plateButton: {
+    flexShrink: 0,
+    minWidth: "auto",
+    height: "24px",
+    paddingLeft: "4px",
+    paddingRight: "4px",
+    color: PLATE_INK,
+    fontSize: "12px",
+    fontWeight: 600,
+    textDecorationLine: "underline",
+    textUnderlineOffset: "2px",
+    ":hover": { color: PLATE_INK, backgroundColor: "rgba(28, 36, 52, 0.08)" },
+    ":hover:active": { color: PLATE_INK, backgroundColor: "rgba(28, 36, 52, 0.14)" },
+  },
   where: {
     fontSize: "10.5px",
     lineHeight: "13px",
@@ -135,26 +159,43 @@ export function plateHover(line: string, where?: string, session?: string): stri
   return session ? `${at}. Session: ${session}` : at;
 }
 
-/** The plate: `POSITION · who` on its first line, where the seat is under it,
- *  and the seat's session on hover. */
+/** The plate: who sits there -- vacant, the model, the person, or pool -- and
+ *  the seat's button beside it (`vacant · Assign`, `Opus 5.5 · Change`), where
+ *  the seat serves under it, and the whole of it, the position's title first,
+ *  with the seat's session, on hover. The title itself is the sign's. */
 export function Plate({
   position,
   who,
   where,
   session,
+  action,
 }: {
   position: string;
-  who?: string;
+  who: string;
   where?: string;
   session?: string;
+  /** The seat's Assign or Change button; absent on a preview and a pool. */
+  action?: ReactNode;
 }) {
   const styles = useStyles();
-  const line = who ? `${position} · ${who}` : position;
   return (
-    <div className={styles.plate} data-testid="org-plate" title={plateHover(line, where, session)}>
+    <div
+      className={styles.plate}
+      data-testid="org-plate"
+      title={plateHover(`${position} · ${who}`, where, session)}
+    >
       <span className={styles.line} data-testid="org-plate-line">
-        {position}
-        {who ? <span className={styles.who}> · {who}</span> : null}
+        <span className={styles.who} data-testid="org-plate-who">
+          {who}
+        </span>
+        {action ? (
+          <>
+            <span className={styles.dot} aria-hidden="true">
+              ·
+            </span>
+            {action}
+          </>
+        ) : null}
       </span>
       {where ? (
         <span className={styles.where} data-testid="org-plate-where">
@@ -162,6 +203,34 @@ export function Plate({
         </span>
       ) : null}
     </div>
+  );
+}
+
+/** Assign or Change, on a plate: a small subtle button with the seat in its name. */
+export function PlateButton({
+  label,
+  children,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  children: ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const styles = useStyles();
+  return (
+    <Button
+      size="small"
+      appearance="subtle"
+      className={styles.plateButton}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      data-testid="org-seat-action"
+    >
+      {children}
+    </Button>
   );
 }
 

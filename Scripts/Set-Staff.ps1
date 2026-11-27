@@ -179,18 +179,19 @@ $maxTrees = 3
 # still starts staffed: the role -> the family its seats start with. Every pool
 # (a position with no seats: the builders) has its default-model line set to
 # the pool's family instead. Every other seat starts vacant.
-# The two VP defaults are the Org tab's step defaults too, so both read them
-# from consts.json org.steps.
-$steps = (Get-P20Consts).org.steps
-$roleEngineering = 'vp-of-engineering.prompt.md'
-$roleProduct = 'vp-of-product.prompt.md'
+# The Org tab's seat dialog fills a vacant seat with the same defaults, so both
+# read them from consts.json: the two VPs' from org.steps (the "Use this org"
+# steps' defaults), by the role files org.roles names, and every other role's
+# from org.roleDefaults.
+$orgConsts = (Get-P20Consts).org
+$steps = $orgConsts.steps
+$roleEngineering = [string]$orgConsts.roles.vpEngineering
+$roleProduct = [string]$orgConsts.roles.vpProduct
 $seatDefaults = [ordered]@{
-    $roleEngineering    = [string]$steps.vpEngineering
-    $roleProduct        = [string]$steps.vpProduct
-    'team-lead.prompt.md' = 'opus'
-    'intern.prompt.md'  = 'haiku'
-    'butler.prompt.md'  = 'haiku'
+    $roleEngineering = [string]$steps.vpEngineering
+    $roleProduct     = [string]$steps.vpProduct
 }
+foreach ($prop in $orgConsts.roleDefaults.PSObject.Properties) { $seatDefaults[$prop.Name] = [string]$prop.Value }
 $poolDefault = 'sonnet'
 $mergesRole = $roleProduct
 
@@ -285,7 +286,8 @@ function Get-StaffBytes {
     if (-not (Test-Path -LiteralPath $orgPath -PathType Leaf)) { return $null }
     return , [System.IO.File]::ReadAllBytes($orgPath)
 }
-$conflict = "$fileName changed since you read it; reload and try again."
+# The words are consts.json org.changedSince: the seat dialog finds them in the answer.
+$conflict = "$fileName $([string](Get-P20Consts).org.changedSince); reload and try again."
 $conflictHint = "Nothing was written. Read it again (${p}OrgChart, or reload the Org page), then make the change."
 
 $exists = Test-Path -LiteralPath $orgPath -PathType Leaf

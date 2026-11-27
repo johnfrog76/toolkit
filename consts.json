@@ -461,7 +461,7 @@
   },
 
   "org": {
-    "_": "The org chart's hub file (docs/hub/org.md): the name of the file at the hub root, beside hub.json, that holds the org's trees, positions and seats. The CLI reads it (Scripts/Read-OrgChart.ps1, the OrgChart verb and the inventory row), the agent serves it (GET rituals.orgRoute), and the web will draw it, so all three type the name from here. rolesFolder is the folder inside an agentic folder that holds the org's role prompts, one <role>.prompt.md each: a position's prompt is looked for in the hub's agentic/<rolesFolder>/, then the hub's agentic/, then the toolkit's agentic/<rolesFolder>/. The CLI and the agent both resolve it. presetsFolder is where the package keeps the org presets, relative to the package root (docs/hub/org.md, \"Org presets\"): the agent serves them (GET rituals.orgPresetsRoute) and Staff -Preset copies one into the hub's org file. steps: The \"Use this org\" steps on the Org tab and Staff -Preset's VP defaults (docs/hub/org.md, \"The one writer: Staff\"; docs/modules/solitaire-agile.md, \"The web UI\"). families are the model families the two VP questions offer, in that order; recommended are the ones offered without a \"not recommended\" note; vpEngineering and vpProduct are each question's default and Staff's default for that seat, resolved through Config/models.json's current; owner is the owner's name when nobody gives one -- the presets' own word. The web asks with them and Staff fills with them, so the two agree.",
+    "_": "The org chart's hub file (docs/hub/org.md): the name of the file at the hub root, beside hub.json, that holds the org's trees, positions and seats. The CLI reads it (Scripts/Read-OrgChart.ps1, the OrgChart verb and the inventory row), the agent serves it (GET rituals.orgRoute), and the web will draw it, so all three type the name from here. rolesFolder is the folder inside an agentic folder that holds the org's role prompts, one <role>.prompt.md each: a position's prompt is looked for in the hub's agentic/<rolesFolder>/, then the hub's agentic/, then the toolkit's agentic/<rolesFolder>/. The CLI and the agent both resolve it. presetsFolder is where the package keeps the org presets, relative to the package root (docs/hub/org.md, \"Org presets\"): the agent serves them (GET rituals.orgPresetsRoute) and Staff -Preset copies one into the hub's org file. steps: The \"Use this org\" steps on the Org tab and Staff -Preset's VP defaults (docs/hub/org.md, \"The one writer: Staff\"; docs/modules/solitaire-agile.md, \"The web UI\"). families are the model families the two VP questions offer, in that order; recommended are the ones offered without a \"not recommended\" note; vpEngineering and vpProduct are each question's default and Staff's default for that seat, resolved through Config/models.json's current; owner is the owner's name when nobody gives one -- the presets' own word. The web asks with them and Staff fills with them, so the two agree. roles names the role files (a position's prompt) the tool asks about by name: the two VP seats', keyed as steps keys their defaults, and the team lead's, whose seat the seat dialog asks for a Space. roleDefaults is the family every other role's seats start with. A seat's default model is its role's, by the role file a position names and never by its id: Staff -Preset fills a new tree with them, and the seat dialog on the Org tab fills a vacant seat's model with them where the position states no defaultModel of its own. A role in neither starts vacant. changedSince is the words of Staff -Seat's -IfMatch refusal (org.json changed since you read it), which the seat dialog finds in the verb's answer to say the org changed and offer a reload.",
     "file": "org.json",
     "rolesFolder": "org",
     "presetsFolder": "samples/org-presets",
@@ -471,7 +471,18 @@
       "vpProduct": "fable",
       "families": ["opus", "fable", "sonnet"],
       "recommended": ["opus", "fable"]
-    }
+    },
+    "roles": {
+      "vpEngineering": "vp-of-engineering.prompt.md",
+      "vpProduct": "vp-of-product.prompt.md",
+      "teamLead": "team-lead.prompt.md"
+    },
+    "roleDefaults": {
+      "team-lead.prompt.md": "opus",
+      "intern.prompt.md": "haiku",
+      "butler.prompt.md": "haiku"
+    },
+    "changedSince": "changed since you read it"
   },
 
   "replyStatuses": {

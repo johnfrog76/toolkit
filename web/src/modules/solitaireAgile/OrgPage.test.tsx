@@ -47,6 +47,12 @@ jest.mock("./api.solitaireAgile", () => ({
   useRunStaffMutation: () => [runStaff, { isLoading: staffWriting }],
 }));
 
+/** The Spaces /env lists: a team lead's seat dialog offers them. */
+let envSpaces: Array<{ slug: string; name: string }> = [];
+jest.mock("../../shell/api", () => ({
+  useGetEnvQuery: () => ({ isLoading: false, data: { config: { spaces: envSpaces } } }),
+}));
+
 function Where() {
   return <p data-testid="where">{useLocation().pathname}</p>;
 }

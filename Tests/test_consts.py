@@ -454,6 +454,15 @@ EXPECTED = {
         "families": ["opus", "fable", "sonnet"],
         "recommended": ["opus", "fable"],
     },
+    # The role files asked about by name, and every other role's default family: Staff fills with them, the web's seat dialog too.
+    ("org", "roles"): {
+        "vpEngineering": "vp-of-engineering.prompt.md",
+        "vpProduct": "vp-of-product.prompt.md",
+        "teamLead": "team-lead.prompt.md",
+    },
+    ("org", "roleDefaults"): {"team-lead.prompt.md": "opus", "intern.prompt.md": "haiku", "butler.prompt.md": "haiku"},
+    # Staff -Seat's -IfMatch refusal, which the seat dialog finds in the verb's answer.
+    ("org", "changedSince"): "changed since you read it",
     # The model map a card's Agent id is looked up in: the agent reads it through models_file().
     ("models", "file"): "Config/models.json",
     # The order a card's agent is worked out in: the agent reads it through model_agent_sources().
@@ -670,6 +679,8 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertEqual(C.org_roles_folder(), EXPECTED[("org", "rolesFolder")])
         self.assertEqual(C.org_presets_folder(), EXPECTED[("org", "presetsFolder")])
         self.assertEqual(C.consts()["org"]["steps"], EXPECTED[("org", "steps")])
+        for key in ("roles", "roleDefaults", "changedSince"):
+            self.assertEqual(C.consts()["org"][key], EXPECTED[("org", key)])
         self.assertEqual(C.models_file(), EXPECTED[("models", "file")])
         self.assertEqual(C.model_agent_sources(), tuple(EXPECTED[("models", "agentSources")]))
         self.assertEqual(C.model_not_models(), tuple(EXPECTED[("models", "notModels")]))

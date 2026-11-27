@@ -310,6 +310,10 @@ $expected = [ordered]@{
     'org.presetsFolder'         = 'samples/org-presets'
     # The Org tab's "Use this org" steps and Staff -Preset's VP defaults: Set-Staff.ps1 reads (Get-P20Consts).org.steps.
     'org.steps'                 = 'owner=You,vpEngineering=opus,vpProduct=fable,families=opus fable sonnet,recommended=opus fable'
+    # The role files asked about by name, every other role's default family, and -IfMatch's refusal: Set-Staff.ps1 reads (Get-P20Consts).org.roles, .roleDefaults and .changedSince.
+    'org.roles'                 = 'vpEngineering=vp-of-engineering.prompt.md,vpProduct=vp-of-product.prompt.md,teamLead=team-lead.prompt.md'
+    'org.changedSince'          = 'changed since you read it'
+    'org.roleDefaults'          = 'team-lead.prompt.md=opus,intern.prompt.md=haiku,butler.prompt.md=haiku'
     # The model map a card's Agent id is looked up in: Get-P20ModelInfo reads (Get-P20Consts).models.file.
     'models.file'               = 'Config/models.json'
     # The order a card's agent is worked out in: Resolve-P20CardAgent reads (Get-P20Consts).models.agentSources.
