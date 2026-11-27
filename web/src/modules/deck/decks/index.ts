@@ -1,10 +1,11 @@
 import type { Deck } from "./types";
 import { connectedDeckTrailerDeck } from "./connected-deck-trailer";
 import { theToolkitDeck } from "./the-toolkit";
+import { thePromptPoetWorksTheBoardDeck } from "./the-prompt-poet-works-the-board";
 
 // The decks this Toolkit ships, and the ONE place they are registered.
 //
-// Two decks, on purpose. Trailer 2.0 (the owner: "that is all I want to
+// Two decks to begin with, on purpose. Trailer 2.0 (the owner: "that is all I want to
 // see there"); and Introducing ToolKit, the Commercial, built
 // in the Wasteland studio to its QA gate and moved here whole ("this lives with
 // the Demo slug OOB" -- the owner); it is the one the Home banner
@@ -30,7 +31,15 @@ import { theToolkitDeck } from "./the-toolkit";
 // always did -- Draft, InProgress, Complete, Archive -- and the launcher
 // filters on it.
 //
+// A third, The Prompt Poet Works the Board, came the same way: built in the
+// studio, shipped whole with its voices, and made for an Azure DevOps Space's
+// first run.
+//
 // PUBLIC_DECKS is kept as a name because the engine's notes window imports it;
 // here it is simply every deck.
-export const DECKS: Deck[] = [connectedDeckTrailerDeck, theToolkitDeck];
+export const DECKS: Deck[] = [
+  connectedDeckTrailerDeck,
+  theToolkitDeck,
+  thePromptPoetWorksTheBoardDeck,
+];
 export const PUBLIC_DECKS: Deck[] = DECKS;
