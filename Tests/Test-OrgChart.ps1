@@ -44,6 +44,12 @@
                       Windows PowerShell 5.1 has no Test-Json, so there it is a
                       named SKIP, and Tests/test_org.py validates the same files.
 
+    5. Staff          the one writer, typed: -Preset and -Activate, then -Seat --
+                      one seat of the tree in use or of a draft, the role on
+                      the position, the owner a person, an empty value taking
+                      a key away, -IfMatch with the file's own hash and with a
+                      stale one, and every refusal, each writing nothing.
+
     Run:  pwsh -File Tests/Test-OrgChart.ps1
     Or:   {cliPrefix}TestToolkit -OrgChart
 #>
@@ -743,6 +749,123 @@ try {
     $noFile = Invoke-OrgChart "tkStaff -Activate hq"
     Assert-True '-Activate with no org.json: exit 2, the sentence, no file made' (
         $noFile.Exit -eq '2' -and $noFile.All.Contains('There is no org.json in the hub, so there is no tree to put in use.') -and -not (Test-Path -LiteralPath $orgPath)) $noFile.All
+
+    # -- 6. Staff -Seat: one seat, and -IfMatch ------------------------------------------
+    # docs/hub/org.md, "The one writer: Staff". The sample hub's tree (a two-seat team
+    # lead office, the owner, the VPs) and an L tree as a draft beside it.
+    Write-Host ""
+    Write-Host "-- Staff -Seat, one seat, typed in a fresh shell -------" -ForegroundColor Cyan
+    function Get-OrgHash {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try { return (-join ($sha.ComputeHash([System.IO.File]::ReadAllBytes($orgPath)) | ForEach-Object { $_.ToString('x2') })) } finally { $sha.Dispose() }
+    }
+    function Get-OrgPosition($TreeObj, [string]$PositionId) { return (@($TreeObj.positions | Where-Object { $_.id -ceq $PositionId } | Select-Object -First 1)[0]) }
+    $noSeatFile = Invoke-OrgChart "tkStaff -Seat owner.owner -Person Sam"
+    Assert-True '-Seat with no org.json: exit 2, the sentence, no file made' (
+        $noSeatFile.Exit -eq '2' -and $noSeatFile.All.Contains('There is no org.json in the hub, so there is no seat to staff.') -and -not (Test-Path -LiteralPath $orgPath)) $noSeatFile.All
+    Copy-Item (Join-Path $pkgRoot 'samples/hub/org.json') $orgPath -Force
+    $l = Invoke-OrgChart "tkStaff -Preset L -Tree hq 3>`$null"
+    Assert-Equal 'the scratch file: the sample tree in use, an L tree beside it as a draft' '0' $l.Exit $l.All
+
+    $stampBefore = (Get-OrgTree (Read-Org) 'mine').activatedAt
+    $before = Get-OrgBytes
+    $seatDry = Invoke-OrgChart "tkStaff -Seat team-lead.github-demo -Model opus -Session mini-lead -WhatIf 3>`$null"
+    Assert-True '-Seat -WhatIf: exit 0, the change line, nothing written' (
+        $seatDry.Exit -eq '0' -and $seatDry.All.Contains("team-lead.github-demo: Team lead $dot vacant [github-demo] -> Team lead $dot $($idOf.opus) [github-demo] (mini-lead)") -and (Test-SameBytes $before (Get-OrgBytes))) $seatDry.All
+
+    $seated = Invoke-OrgChart "tkStaff -Seat team-lead.github-demo -Model opus -Session mini-lead 3>`$null"
+    Assert-Equal '-Seat on the tree in use: exit 0' '0' $seated.Exit $seated.All
+    Assert-True '  one change line, <position>.<seat>: <before> -> <after>' ($seated.All.Contains("team-lead.github-demo: Team lead $dot vacant [github-demo] -> Team lead $dot $($idOf.opus) [github-demo] (mini-lead)")) $seated.All
+    $doc = Read-Org
+    $lead = @(Get-OrgSeat (Get-OrgTree $doc 'mine') 'team-lead') | Where-Object { $_.id -eq 'github-demo' }
+    Assert-Equal '  the family is stored as its id' $idOf.opus $lead.model
+    Assert-Equal '  the session is the seat''s' 'mini-lead' $lead.session
+    Assert-Equal '  the other seat of the office is as it was' 'opus|demo' ("$(@(@(Get-OrgSeat (Get-OrgTree $doc 'mine') 'team-lead') | Where-Object { $_.id -eq 'demo' })[0].model)|$(@(@(Get-OrgSeat (Get-OrgTree $doc 'mine') 'team-lead') | Where-Object { $_.id -eq 'demo' })[0].space)")
+    Assert-True '  the sample''s note is kept, and a seat''s edit stamps no tree' ($doc.PSObject.Properties['_comment'] -and -not (Get-OrgTree $doc 'hq').PSObject.Properties['activatedAt'] -and (Get-OrgTree $doc 'mine').activatedAt -eq $stampBefore)
+    Assert-Equal '  the tree in use is as it was' 'mine' $doc.activeTree
+
+    $before = Get-OrgBytes
+    $same = Invoke-OrgChart "tkStaff -Seat team-lead.github-demo -Model $($idOf.opus) -Session mini-lead 3>`$null"
+    Assert-True 'the same values again: exit 0, nothing changed, nothing written' (
+        $same.Exit -eq '0' -and $same.All.Contains('nothing changed, so nothing was written') -and (Test-SameBytes $before (Get-OrgBytes))) $same.All
+
+    # The role belongs to the position: one edit changes every seat of the office.
+    $role = Invoke-OrgChart "tkStaff -Seat team-lead.demo -RoleTitle 'Lead' 3>`$null"
+    $office = Get-OrgPosition (Get-OrgTree (Read-Org) 'mine') 'team-lead'
+    Assert-True '-RoleTitle is the position''s title: both seats of the office read it' (
+        $role.Exit -eq '0' -and $office.title -eq 'Lead' -and @($office.seats | Where-Object { $_.PSObject.Properties['roleTitle'] }).Count -eq 0) $role.All
+    $roleName = Invoke-OrgChart "tkStaff -Seat team-lead.demo -RoleName pm.prompt.md 3>`$null"
+    Assert-True '-RoleName is the position''s prompt, and the change line names it' (
+        $roleName.Exit -eq '0' -and (Get-OrgPosition (Get-OrgTree (Read-Org) 'mine') 'team-lead').prompt -eq 'pm.prompt.md' -and $roleName.All.Contains('{team-lead.prompt.md} -> ') -and $roleName.All.Contains('{pm.prompt.md}')) $roleName.All
+
+    # An empty value takes the key away; -Merges sets the flag and leaves every other seat's.
+    $cleared = Invoke-OrgChart "tkStaff -Seat team-lead.demo -Session '' -Space '' -Merges 3>`$null"
+    $demo = @(@(Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'team-lead') | Where-Object { $_.id -eq 'demo' })[0]
+    Assert-True 'an empty -Space takes the key away, and -Merges sets merges: true' (
+        $cleared.Exit -eq '0' -and -not $demo.PSObject.Properties['space'] -and $demo.merges -eq $true) $cleared.All
+
+    # A draft is staffed by -Tree; the tree in use stays.
+    $draft = Invoke-OrgChart "tkStaff -Seat pm.pm -Tree hq -Model fable 3>`$null"
+    $doc = Read-Org
+    Assert-True '-Tree staffs a draft: its seat changes, the tree in use stays' (
+        $draft.Exit -eq '0' -and (Get-OrgSeat (Get-OrgTree $doc 'hq') 'pm')[0].model -eq $idOf.fable -and $doc.activeTree -eq 'mine' -and (Get-OrgSeat (Get-OrgTree $doc 'mine') 'pm')[0].model -eq 'opus') $draft.All
+
+    # The owner is renamed, and is a person, never a model.
+    $owner = Invoke-OrgChart "tkStaff -Seat owner.owner -Person Sam 3>`$null"
+    Assert-True 'the owner renamed with -Person' ($owner.Exit -eq '0' -and (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'owner')[0].person -eq 'Sam' -and $owner.All.Contains("owner.owner: Owner $dot You -> Owner $dot Sam")) $owner.All
+    $dash = Invoke-OrgChart "tkStaff -Seat owner.owner -Person '-Sam' 3>`$null"
+    Assert-True '  a name that starts with a dash, quoted, is a name' ($dash.Exit -eq '0' -and (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'owner')[0].person -eq '-Sam') $dash.All
+
+    # -IfMatch: the hash of the bytes as read.
+    $hash = Get-OrgHash
+    $matched = Invoke-OrgChart "tkStaff -Seat vp-engineering.vp-engineering -Session mac-opus-vp -IfMatch $($hash.ToUpperInvariant()) 3>`$null"
+    Assert-True '-IfMatch with the file''s own hash (any case): exit 0, written' (
+        $matched.Exit -eq '0' -and (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'vp-engineering')[0].session -eq 'mac-opus-vp') $matched.All
+    $before = Get-OrgBytes
+    $stale = Invoke-OrgChart "tkStaff -Seat vp-engineering.vp-engineering -Session other -IfMatch $hash"
+    Assert-Equal '-IfMatch with the hash from before that write: exit 2' '2' $stale.Exit $stale.All
+    Assert-True '  says the file changed, once' (([regex]::Matches($stale.All, [regex]::Escape('org.json changed since you read it; reload and try again.'))).Count -eq 1) $stale.All
+    Assert-True '  and writes nothing' (Test-SameBytes $before (Get-OrgBytes))
+
+    # Refusals: exit 2, the sentence once, nothing written.
+    $seatRefusals = [ordered]@{
+        '-Model on the owner''s seat'      = @('tkStaff -Seat owner.owner -Model opus', "The owner's seat takes -Person only: -Model does not go on it, because the owner is a person, never a model.")
+        '-Session on the owner''s seat'    = @('tkStaff -Seat owner.owner -Session x', "The owner's seat takes -Person only: -Session does not go on it.")
+        'an empty owner'                   = @("tkStaff -Seat owner.owner -Person ''", "-Person needs a name: the owner's seat always has a person, in your own words.")
+        'a model not in the map'           = @('tkStaff -Seat pm.pm -Model gpt-9', "-Model 'gpt-9' is not a model id or a family in Config/models.json. Families: ")
+        'a Space nobody declared'          = @('tkStaff -Seat team-lead.demo -Space nope', "-Space 'nope' is not a Space the hub declares. Spaces: ")
+        'a seat the tree does not have'    = @('tkStaff -Seat pm.nope -Model opus', "'pm.nope' is not a seat of the tree 'mine'. Seats: owner.owner, ")
+        'a seat with no dot'               = @('tkStaff -Seat pm -Model opus', "'pm' is not a seat of the tree 'mine'. A seat is named <position>.<seat>.")
+        'a pool has no seat'               = @('tkStaff -Seat builder.builder -Model opus', "'builder.builder' is not a seat of the tree 'mine'.")
+        'a tree the file does not have'    = @('tkStaff -Seat pm.pm -Tree nope -Model opus', "-Tree names 'nope', which is not a tree in org.json. Trees: mine, hq.")
+        'nothing to change'                = @('tkStaff -Seat pm.pm', "Nothing to change in 'pm.pm': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle or -Merges.")
+        'an -IfMatch that is no hash'      = @('tkStaff -Seat pm.pm -Model opus -IfMatch abc', "-IfMatch 'abc' is not a SHA-256: 64 hex digits")
+        'a role file nobody has'           = @('tkStaff -Seat pm.pm -RoleName nope.prompt.md', "names the prompt 'nope.prompt.md', which is not a file in")
+        '-Seat with -Preset'               = @('tkStaff -Seat pm.pm -Preset S', '-Seat does not go with -Preset: it edits one seat of a tree that is already saved.')
+        '-Seat with -Activate'             = @('tkStaff -Seat pm.pm -Activate', '-Seat does not go with -Activate: it edits one seat of a tree that is already saved.')
+        '-Model without -Seat'             = @('tkStaff -Activate hq -Model opus', '-Model goes with -Seat: it changes the seat -Seat names.')
+        '-Owner with -Seat'                = @('tkStaff -Seat pm.pm -Owner Sam', '-Owner goes with -Preset: it fills the tree -Preset adds.')
+    }
+    foreach ($name in $seatRefusals.Keys) {
+        $before = Get-OrgBytes
+        $ran = Invoke-OrgChart "$($seatRefusals[$name][0]) 3>`$null"
+        Assert-Equal "Staff -Seat refused ($name): exit 2" '2' $ran.Exit $ran.All
+        Assert-True "  says why, once" (([regex]::Matches($ran.All, [regex]::Escape($seatRefusals[$name][1]))).Count -eq 1) $ran.All
+        Assert-True "  and writes nothing" (Test-SameBytes $before (Get-OrgBytes))
+    }
+    # A declared Space is taken.
+    $spaced = Invoke-OrgChart "tkStaff -Seat team-lead.demo -Space github-demo 3>`$null"
+    Assert-True 'a Space the hub declares is the seat''s' ($spaced.Exit -eq '0' -and @(@(Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'team-lead') | Where-Object { $_.id -eq 'demo' })[0].space -eq 'github-demo') $spaced.All
+    # An edited CRLF file stays CRLF, and a hand-made key survives a seat's edit.
+    $crlf = [System.IO.File]::ReadAllText($orgPath).Replace("`r`n", "`n").Replace("`"id`": `"mine`",", "`"id`": `"mine`",`n      `"colour`": `"teal`",").Replace("`n", "`r`n")
+    [System.IO.File]::WriteAllText($orgPath, $crlf, $utf8)
+    $kept = Invoke-OrgChart "tkStaff -Seat intern.intern -Model sonnet 3>`$null"
+    $keptText = [System.IO.File]::ReadAllText($orgPath)
+    Assert-True 'a seat''s edit of a CRLF file: CRLF kept, no bare LF, the hand-made key kept' (
+        $kept.Exit -eq '0' -and $keptText.Contains("`r`n") -and -not ($keptText.Replace("`r`n", '').Contains("`n")) -and (Get-OrgTree (Read-Org) 'mine').colour -eq 'teal') $kept.All
+    $keptBytes = Get-OrgBytes
+    Assert-True '  and the bytes are UTF-8 with no BOM' (-not ($keptBytes[0] -eq 0xEF -and $keptBytes[1] -eq 0xBB -and $keptBytes[2] -eq 0xBF))
+
     for ($i = 0; $i -lt $neverWritten.Count; $i++) {
         Assert-True "Staff never wrote $($neverWritten[$i].Replace($root, '<scratch>').Replace($pkgRoot, '<package>')): every file the same bytes as before its cases" ((Get-Snapshot $neverWritten[$i]) -ceq $neverBefore[$i])
     }

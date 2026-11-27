@@ -30,6 +30,7 @@ Run directly:  python3 Tests/test_bridge.py
 Under pytest:  python3 -m pytest Tests/
 """
 
+import hashlib
 import json
 import os
 import shutil
@@ -603,6 +604,52 @@ class StaffThroughTheBridge(TeamAgileScratchPackage):
         body = client.post("/api/cmd/Staff", json={"params": ["-Activate", "nope"]}).json()
         self.assertEqual(body["status"], "error", body)
         self.assertIn("-Activate names 'nope', which is not a tree in org.json.", body.get("error") or "")
+
+    def _seat(self, *params: str) -> dict:
+        return client.post("/api/cmd/Staff", json={"params": ["-Seat", *params]}).json()
+
+    def _hash(self) -> str:
+        return hashlib.sha256((self.hub / C.org_file()).read_bytes()).hexdigest()
+
+    def test_seat_with_the_etag_writes_and_a_stale_one_is_refused(self):
+        # The page's call: -Seat ... -IfMatch <the etag it read>.
+        self._config(True)
+        self.assertEqual(self._post_preset(), "success")
+        etag = self._hash()
+        body = self._seat("vp-engineering.vp-engineering", "-Model", "sonnet", "-Session", "mac-vp", "-IfMatch", etag)
+        self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+        self.assertIn("vp-engineering.vp-engineering: VP of engineering", body["output"])
+        seat = self._seat_of("vp-engineering")
+        sonnet = json.loads((PKG_ROOT / "Config" / "models.json").read_text("utf-8"))["current"]["sonnet"]
+        self.assertEqual((seat["model"], seat["session"]), (sonnet, "mac-vp"))
+        # The etag the page holds is from before that write: refused, nothing written.
+        before = (self.hub / C.org_file()).read_bytes()
+        body = self._seat("vp-engineering.vp-engineering", "-Session", "other", "-IfMatch", etag)
+        self.assertEqual(body["status"], "error", body)
+        self.assertIn("org.json changed since you read it; reload and try again.", body.get("error") or "")
+        self.assertEqual((self.hub / C.org_file()).read_bytes(), before)
+
+    def test_a_name_that_starts_with_a_dash_is_a_name(self):
+        # A bare "-Sam" after -Person binds as its value: the bridge's argv is a
+        # script's, and the binder takes a token it has no parameter for as one.
+        # A name that IS one of the verb's switches ("-WhatIf") would be read as
+        # the switch, so the page sends every such value joined, "-Person:-WhatIf".
+        self._config(True)
+        self.assertEqual(self._post_preset(), "success")
+        body = self._seat("owner.owner", "-Person", "-Sam")
+        self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+        self.assertEqual(self._seat_of("owner")["person"], "-Sam")
+        body = self._seat("owner.owner", "-Person:-WhatIf")
+        self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+        self.assertEqual(self._seat_of("owner")["person"], "-WhatIf")
+
+    def _post_preset(self) -> str:
+        return client.post("/api/cmd/Staff", json={"params": ["-Preset", "S"]}).json()["status"]
+
+    def _seat_of(self, position: str) -> dict:
+        doc = json.loads((self.hub / C.org_file()).read_text("utf-8"))
+        tree = doc["trees"][0]
+        return next(p for p in tree["positions"] if p["id"] == position)["seats"][0]
 
 
 class ParametersTravelAsArgv(unittest.TestCase):

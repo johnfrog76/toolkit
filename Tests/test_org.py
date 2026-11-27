@@ -11,7 +11,8 @@ order aside. A failure's ``kind`` is the contract; its sentence is the CLI's.
 Beyond the table: the route's gate (off is 404, not 403), what a failed read
 answers, the fields only the route adds for the web (``promptTitle`` and
 ``promptRef`` on each position, through the Studio's one prompt record, and
-``modelName`` on each seat, through the model map), that nothing in the hub is
+``modelName`` on each seat, through the model map, and ``etag``, the SHA-256 of
+the file's bytes, which ``Staff -Seat -IfMatch`` checks), that nothing in the hub is
 written, and the schema (Config/org.schema.json) validating the sample hub's file
 and the presets with ``jsonschema``.
 
@@ -20,6 +21,7 @@ No network: the route reads one file and calls nothing.
 Run:  python3 -m pytest Tests/test_org.py
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -39,7 +41,7 @@ try:
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
-    from agent.core import config
+    from agent.core import config, models
     from agent.core import consts as C
     from agent.solitaire import api as solitaire_api
     from agent.solitaire import org
@@ -237,20 +239,29 @@ class TheSharedTable(OrgBase):
                     }
                     for where, name in want.get("modelNames", {}).items():
                         self.assertEqual(names.get(where, "no such seat"), name, where)
+                    # The etag is the file's bytes as read, hashed -- route-only, so stripped below.
+                    etag = body.pop("etag")
+                    self.assertEqual(body.pop("families"), list(models.read_model_current()))
+                    self.assertEqual(etag, hashlib.sha256((hub / C.org_file()).read_bytes()).hexdigest())
                     # The file's trees, listed: the tree shown among them, exactly one in use.
                     trees = body.pop("trees")
                     self.assertIn(body["tree"]["id"], [t["id"] for t in trees])
                     self.assertEqual([t["id"] for t in trees if t["active"]], [want["activeTree"]])
                     for position in body["tree"]["positions"]:
                         # the fields only the route adds; the table's response is the shared part
-                        added = {"promptTitle", "promptRef", "defaultModelName"}
+                        added = {"promptTitle", "promptRef", "defaultModelName", "defaultModelFamily"}
                         self.assertEqual(set(position) & added, added, position)
                         self.assertEqual(
                             position["defaultModelName"], org.model_name(position["defaultModel"]), position
                         )
-                        del position["promptTitle"], position["promptRef"], position["defaultModelName"]
+                        self.assertEqual(
+                            position["defaultModelFamily"], org.model_family(position["defaultModel"]), position
+                        )
+                        for key in added:
+                            del position[key]
                         for seat in position["seats"]:
                             self.assertIn("modelName", seat, seat)
+                            self.assertEqual(seat.pop("modelFamily"), org.model_family(seat["model"]), seat)
                             del seat["modelName"]
                     chart = json.loads((FIXTURES / want["chart"]).read_text(encoding="utf-8"))
                     self.assertTrue(same_json(body, chart), json.dumps(body, indent=1))
@@ -474,6 +485,23 @@ class TheRoute(OrgBase):
         self.assertEqual(self.client.get(ROUTE).json()["tree"]["id"], "a")
         # the CLI trims -Tree, so the agent does
         self.assertEqual(self.client.get(ROUTE + "?tree=%20b%20").json()["tree"]["id"], "b")
+
+    def test_the_etag_is_the_files_bytes_for_every_tree_and_moves_with_them(self):
+        # One file, one hash: a draft read by ?tree= carries the same etag as the
+        # tree in use, and any change to the bytes -- a line ending, a space -- is a new one.
+        doc = {
+            "activeTree": "a",
+            "trees": [{"id": "a", "positions": [{"id": "x"}]}, {"id": "b", "positions": [{"id": "y"}]}],
+        }
+        self.put(doc)
+        path = self.hub / C.org_file()
+        want = hashlib.sha256(path.read_bytes()).hexdigest()
+        self.assertEqual(self.client.get(ROUTE).json()["etag"], want)
+        self.assertEqual(self.client.get(ROUTE + "?tree=b").json()["etag"], want)
+        path.write_bytes(path.read_bytes() + b"\n")
+        moved = self.client.get(ROUTE).json()["etag"]
+        self.assertNotEqual(moved, want)
+        self.assertEqual(moved, hashlib.sha256(path.read_bytes()).hexdigest())
 
     def test_an_unknown_tree_is_422_naming_it_and_the_trees(self):
         self.put(self.doc())
@@ -936,3 +964,22 @@ class TheModelName(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TheModelFamily(unittest.TestCase):
+    """A seat's ``modelFamily``, for the seat dialog's picker: the model map's
+    family, looked up and never parsed -- the word in an id is not read."""
+
+    def test_an_id_with_a_row_is_its_family(self):
+        self.assertEqual(org.model_family("claude-opus-5-5"), "opus")
+        self.assertEqual(org.model_family("claude-haiku-4-5"), "haiku")
+
+    def test_a_family_is_itself(self):
+        for family in ("opus", "fable", "sonnet", "haiku"):
+            with self.subTest(family):
+                self.assertEqual(org.model_family(family), family)
+
+    def test_anything_else_has_none(self):
+        for text in ("claude-opus-9", "sonnet for crew cards", "", None):
+            with self.subTest(text):
+                self.assertIsNone(org.model_family(text))

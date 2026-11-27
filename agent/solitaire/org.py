@@ -19,14 +19,18 @@ Three layers, so the rule is testable without a hub:
   agentic/org/).
 - the route -- the thin layer: ``find_org_chart`` plus each position's prompt
   as the Studio's reading room knows it (``promptTitle``, ``promptRef``), taken
-  through ``agent/studio/prompts.py``'s one record, never a second parser.
+  through ``agent/studio/prompts.py``'s one record, never a second parser --
+  and the file's ``etag``, the SHA-256 of its bytes, which ``Staff -Seat
+  -IfMatch`` checks before it writes.
 
-The route is a READ and the file is hand-edited: nothing here writes.
+The route is a READ: nothing here writes. The file's one writer is the CLI's
+``Staff``, which the page reaches through the bridge.
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import math
 import re
@@ -92,6 +96,9 @@ class OrgResult:
     # Every tree of the file, in its order, as the route lists them (``tree_summaries``).
     trees: list[dict] = field(default_factory=list)
     path: str = ""
+    # The SHA-256 of the file's bytes, as read: the route's ``etag``, which the
+    # page sends back to ``Staff -Seat`` as ``-IfMatch``.
+    etag: str = ""
 
 
 # -- Reading a field the way the CLI's reader does -----------------------------
@@ -519,15 +526,17 @@ def find_org_chart(tree_id: str = "") -> OrgResult:
     if not root.is_dir() or not path.is_file():
         return OrgResult("missing", KIND_MISSING, f"There is no {org_file()} in the hub.", path=str(path))
     try:
-        text = path.read_bytes().decode("utf-8", errors="replace")
+        raw = path.read_bytes()
     except OSError as e:
         return OrgResult("invalid", "unreadable", f"{org_file()} is not readable ({e}).", path=str(path))
+    text = raw.decode("utf-8", errors="replace")
 
     def prompt_exists(name: str) -> bool:
         return find_prompt(name) is not None
 
     result = read_org_chart(text, prompt_exists, hub_folder("agentic").name, tree_id.strip())
     result.path = str(path)
+    result.etag = hashlib.sha256(raw).hexdigest()
     return result
 
 
@@ -581,16 +590,32 @@ def model_name(model: str | None) -> str | None:
     return models.model_info(current)["name"] if current else model
 
 
+def model_family(model: str | None) -> str | None:
+    """The family a seat's ``model`` belongs to, for the seat dialog's picker: the
+    model map's ``family`` for an id it has a row for; the family itself for a
+    family it names in ``current`` (``opus``); else None. Looked up, never parsed."""
+    if not model:
+        return None
+    info = models.model_info(model)
+    if info["known"]:
+        return info["family"]
+    current = models.current_model(model)
+    return models.model_info(current)["family"] if current else None
+
+
 def with_prompts(chart: dict) -> dict:
     """The chart with the fields only the route adds: ``promptTitle`` and
     ``promptRef`` on every position (both null for a position with no prompt),
-    ``modelName`` on every seat and ``defaultModelName`` on every position
-    (``model_name``: a pool's line written as an id reads as the model's name)."""
+    ``modelName`` and ``modelFamily`` on every seat and ``defaultModelName`` and
+    ``defaultModelFamily`` on every position (``model_name``: a pool's line
+    written as an id reads as the model's name; ``model_family``)."""
     for position in chart["tree"]["positions"]:
         position["promptTitle"], position["promptRef"] = prompt_fields(position["prompt"] or "")
         position["defaultModelName"] = model_name(position["defaultModel"])
+        position["defaultModelFamily"] = model_family(position["defaultModel"])
         for seat in position["seats"]:
             seat["modelName"] = model_name(seat["model"])
+            seat["modelFamily"] = model_family(seat["model"])
     return chart
 
 
@@ -617,6 +642,12 @@ def org_chart(tree: str = "") -> dict:
         raise _refusal(result)
     chart = with_prompts(result.chart)
     chart["trees"] = result.trees
+    # The file's bytes as this read saw them (docs/hub/org.md, "The response"):
+    # a seat's edit sends it back, so a file changed since is refused, not overwritten.
+    chart["etag"] = result.etag
+    # The families a seat can be staffed with -- the model map's current block,
+    # in its order -- which the seat dialog offers and Staff -Model resolves.
+    chart["families"] = list(models.read_model_current())
     log_writer.write_log(
         "CMD",
         f"agent{ROUTE}",

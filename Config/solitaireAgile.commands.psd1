@@ -27,7 +27,7 @@
 
     Staff is the org file's one writer: -Preset saves a tree from one of the
     package's presets, with the default models filled in, as a draft;
-    -Activate chooses the tree in use. It rides Team Agile like OrgChart, and writes only org.json.
+    -Seat staffs one seat of a saved tree; -Activate chooses the tree in use. It rides Team Agile like OrgChart, and writes only org.json.
 
     Commands is a PLAIN hashtable: Import-PowerShellDataFile, the only reader
     the loader uses, refuses a type cast such as [ordered].
@@ -142,17 +142,21 @@
         }
         'Staff' = @{
             category    = 'rituals'
-            description = 'Save an org from a preset, or choose the one in use'
+            description = 'Save an org, staff a seat, or choose the one in use'
             notes       = @(
                 '-Preset S|M|L saves a tree in the hub''s org file (org.json at the hub root; docs/hub/org.md) from the preset of that size, creating the file when there is none. The tree carries preset: <the preset''s id>, and the default models, each stored as a model id from Config/models.json (a family resolves through its current block): the VP of engineering and the team leads Opus, the VP of product Fable with merges: true on its seat, the intern and the butler Haiku, and every builder pool''s line Sonnet (each default by the role a position names, not its id). The PM, the test runner and the merge stand-in start vacant.',
                 '-VpEngineering and -VpProduct put another model in those two seats (a family or a model id). -Owner names the owner, the root''s seat, a person and never a model ("You" otherwise). -Title names the tree in place of the preset''s title.',
                 'The tree''s id is -Tree, else the preset''s id, then <id>-2 and <id>-3. An id that is already a tree is refused, never overwritten, and so is a fourth tree. A saved tree is a draft: -Preset never changes the tree in use, and -Activate <tree-id> is the one way to choose it (not with -Preset). The first tree of a new file is the only one, so it is the one in use; adding a second to a file that names none in use names the one that was, never the draft.',
+                '-Seat <position>.<seat> edits one seat of a saved tree, active or not: the tree in use, or the one -Tree names. -Model (a family or a model id, stored as the id), -Person, -Session (the session''s name), -Space (a Space the toolkit knows, a team lead''s) and -Merges are the seat''s own; -RoleName (the role file) and -RoleTitle are the position''s, so they change every seat of it. The owner''s seat, the root''s, takes -Person only: -Model on it is refused. An empty value takes that key away. It prints one line, <position>.<seat>: <before> -> <after>, and a call that changes nothing writes nothing.',
+                '-IfMatch <sha256> is the SHA-256 of the org file''s bytes as you read them (the Org page sends the etag GET /api/ritual/org served): a file that has changed since is refused, and nothing is written. Without it, -Seat edits the file as it is now.',
                 'Every write keeps every other tree, key and note in its order, is checked with OrgChart''s own checks before it lands, and goes out as two-space JSON, UTF-8 with no BOM -- a created file LF, an edited one with its own line ending. -WhatIf prints the file it would write and writes nothing. A refusal writes nothing. Hand edits to the file keep working.'
             )
-            usage       = '{cliPrefix}Staff [-Preset <S|M|L>] [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-Activate] [-WhatIf] [-Help]'
+            usage       = '{cliPrefix}Staff [-Preset <S|M|L>] [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-Seat <position.seat>] [-Model <model>] [-Person <name>] [-Session <name>] [-Space <slug>] [-RoleName <file>] [-RoleTitle <text>] [-Merges] [-IfMatch <sha256>] [-Activate] [-WhatIf] [-Help]'
             examples    = @(
                 '{cliPrefix}Staff -Preset S -Owner Sam',
                 '{cliPrefix}Staff -Preset M -Tree branch -VpProduct opus -WhatIf',
+                '{cliPrefix}Staff -Seat vp-engineering.vp-engineering -Model opus -Session mac-opus-vp',
+                '{cliPrefix}Staff -Seat owner.owner -Person Sam',
                 '{cliPrefix}Staff -Activate branch'
             )
         }
