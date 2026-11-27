@@ -42,7 +42,10 @@ and each org's description says where it sits.
 
 ## Saving an org, and the one in use
 
-The Org tab previews. `tkStaff` saves:
+On the Org tab, **Use this org** on a preview saves it, after three questions that are already answered: your
+name and the two VPs' models. Two labelled dropdowns sit in the header: **View**, for the org you are looking
+at, and **Active**, for the org in use. Choosing in Active makes that org the one in use. In the terminal,
+`tkStaff` does the same:
 
 ```powershell
 tkStaff -Preset S -Owner "Sam"          # save the Executive Suite as an org of your own
@@ -125,13 +128,10 @@ schema, and `tkOrgChart` says plainly what is wrong with a file that fails its c
 ## Where it is going
 
 **Not built yet.** This section describes what is planned, so that you can see where the org is heading.
-None of it works today. [Known gaps](KNOWN-GAPS.md#the-org-is-set-up-from-the-terminal-not-yet-from-the-page) lists it too.
+None of it works today. [Known gaps](KNOWN-GAPS.md#seats-are-staffed-by-hand-not-yet-from-the-page) lists it too.
 
 **The next steps:**
 
-- **Setting up an org from the page.** "Use this org" on a preview asks three questions (your name and the
-  two VPs' models, each with its default filled) and saves it. Two dropdowns: **View**, to choose the org
-  you are looking at, and **Active**, to choose the org in use.
 - **The seat dialog.** Each seat of a saved org gets an **Assign** or **Change** button. It sets the
   seat's model and session, and for a team lead its Space. The owner's seat has a **Change** button for
   your name too.
