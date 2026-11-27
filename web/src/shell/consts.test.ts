@@ -18,6 +18,7 @@ import {
   BILLING,
   COMMUNICATION,
   DESIGN,
+  AZURE_DEMO_SPACE,
   DOCS,
   FEATURES,
   FOLDERS,
@@ -183,6 +184,8 @@ describe("consts.json", () => {
     // A shipped Space's old slug -> its new one. Both loaders read it;
     // the web reads /api/env, where the old slug has already become the new.
     expect(consts.spaces.renamed).toEqual({ test: "azure-demo" });
+    // The shipped Azure demo Space: the Prompt Poet deck is offered on it.
+    expect(AZURE_DEMO_SPACE).toBe("azure-demo");
     // The package's own repository: the agent's fallback for a Space that is
     // this package itself when a copy has no git origin; the web reads the
     // answer (`space.isToolkit`), never the address.

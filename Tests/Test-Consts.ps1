@@ -199,6 +199,8 @@ $expected = [ordered]@{
     # A shipped Space's old slug -> its new one. A map travels as its
     # old=new pairs joined with a comma, so the table stays flat.
     'spaces.renamed'          = 'test=azure-demo'
+    # The shipped Azure demo Space's slug: the web offers the Prompt Poet deck on it.
+    'spaces.azureDemo'        = 'azure-demo'
     # Whether a GitHub Space's repository is public: the three words the
     # agent serves and Env, SwitchSpace Status and the writing verbs print, and
     # the one line a write to a public repository carries.

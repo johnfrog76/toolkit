@@ -259,6 +259,23 @@ Complete, so no state chip is drawn in any row:
 | `["the-toolkit"]` | the Trailer alone; the header counts 1 | **All 1 · archived 1** | Introducing ToolKit, whose page says `archived on this machine` |
 | both ids | nothing: `Every deck is archived on this machine -- the archived filter shows them.` | **All 0 · archived 2** | both |
 
+### Home's first-run banner, by Space and flags (`scenarios.test.tsx`; the render is `homeBanner.test.tsx`)
+
+The deck module's contribution to Home's banner slot, with the deck module on. One banner at a time:
+`firstRun.welcome` is the commercial's (set by `tkStart`), `firstRun.poet` is the Prompt Poet's (true
+until closed) and counts only on the shipped Azure demo Space (`azure-demo`).
+
+| The Space | `welcome` | `poet` | The banner |
+| --- | --- | --- | --- |
+| Azure demo | on | on | Introducing ToolKit -- the poet waits |
+| Azure demo | off | on | **The Prompt Poet Works the Board** |
+| Azure demo | off | off | none |
+| GitHub demo, local demo, or a person's own Azure DevOps Space | off | on | none |
+| any other Space | on | any | Introducing ToolKit |
+| deck module off | any | any | none -- no banner, no chunk |
+
+The Decks launcher lists the poet deck under Growth in every row.
+
 ### The sign-in strip, by Space and sign-in state (`scenarios.test.tsx`; the render is `SignInStrip.test.tsx`, the agent's rule `Tests/test_signin.py`)
 
 "Sign in to Azure DevOps", with the one command (`az login --allow-no-subscriptions`, `consts.json` `signIn.azCommand`), **Copy** and **Check again**, above the page on every page you work from. The agent decides (`azSignIn.needed` in `GET /api/env`); the web reads it. Said and checked, never run -- the app never signs in for you -- and drawn in the neutral style, a status and never an alert.

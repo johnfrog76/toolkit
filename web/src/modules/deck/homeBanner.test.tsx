@@ -1,4 +1,5 @@
 import { deckModule } from ".";
+import { AZURE_DEMO_SPACE } from "../../shell/consts";
 import { HOME_BANNER_SLOT } from "../../shell/slots";
 import type { CardContext } from "../../shell/registry";
 import type { EnvStatus } from "../../shell/api";
@@ -24,15 +25,16 @@ function ctx(env: Partial<EnvStatus> | undefined): CardContext {
 
 const banner = (env: Partial<EnvStatus> | undefined) =>
   deckModule.slotCards?.[HOME_BANNER_SLOT]?.(ctx(env)) ?? [];
-const config = (firstRunWelcome?: boolean) =>
+const config = (firstRunWelcome?: boolean, firstRunPoet?: boolean, activeSpace = "demo") =>
   ({
     config: {
       org: null,
       projects: [],
       promptsFolder: "",
-      activeSpace: "demo",
+      activeSpace,
       spaces: [],
       firstRunWelcome,
+      firstRunPoet,
     },
   }) as Partial<EnvStatus>;
 
@@ -48,5 +50,39 @@ describe("the first-run banner", () => {
 
   it("is one element while firstRun.welcome is on", () => {
     expect(banner(config(true))).toHaveLength(1);
+  });
+});
+
+// The Prompt Poet's offer: the shipped Azure demo Space only, until it is closed,
+// and never beside the commercial's.
+describe("the Prompt Poet's first-run offer", () => {
+  const azure = AZURE_DEMO_SPACE;
+
+  it("shows on the shipped Azure demo Space while firstRun.poet is on", () => {
+    expect(banner(config(false, true, azure))).toHaveLength(1);
+    expect((banner(config(false, true, azure))[0] as { key: string }).key).toBe(
+      "first-run-poet-banner",
+    );
+  });
+
+  it.each([
+    ["the GitHub demo", "github-demo"],
+    ["the local demo", "demo"],
+    ["a person's own Azure DevOps Space", "acme"],
+  ])("does not show on %s", (_name, slug) => {
+    expect(banner(config(false, true, slug))).toHaveLength(0);
+  });
+
+  it("does not show once closed, or before /env says", () => {
+    expect(banner(config(false, false, azure))).toHaveLength(0);
+    expect(banner(config(false, undefined, azure))).toHaveLength(0);
+  });
+
+  it("waits while the commercial's offer shows, and follows it when that is closed", () => {
+    const keyOf = (e: Partial<EnvStatus>) => (banner(e)[0] as { key: string } | undefined)?.key;
+    expect(keyOf(config(true, true, azure))).toBe("first-run-banner");
+    expect(keyOf(config(true, false, azure))).toBe("first-run-banner");
+    expect(keyOf(config(false, true, azure))).toBe("first-run-poet-banner");
+    expect(keyOf(config(false, false, azure))).toBeUndefined();
   });
 });

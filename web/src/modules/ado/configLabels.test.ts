@@ -65,6 +65,13 @@ describe("configLabels", () => {
     });
   });
 
+  it("the Prompt Poet's offer is named for hiding too, drawn inverted", () => {
+    expect(wordsFor("firstRun.poet", "")).toMatchObject({
+      label: "Hide Prompt Poet Deck",
+      inverted: true,
+    });
+  });
+
   // A Space's checkout (#146) is keyed by its slug, like a Space's own fields.
   it("names a Space's checkout by its pattern", () => {
     expect(schemaKeyOf("spaceCheckouts.toolkit.path")).toBe("spaceCheckouts.<slug>.path");

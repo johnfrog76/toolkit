@@ -22,6 +22,9 @@ import consts from "@consts";
 /** The running version: what the package says it is (`consts.json`'s `version`). */
 export const VERSION = consts.version as string;
 
+/** The shipped Azure demo Space's slug (`consts.json` `spaces.azureDemo`): where the Prompt Poet deck is offered. */
+export const AZURE_DEMO_SPACE = (consts.spaces as { azureDemo: string }).azureDemo;
+
 /**
  * The derived state of a card. There is no status field -- these strings are it.
  * `backlog` and `done` are FOLDER states: a card in `backlog/` is planned, not in

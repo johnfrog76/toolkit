@@ -372,6 +372,9 @@ def _config_block(cfg: dict) -> dict:
         # The first-run banner's switch. The web renders it only when this
         # is true AND the deck module is on.
         "firstRunWelcome": bool((cfg.get("firstRun") or {}).get("welcome", False)),
+        # firstRun.poet: the Azure demo Space's deck offer. True until closed,
+        # unlike welcome, because the offer is about the Space, not a fresh install.
+        "firstRunPoet": bool((cfg.get("firstRun") or {}).get("poet", True)),
         # deck.archived: the decks this machine has put away, by id. The Decks
         # card leaves them out of its default list; the deck file is untouched.
         "deckArchived": deck_archived(cfg),

@@ -1,5 +1,6 @@
 import { Suspense, lazy } from "react";
 import { Spinner } from "@fluentui/react-components";
+import { AZURE_DEMO_SPACE } from "../../shell/consts";
 import { HOME_BANNER_SLOT } from "../../shell/slots";
 import type { ToolkitModule } from "../../shell/registry";
 import { DECKS_HOME, DECK_PAGE_ROUTE, DECK_PLAY_PREFIX } from "./paths";
@@ -31,6 +32,8 @@ const DeckLauncher = lazy(() =>
 // The first-run banner, lazy like the rest: it carries the tour deck's first
 // slide, and a person who has dismissed it should never download it.
 const HomeBanner = lazy(() => import("./HomeBanner"));
+// The Prompt Poet's offer on the shipped Azure demo Space, its own chunk for the same reason.
+const PoetBanner = lazy(() => import("./PoetBanner"));
 
 // A deck's page: what the deck file says about it, Play, and this machine's
 // Archive -- between the list and the player (docs/modules/deck.md, "A deck's page").
@@ -92,14 +95,26 @@ export const deckModule: ToolkitModule = {
     // Home's banner, above its tabs, while `firstRun.welcome` is on. Asked for
     // only once /env has answered true, so it never flashes and never loads for
     // a machine that was not started from the sample hub.
-    [HOME_BANNER_SLOT]: (ctx) =>
-      ctx.env?.config?.firstRunWelcome
-        ? [
-            <Suspense key="first-run-banner" fallback={null}>
-              <HomeBanner />
-            </Suspense>,
-          ]
-        : [],
+    // One banner at a time: the commercial's while `firstRun.welcome` is on; once it is
+    // closed, the Prompt Poet's on the shipped Azure demo Space until it is closed.
+    [HOME_BANNER_SLOT]: (ctx) => {
+      const config = ctx.env?.config;
+      if (config?.firstRunWelcome) {
+        return [
+          <Suspense key="first-run-banner" fallback={null}>
+            <HomeBanner />
+          </Suspense>,
+        ];
+      }
+      if (config?.firstRunPoet && config.activeSpace === AZURE_DEMO_SPACE) {
+        return [
+          <Suspense key="first-run-poet-banner" fallback={null}>
+            <PoetBanner />
+          </Suspense>,
+        ];
+      }
+      return [];
+    },
   },
   // A deck is a room of its own: the player and its notes window take the screen.
   // A deck's PAGE (/decks/<id>) is not: it is read inside the shell like every other record.

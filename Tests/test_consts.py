@@ -162,6 +162,7 @@ EXPECTED = {
     ("docs", "segment"): r"^[A-Za-z0-9_][A-Za-z0-9._-]*$",
     ("docs", "landingUrl"): "https://johnfrog76.github.io/toolkit/",
     ("spaces", "renamed"): {"test": "azure-demo"},
+    ("spaces", "azureDemo"): "azure-demo",
     ("studio", "noteName"): r"^[A-Za-z0-9][A-Za-z0-9._-]*\.md$",
     ("studio", "threadLine"): "> GitHub:",
     ("studio", "promoteLabel"): "design",
@@ -602,6 +603,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertFalse(C.re_docs_segment().match(".."))
         self.assertEqual(C.docs_landing_url(), EXPECTED[("docs", "landingUrl")])
         self.assertEqual(C.renamed_spaces(), EXPECTED[("spaces", "renamed")])
+        self.assertEqual(C.azure_demo_space(), EXPECTED[("spaces", "azureDemo")])
         self.assertEqual(C.visibility_public(), EXPECTED[("visibility", "public")])
         self.assertEqual(C.visibility_private(), EXPECTED[("visibility", "private")])
         self.assertEqual(C.visibility_unknown(), EXPECTED[("visibility", "unknown")])
