@@ -221,6 +221,12 @@ function Stop-Staff([string]$Message, [string]$Hint = '') {
 
 # -- What was asked ------------------------------------------------------------------
 
+# A switch given as false (-Vacate:$false) is a switch not given: every check
+# below asks $PSBoundParameters, so it is taken out of it once, here.
+foreach ($name in @('Merges', 'Vacate', 'Activate', 'WhatIf')) {
+    if ($PSBoundParameters.ContainsKey($name) -and -not $PSBoundParameters[$name]) { [void]$PSBoundParameters.Remove($name) }
+}
+
 $Tree = ([string]$Tree).Trim()
 $Preset = ([string]$Preset).Trim()
 $Seat = ([string]$Seat).Trim()
@@ -513,8 +519,13 @@ else {
     }
     $editPosition = $found.Position
     $editSeat = $found.Seat
-    # The change line names the seat by its whole address, however it was typed.
-    $seatAddress = "$(Get-P20OrgText (Get-P20OrgField $editPosition 'id')).$(Get-P20OrgText (Get-P20OrgField $editSeat 'id'))"
+    # The change line names the seat by its whole address, however it was typed:
+    # <position>.<seat>, or, where either id holds a dot and the plain form could
+    # be read two ways, each id quoted -- 'x.y'.'z' -- as the writer resolved it.
+    $editPositionId = Get-P20OrgText (Get-P20OrgField $editPosition 'id')
+    $editSeatId = Get-P20OrgText (Get-P20OrgField $editSeat 'id')
+    $seatAddress = "$editPositionId.$editSeatId"
+    if ($editPositionId.Contains('.') -or $editSeatId.Contains('.')) { $seatAddress = "'$editPositionId'.'$editSeatId'" }
 
     # The owner's seat -- the root's -- is a person in the user's own words, never a model.
     $isRoot = -not (Get-P20OrgText (Get-P20OrgField $editPosition 'reportsTo'))

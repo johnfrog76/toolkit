@@ -1130,6 +1130,51 @@ try {
     Assert-True 'the short address of an office of two: exit 2, naming its seats, nothing written' (
         $several.Exit -eq '2' -and $several.All.Contains('Its seats: lead.alpha, lead.beta.') -and (Test-SameBytes $before (Get-OrgBytes))) $several.All
 
+    # -Vacate:$false is -Vacate absent: alone, nothing to change; beside a change, no contradiction.
+    $before = Get-OrgBytes
+    $vacFalse = Invoke-OrgChart "tkStaff -Seat lead.beta -Vacate:`$false 3>`$null"
+    Assert-True '-Vacate:$false alone: exit 2, nothing to change, nothing written' (
+        $vacFalse.Exit -eq '2' -and $vacFalse.All.Contains("Nothing to change in 'lead.beta': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle, -Merges or -Vacate.") -and (Test-SameBytes $before (Get-OrgBytes))) $vacFalse.All
+    $vacFalseSet = Invoke-OrgChart "tkStaff -Seat lead.beta -Session desk-four -Vacate:`$false 3>`$null"
+    Assert-True '-Vacate:$false beside -Session: the session is set, no contradiction' (
+        $vacFalseSet.Exit -eq '0' -and @(@(Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'lead') | Where-Object { $_.id -eq 'beta' })[0].session -eq 'desk-four') $vacFalseSet.All
+    $vacFalseOff = Invoke-OrgChart "tkStaff -Activate mine -Vacate:`$false 3>`$null"
+    Assert-True '-Vacate:$false without -Seat is no seat switch: -Activate answers as it would alone' (
+        $vacFalseOff.Exit -eq '0' -and -not $vacFalseOff.All.Contains('-Vacate goes with -Seat')) $vacFalseOff.All
+    $mergesFalse = Invoke-OrgChart "tkStaff -Seat lead.beta -Merges:`$false 3>`$null"
+    Assert-True '-Merges:$false alone is nothing to change too' ($mergesFalse.Exit -eq '2' -and $mergesFalse.All.Contains("Nothing to change in 'lead.beta'")) $mergesFalse.All
+
+    # Dotted ids: the change line names the position and the seat as resolved, each quoted
+    # where either id holds a dot, plain <position>.<seat> where neither does.
+    $dotted = [ordered]@{
+        trees = @([ordered]@{
+                id = 'dots'
+                positions = @(
+                    [ordered]@{ id = 'owner'; seats = @([ordered]@{ id = 'owner'; person = 'Sam' }) }
+                    [ordered]@{ id = 'x'; reportsTo = 'owner'; seats = @([ordered]@{ id = 'y' }) }
+                    [ordered]@{ id = 'x.y'; reportsTo = 'owner'; seats = @([ordered]@{ id = 'z' }) }
+                    [ordered]@{ id = 'a.b'; reportsTo = 'owner'; seats = @([ordered]@{ id = 'only' }) }
+                    [ordered]@{ id = 'p'; reportsTo = 'owner'; seats = @([ordered]@{ id = 'q.r' }) }
+                )
+            })
+    }
+    [System.IO.File]::WriteAllBytes($orgPath, $utf8.GetBytes((ConvertTo-P20ConfigJson $dotted) + "`n"))
+    $dotRows = @(
+        @{ Address = 'x.y'; Want = 'x.y: '; Position = 'x'; Seat = 'y' }
+        @{ Address = 'x.y.z'; Want = "'x.y'.'z': "; Position = 'x.y'; Seat = 'z' }
+        @{ Address = 'a.b'; Want = "'a.b'.'only': "; Position = 'a.b'; Seat = 'only' }
+        @{ Address = 'p.q.r'; Want = "'p'.'q.r': "; Position = 'p'; Seat = 'q.r' }
+    )
+    foreach ($row in $dotRows) {
+        $ran = Invoke-OrgChart "tkStaff -Seat '$($row.Address)' -Session 'desk-$($row.Seat)' 3>`$null"
+        $set = @(@(Get-OrgSeat (Get-OrgTree (Read-Org) 'dots') $row.Position) | Where-Object { $_.id -eq $row.Seat })[0].session
+        Assert-True "the address '$($row.Address)': the change line starts $($row.Want.Trim()) and the seat it names is the one written" (
+            $ran.Exit -eq '0' -and ($ran.All -split "`n" | Where-Object { $_.StartsWith($row.Want) }).Count -eq 1 -and $set -eq "desk-$($row.Seat)") $ran.All
+    }
+    $again = Invoke-OrgChart "tkStaff -Seat 'x.y.z' -Session 'desk-z' 3>`$null"
+    Assert-True '  and the nothing-changed line names it the same way' ($again.All.Contains("'x.y'.'z': ") -and $again.All.Contains('nothing changed')) $again.All
+    [System.IO.File]::WriteAllBytes($orgPath, $utf8.GetBytes($fullText))
+
     # An address that starts with a dash the binder reads: joined to -Seat it binds as the
     # address, names no seat, and is a stated refusal that writes nothing -- never a switch.
     foreach ($code in @(0x2D, 0x2013, 0x2014, 0x2015)) {

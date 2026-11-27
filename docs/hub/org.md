@@ -475,7 +475,12 @@ Staff -Activate <tree-id> [-WhatIf]
   and a pool as having none. An address that starts with a dash and names no seat is refused like any other unknown
   seat; typed bare after `-Seat` the binder takes it for a switch and refuses the missing address, and the page sends
   the address joined to its switch, as it sends every value. The change line names the seat by its whole address,
-  however it was typed. `-Model` takes a family or an id and stores the id, as `-Preset` does; `-Person`, `-Session`
+  however it was typed: `<position>.<seat>`, or, where either id holds a dot, each id quoted as the writer resolved
+  it -- `'x.y'.'z'` -- so the line cannot be read two ways. **An id with a dot can make an address ambiguous:** with a
+  position `x` holding a seat `y` and a position `x.y` holding one seat, `x.y` could name either, and the two-part
+  reading wins, so it is `x`'s seat `y`. The full address is always exact: `x.y.z` names `x.y`'s seat `z`, since no
+  other split of it names a seat. A switch given as false (`-Vacate:$false`, `-Merges:$false`) is a switch not
+  given. `-Model` takes a family or an id and stores the id, as `-Preset` does; `-Person`, `-Session`
   (the session's name, the address readies go to) and `-Merges` (sets `merges: true`, and clears no other seat's: a
   stand-in may hold it too) are the seat's own. `-Space` is a team lead's -- a seat whose position's role is
   `consts.json` `org.roles.teamLead` -- and must be a Space the toolkit knows; any other seat's is refused, naming
