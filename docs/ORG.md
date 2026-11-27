@@ -13,7 +13,7 @@ This page is the story. The file's exact shape, field by field, is [`docs/hub/or
 | --- | --- |
 | **The team** | a shared understanding: who sits where, who reports to whom, and which seat merges |
 | **An agent** | `org.json`, the structure itself, readable as it is. `tkOrgChart -AsJson` prints it in the shape the web UI reads, less the few fields only the page uses |
-| **You** | the Org tab in Team Agile: the tree drawn as offices, each org's description, and each role's job description one click away |
+| **You** | the Org tab in Team Agile: the tree drawn as offices, each org's description, and each role's job description one click away. Over the chart, **Zoom out**, **Zoom in** and **Fit to width** show a large org whole or up close; it opens fitted to the page's width |
 
 The org rides [Team Agile](modules/solitaire-agile.md). It is there wherever Team Agile is on in the
 Space you are in: `features.solitaireAgile`, with the Space answered "with agents".
@@ -135,7 +135,6 @@ None of it works today. [Known gaps](KNOWN-GAPS.md#the-org-is-set-up-from-the-te
 - **Adding a team.** A team is a team lead assigned to one Space, with builders under it. The org grows
   with your projects, one team for each: Small has no team, adding the first team makes it the Branch
   Office, and adding a second makes it Corporate Headquarters.
-- **Zoom** for a large org's chart.
 - **A seat's brief.** It is composed on demand from the role, the Space's note and the seat, so nothing
   is copied and nothing goes stale.
 - **Printing a starting org** from the terminal.
