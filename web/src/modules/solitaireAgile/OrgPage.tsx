@@ -67,6 +67,7 @@ import {
   positionFaces,
   seatActionLabel,
   seatFace,
+  seatWhere,
   signTitle,
   viewLabel,
 } from "./orgChart";
@@ -265,6 +266,7 @@ function StaffedSeat({
         who={plateWho(seat)}
         where={where || undefined}
         session={seat.session ?? undefined}
+        space={seatWhere(seat)}
         action={action}
       />
     </SeatCell>
@@ -374,6 +376,7 @@ function Office({ office, actions }: { office: PlacedOffice; actions?: SeatActio
                 level={p.level}
                 where={plateWhere(p, seat) || undefined}
                 session={seat.session ?? undefined}
+                space={seatWhere(seat)}
                 action={action(seat)}
               />
             ) : (

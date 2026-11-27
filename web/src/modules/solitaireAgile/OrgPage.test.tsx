@@ -10,7 +10,8 @@ import {
   presetLabel,
   presetSizeWord,
 } from "./OrgPage";
-import { modelNameOf, orgResponse } from "./orgFixture";
+import { FAMILIES, TEST_ETAG, modelNameOf, orgResponse } from "./orgFixture";
+import { CHANGED_SINCE_TEXT, SeatDialog } from "./SeatDialog";
 import { UseOrgDialog } from "./UseOrgDialog";
 
 // The Org tab (docs/modules/solitaire-agile.md, "The web UI"): the tree the
@@ -70,10 +71,13 @@ function draw() {
 
 const office = (id: string) =>
   screen.getAllByTestId("org-office").find((o) => o.dataset.position === id)!;
+/** Who sits in each seat, as each plate says it (its button aside). */
 const plates = (el: HTMLElement) =>
   within(el)
-    .getAllByTestId("org-plate-line")
+    .getAllByTestId("org-plate-who")
     .map((p) => p.textContent);
+/** The office's sign: its title, without View. */
+const sign = (el: HTMLElement) => within(el).getByTestId("org-sign-text").textContent;
 const wheres = (el: HTMLElement) =>
   within(el)
     .queryAllByTestId("org-plate-where")
@@ -115,20 +119,18 @@ describe("the chart, over the table's tree shaped like ours", () => {
     const lead = office("team-lead");
     const seats = within(lead).getAllByTestId("org-seat");
     expect(seats.map((s) => s.dataset.state)).toEqual(["staffed", "staffed", "vacant"]);
-    expect(plates(lead)).toEqual([
-      `Team lead · ${modelNameOf("fable")}`,
-      `Team lead · ${modelNameOf("opus")}`,
-      "Team lead · vacant",
-    ]);
+    expect(sign(lead)).toBe("Team lead");
+    expect(plates(lead)).toEqual([modelNameOf("fable"), modelNameOf("opus"), "vacant"]);
     expect(wheres(lead)).toEqual(["alpha", "beta", "gamma"]);
   });
 
-  it("a staffed seat: a bust in colour and POSITION · the model's name, and no machine", () => {
+  it("a staffed seat: the position on the sign, a bust in colour, the model's name on the plate, and no machine", () => {
     draw();
     const vp = office("vp-product");
     expect(within(vp).getByTestId("org-seat").dataset.state).toBe("staffed");
     expect(vp.querySelector('svg[data-refined="designer"]')).toBeTruthy();
-    expect(plates(vp)).toEqual([`VP of product · ${modelNameOf("fable")}`]);
+    expect(sign(vp)).toBe("VP of product");
+    expect(plates(vp)).toEqual([modelNameOf("fable")]);
     expect(wheres(vp)).toEqual([]);
     // The older file puts a machine on every seat; none is drawn, in the text or on hover.
     for (const word of ["laptop", "mini"]) {
@@ -165,20 +167,22 @@ describe("the chart, over the table's tree shaped like ours", () => {
     expect(vacant.querySelector("svg[data-refined]")).toBeNull();
   });
 
-  it("the owner is a person: the position and the name, no model, no where", () => {
+  it("the owner is a person: the position on the sign, the name on the plate, no model, no where", () => {
     draw();
     const owner = office("owner");
-    expect(plates(owner)).toEqual(["Owner · Sam"]);
+    expect(sign(owner)).toBe("Owner");
+    expect(plates(owner)).toEqual(["Sam"]);
     expect(wheres(owner)).toEqual([]);
     expect(owner.querySelector('svg[data-refined="owner"]')).toBeTruthy();
   });
 
-  it("the builders are a pool: one card, POSITION · pool, and the default-model line", () => {
+  it("the builders are a pool: one card, the position on the sign, pool on the plate, and the default-model line", () => {
     draw();
     const pool = office("builder");
     const seats = within(pool).getAllByTestId("org-seat");
     expect(seats.map((s) => s.dataset.state)).toEqual(["pool"]);
-    expect(plates(pool)).toEqual(["Builder · pool"]);
+    expect(sign(pool)).toBe("Builder");
+    expect(plates(pool)).toEqual(["pool"]);
     expect(within(pool).getByTestId("org-pool-line").textContent).toBe(
       "sonnet for crew cards, opus across halves, fable for art on the owner's word",
     );
@@ -194,35 +198,52 @@ describe("the chart, over the table's tree shaped like ours", () => {
     expect(within(office("builder")).getByTestId("org-pool-line").textContent).toBe("Sonnet 5.5");
   });
 
-  it("an office with a prompt is a link into the reading room, under its prompt's title", () => {
+  it("an office with a prompt has View on its sign: a link into the reading room, named for the role", () => {
     draw();
     const pm = office("pm");
-    expect(pm.tagName).toBe("A");
-    expect(pm.getAttribute("href")).toBe("/studio/prompts/yours/pm");
-    expect(within(pm).getByText("pm")).toBeTruthy();
-    expect(office("team-lead").getAttribute("href")).toBe("/studio/prompts/yours/team-lead");
-    fireEvent.click(pm);
+    const view = within(pm).getByRole("link", { name: "View the pm role" });
+    expect(view.textContent).toBe("View");
+    expect(view.getAttribute("href")).toBe("/studio/prompts/yours/pm");
+    expect(within(office("team-lead")).getByRole("link").getAttribute("href")).toBe(
+      "/studio/prompts/yours/team-lead",
+    );
+    fireEvent.click(view);
     expect(screen.getByTestId("where").textContent).toBe("/studio/prompts/yours/pm");
   });
 
-  it("the owner and the pool have no prompt, and are not links", () => {
+  it("the card is not a link: every office is a plain box, and View is the only link", () => {
     draw();
-    for (const id of ["owner", "builder"]) {
-      expect(office(id).tagName).toBe("DIV");
-      expect(office(id).getAttribute("href")).toBeNull();
+    for (const o of screen.getAllByTestId("org-office")) {
+      expect(o.tagName).toBe("DIV");
+      expect(o.getAttribute("href")).toBeNull();
     }
+    // The four offices with a role; the owner and the pool have none.
     expect(screen.getAllByRole("link")).toHaveLength(4);
+    for (const id of ["owner", "builder"])
+      expect(within(office(id)).queryByTestId("org-view")).toBeNull();
   });
 
-  it("a prompt the reading room does not list has its title and no link", () => {
+  it("a prompt the reading room does not list has no View", () => {
     const data = orgResponse("valid");
     const pm = data.tree.positions.find((p) => p.id === "pm")!;
     pm.promptTitle = "Notes";
     pm.promptRef = null;
     response = { isLoading: false, data };
     draw();
-    expect(office("pm").tagName).toBe("DIV");
-    expect(within(office("pm")).getByText("Notes")).toBeTruthy();
+    expect(within(office("pm")).queryByTestId("org-view")).toBeNull();
+    expect(sign(office("pm"))).toBe("PM");
+  });
+
+  it("a long title clamps on the sign, the whole of it in the tooltip, and View stays", () => {
+    const data = orgResponse("valid");
+    const pm = data.tree.positions.find((p) => p.id === "pm")!;
+    pm.title = "The programme manager of every product we have ever shipped";
+    pm.seats[0].roleTitle = null;
+    response = { isLoading: false, data };
+    draw();
+    const text = within(office("pm")).getByTestId("org-sign-text");
+    expect(text.getAttribute("title")).toBe(pm.title);
+    expect(within(office("pm")).getByTestId("org-view")).toBeTruthy();
   });
 
   it("a seat's own roleTitle stands in for the position's title, and its session is on hover", () => {
@@ -230,14 +251,14 @@ describe("the chart, over the table's tree shaped like ours", () => {
     draw();
     expect(screen.getByTestId("org-heading").textContent).toBe("The Branch Office");
     const lead = office("team-lead");
-    expect(plates(lead)).toEqual([
-      "Alpha lead · Opus 5.5",
-      "Team lead · a-model-the-map-does-not-know",
-    ]);
+    expect(sign(lead)).toBe("Team lead");
+    expect(plates(lead)).toEqual(["Opus 5.5", "a-model-the-map-does-not-know"]);
+    // In a room of seats, a seat's own label is on its plate, before its Space.
+    expect(wheres(lead)).toEqual(["Alpha lead · alpha", "beta"]);
     const [alpha, beta] = within(lead).getAllByTestId("org-plate");
     expect(alpha.getAttribute("title")).toBe("Alpha lead · Opus 5.5, alpha. Session: lead-session");
     expect(beta.getAttribute("title")).toBe("Team lead · a-model-the-map-does-not-know, beta");
-    expect(plates(office("vp-product"))).toEqual(["VP of product · Fable 5.2"]);
+    expect(plates(office("vp-product"))).toEqual(["Fable 5.2"]);
     expect(within(office("vp-product")).getByTestId("org-plate").getAttribute("title")).toBe(
       "VP of product · Fable 5.2. Session: product-session",
     );
@@ -1018,10 +1039,10 @@ describe("the zoom", () => {
     expect(level().textContent).toBe("Zoom 100%");
   });
 
-  it("the offices inside the scaled chart are still links", () => {
+  it("View inside the scaled chart still opens the role", () => {
     draw();
     fireEvent.click(zoomButton("Zoom out"));
-    fireEvent.click(office("pm"));
+    fireEvent.click(within(office("pm")).getByTestId("org-view"));
     expect(screen.getByTestId("where").textContent).toBe("/studio/prompts/yours/pm");
   });
 });
@@ -1031,3 +1052,242 @@ function cleanupAndDraw() {
   cleanup();
   draw();
 }
+
+describe("the seat dialog: Assign and Change on a saved org", () => {
+  const TREE = () => response.data!.tree.id;
+  const actions = () => screen.getAllByTestId("org-seat-action");
+  const open = (positionId: string, name: string) => {
+    fireEvent.click(within(office(positionId)).getByRole("button", { name }));
+    return screen.getByTestId("org-seat-dialog");
+  };
+  const radio = (dialog: HTMLElement, name: string) =>
+    within(dialog).getByRole("radio", { name }) as HTMLInputElement;
+  const lastParams = () => runStaff.mock.calls[runStaff.mock.calls.length - 1][0].params;
+
+  beforeEach(() => {
+    envSpaces = [
+      { slug: "alpha", name: "Alpha" },
+      { slug: "toolkit", name: "Toolkit" },
+    ];
+  });
+
+  it("every seat of a saved org has its button on the plate, named for the seat and who sits there", () => {
+    draw();
+    expect(actions().map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Change Owner, Sam",
+      `Change VP of product, ${modelNameOf("fable")}`,
+      `Change VP of engineering, ${modelNameOf("fable")}`,
+      `Change PM, ${modelNameOf("opus")}`,
+      `Change Team lead, ${modelNameOf("fable")}`,
+      `Change Team lead, ${modelNameOf("opus")}`,
+      "Assign Team lead",
+    ]);
+    expect(actions().map((b) => b.textContent)).toEqual([...Array(6).fill("Change"), "Assign"]);
+    // A pool has no seat to staff.
+    expect(within(office("builder")).queryByTestId("org-seat-action")).toBeNull();
+  });
+
+  it("a preview has View and no Assign or Change", () => {
+    presetsResponse = { isLoading: false, data: { presets: PRESETS } };
+    draw();
+    pick("Executive Suite (S)");
+    expect(screen.getAllByTestId("org-office").length).toBeGreaterThan(0);
+    expect(screen.queryAllByTestId("org-seat-action")).toHaveLength(0);
+  });
+
+  it("while a Staff write is in flight, Assign and Change wait", () => {
+    staffWriting = true;
+    draw();
+    for (const b of actions()) expect((b as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("Assign on a vacant team lead: the position's default model, the session, a Space, the shared role said", async () => {
+    draw();
+    const dialog = open("team-lead", "Assign Team lead");
+    expect(within(dialog).getByText("Assign Team lead")).toBeTruthy();
+    // Every family the model map's current block names, none marked; the position's default chosen.
+    expect(
+      within(dialog)
+        .getAllByRole("radio")
+        .map((r) => (r as HTMLInputElement).value),
+    ).toEqual(FAMILIES);
+    expect(within(dialog).queryByText(/not recommended/)).toBeNull();
+    expect(radio(dialog, "Opus").checked).toBe(true);
+    expect((within(dialog).getByTestId("org-seat-session") as HTMLInputElement).value).toBe("");
+    expect(within(dialog).getByTestId("org-seat-space")).toBeTruthy();
+    expect(within(dialog).getByTestId("org-seat-shared").textContent).toBe(
+      "Team lead has 3 seats: its role name and title change for all of them.",
+    );
+    // The acceptance scenario: the model is filled, the session is the only thing typed.
+    fireEvent.change(within(dialog).getByTestId("org-seat-session"), {
+      target: { value: "mini-lead-three" },
+    });
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(screen.queryByTestId("org-seat-dialog")).toBeNull());
+    expect(lastParams()).toEqual([
+      "-Seat",
+      "team-lead.gamma",
+      "-Tree",
+      TREE(),
+      "-Model",
+      "opus",
+      "-Session",
+      "mini-lead-three",
+      "-IfMatch",
+      TEST_ETAG,
+    ]);
+  });
+
+  it("Change on a VP: Opus and Fable, Sonnet not recommended, the seat's own model chosen; a Save that changes nothing writes nothing", async () => {
+    draw();
+    const dialog = open("vp-product", `Change VP of product, ${modelNameOf("fable")}`);
+    expect(
+      within(dialog)
+        .getAllByRole("radio")
+        .map((r) => (r as HTMLInputElement).value),
+    ).toEqual(["opus", "fable", "sonnet"]);
+    expect(radio(dialog, "Sonnet (not recommended)")).toBeTruthy();
+    expect(radio(dialog, "Fable").checked).toBe(true);
+    expect(within(dialog).queryByTestId("org-seat-space")).toBeNull();
+    expect(within(dialog).queryByTestId("org-seat-shared")).toBeNull();
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(screen.queryByTestId("org-seat-dialog")).toBeNull());
+    expect(runStaff).not.toHaveBeenCalled();
+  });
+
+  it("only what changed is sent: a new model and a role title", async () => {
+    draw();
+    const dialog = open("vp-product", `Change VP of product, ${modelNameOf("fable")}`);
+    fireEvent.click(radio(dialog, "Opus"));
+    fireEvent.change(within(dialog).getByTestId("org-seat-role-title"), {
+      target: { value: "Head of product" },
+    });
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(runStaff).toHaveBeenCalled());
+    expect(lastParams()).toEqual([
+      "-Seat",
+      "vp-product.vp-product",
+      "-Tree",
+      TREE(),
+      "-Model",
+      "opus",
+      "-RoleTitle",
+      "Head of product",
+      "-IfMatch",
+      TEST_ETAG,
+    ]);
+  });
+
+  it("the owner's seat asks for the name alone, and a name that starts with a dash travels as the name", async () => {
+    draw();
+    const dialog = open("owner", "Change Owner, Sam");
+    expect(within(dialog).queryAllByRole("radio")).toHaveLength(0);
+    expect(within(dialog).queryByTestId("org-seat-session")).toBeNull();
+    expect((within(dialog).getByTestId("org-seat-person") as HTMLInputElement).value).toBe("Sam");
+    fireEvent.change(within(dialog).getByTestId("org-seat-person"), {
+      target: { value: "-WhatIf" },
+    });
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(runStaff).toHaveBeenCalled());
+    expect(lastParams()).toEqual([
+      "-Seat",
+      "owner.owner",
+      "-Tree",
+      TREE(),
+      "-Person:-WhatIf",
+      "-IfMatch",
+      TEST_ETAG,
+    ]);
+  });
+
+  it("a team lead's Space is a choice of /env's Spaces, None first, and the seat's own kept", () => {
+    draw();
+    const dialog = open("team-lead", `Change Team lead, ${modelNameOf("fable")}`);
+    fireEvent.click(within(dialog).getByTestId("org-seat-space"));
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "None",
+      "Alpha",
+      "Toolkit",
+    ]);
+  });
+
+  it("a file changed since the page read it: the conflict, said plainly, with Reload; nothing else is offered", async () => {
+    staffAnswer = () =>
+      Promise.resolve({
+        status: "error",
+        output: "",
+        error: "org.json changed since you read it; reload and try again.",
+        duration: 1,
+      } as CommandResponse);
+    draw();
+    const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
+    fireEvent.change(within(dialog).getByTestId("org-seat-session"), {
+      target: { value: "mac-pm" },
+    });
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    const conflict = await within(dialog).findByTestId("org-seat-conflict");
+    expect(conflict.textContent).toContain(CHANGED_SINCE_TEXT);
+    // Information, not a failure: no error bar, and it sits in the status region.
+    expect(within(dialog).queryByTestId("org-seat-away")).toBeNull();
+    expect(conflict.closest('[role="status"]')).toBeTruthy();
+    expect((within(dialog).getByTestId("org-seat-save") as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(within(dialog).getByTestId("org-seat-reload"));
+    await waitFor(() => expect(screen.queryByTestId("org-seat-dialog")).toBeNull());
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it("any other refusal is the verb's sentence, plainly, in the dialog", async () => {
+    staffAnswer = () =>
+      Promise.resolve({
+        status: "error",
+        output: "",
+        error: "Some other refusal.",
+        duration: 1,
+      } as CommandResponse);
+    draw();
+    const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
+    fireEvent.change(within(dialog).getByTestId("org-seat-session"), { target: { value: "x" } });
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    expect((await within(dialog).findByTestId("org-seat-refusal")).textContent).toBe(
+      "Some other refusal.",
+    );
+    expect(within(dialog).queryByTestId("org-seat-conflict")).toBeNull();
+  });
+
+  it("the agent away is the one error", async () => {
+    staffAnswer = () => Promise.reject(new Error("away"));
+    draw();
+    const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
+    fireEvent.change(within(dialog).getByTestId("org-seat-session"), { target: { value: "x" } });
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    expect((await within(dialog).findByTestId("org-seat-away")).textContent).toContain(
+      "Could not reach the agent",
+    );
+  });
+
+  it("Save, Cancel and Close wait for a write already in flight on the page", () => {
+    const data = orgResponse("valid");
+    const pm = data.tree.positions.find((p) => p.id === "pm")!;
+    render(
+      <SeatDialog
+        position={pm}
+        seat={pm.seats[0]}
+        treeId={data.tree.id}
+        etag={TEST_ETAG}
+        families={FAMILIES}
+        spaces={[]}
+        run={() => Promise.resolve({ status: "success" } as CommandResponse)}
+        busy
+        onSaved={() => {}}
+        onReload={() => {}}
+        onClose={() => {}}
+      />,
+    );
+    const dialog = screen.getByTestId("org-seat-dialog");
+    for (const name of ["Save", "Cancel", "Close"]) {
+      expect((within(dialog).getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(
+        true,
+      );
+    }
+  });
+});

@@ -194,9 +194,13 @@ export function seatFamilies(position: OrgPosition, all: string[], start: string
       recommended: recommended.includes(family),
     }));
   } else {
-    choices = (all.length ? all : ORG.steps.families).map((family) => ({ family, recommended: true }));
+    choices = (all.length ? all : ORG.steps.families).map((family) => ({
+      family,
+      recommended: true,
+    }));
   }
-  if (start && !choices.some((c) => c.family === start)) choices.push({ family: start, recommended: true });
+  if (start && !choices.some((c) => c.family === start))
+    choices.push({ family: start, recommended: true });
   return choices;
 }
 

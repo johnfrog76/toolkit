@@ -168,12 +168,15 @@ export function Plate({
   who,
   where,
   session,
+  space,
   action,
 }: {
   position: string;
   who: string;
   where?: string;
   session?: string;
+  /** The Space the seat serves, for the hover; `where` otherwise. */
+  space?: string;
   /** The seat's Assign or Change button; absent on a preview and a pool. */
   action?: ReactNode;
 }) {
@@ -182,7 +185,7 @@ export function Plate({
     <div
       className={styles.plate}
       data-testid="org-plate"
-      title={plateHover(`${position} · ${who}`, where, session)}
+      title={plateHover(`${position} · ${who}`, space ?? where, session)}
     >
       <span className={styles.line} data-testid="org-plate-line">
         <span className={styles.who} data-testid="org-plate-who">

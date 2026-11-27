@@ -23,6 +23,7 @@ export function VacantSeat({
   level,
   where,
   session,
+  space,
   action,
 }: {
   seatId: string;
@@ -30,6 +31,8 @@ export function VacantSeat({
   level: number;
   where?: string;
   session?: string;
+  /** The Space the seat serves, for the plate's hover. */
+  space?: string;
   /** Assign, on a saved org. */
   action?: ReactNode;
 }) {
@@ -49,7 +52,14 @@ export function VacantSeat({
           </div>
         </foreignObject>
       </OfficeDoor>
-      <Plate position={position} who={VACANT_WORD} where={where} session={session} action={action} />
+      <Plate
+        position={position}
+        who={VACANT_WORD}
+        where={where}
+        session={session}
+        space={space}
+        action={action}
+      />
     </SeatCell>
   );
 }

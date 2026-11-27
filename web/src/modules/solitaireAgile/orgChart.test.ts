@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { FACE_IDS } from "../../shared/refinedFaces";
-import type { OrgPosition } from "./api.solitaireAgile";
+import type { OrgPosition, OrgSeat } from "./api.solitaireAgile";
+import { ORG } from "../../shell/consts";
 import type { PlacedOffice } from "./orgChart";
 import {
   LEVEL_FACES,
@@ -12,8 +13,15 @@ import {
   layoutChart,
   levelWall,
   officeWidth,
+  isChangedSince,
   plateTitle,
+  plateWhere,
   plateWho,
+  seatActionLabel,
+  seatFamilies,
+  seatModelDefault,
+  signTitle,
+  viewLabel,
   positionFaces,
   seatFace,
   seatWhere,
@@ -251,4 +259,105 @@ describe("the layout of a team: one lead, its own pool", () => {
       }
     },
   );
+});
+
+describe("the seat dialog's rules", () => {
+  const position = (over: Partial<OrgPosition> = {}): OrgPosition => ({
+    id: "p",
+    title: "P",
+    prompt: null,
+    reportsTo: "owner",
+    defaultModel: null,
+    recommend: [],
+    level: 1,
+    seats: [],
+    promptTitle: null,
+    promptRef: null,
+    defaultModelName: null,
+    defaultModelFamily: null,
+    ...over,
+  });
+  const seat = (over: Partial<OrgSeat> = {}): OrgSeat => ({
+    id: "s",
+    roleTitle: null,
+    model: null,
+    modelName: null,
+    modelFamily: null,
+    person: null,
+    session: null,
+    merges: null,
+    space: null,
+    state: "vacant",
+    ...over,
+  });
+
+  it("a vacant seat starts on its position's defaultModel, else its role's, else none", () => {
+    expect(seatModelDefault(position({ defaultModelFamily: "haiku" }), seat())).toBe("haiku");
+    expect(seatModelDefault(position({ prompt: ORG.roles.vpEngineering }), seat())).toBe(
+      ORG.steps.vpEngineering,
+    );
+    expect(seatModelDefault(position({ prompt: ORG.roles.vpProduct }), seat())).toBe(
+      ORG.steps.vpProduct,
+    );
+    for (const [role, family] of Object.entries(ORG.roleDefaults)) {
+      expect(seatModelDefault(position({ prompt: role }), seat())).toBe(family);
+    }
+    expect(seatModelDefault(position({ prompt: "pm.prompt.md" }), seat())).toBe("");
+  });
+
+  it("a staffed seat keeps its own family, and none where the map does not know its model or a person sits there", () => {
+    const vp = position({ prompt: ORG.roles.vpEngineering });
+    expect(
+      seatModelDefault(vp, seat({ model: "claude-opus-5", modelFamily: "opus", state: "staffed" })),
+    ).toBe("opus");
+    expect(seatModelDefault(vp, seat({ model: "x-model", state: "staffed" }))).toBe("");
+    expect(seatModelDefault(vp, seat({ person: "Kim", state: "staffed" }))).toBe("");
+  });
+
+  it("a VP is offered the steps' families, those outside its recommend marked; anyone else every family", () => {
+    const all = ["fable", "opus", "sonnet", "haiku"];
+    expect(seatFamilies(position({ recommend: ["opus", "fable"] }), all, "fable")).toEqual([
+      { family: "opus", recommended: true },
+      { family: "fable", recommended: true },
+      { family: "sonnet", recommended: false },
+    ]);
+    expect(seatFamilies(position(), all, "").map((c) => c.family)).toEqual(all);
+    // A family the seat already has is always offered.
+    expect(
+      seatFamilies(position({ recommend: ["opus"] }), all, "haiku").map((c) => c.family),
+    ).toContain("haiku");
+  });
+
+  it("the sign is the one seat's label, a room's position title; a room's plate carries a seat's own label", () => {
+    const one = position({
+      title: "Team lead",
+      seats: [seat({ roleTitle: "Toolkit lead", space: "toolkit" })],
+    });
+    expect(signTitle(one)).toBe("Toolkit lead");
+    expect(plateWhere(one, one.seats[0])).toBe("toolkit");
+    const room = position({
+      title: "Team lead",
+      seats: [seat({ id: "a", roleTitle: "A lead", space: "a" }), seat({ id: "b" })],
+    });
+    expect(signTitle(room)).toBe("Team lead");
+    expect(plateWhere(room, room.seats[0])).toBe("A lead · a");
+    expect(plateWhere(room, room.seats[1])).toBe("");
+  });
+
+  it("the button's name: Assign the seat, or Change it naming who sits there", () => {
+    const vp = position({ title: "VP of engineering" });
+    expect(seatActionLabel(vp, seat())).toBe("Assign VP of engineering");
+    expect(seatActionLabel(vp, seat({ model: "m", modelName: "Opus 5.5", state: "staffed" }))).toBe(
+      "Change VP of engineering, Opus 5.5",
+    );
+    expect(viewLabel(position({ title: "PM", promptTitle: "The PM" }))).toBe(
+      "View the The PM role",
+    );
+  });
+
+  it("finds Staff's -IfMatch refusal by its words", () => {
+    expect(isChangedSince(`org.json ${ORG.changedSince}; reload and try again.`)).toBe(true);
+    expect(isChangedSince("Some other refusal.")).toBe(false);
+    expect(isChangedSince(null)).toBe(false);
+  });
 });

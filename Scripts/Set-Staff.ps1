@@ -493,6 +493,18 @@ else {
                 "Name the owner with '${p}Staff -Seat $Seat -Person <name>'."
         }
     }
+    # A Space is a team lead's (consts.json org.roles.teamLead): the team's Space is
+    # its lead seat's. An empty -Space takes the key away on any seat.
+    if ($PSBoundParameters.ContainsKey('Space') -and ([string]$Space).Trim()) {
+        $leadRole = [string]$orgConsts.roles.teamLead
+        $editRole = Get-P20OrgText (Get-P20OrgField $editPosition 'prompt')
+        if ($editRole -cne $leadRole) {
+            $editTitle = Get-P20OrgText (Get-P20OrgField $editPosition 'title')
+            if (-not $editTitle) { $editTitle = Get-P20OrgText (Get-P20OrgField $editPosition 'id') }
+            Stop-Staff "-Space is for a team lead's seat, and '$Seat' is a $editTitle's: its position's role is not $leadRole." `
+                "Give -Space on a team lead's seat (a position whose role is $leadRole)."
+        }
+    }
     if ($PSBoundParameters.ContainsKey('Space') -and ([string]$Space).Trim()) {
         $slugs = @(@($cfg.Spaces) | ForEach-Object { [string]$_.slug } | Where-Object { $_ })
         if ($slugs -cnotcontains $Space.Trim()) {

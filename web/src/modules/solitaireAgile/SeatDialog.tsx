@@ -68,7 +68,9 @@ export const NO_SPACE_LABEL = "None";
 /** The note on a seat of a position with several: the role is the position's. */
 export function sharedRoleNote(position: OrgPosition): string | null {
   const n = position.seats.length;
-  return n > 1 ? `${position.title} has ${n} seats: its role name and title change for all of them.` : null;
+  return n > 1
+    ? `${position.title} has ${n} seats: its role name and title change for all of them.`
+    : null;
 }
 
 /** A family as the model question offers it: its word, and the note where it is not recommended. */
@@ -94,7 +96,8 @@ export function seatChanges(
   }
   if (answers.model && answers.model !== seat.modelFamily) set("model", answers.model);
   if (answers.session.trim() !== (seat.session ?? "")) set("session", answers.session.trim());
-  if (isTeamLead(position) && answers.space !== (seat.space ?? NO_SPACE)) set("space", answers.space);
+  if (isTeamLead(position) && answers.space !== (seat.space ?? NO_SPACE))
+    set("space", answers.space);
   const title = answers.roleTitle.trim();
   if (title && title !== position.title) set("roleTitle", title);
   return changed ? out : null;
@@ -211,7 +214,11 @@ export function SeatDialog({
                     data-testid="org-seat-model"
                   >
                     {choices.map((c) => (
-                      <Radio key={c.family} value={c.family} label={familyText(c.family, c.recommended)} />
+                      <Radio
+                        key={c.family}
+                        value={c.family}
+                        label={familyText(c.family, c.recommended)}
+                      />
                     ))}
                   </RadioGroup>
                 </Field>

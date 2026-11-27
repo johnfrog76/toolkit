@@ -510,7 +510,11 @@ export interface StaffSeatFields {
  * which takes the key away.
  */
 export function buildStaffSeatParams(fields: StaffSeatFields): string[] {
-  const params = ["-Seat", `${fields.position}.${fields.seat}`, ...staffValue("-Tree", fields.tree)];
+  const params = [
+    "-Seat",
+    `${fields.position}.${fields.seat}`,
+    ...staffValue("-Tree", fields.tree),
+  ];
   const add = (name: string, value: string | undefined) => {
     if (value === undefined) return;
     params.push(...staffValue(name, value.trim()));

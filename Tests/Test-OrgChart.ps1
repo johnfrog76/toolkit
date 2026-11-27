@@ -797,6 +797,8 @@ try {
     $roleName = Invoke-OrgChart "tkStaff -Seat team-lead.demo -RoleName pm.prompt.md 3>`$null"
     Assert-True '-RoleName is the position''s prompt, and the change line names it' (
         $roleName.Exit -eq '0' -and (Get-OrgPosition (Get-OrgTree (Read-Org) 'mine') 'team-lead').prompt -eq 'pm.prompt.md' -and $roleName.All.Contains('{team-lead.prompt.md} -> ') -and $roleName.All.Contains('{pm.prompt.md}')) $roleName.All
+    $roleBack = Invoke-OrgChart "tkStaff -Seat team-lead.demo -RoleName team-lead.prompt.md 3>`$null"
+    Assert-Equal '  and back again: the office is a team lead''s once more' 'team-lead.prompt.md' (Get-OrgPosition (Get-OrgTree (Read-Org) 'mine') 'team-lead').prompt $roleBack.All
 
     # An empty value takes the key away; -Merges sets the flag and leaves every other seat's.
     $cleared = Invoke-OrgChart "tkStaff -Seat team-lead.demo -Session '' -Space '' -Merges 3>`$null"
@@ -833,6 +835,7 @@ try {
         '-Session on the owner''s seat'    = @('tkStaff -Seat owner.owner -Session x', "The owner's seat takes -Person only: -Session does not go on it.")
         'an empty owner'                   = @("tkStaff -Seat owner.owner -Person ''", "-Person needs a name: the owner's seat always has a person, in your own words.")
         'a model not in the map'           = @('tkStaff -Seat pm.pm -Model gpt-9', "-Model 'gpt-9' is not a model id or a family in Config/models.json. Families: ")
+        '-Space on a seat that is no team lead''s' = @('tkStaff -Seat pm.pm -Space demo', "-Space is for a team lead's seat, and 'pm.pm' is a PM's: its position's role is not team-lead.prompt.md.")
         'a Space nobody declared'          = @('tkStaff -Seat team-lead.demo -Space nope', "-Space 'nope' is not a Space the hub declares. Spaces: ")
         'a seat the tree does not have'    = @('tkStaff -Seat pm.nope -Model opus', "'pm.nope' is not a seat of the tree 'mine'. Seats: owner.owner, ")
         'a seat with no dot'               = @('tkStaff -Seat pm -Model opus', "'pm' is not a seat of the tree 'mine'. A seat is named <position>.<seat>.")
