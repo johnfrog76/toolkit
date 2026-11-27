@@ -53,8 +53,6 @@ import {
 import { LANE_FIELD_KEY, laneLabel } from "../modules/ado/laneNames";
 import { countInPlay, inPlayLine } from "../modules/ado/inPlay";
 import { ARCHIVED_FILTER, deckListView } from "../modules/deck/deckList";
-import { deckModule } from "../modules/deck";
-import { DECKS } from "../modules/deck/decks";
 import { DeckState } from "../modules/deck/decks/types";
 import { AZURE_DEMO_SPACE } from "./consts";
 import { HOME_BANNER_SLOT } from "./slots";
