@@ -5,7 +5,11 @@
 // (docs/modules/solitaire-agile.md, "The web UI"). This mode does both and reads
 // the hub's org.json back after each.
 //
-// Both WRITE the hub, so, like --first-run, it starts its own servers
+// Before them, on the hub's own saved org: axe over the page and over the seat
+// dialog, then Assign on a vacant seat, Save, and org.json read back -- the
+// seat staffed through the bridge (Staff -Seat, with the chart's etag).
+//
+// All of it WRITES the hub, so, like --first-run, it starts its own servers
 // (smokeStack.mjs) over a COPY of samples/hub in the OS temp folder -- the
 // package's samples are never used in place -- and turns Team Agile on through
 // the one writer, into the scratch package's config. Both are removed when the
@@ -21,11 +25,15 @@ import {
   setFlags,
   startStack,
 } from "./smokeStack.mjs";
+import { TABSTER_DUMMY } from "./smokeA11y.mjs";
 
 const SPACE = "demo";
 const SMALL = "Executive Suite (S)";
 const SMALL_TITLE = "The Executive Suite";
 const SMALL_ID = "executive-suite";
+// The sample hub's vacant seat: its second team lead's.
+const VACANT_SEAT = "github-demo";
+const SEAT_SESSION = "smoke-lead";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -94,6 +102,53 @@ export async function runOrg({ repoRoot, agentPort, webPort, python }) {
     check(
       "org: the page opens on the hub's active org, with Active beside View",
       (await page.getByTestId("org-heading").textContent()) === activeTitle,
+    );
+
+    // axe on a saved org, and on the seat dialog open over it: nothing serious or critical.
+    const { AxeBuilder } = await import("@axe-core/playwright");
+    const blocking = async () =>
+      (await new AxeBuilder({ page }).exclude(TABSTER_DUMMY).analyze()).violations
+        .filter((v) => v.impact === "critical" || v.impact === "serious")
+        .map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
+    const onPage = await blocking();
+    check("org: axe on a saved org finds nothing serious or critical", onPage.length === 0, onPage.join(" | "));
+
+    // Assign a vacant seat: the second team lead's, whose model the position states.
+    const lead = page.locator('[data-testid="org-office"][data-position="team-lead"]');
+    await lead.getByRole("button", { name: "Assign Team lead" }).click();
+    const dialog = page.getByTestId("org-seat-dialog");
+    await dialog.waitFor();
+    // Past the dialog's fade-in: a colour read mid-animation is not the colour drawn.
+    await sleep(1000);
+    const inDialog = await blocking();
+    check("org: axe on the seat dialog finds nothing serious or critical", inDialog.length === 0, inDialog.join(" | "));
+    check(
+      "org: the dialog opens with the position's model chosen",
+      await dialog.getByRole("radio", { name: "Opus" }).isChecked(),
+    );
+    await page.getByTestId("org-seat-session").fill(SEAT_SESSION);
+    await page.getByTestId("org-seat-save").click();
+    const opus = JSON.parse(readFileSync(join(repoRoot, "Config", "models.json"), "utf8")).current.opus;
+    const seatOf = (d) =>
+      d.trees
+        .find((t) => t.id === before.activeTree)
+        ?.positions.find((p) => p.id === "team-lead")
+        ?.seats.find((x) => x.id === VACANT_SEAT);
+    const staffed = await waitForOrg(orgPath, (d) => seatOf(d)?.session === SEAT_SESSION);
+    check(
+      "org: Assign ran Staff -Seat: org.json's seat has the model's id and the session",
+      Boolean(staffed) && seatOf(staffed)?.model === opus && seatOf(staffed)?.session === SEAT_SESSION,
+      JSON.stringify(staffed && seatOf(staffed)),
+    );
+    await dialog.waitFor({ state: "detached", timeout: 30000 }).catch(() => {});
+    await lead
+      .getByRole("button", { name: /^Change Team lead, / })
+      .nth(1)
+      .waitFor({ timeout: 30000 })
+      .catch(() => {});
+    check(
+      "org: the seat's plate now offers Change, naming the model",
+      (await lead.getByRole("button", { name: /^Change Team lead, Opus/ }).count()) === 2,
     );
 
     // Save Small: the preview, the steps, Save.

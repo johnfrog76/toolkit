@@ -50,7 +50,7 @@ const IMPACTS = ["critical", "serious", "moderate", "minor"];
 // runtime. Excluding the attribute is the decision (the shell step), and
 // it is reversible: if a Fluent or tabster version stops inserting the
 // sentinels, this line and its sentence in docs/TESTING.md go with them.
-const TABSTER_DUMMY = "[data-tabster-dummy]";
+export const TABSTER_DUMMY = "[data-tabster-dummy]";
 
 // The six opt-in modules' feature keys -- the flags --matrix walks one at a
 // time; this mode sets them all at once.
