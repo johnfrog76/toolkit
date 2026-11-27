@@ -608,6 +608,9 @@ export interface OrgResponse {
   /** The model families a seat can be staffed with, the model map's current
    *  block in its order. GET /api/ritual/org alone. */
   families?: string[];
+  /** Each of `families` by the name of the model it resolves to today ("Opus
+   *  5.5"), looked up by the agent: the seat dialog's labels. GET /api/ritual/org alone. */
+  familyNames?: Record<string, string>;
 }
 
 /** A refusal's detail: the kind is the contract, the message the sentence. */

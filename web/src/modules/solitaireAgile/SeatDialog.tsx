@@ -17,14 +17,15 @@ import {
   RadioGroup,
   makeStyles,
   tokens,
+  useId,
 } from "@fluentui/react-components";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DialogDismiss } from "../../shared/DialogDismiss";
 import { buildStaffSeatParams } from "../ado/cliBridge";
 import type { StaffSeatFields } from "../ado/cliBridge";
 import type { CommandResponse } from "../ado/api.ado";
 import type { OrgPosition, OrgSeat } from "./api.solitaireAgile";
-import { NOT_RECOMMENDED, familyLabel, refusalText } from "./UseOrgDialog";
+import { refusalText } from "./UseOrgDialog";
 import {
   ASSIGN_WORD,
   CHANGE_WORD,
@@ -32,7 +33,10 @@ import {
   isOwnerPosition,
   isTeamLead,
   plateTitle,
-  seatFamilies,
+  HELD_MODEL,
+  hasOwnTitle,
+  isHeldModel,
+  seatChoices,
   seatModelDefault,
 } from "./orgChart";
 
@@ -50,6 +54,16 @@ const useStyles = makeStyles({
   surface: { maxWidth: "480px" },
   content: { display: "flex", flexDirection: "column", rowGap: tokens.spacingVerticalM },
   note: { color: tokens.colorNeutralForeground2 },
+  titleRow: { display: "flex" },
+  // A link to look at, a real button underneath: no padding to push it off the fields' edge.
+  titleLink: {
+    minWidth: "auto",
+    paddingLeft: 0,
+    paddingRight: 0,
+    color: tokens.colorBrandForegroundLink,
+    textDecorationLine: "underline",
+    ":hover": { color: tokens.colorBrandForegroundLinkHover },
+  },
   refusal: { color: tokens.colorNeutralForeground1, whiteSpace: "pre-wrap" },
   conflict: {
     display: "flex",
@@ -73,16 +87,15 @@ export function sharedRoleNote(position: OrgPosition): string | null {
     : null;
 }
 
-/** A family as the model question offers it: its word, and the note where it is not recommended. */
-export function familyText(family: string, recommended: boolean): string {
-  return recommended ? familyLabel(family) : `${familyLabel(family)} (${NOT_RECOMMENDED})`;
-}
+/** The control that opens the role title's field in place. */
+export const OTHER_TITLE = "Use a different title";
 
 /** What Save sends: the seat, and each answer that differs from what the file says now. */
 export function seatChanges(
   position: OrgPosition,
   seat: OrgSeat,
   answers: { model: string; person: string; session: string; space: string; roleTitle: string },
+  familyNames: Record<string, string> = {},
 ): Omit<StaffSeatFields, "tree" | "ifMatch"> | null {
   const out: Omit<StaffSeatFields, "tree" | "ifMatch"> = { position: position.id, seat: seat.id };
   let changed = false;
@@ -94,7 +107,13 @@ export function seatChanges(
     if (answers.person.trim() !== (seat.person ?? "")) set("person", answers.person.trim());
     return changed ? out : null;
   }
-  if (answers.model && answers.model !== seat.modelFamily) set("model", answers.model);
+  // A held model kept sends no -Model; its family's current model, picked over it, is a change.
+  if (
+    answers.model &&
+    answers.model !== HELD_MODEL &&
+    (answers.model !== seat.modelFamily || isHeldModel(seat, familyNames))
+  )
+    set("model", answers.model);
   if (answers.session.trim() !== (seat.session ?? "")) set("session", answers.session.trim());
   if (isTeamLead(position) && answers.space !== (seat.space ?? NO_SPACE))
     set("space", answers.space);
@@ -109,6 +128,7 @@ export function SeatDialog({
   treeId,
   etag,
   families,
+  familyNames = {},
   spaces,
   run,
   busy = false,
@@ -124,6 +144,8 @@ export function SeatDialog({
   etag?: string;
   /** Every family the model map's current block names, as the agent serves it. */
   families: string[];
+  /** Each family by its current model's name, as the agent serves it (familyNames). */
+  familyNames?: Record<string, string>;
   /** The Spaces a team lead's seat may serve, as /env lists them. */
   spaces: Array<{ slug: string; name?: string }>;
   /** Runs Staff through the bridge; resolves to its answer, rejects when the agent is away. */
@@ -138,12 +160,29 @@ export function SeatDialog({
   const styles = useStyles();
   const owner = isOwnerPosition(position);
   const lead = isTeamLead(position);
-  const start = seatModelDefault(position, seat);
+  const start = seatModelDefault(position, seat, familyNames);
   const [model, setModel] = useState(start);
   const [person, setPerson] = useState(seat.person ?? "");
   const [session, setSession] = useState(seat.session ?? "");
   const [space, setSpace] = useState(seat.space ?? NO_SPACE);
   const [roleTitle, setRoleTitle] = useState(position.title);
+  // The role title waits behind a link, open from the start where the position's
+  // title already differs from its role's; opened, its field takes the focus.
+  const [titleOpen, setTitleOpen] = useState(hasOwnTitle(position));
+  const titleField = useRef<HTMLInputElement>(null);
+  const titleId = useId("org-seat-title");
+  const [focusTitle, setFocusTitle] = useState(false);
+  useEffect(() => {
+    if (focusTitle && titleOpen) {
+      titleField.current?.focus();
+      setFocusTitle(false);
+    }
+  }, [focusTitle, titleOpen]);
+  const toggleTitle = () => {
+    if (titleOpen) setRoleTitle(position.title);
+    else setFocusTitle(true);
+    setTitleOpen(!titleOpen);
+  };
   const [saving, setSaving] = useState(false);
   // While this save, or any other Staff write of the page's, is in flight,
   // nothing leaves or saves: Cancel, Escape and Close wait.
@@ -154,7 +193,7 @@ export function SeatDialog({
 
   const title = plateTitle(position, seat);
   const verb = seat.state === "vacant" ? ASSIGN_WORD : CHANGE_WORD;
-  const choices = seatFamilies(position, families, start);
+  const choices = seatChoices(position, seat, families, familyNames);
   const note = sharedRoleNote(position);
   const spaceName = (slug: string) =>
     slug === NO_SPACE ? NO_SPACE_LABEL : (spaces.find((s) => s.slug === slug)?.name ?? slug);
@@ -166,7 +205,12 @@ export function SeatDialog({
 
   const save = async () => {
     if (locked) return;
-    const changes = seatChanges(position, seat, { model, person, session, space, roleTitle });
+    const changes = seatChanges(
+      position,
+      seat,
+      { model, person, session, space, roleTitle: titleOpen ? roleTitle : position.title },
+      familyNames,
+    );
     if (!changes) {
       onClose();
       return;
@@ -214,11 +258,7 @@ export function SeatDialog({
                     data-testid="org-seat-model"
                   >
                     {choices.map((c) => (
-                      <Radio
-                        key={c.family}
-                        value={c.family}
-                        label={familyText(c.family, c.recommended)}
-                      />
+                      <Radio key={c.value} value={c.value} label={c.label} />
                     ))}
                   </RadioGroup>
                 </Field>
@@ -246,17 +286,36 @@ export function SeatDialog({
                     </Dropdown>
                   </Field>
                 ) : null}
-                <Field label="Role title">
-                  <Input
-                    value={roleTitle}
-                    onChange={(_, d) => setRoleTitle(d.value)}
-                    data-testid="org-seat-role-title"
-                  />
-                </Field>
-                {note ? (
-                  <Body1 className={styles.note} data-testid="org-seat-shared">
-                    {note}
-                  </Body1>
+                <div className={styles.titleRow}>
+                  <Button
+                    appearance="transparent"
+                    size="small"
+                    className={styles.titleLink}
+                    aria-expanded={titleOpen}
+                    aria-controls={titleId}
+                    onClick={toggleTitle}
+                    data-testid="org-seat-title-toggle"
+                  >
+                    {OTHER_TITLE}
+                  </Button>
+                </div>
+                {titleOpen ? (
+                  <>
+                    <Field label="Role title">
+                      <Input
+                        id={titleId}
+                        ref={titleField}
+                        value={roleTitle}
+                        onChange={(_, d) => setRoleTitle(d.value)}
+                        data-testid="org-seat-role-title"
+                      />
+                    </Field>
+                    {note ? (
+                      <Body1 className={styles.note} data-testid="org-seat-shared">
+                        {note}
+                      </Body1>
+                    ) : null}
+                  </>
                 ) : null}
               </>
             )}

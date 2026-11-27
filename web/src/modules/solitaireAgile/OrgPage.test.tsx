@@ -10,7 +10,7 @@ import {
   presetLabel,
   presetSizeWord,
 } from "./OrgPage";
-import { FAMILIES, TEST_ETAG, modelNameOf, orgResponse } from "./orgFixture";
+import { FAMILIES, FAMILY_NAMES, TEST_ETAG, modelNameOf, orgResponse } from "./orgFixture";
 import { CHANGED_SINCE_TEXT, SeatDialog } from "./SeatDialog";
 import { UseOrgDialog } from "./UseOrgDialog";
 
@@ -1064,11 +1064,18 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
     within(dialog).getByRole("radio", { name }) as HTMLInputElement;
   const lastParams = () => runStaff.mock.calls[runStaff.mock.calls.length - 1][0].params;
 
+  /** The name each family's current model is served by (familyNames). */
+  const named = (family: string) => FAMILY_NAMES[family];
+
   beforeEach(() => {
     envSpaces = [
       { slug: "alpha", name: "Alpha" },
       { slug: "toolkit", name: "Toolkit" },
     ];
+    // The roles' own titles, as the reading room reads them: each position's title is its role's.
+    const data = orgResponse("valid");
+    for (const p of data.tree.positions) if (p.promptTitle) p.promptTitle = p.title;
+    response = { isLoading: false, data };
   });
 
   it("every seat of a saved org has its button on the plate, named for the seat and who sits there", () => {
@@ -1112,12 +1119,17 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
         .map((r) => (r as HTMLInputElement).value),
     ).toEqual(FAMILIES);
     expect(within(dialog).queryByText(/not recommended/)).toBeNull();
-    expect(radio(dialog, "Opus").checked).toBe(true);
+    expect(radio(dialog, named("opus")).checked).toBe(true);
     expect((within(dialog).getByTestId("org-seat-session") as HTMLInputElement).value).toBe("");
     expect(within(dialog).getByTestId("org-seat-space")).toBeTruthy();
+    // The role title, and the note that it is every seat's, wait behind the link.
+    expect(within(dialog).queryByTestId("org-seat-role-title")).toBeNull();
+    expect(within(dialog).queryByTestId("org-seat-shared")).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Use a different title" }));
     expect(within(dialog).getByTestId("org-seat-shared").textContent).toBe(
       "Team lead has 3 seats: its role name and title change for all of them.",
     );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Use a different title" }));
     // The acceptance scenario: the model is filled, the session is the only thing typed.
     fireEvent.change(within(dialog).getByTestId("org-seat-session"), {
       target: { value: "lead-gamma" },
@@ -1146,8 +1158,13 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
         .getAllByRole("radio")
         .map((r) => (r as HTMLInputElement).value),
     ).toEqual(["opus", "fable", "sonnet"]);
-    expect(radio(dialog, "Sonnet (not recommended)")).toBeTruthy();
-    expect(radio(dialog, "Fable").checked).toBe(true);
+    expect(
+      within(dialog)
+        .getAllByRole("radio")
+        .map((r) => r.closest("span")?.textContent ?? ""),
+    ).toEqual([named("opus"), named("fable"), `${named("sonnet")} (not recommended)`]);
+    expect(radio(dialog, named("fable")).checked).toBe(true);
+    expect(within(dialog).queryByTestId("org-seat-role-title")).toBeNull();
     expect(within(dialog).queryByTestId("org-seat-space")).toBeNull();
     expect(within(dialog).queryByTestId("org-seat-shared")).toBeNull();
     fireEvent.click(within(dialog).getByTestId("org-seat-save"));
@@ -1158,7 +1175,8 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
   it("only what changed is sent: a new model and a role title", async () => {
     draw();
     const dialog = open("vp-product", `Change VP of product, ${modelNameOf("fable")}`);
-    fireEvent.click(radio(dialog, "Opus"));
+    fireEvent.click(radio(dialog, named("opus")));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Use a different title" }));
     fireEvent.change(within(dialog).getByTestId("org-seat-role-title"), {
       target: { value: "Head of product" },
     });
@@ -1173,6 +1191,88 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
       "opus",
       "-RoleTitle",
       "Head of product",
+      "-IfMatch",
+      TEST_ETAG,
+    ]);
+  });
+
+  it("Use a different title opens the field in place, filled with the position's title, focused, its state announced", async () => {
+    draw();
+    const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
+    const link = within(dialog).getByRole("button", { name: "Use a different title" });
+    expect(link.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(link);
+    expect(link.getAttribute("aria-expanded")).toBe("true");
+    const field = within(dialog).getByTestId("org-seat-role-title") as HTMLInputElement;
+    expect(field.value).toBe("PM");
+    await waitFor(() => expect(document.activeElement).toBe(field));
+    expect(link.getAttribute("aria-controls")).toBe(field.closest("[id]")?.id ?? field.id);
+    // Left as the position's title, it is not sent.
+    fireEvent.change(within(dialog).getByTestId("org-seat-session"), {
+      target: { value: "desk-pm" },
+    });
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(runStaff).toHaveBeenCalled());
+    expect(lastParams()).not.toContain("-RoleTitle");
+  });
+
+  it("a position whose title already differs from its role's opens the field from the start", () => {
+    const data = orgResponse("valid");
+    for (const p of data.tree.positions) if (p.promptTitle) p.promptTitle = p.title;
+    data.tree.positions.find((p) => p.id === "pm")!.title = "Planner";
+    response = { isLoading: false, data };
+    draw();
+    const dialog = open("pm", `Change Planner, ${modelNameOf("opus")}`);
+    expect((within(dialog).getByTestId("org-seat-role-title") as HTMLInputElement).value).toBe(
+      "Planner",
+    );
+    expect(
+      within(dialog)
+        .getByRole("button", { name: "Use a different title" })
+        .getAttribute("aria-expanded"),
+    ).toBe("true");
+  });
+
+  it("a seat holding an older model keeps it as its own named choice, chosen; kept, it sends no -Model", async () => {
+    const data = response.data!;
+    const vp = data.tree.positions.find((p) => p.id === "vp-engineering")!.seats[0];
+    Object.assign(vp, { model: "claude-opus-5", modelName: "Opus 5", modelFamily: "opus" });
+    draw();
+    const dialog = open("vp-engineering", "Change VP of engineering, Opus 5");
+    const labels = within(dialog)
+      .getAllByRole("radio")
+      .map((r) => r.closest("span")?.textContent ?? "");
+    expect(labels).toEqual([
+      "Opus 5",
+      named("opus"),
+      named("fable"),
+      `${named("sonnet")} (not recommended)`,
+    ]);
+    expect(radio(dialog, "Opus 5").checked).toBe(true);
+    fireEvent.change(within(dialog).getByTestId("org-seat-session"), {
+      target: { value: "desk-one" },
+    });
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(runStaff).toHaveBeenCalled());
+    expect(lastParams()).not.toContain("-Model");
+  });
+
+  it("picking the family's current model over a held older one is a change, and is sent", async () => {
+    const data = response.data!;
+    const vp = data.tree.positions.find((p) => p.id === "vp-engineering")!.seats[0];
+    Object.assign(vp, { model: "claude-opus-5", modelName: "Opus 5", modelFamily: "opus" });
+    draw();
+    const dialog = open("vp-engineering", "Change VP of engineering, Opus 5");
+    fireEvent.click(radio(dialog, named("opus")));
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(runStaff).toHaveBeenCalled());
+    expect(lastParams()).toEqual([
+      "-Seat",
+      "vp-engineering.vp-engineering",
+      "-Tree",
+      TREE(),
+      "-Model",
+      "opus",
       "-IfMatch",
       TEST_ETAG,
     ]);

@@ -242,6 +242,11 @@ class TheSharedTable(OrgBase):
                     # The etag is the file's bytes as read, hashed -- route-only, so stripped below.
                     etag = body.pop("etag")
                     self.assertEqual(body.pop("families"), list(models.read_model_current()))
+                    # Each family's current model by the map's name, looked up: what the dialog's choices say.
+                    self.assertEqual(
+                        body.pop("familyNames"),
+                        {f: models.model_info(mid)["name"] for f, mid in models.read_model_current().items()},
+                    )
                     self.assertEqual(etag, hashlib.sha256((hub / C.org_file()).read_bytes()).hexdigest())
                     # The file's trees, listed: the tree shown among them, exactly one in use.
                     trees = body.pop("trees")
@@ -1020,3 +1025,16 @@ class TheEtag(unittest.TestCase):
                 got = org.find_org_chart()
                 self.assertEqual(got.status, "ok", got.message)
                 self.assertEqual(got.etag, row["sha256"])
+
+
+class TheFamilyNames(unittest.TestCase):
+    """The route's ``familyNames``: each family of the map's ``current`` block by
+    the name of the model it resolves to today -- the seat dialog's labels."""
+
+    def test_each_current_family_by_its_models_name(self):
+        names = org.family_names()
+        self.assertEqual(list(names), list(models.read_model_current()))
+        self.assertEqual(names["opus"], models.model_info(models.current_model("opus"))["name"])
+        for family, name in names.items():
+            with self.subTest(family):
+                self.assertEqual(name, models.model_info(models.read_model_current()[family])["name"])

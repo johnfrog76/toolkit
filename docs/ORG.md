@@ -100,9 +100,12 @@ An org is made of **positions**, the offices, and the **seats** in each:
 ## Staffing a seat
 
 On the Org tab, each seat of a saved org, active or a draft, has a button on its plate: **Assign** on a
-vacant seat, **Change** on a staffed one. It opens the seat dialog, already filled in: the model (the seat's
-own, or its role's default), the session's name, and the role title. A team lead's seat also asks which Space
-the team serves; the owner's seat asks only for your name. **View**, above each office, opens the role in the
+vacant seat, **Change** on a staffed one. It opens the seat dialog, already filled in: the model, each choice
+named for the model it is today ("Opus 5.5"), and the session's name. A seat that holds an older model keeps
+it as a choice of its own, chosen, until you pick another. A VP's seat offers Opus, Fable, and Sonnet marked
+"not recommended". A team lead's seat also asks which Space the team serves; the owner's seat asks only for
+your name. **Use a different title** opens the role title's field, for when the office should be called
+something else; it is open already where it is. **View**, above each office, opens the role in the
 Studio's reading room. A starting org you are only previewing has View and nothing else.
 
 In the terminal, `tkStaff -Seat` does the same:

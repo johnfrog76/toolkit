@@ -533,14 +533,21 @@ a status region, both always mounted, so a change is announced.
 a small subtle button beside who sits there: **Assign** on a vacant seat (`vacant · Assign`), **Change** on a
 staffed one (`Opus 5.5 · Change`), named for the seat (`Assign VP of engineering`, `Change VP of engineering, Opus
 5.5`, `Change Owner, Sam`). It opens the seat dialog (`SeatDialog.tsx`), a Fluent `Dialog` that asks the fewest
-questions, each already answered: the **model**, as a choice of families -- a VP's offers `consts.json`
-`org.steps`' families, those outside the position's `recommend` marked `not recommended`; any other seat every
-family the route serves (`families`) -- starting on the seat's own (`modelFamily`), or on a vacant seat on its
-position's default: the `defaultModel` line where the file states one, else its role's (`org.steps` for the VPs,
-`org.roleDefaults` for the rest, by `org.roles`), else none; the **session name**; the **role title**, the
-position's; and on a team lead's seat (`org.roles.teamLead`) a **Space**, a dropdown of the Spaces `/env` lists,
-`None` first. Where a position has several seats the dialog says that its role name and title change for all of
-them. The owner's seat asks for the **name** alone. **Save** sends only what differs from the file --
+questions, each already answered: the **model**, radios each named for its family's current model by the
+route's `familyNames` (`Opus 5.5`, `Fable 5.2`; the page types no version) -- a VP's three, `consts.json`
+`org.steps`' families, those outside the position's `recommend` marked `(not recommended)`, so `Sonnet 5.5 (not
+recommended)`; any other seat every family the route serves (`families`) -- starting on the seat's own
+(`modelFamily`), or on a vacant seat on its position's default: the `defaultModel` line where the file states one,
+else its role's (`org.steps` for the VPs, `org.roleDefaults` for the rest, by `org.roles`), else none. A seat
+holding a model that is not its family's current one -- an older id, another provider's, one the map does not
+know -- has it first as a choice of its own, by the map's name for it (`Opus 5`) or as written, chosen; kept, Save
+sends no `-Model`, and picking its family's current model is a change that does. Then the **session name**; on a
+team lead's seat (`org.roles.teamLead`) a **Space**, a dropdown of the Spaces `/env` lists, `None` first; and
+**Use a different title**, a small link-style button (`aria-expanded`, `aria-controls`) that opens the **role
+title**'s field in place, filled with the position's title and taking the focus -- open from the start where the
+position's title already differs from its role's (`promptTitle`). The title is sent only where it differs from
+the position's. Where a position has several seats, the open field says that its role name and title change for
+all of them. The owner's seat asks for the **name** alone. **Save** sends only what differs from the file --
 `Staff -Seat <position>.<seat> -Tree <id> ... -IfMatch <etag>` through the bridge, the tree the page shows and the
 route's `etag` -- and a Save that changes nothing closes with nothing written. A value that starts with a dash
 travels joined to its name (`-Person:-Sam`), so the binder never reads it as a switch. When the file changed since

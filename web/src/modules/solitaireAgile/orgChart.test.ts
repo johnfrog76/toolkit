@@ -18,7 +18,9 @@ import {
   plateWhere,
   plateWho,
   seatActionLabel,
-  seatFamilies,
+  HELD_MODEL,
+  isHeldModel,
+  seatChoices,
   seatModelDefault,
   signTitle,
   viewLabel,
@@ -305,27 +307,70 @@ describe("the seat dialog's rules", () => {
     expect(seatModelDefault(position({ prompt: "pm.prompt.md" }), seat())).toBe("");
   });
 
-  it("a staffed seat keeps its own family, and none where the map does not know its model or a person sits there", () => {
+  it("a person in a seat with no model starts on no model", () => {
     const vp = position({ prompt: ORG.roles.vpEngineering });
-    expect(
-      seatModelDefault(vp, seat({ model: "claude-opus-5", modelFamily: "opus", state: "staffed" })),
-    ).toBe("opus");
-    expect(seatModelDefault(vp, seat({ model: "x-model", state: "staffed" }))).toBe("");
     expect(seatModelDefault(vp, seat({ person: "Kim", state: "staffed" }))).toBe("");
   });
 
-  it("a VP is offered the steps' families, those outside its recommend marked; anyone else every family", () => {
-    const all = ["fable", "opus", "sonnet", "haiku"];
-    expect(seatFamilies(position({ recommend: ["opus", "fable"] }), all, "fable")).toEqual([
-      { family: "opus", recommended: true },
-      { family: "fable", recommended: true },
-      { family: "sonnet", recommended: false },
+  const NAMES = { fable: "Fable 5.2", opus: "Opus 5.5", sonnet: "Sonnet 5.5", haiku: "Haiku 5.5" };
+  const ALL = ["fable", "opus", "sonnet", "haiku"];
+
+  it("a VP is offered three choices by their current models' names, Sonnet not recommended, no Haiku", () => {
+    const vp = position({ prompt: ORG.roles.vpEngineering, recommend: ["opus", "fable"] });
+    expect(seatChoices(vp, seat(), ALL, NAMES)).toEqual([
+      { value: "opus", label: "Opus 5.5" },
+      { value: "fable", label: "Fable 5.2" },
+      { value: "sonnet", label: "Sonnet 5.5 (not recommended)" },
     ]);
-    expect(seatFamilies(position(), all, "").map((c) => c.family)).toEqual(all);
-    // A family the seat already has is always offered.
-    expect(
-      seatFamilies(position({ recommend: ["opus"] }), all, "haiku").map((c) => c.family),
-    ).toContain("haiku");
+  });
+
+  it("any other seat is offered the four current families, by name", () => {
+    expect(seatChoices(position(), seat(), ALL, NAMES).map((c) => c.label)).toEqual([
+      "Fable 5.2",
+      "Opus 5.5",
+      "Sonnet 5.5",
+      "Haiku 5.5",
+    ]);
+  });
+
+  it("a seat holding a model that is not its family's current one keeps it as a choice of its own, chosen", () => {
+    const older = seat({
+      model: "claude-opus-5",
+      modelName: "Opus 5",
+      modelFamily: "opus",
+      state: "staffed",
+    });
+    expect(isHeldModel(older, NAMES)).toBe(true);
+    expect(seatChoices(position(), older, ALL, NAMES)[0]).toEqual({
+      value: HELD_MODEL,
+      label: "Opus 5",
+    });
+    expect(seatModelDefault(position(), older, NAMES)).toBe(HELD_MODEL);
+    // Another provider's, or one the map does not know: as written, held the same way.
+    const unknown = seat({ model: "x-model", modelName: "x-model", state: "staffed" });
+    expect(seatChoices(position(), unknown, ALL, NAMES)[0]).toEqual({
+      value: HELD_MODEL,
+      label: "x-model",
+    });
+    expect(seatModelDefault(position(), unknown, NAMES)).toBe(HELD_MODEL);
+    // The current model, or its family's word, is no held model.
+    const current = seat({
+      model: "claude-opus-5-5",
+      modelName: "Opus 5.5",
+      modelFamily: "opus",
+      state: "staffed",
+    });
+    const word = seat({
+      model: "opus",
+      modelName: "Opus 5.5",
+      modelFamily: "opus",
+      state: "staffed",
+    });
+    for (const s of [current, word]) {
+      expect(isHeldModel(s, NAMES)).toBe(false);
+      expect(seatModelDefault(position(), s, NAMES)).toBe("opus");
+      expect(seatChoices(position(), s, ALL, NAMES)).toHaveLength(4);
+    }
   });
 
   it("the sign is the one seat's label, a room's position title; a room's plate carries a seat's own label", () => {

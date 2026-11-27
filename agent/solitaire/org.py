@@ -603,6 +603,13 @@ def model_family(model: str | None) -> str | None:
     return models.model_info(current)["family"] if current else None
 
 
+def family_names() -> dict[str, str]:
+    """Each family of the model map's ``current`` block, in its order, by the name
+    of the model it resolves to today ("Opus 5.5"): the seat dialog's labels.
+    Looked up, never parsed; a current id with no row reads as written."""
+    return {family: models.model_info(mid)["name"] for family, mid in models.read_model_current().items()}
+
+
 def with_prompts(chart: dict) -> dict:
     """The chart with the fields only the route adds: ``promptTitle`` and
     ``promptRef`` on every position (both null for a position with no prompt),
@@ -648,6 +655,8 @@ def org_chart(tree: str = "") -> dict:
     # The families a seat can be staffed with -- the model map's current block,
     # in its order -- which the seat dialog offers and Staff -Model resolves.
     chart["families"] = list(models.read_model_current())
+    # Each of them by its current model's name, so the page types no version.
+    chart["familyNames"] = family_names()
     log_writer.write_log(
         "CMD",
         f"agent{ROUTE}",

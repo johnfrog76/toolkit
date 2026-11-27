@@ -308,7 +308,7 @@ draw one.
 use. [`Tests/fixtures/org/charts/`](../../Tests/fixtures/org/charts/) holds the responses the table states.
 
 **The one difference between the two halves: the fields only the route adds.** The route adds four keys to
-every position, two to every seat and three to the document, which `OrgChart -AsJson` does not print -- the CLI has no prompt reader,
+every position, two to every seat and four to the document, which `OrgChart -AsJson` does not print -- the CLI has no prompt reader,
 and the Studio's is the agent's; the model's name is what the Org tab draws, and the terminal prints the model as
 the file writes it:
 
@@ -321,6 +321,7 @@ the file writes it:
 | `trees` (the document's) | every tree of the file, in its order, as the Org tab's View and Active dropdowns list them: `{ "id", "title", "size", "preset", "active", "state", "activatedAt" }` -- `state` is [the tree's state](#an-orgs-state), `active` true on the active one alone -- each read as that tree's own chart reads it (`title`, `size`, `preset` and `activatedAt` `null` where unset) -- the same list whichever tree `?tree=` asks for | `agent/solitaire/org.py`'s `tree_summaries`, over the trees the reader has already checked |
 | `etag` (the document's) | the SHA-256 of `org.json`'s bytes as this read saw them, lowercase hex -- the same whichever tree `?tree=` asks for. The seat dialog sends it back as `Staff -Seat -IfMatch`, so a file changed since the page read it is refused rather than written over | `agent/solitaire/org.py`'s `find_org_chart`, over the bytes it parsed |
 | `families` (the document's) | the model families a seat can be staffed with: the keys of the model map's `current` block, in its order -- what the seat dialog offers a seat that is not a VP's | `agent/core/models.py`'s `read_model_current` |
+| `familyNames` (the document's) | each of `families` by the name of the model it resolves to today ("Opus 5.5"): the model map's `name` for the `current` id, looked up, never parsed -- the seat dialog's labels, so the page types no version | `agent/solitaire/org.py`'s `family_names` |
 | `modelFamily` (a seat's) | the family of the seat's `model`: the map's `family` for an id it has a row for, the family itself for one `current` names, `null` otherwise -- the choice the seat dialog starts on | `agent/solitaire/org.py`'s `model_family`, looked up, never parsed |
 | `modelName` (a seat's) | what the seat's `model` is called: the model map's `name` for an id it has a row for ("Opus 5.5"); for a family the map's `current` names (`opus`), the name of the id that family is today; anything else as written; `null` with no model | `agent/core/models.py`'s `model_info` and `current_model`, the lookup the Agent line uses -- looked up, never parsed |
 

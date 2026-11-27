@@ -155,15 +155,44 @@ function isVp(position: OrgPosition): boolean {
   );
 }
 
+/** A family as a person reads it: its word, with a capital first letter. */
+export function familyLabel(family: string): string {
+  return family ? family[0].toUpperCase() + family.slice(1) : family;
+}
+
+/** The note a family carries in a VP question: none when it is recommended. */
+export const NOT_RECOMMENDED = "not recommended";
+
+/** The model question's value for a model the seat holds that is not its family's current one. */
+export const HELD_MODEL = "held";
+
 /**
- * The family the seat dialog's model question starts on. A seat that is
- * staffed keeps its own (none where the model map does not know its model, or
- * where a person sits there): Save sends a model only when it changes. A
- * vacant seat starts on its position's default: the defaultModel line where
- * the file states one, else its role's (consts.json org.steps for the two VPs,
- * org.roleDefaults for the rest), else none.
+ * Does the seat hold a model that is not its family's current one -- an older
+ * id, another provider's, or one the map does not know? Its name differs from
+ * the current model's (`familyNames`, served by the agent), or it has no family.
+ * A family's own word (`opus`) is its current model, and not held.
  */
-export function seatModelDefault(position: OrgPosition, seat: OrgSeat): string {
+export function isHeldModel(seat: OrgSeat, familyNames: Record<string, string>): boolean {
+  if (!seat.model) return false;
+  if (!seat.modelFamily) return true;
+  return (seat.modelName ?? seat.model) !== familyNames[seat.modelFamily];
+}
+
+/**
+ * The choice the seat dialog's model question starts on. A seat holding a model
+ * that is not current starts on that model, its own choice (HELD_MODEL), kept
+ * unless the person picks another. A seat that is staffed keeps its own family
+ * (none where a person sits there with no model): Save sends a model only when it
+ * changes. A vacant seat starts on its position's default: the defaultModel line
+ * where the file states one, else its role's (consts.json org.steps for the two
+ * VPs, org.roleDefaults for the rest), else none.
+ */
+export function seatModelDefault(
+  position: OrgPosition,
+  seat: OrgSeat,
+  familyNames: Record<string, string> = {},
+): string {
+  if (isHeldModel(seat, familyNames)) return HELD_MODEL;
   if (seat.model || seat.person) return seat.modelFamily ?? "";
   if (position.defaultModelFamily) return position.defaultModelFamily;
   const role = position.prompt ?? "";
@@ -172,36 +201,51 @@ export function seatModelDefault(position: OrgPosition, seat: OrgSeat): string {
   return ORG.roleDefaults[role] ?? "";
 }
 
-/** One family the model question offers, and whether it carries "not recommended". */
-export interface FamilyChoice {
-  family: string;
-  recommended: boolean;
+/** One choice of the model question: its value (a family, or HELD_MODEL) and its words. */
+export interface ModelChoice {
+  value: string;
+  label: string;
 }
 
 /**
- * The families the model question offers: for a VP, consts.json org.steps'
- * families, those outside the position's `recommend` (else the steps' own
- * recommended) marked; for every other seat, every family the model map's
- * current block names (`all`, served by the agent). The family the seat starts
- * on is always offered, so a seat is never shown a model it cannot keep.
+ * The model question's choices, each by its current model's versioned name
+ * (`familyNames`, served by the agent: the page types no version). A VP's:
+ * consts.json org.steps' families, those outside the position's `recommend`
+ * (else the steps' own recommended) marked "not recommended". Any other seat's:
+ * every family the agent serves. A seat holding a model that is not current
+ * has it first, a choice of its own, by the map's name for it (as written where
+ * the map has none).
  */
-export function seatFamilies(position: OrgPosition, all: string[], start: string): FamilyChoice[] {
-  let choices: FamilyChoice[];
+export function seatChoices(
+  position: OrgPosition,
+  seat: OrgSeat,
+  families: string[],
+  familyNames: Record<string, string>,
+): ModelChoice[] {
+  const name = (f: string) => familyNames[f] ?? familyLabel(f);
+  let choices: ModelChoice[];
   if (isVp(position)) {
     const recommended = position.recommend.length ? position.recommend : ORG.steps.recommended;
-    choices = ORG.steps.families.map((family) => ({
-      family,
-      recommended: recommended.includes(family),
+    choices = ORG.steps.families.map((f) => ({
+      value: f,
+      label: recommended.includes(f) ? name(f) : `${name(f)} (${NOT_RECOMMENDED})`,
     }));
   } else {
-    choices = (all.length ? all : ORG.steps.families).map((family) => ({
-      family,
-      recommended: true,
+    choices = (families.length ? families : ORG.steps.families).map((f) => ({
+      value: f,
+      label: name(f),
     }));
   }
-  if (start && !choices.some((c) => c.family === start))
-    choices.push({ family: start, recommended: true });
+  if (isHeldModel(seat, familyNames)) {
+    choices.unshift({ value: HELD_MODEL, label: seat.modelName ?? seat.model ?? "" });
+  }
   return choices;
+}
+
+/** Does a position's title differ from its role's own (the prompt's title)? Then
+ *  the seat dialog opens its title field from the start. */
+export function hasOwnTitle(position: OrgPosition): boolean {
+  return Boolean(position.promptTitle) && position.title !== position.promptTitle;
 }
 
 /** Did Staff refuse because org.json changed since the page read it (-IfMatch)? */

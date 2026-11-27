@@ -47,6 +47,11 @@ export function modelFamilyOf(model: string | null): string | null {
 /** The families the route serves: the model map's current block, in its order. */
 export const FAMILIES = Object.keys(MODEL_MAP.current);
 
+/** Each family by its current model's name, as the route serves familyNames. */
+export const FAMILY_NAMES: Record<string, string> = Object.fromEntries(
+  FAMILIES.map((f) => [f, MODEL_MAP.models[MODEL_MAP.current[f]]?.name ?? MODEL_MAP.current[f]]),
+);
+
 /** The etag every test chart is served with. */
 export const TEST_ETAG = "a".repeat(64);
 
@@ -76,5 +81,5 @@ export function orgResponse(name: string): OrgResponse {
       s.modelFamily = modelFamilyOf(s.model);
     }
   }
-  return { ...chart, etag: TEST_ETAG, families: FAMILIES };
+  return { ...chart, etag: TEST_ETAG, families: FAMILIES, familyNames: FAMILY_NAMES };
 }

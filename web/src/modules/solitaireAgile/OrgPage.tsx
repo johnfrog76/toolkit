@@ -996,6 +996,7 @@ export function OrgPage() {
           treeId={chart.tree.id}
           etag={chart.etag}
           families={chart.families ?? []}
+          familyNames={chart.familyNames ?? {}}
           spaces={env.data?.config.spaces ?? []}
           run={saveRun}
           busy={writing}
