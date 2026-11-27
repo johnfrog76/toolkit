@@ -18,7 +18,7 @@ import {
   tokens,
   useId,
 } from "@fluentui/react-components";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   DocumentTextRegular,
   OrganizationRegular,
@@ -344,6 +344,7 @@ function Office({ office, actions }: { office: PlacedOffice; actions?: SeatActio
     actions ? (
       <PlateButton
         label={seatActionLabel(p, seat)}
+        seat={`${p.id}.${seat.id}`}
         disabled={actions.busy}
         onClick={() => actions.onOpen(p, seat)}
       >
@@ -857,6 +858,32 @@ export function OrgPage() {
     ? chart?.tree.positions.find((p) => p.id === seatOpen.position)
     : undefined;
   const openSeat = openPosition?.seats.find((x) => x.id === seatOpen?.seat);
+
+  // Focus goes back to the seat's button when its dialog closes: Cancel, Escape
+  // or Save. After a Save the button is drawn again -- Assign becomes Change --
+  // once the chart is read again, so it waits for a chart read since the save
+  // (a new etag) before it looks.
+  const [returnTo, setReturnTo] = useState<{ seat: string; afterEtag?: string } | null>(null);
+  const closeSeat = (saved: boolean) => {
+    if (seatOpen) {
+      setReturnTo({
+        seat: `${seatOpen.position}.${seatOpen.seat}`,
+        afterEtag: saved ? (chart?.etag ?? "") : undefined,
+      });
+    }
+    setSeatOpen(null);
+  };
+  useEffect(() => {
+    if (!returnTo || seatOpen) return;
+    if (returnTo.afterEtag !== undefined && chart?.etag === returnTo.afterEtag) return;
+    const button = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="org-seat-action"]'),
+    ).find((b) => b.dataset.seat === returnTo.seat);
+    if (button) {
+      button.focus();
+      setReturnTo(null);
+    }
+  });
   const reread = async () => {
     await ours.refetch();
     if (savedId && savedId !== active?.id) await other.refetch();
@@ -972,12 +999,12 @@ export function OrgPage() {
           spaces={env.data?.config.spaces ?? []}
           run={saveRun}
           busy={writing}
-          onSaved={() => setSeatOpen(null)}
+          onSaved={() => closeSeat(true)}
           onReload={() => {
-            setSeatOpen(null);
+            closeSeat(false);
             void reread();
           }}
-          onClose={() => setSeatOpen(null)}
+          onClose={() => closeSeat(false)}
         />
       ) : null}
       {useOpen && preset ? (

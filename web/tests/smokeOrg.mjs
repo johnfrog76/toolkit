@@ -111,7 +111,11 @@ export async function runOrg({ repoRoot, agentPort, webPort, python }) {
         .filter((v) => v.impact === "critical" || v.impact === "serious")
         .map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`);
     const onPage = await blocking();
-    check("org: axe on a saved org finds nothing serious or critical", onPage.length === 0, onPage.join(" | "));
+    check(
+      "org: axe on a saved org finds nothing serious or critical",
+      onPage.length === 0,
+      onPage.join(" | "),
+    );
 
     // Assign a vacant seat: the second team lead's, whose model the position states.
     const lead = page.locator('[data-testid="org-office"][data-position="team-lead"]');
@@ -121,14 +125,19 @@ export async function runOrg({ repoRoot, agentPort, webPort, python }) {
     // Past the dialog's fade-in: a colour read mid-animation is not the colour drawn.
     await sleep(1000);
     const inDialog = await blocking();
-    check("org: axe on the seat dialog finds nothing serious or critical", inDialog.length === 0, inDialog.join(" | "));
+    check(
+      "org: axe on the seat dialog finds nothing serious or critical",
+      inDialog.length === 0,
+      inDialog.join(" | "),
+    );
     check(
       "org: the dialog opens with the position's model chosen",
       await dialog.getByRole("radio", { name: "Opus" }).isChecked(),
     );
     await page.getByTestId("org-seat-session").fill(SEAT_SESSION);
     await page.getByTestId("org-seat-save").click();
-    const opus = JSON.parse(readFileSync(join(repoRoot, "Config", "models.json"), "utf8")).current.opus;
+    const opus = JSON.parse(readFileSync(join(repoRoot, "Config", "models.json"), "utf8")).current
+      .opus;
     const seatOf = (d) =>
       d.trees
         .find((t) => t.id === before.activeTree)
@@ -137,7 +146,9 @@ export async function runOrg({ repoRoot, agentPort, webPort, python }) {
     const staffed = await waitForOrg(orgPath, (d) => seatOf(d)?.session === SEAT_SESSION);
     check(
       "org: Assign ran Staff -Seat: org.json's seat has the model's id and the session",
-      Boolean(staffed) && seatOf(staffed)?.model === opus && seatOf(staffed)?.session === SEAT_SESSION,
+      Boolean(staffed) &&
+        seatOf(staffed)?.model === opus &&
+        seatOf(staffed)?.session === SEAT_SESSION,
       JSON.stringify(staffed && seatOf(staffed)),
     );
     await dialog.waitFor({ state: "detached", timeout: 30000 }).catch(() => {});
@@ -146,6 +157,17 @@ export async function runOrg({ repoRoot, agentPort, webPort, python }) {
       .nth(1)
       .waitFor({ timeout: 30000 })
       .catch(() => {});
+    const focused = await page
+      .waitForFunction(
+        (seat) =>
+          document.activeElement?.getAttribute("data-seat") === seat &&
+          document.activeElement?.textContent === "Change",
+        `team-lead.${VACANT_SEAT}`,
+        { timeout: 30000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    check("org: after the save, focus is on the seat's new Change button", focused);
     check(
       "org: the seat's plate now offers Change, naming the model",
       (await lead.getByRole("button", { name: /^Change Team lead, Opus/ }).count()) === 2,
@@ -166,7 +188,9 @@ export async function runOrg({ repoRoot, agentPort, webPort, python }) {
     check(
       "org: Save wrote the preset into org.json as a draft, the active org unchanged",
       Boolean(small) && small.preset === SMALL_ID && saved.activeTree === before.activeTree,
-      JSON.stringify(saved && { activeTree: saved.activeTree, trees: saved.trees.map((t) => t.id) }),
+      JSON.stringify(
+        saved && { activeTree: saved.activeTree, trees: saved.trees.map((t) => t.id) },
+      ),
     );
     await page
       .waitForFunction(

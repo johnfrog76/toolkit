@@ -212,11 +212,14 @@ export function Plate({
 /** Assign or Change, on a plate: a small subtle button with the seat in its name. */
 export function PlateButton({
   label,
+  seat,
   children,
   disabled,
   onClick,
 }: {
   label: string;
+  /** `<position>.<seat>`: how the page finds this button again to return focus to it. */
+  seat: string;
   children: ReactNode;
   disabled?: boolean;
   onClick: () => void;
@@ -231,6 +234,7 @@ export function PlateButton({
       disabled={disabled}
       onClick={onClick}
       data-testid="org-seat-action"
+      data-seat={seat}
     >
       {children}
     </Button>

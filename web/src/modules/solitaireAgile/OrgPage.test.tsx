@@ -1265,6 +1265,63 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
     );
   });
 
+  const seatButton = (positionId: string, seatId: string) =>
+    within(office(positionId))
+      .getAllByTestId("org-seat-action")
+      .find((b) => b.dataset.seat === `${positionId}.${seatId}`)!;
+
+  it("Cancel puts focus back on the seat's button", async () => {
+    draw();
+    open("pm", `Change PM, ${modelNameOf("opus")}`);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByTestId("org-seat-dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(seatButton("pm", "pm")));
+  });
+
+  it("Escape puts focus back on the seat's button", async () => {
+    draw();
+    const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
+    fireEvent.keyDown(within(dialog).getByTestId("org-seat-session"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("org-seat-dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(seatButton("pm", "pm")));
+  });
+
+  it("after an Assign is saved, focus lands on the seat's new Change button", async () => {
+    const staffed = orgResponse("valid");
+    const gamma = staffed.tree.positions
+      .find((p) => p.id === "team-lead")!
+      .seats.find((x) => x.id === "gamma")!;
+    Object.assign(gamma, {
+      model: "opus",
+      modelName: modelNameOf("opus"),
+      modelFamily: "opus",
+      session: "lead-gamma",
+      state: "staffed",
+    });
+    staffAnswer = () => {
+      // The write lands, and the next read serves the seat staffed, under a new etag.
+      response = { isLoading: false, data: { ...staffed, etag: "b".repeat(64) } };
+      return Promise.resolve({
+        status: "success",
+        output: "",
+        error: "",
+        duration: 1,
+      } as CommandResponse);
+    };
+    draw();
+    const dialog = open("team-lead", "Assign Team lead");
+    fireEvent.change(within(dialog).getByTestId("org-seat-session"), {
+      target: { value: "lead-gamma" },
+    });
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(screen.queryByTestId("org-seat-dialog")).toBeNull());
+    await waitFor(() => {
+      const button = seatButton("team-lead", "gamma");
+      expect(button.textContent).toBe("Change");
+      expect(document.activeElement).toBe(button);
+    });
+  });
+
   it("Save, Cancel and Close wait for a write already in flight on the page", () => {
     const data = orgResponse("valid");
     const pm = data.tree.positions.find((p) => p.id === "pm")!;
