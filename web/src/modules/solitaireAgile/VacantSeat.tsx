@@ -1,10 +1,12 @@
+import type { ReactNode } from "react";
 import { OfficeDoor, Plate, SeatCell } from "./OrgParts";
 import { SIZE, VACANT_WORD, levelWall, vacantMug } from "./orgChart";
 import { EmptyDesk } from "./stage/EmptyDesk";
 
 // A seat nobody sits in: the office is there, its door and its plate, and
-// nobody in it. The plate reads `POSITION · vacant`, and the card is the same
-// size as a staffed one, so a row of seats does not move when a seat empties.
+// nobody in it. The plate reads `vacant`, with Assign beside it on a saved org,
+// and the card is the same size as a staffed one, so a row of seats does not
+// move when a seat empties.
 //
 // What stands in the door is the standup's empty desk -- an office chair
 // pushed back, a desk and a steaming mug -- on the level's wall, dimmed. It
@@ -21,12 +23,18 @@ export function VacantSeat({
   level,
   where,
   session,
+  space,
+  action,
 }: {
   seatId: string;
   position: string;
   level: number;
   where?: string;
   session?: string;
+  /** The Space the seat serves, for the plate's hover. */
+  space?: string;
+  /** Assign, on a saved org. */
+  action?: ReactNode;
 }) {
   const { wall, shade } = levelWall(level);
   return (
@@ -44,7 +52,14 @@ export function VacantSeat({
           </div>
         </foreignObject>
       </OfficeDoor>
-      <Plate position={position} who={VACANT_WORD} where={where} session={session} />
+      <Plate
+        position={position}
+        who={VACANT_WORD}
+        where={where}
+        session={session}
+        space={space}
+        action={action}
+      />
     </SeatCell>
   );
 }

@@ -558,17 +558,18 @@ entry, with the chrome, and absent with the flag off whatever `org.json` says (`
 page under Team Agile's one entry"). Two dropdowns sit at the header's right: **View** picks the org shown -- the
 saved orgs, then the presets (`GET /api/ritual/org/presets`) as previews -- and **Active**, once an org is saved,
 picks the one in use. The page's writes are `Staff`'s, through the bridge: "Use this org" saves a preset as a draft,
-and Active runs `Staff -Activate` (`OrgPage.test.tsx`, "the presets", "with saved orgs: View and Active", "Use this
-org: the steps").
+Active runs `Staff -Activate`, and the seat dialog runs `Staff -Seat` (`OrgPage.test.tsx`, "the presets", "with saved
+orgs: View and Active", "Use this org: the steps", "the seat dialog: Assign and Change on a saved org").
 
 | `GET /api/ritual/org` answers | The page shows |
 | --- | --- |
-| the tree in use | the tree's title as the heading (an older file's name; `Org chart` while there is no chart); one office a position, a row a level from the owner down, the walls coloured by level, lines from each office to its reports; a card a seat with a bust and a plate, `POSITION · model` -- the seat's `roleTitle` in place of the position's where it has one, the model by its model-map name (`Opus 5.5`) -- and the Space it serves (`alpha`), its session on hover, never a machine; the prompt's title over each office that has one |
-| a position with several seats | a row of cards in one office |
-| a vacant seat | `POSITION · vacant` on a dimmed office with a dashed outline -- a placeholder for the empty desk, the size of a staffed card |
-| the owner's seat (a person) | `Owner · <name>`, no model, not a link |
-| a position with no seats (the pool) | one wider card, `POSITION · pool`, its default-model line under it, not a link |
-| a position with a prompt | the office is a link: the prompt in the Studio's reading room (`/studio/prompts/yours/<name>`) |
+| the tree in use | the tree's title as the heading (an older file's name; `Org chart` while there is no chart); one office a position, a row a level from the owner down, the walls coloured by level, lines from each office to its reports; over each office its sign, its title -- the one seat's `roleTitle` where it has one, else the position's -- with View where it has a role; a card a seat with a bust and a plate, who sits there -- the model by its model-map name (`Opus 5.5`) -- and the Space it serves (`alpha`), its session on hover, never a machine |
+| a position with several seats | a row of cards in one office, the position's title on its sign, a seat's own `roleTitle` on its plate |
+| a vacant seat | `vacant` on the plate, an empty desk in a dimmed door, the size of a staffed card |
+| the owner's seat (a person) | `Owner` on the sign, the name on the plate, no model, no View |
+| a position with no seats (the pool) | one wider card, `pool` on its plate, its default-model line under it, no View and no button |
+| a position with a prompt | View on its sign, a link to the prompt in the Studio's reading room (`/studio/prompts/yours/<name>`); the card itself is never a link |
+| a saved org (active, draft or inactive) | each seat's plate carries **Assign** (vacant) or **Change** (staffed), named for the seat (`Change VP of product, Fable 5.2`); a preview has neither. It opens the seat dialog, filled in: the model (the seat's own, else its position's default), the session name, the role title, a team lead's Space; the owner's seat the name alone. Save runs `Staff -Seat <position>.<seat> -Tree <id> ... -IfMatch <etag>`; a file changed since says `The org changed since you opened it. Reload to see it.` with a Reload button, plainly |
 | any chart, any tree | over it at the content area's top right, a `Zoom` toolbar -- **Zoom out**, **Zoom in**, **Fit to width** -- and `Zoom <n>%` in a polite live region; the chart opens fitted to its box's width, capped at 100%, and only the chart scales; its box pans on both axes (`OrgPage.test.tsx`, "the zoom") |
 | 404 `missing` (no `org.json`) or `no-hub` | `No org chart yet`, with the agent's sentence (`There is no org.json in the hub.`) |
 | 409 (the file fails its checks) | `The org chart could not be read`, with the agent's sentence, said plainly; View opens on `Your org` and still offers the presets |

@@ -1,13 +1,16 @@
 <#
 .SYNOPSIS
-    Staff -- the org file's one writer: start a tree from a preset, or choose the tree in use (the Team Agile add-on).
+    Staff -- the org file's one writer: start a tree from a preset, staff one seat, or choose the tree in use (the Team Agile add-on).
 
 .DESCRIPTION
     Writes the hub's org file (consts.json org.file, at the hub root beside
-    hub.json; docs/hub/org.md). Two forms:
+    hub.json; docs/hub/org.md). Three forms:
 
       Staff -Preset S|M|L [-Tree <id>] [-Title <text>] [-Owner <name>]
             [-VpEngineering <model>] [-VpProduct <model>] [-WhatIf]
+      Staff -Seat <position>.<seat> [-Tree <id>] [-Model <model>] [-Person <name>]
+            [-Session <name>] [-Space <slug>] [-RoleName <file>] [-RoleTitle <text>]
+            [-Merges] [-IfMatch <sha256>] [-WhatIf]
       Staff -Activate <tree-id> [-WhatIf]
 
     -Preset copies the preset of that size (the package's org presets,
@@ -21,6 +24,17 @@
     stand-in stay vacant. -VpEngineering and -VpProduct put another model in
     those two seats; -Owner names the owner (the root's seat, a person, never a
     model; the preset's "You" otherwise); -Title names the tree.
+
+    -Seat edits one seat of a saved tree, active or not: the tree in use, or
+    the one -Tree names. -Model (a family or an id, stored as the id), -Person,
+    -Session, -Space (a team lead's seat only; a Space the toolkit knows) and -Merges are the seat's own;
+    -RoleName (the role file) and -RoleTitle belong to the POSITION, so they
+    change every seat of it. The owner's seat (the root's) takes -Person only.
+    An empty -Model, -Person, -Session, -Space or -RoleTitle takes that key
+    away. -IfMatch is the SHA-256 of the file's bytes as the caller read them
+    (the agent serves it as the chart's etag): a file that has changed since is
+    refused, and nothing is written. One line says what changed; a call that
+    changes nothing writes nothing.
 
     The tree's id is -Tree, else the preset's id, then <id>-2 and <id>-3. An id
     that is already a tree is refused -- a tree is never overwritten -- and so
@@ -49,6 +63,24 @@
     The VP of engineering's model: a model id or a family; the default otherwise.
 .PARAMETER VpProduct
     The VP of product's model: a model id or a family; the default otherwise.
+.PARAMETER Seat
+    The seat to edit, as <position>.<seat>: the position's id, a dot, the seat's id.
+.PARAMETER Model
+    The seat's model: a family (opus) or a model id; stored as the id. Empty takes it away.
+.PARAMETER Person
+    The person in the seat; on the owner's seat, the owner's name.
+.PARAMETER Session
+    The seat's session name, the address readies and messages go to.
+.PARAMETER Space
+    The Space the seat serves, a team lead's: a slug the toolkit knows.
+.PARAMETER RoleName
+    The position's role file (its prompt), for every seat of the position.
+.PARAMETER RoleTitle
+    The position's title, for every seat of the position.
+.PARAMETER Merges
+    Mark the seat as one that holds the merge.
+.PARAMETER IfMatch
+    The SHA-256 of org.json's bytes as they were read; a file that has changed since is refused.
 .PARAMETER Activate
     Make the tree -Tree names the one in use. Not with -Preset: a saved tree is a draft.
 .PARAMETER WhatIf
@@ -58,6 +90,10 @@
     {cliPrefix}Staff -Preset S -Owner Sam
 .EXAMPLE
     {cliPrefix}Staff -Preset M -Tree branch -VpProduct opus -WhatIf
+.EXAMPLE
+    {cliPrefix}Staff -Seat vp-engineering.vp-engineering -Model opus -Session desk-one
+.EXAMPLE
+    {cliPrefix}Staff -Seat owner.owner -Person Sam
 .EXAMPLE
     {cliPrefix}Staff -Activate branch
 
@@ -79,6 +115,24 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$VpProduct,
     [Parameter(Mandatory = $false)]
+    [string]$Seat,
+    [Parameter(Mandatory = $false)]
+    [string]$Model,
+    [Parameter(Mandatory = $false)]
+    [string]$Person,
+    [Parameter(Mandatory = $false)]
+    [string]$Session,
+    [Parameter(Mandatory = $false)]
+    [string]$Space,
+    [Parameter(Mandatory = $false)]
+    [string]$RoleName,
+    [Parameter(Mandatory = $false)]
+    [string]$RoleTitle,
+    [Parameter(Mandatory = $false)]
+    [switch]$Merges,
+    [Parameter(Mandatory = $false)]
+    [string]$IfMatch,
+    [Parameter(Mandatory = $false)]
     [switch]$Activate,
     [Parameter(Mandatory = $false)]
     [switch]$WhatIf,
@@ -91,7 +145,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 $p = Get-CliPrefix
-$usage = "${p}Staff -Preset S|M|L [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-WhatIf]  |  ${p}Staff -Activate <tree-id> [-WhatIf]"
+$usage = "${p}Staff -Preset S|M|L [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-WhatIf]  |  ${p}Staff -Seat <position>.<seat> [-Tree <id>] [-Model <model>] [-Person <name>] [-Session <name>] [-Space <slug>] [-RoleName <file>] [-RoleTitle <text>] [-Merges] [-IfMatch <sha256>] [-WhatIf]  |  ${p}Staff -Activate <tree-id> [-WhatIf]"
 
 if ($Help) {
     Write-Host ""
@@ -99,9 +153,10 @@ if ($Help) {
     Write-Host ""
     Write-Host "  Usage:" -ForegroundColor Yellow
     Write-Host "    ${p}Staff -Preset S|M|L [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-WhatIf]"
+    Write-Host "    ${p}Staff -Seat <position>.<seat> [-Tree <id>] [-Model <model>] [-Person <name>] [-Session <name>] [-Space <slug>] [-RoleName <file>] [-RoleTitle <text>] [-Merges] [-IfMatch <sha256>] [-WhatIf]"
     Write-Host "    ${p}Staff -Activate <tree-id> [-WhatIf]"
     Write-Host ""
-    Write-Host "  -Preset saves a tree from a preset, with the default models, as a draft; -Activate chooses the tree in use."
+    Write-Host "  -Preset saves a tree from a preset, with the default models, as a draft; -Seat staffs one seat; -Activate chooses the tree in use."
     Write-Host "  A tree is never overwritten, and a file holds at most three. -WhatIf writes nothing."
     Write-Host ""
     return
@@ -124,18 +179,19 @@ $maxTrees = 3
 # still starts staffed: the role -> the family its seats start with. Every pool
 # (a position with no seats: the builders) has its default-model line set to
 # the pool's family instead. Every other seat starts vacant.
-# The two VP defaults are the Org tab's step defaults too, so both read them
-# from consts.json org.steps.
-$steps = (Get-P20Consts).org.steps
-$roleEngineering = 'vp-of-engineering.prompt.md'
-$roleProduct = 'vp-of-product.prompt.md'
+# The Org tab's seat dialog fills a vacant seat with the same defaults, so both
+# read them from consts.json: the two VPs' from org.steps (the "Use this org"
+# steps' defaults), by the role files org.roles names, and every other role's
+# from org.roleDefaults.
+$orgConsts = (Get-P20Consts).org
+$steps = $orgConsts.steps
+$roleEngineering = [string]$orgConsts.roles.vpEngineering
+$roleProduct = [string]$orgConsts.roles.vpProduct
 $seatDefaults = [ordered]@{
-    $roleEngineering    = [string]$steps.vpEngineering
-    $roleProduct        = [string]$steps.vpProduct
-    'team-lead.prompt.md' = 'opus'
-    'intern.prompt.md'  = 'haiku'
-    'butler.prompt.md'  = 'haiku'
+    $roleEngineering = [string]$steps.vpEngineering
+    $roleProduct     = [string]$steps.vpProduct
 }
+foreach ($prop in $orgConsts.roleDefaults.PSObject.Properties) { $seatDefaults[$prop.Name] = [string]$prop.Value }
 $poolDefault = 'sonnet'
 $mergesRole = $roleProduct
 
@@ -149,19 +205,53 @@ function Stop-Staff([string]$Message, [string]$Hint = '') {
 
 $Tree = ([string]$Tree).Trim()
 $Preset = ([string]$Preset).Trim()
+$Seat = ([string]$Seat).Trim()
 $creating = [bool]$Preset
+$seating = $PSBoundParameters.ContainsKey('Seat')
+$presetOnly = @('Title', 'Owner', 'VpEngineering', 'VpProduct')
+$seatOnly = @('Model', 'Person', 'Session', 'Space', 'RoleName', 'RoleTitle', 'Merges', 'IfMatch')
 if ($creating -and $Activate) {
     Stop-Staff '-Activate does not go with -Preset: a saved tree is a draft, and the tree in use stays as it was.' `
         "Save it first, then put it in use with '${p}Staff -Activate <tree-id>'."
 }
-if (-not $creating -and -not $Activate) {
-    Stop-Staff 'Nothing to do: give -Preset S|M|L to add a tree, or -Activate <tree-id> to choose the tree in use.'
+if ($seating -and ($creating -or $Activate)) {
+    $other = '-Preset'
+    if ($Activate) { $other = '-Activate' }
+    Stop-Staff "-Seat does not go with ${other}: it edits one seat of a tree that is already saved." `
+        "Run them one at a time: '${p}Staff -Seat <position>.<seat> ...' edits a seat."
+}
+if (-not $creating -and -not $Activate -and -not $seating) {
+    Stop-Staff 'Nothing to do: give -Preset S|M|L to add a tree, -Seat <position>.<seat> to staff a seat, or -Activate <tree-id> to choose the tree in use.'
+}
+if (-not $seating) {
+    foreach ($name in $seatOnly) {
+        if ($PSBoundParameters.ContainsKey($name)) { Stop-Staff "-$name goes with -Seat: it changes the seat -Seat names." }
+    }
 }
 if (-not $creating) {
-    foreach ($name in @('Title', 'Owner', 'VpEngineering', 'VpProduct')) {
+    foreach ($name in $presetOnly) {
         if ($PSBoundParameters.ContainsKey($name)) { Stop-Staff "-$name goes with -Preset: it fills the tree -Preset adds." }
     }
-    if (-not $Tree) { Stop-Staff '-Activate needs the id of the tree to put in use.' }
+}
+if ($Activate -and -not $Tree) { Stop-Staff '-Activate needs the id of the tree to put in use.' }
+if ($seating) {
+    if (-not $Seat) { Stop-Staff '-Seat needs the seat to edit, as <position>.<seat>.' }
+    $asked = @($seatOnly | Where-Object { $_ -ne 'IfMatch' -and $PSBoundParameters.ContainsKey($_) })
+    if ($asked.Count -eq 0) {
+        Stop-Staff "Nothing to change in '$Seat': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle or -Merges."
+    }
+    # A typed value is one line of text: a newline, a tab or any other control
+    # character is refused, never stored.
+    foreach ($name in @('Person', 'Session', 'RoleTitle', 'Space', 'Model', 'RoleName')) {
+        if ($PSBoundParameters.ContainsKey($name) -and ([string]$PSBoundParameters[$name]) -match '[\x00-\x1F\x7F]') {
+            Stop-Staff "-$name holds a control character (a newline, a tab or another): it is one line of text, so nothing was written." `
+                "Give -$name as one line, with no tab."
+        }
+    }
+    if ($PSBoundParameters.ContainsKey('IfMatch') -and ([string]$IfMatch).Trim() -notmatch '^[0-9A-Fa-f]{64}$') {
+        Stop-Staff "-IfMatch '$IfMatch' is not a SHA-256: 64 hex digits, the hash of $fileName's bytes as you read them." `
+            'The Org page sends the etag GET /api/ritual/org served; typed by hand, leave it out.'
+    }
 }
 
 # "The hub resolved" is not "a hub was configured" (OrgChart's own rule).
@@ -193,9 +283,30 @@ function Set-StaffField($Object, [string]$Name, $Value) {
     $Object | Add-Member -NotePropertyName $Name -NotePropertyValue $Value
 }
 
+function Get-StaffHash([byte[]]$Bytes) {
+    # The SHA-256 of a file's bytes, lowercase hex: the etag the agent serves
+    # (agent/solitaire/org.py), so the page's -IfMatch is compared byte for byte.
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { $hash = $sha.ComputeHash($Bytes) } finally { $sha.Dispose() }
+    return (-join ($hash | ForEach-Object { $_.ToString('x2') }))
+}
+function Get-StaffBytes {
+    if (-not (Test-Path -LiteralPath $orgPath -PathType Leaf)) { return $null }
+    return , [System.IO.File]::ReadAllBytes($orgPath)
+}
+# The words are consts.json org.changedSince: the seat dialog finds them in the answer.
+$conflict = "$fileName $([string](Get-P20Consts).org.changedSince); reload and try again."
+$conflictHint = "Nothing was written. Read it again (${p}OrgChart, or reload the Org page), then make the change."
+
 $exists = Test-Path -LiteralPath $orgPath -PathType Leaf
 $data = $null
 $trees = @()
+$readHash = ''
+if ($exists) { $readHash = Get-StaffHash (Get-StaffBytes) }
+# A file that is not there is said as that, below, not as a change.
+if ($exists -and $seating -and $PSBoundParameters.ContainsKey('IfMatch') -and $readHash -ne ([string]$IfMatch).Trim().ToLowerInvariant()) {
+    Stop-Staff $conflict $conflictHint
+}
 if ($exists) {
     $before = Read-P20OrgChart -PromptsRoot $hubRoot -PackageRoot $repoRoot
     if ($before.Status -ne 'ok') {
@@ -204,6 +315,10 @@ if ($exists) {
     }
     $data = ConvertFrom-StaffJson (Read-CardText -Path $orgPath)
     $trees = (Get-P20OrgItems (Get-P20OrgField $data 'trees'))
+}
+elseif ($seating) {
+    Stop-Staff "There is no $fileName in the hub, so there is no seat to staff." `
+        "Start one with '${p}Staff -Preset S|M|L'; docs/hub/org.md has the shape."
 }
 elseif (-not $creating) {
     Stop-Staff "There is no $fileName in the hub, so there is no tree to put in use." `
@@ -215,6 +330,21 @@ if ($data) { $activeBefore = Get-P20OrgText (Get-P20OrgField $data 'activeTree')
 # The tree in use as the reader sees it: the file's activeTree, or its one tree.
 $inUseBefore = ''
 if ($exists) { $inUseBefore = [string]$before.ActiveTree }
+
+# A model, as a seat stores it: an id the model map has a row for passes
+# through, a family resolves through its current block -- looked up, never
+# parsed -- and anything else is refused, naming the families.
+$models = Get-P20ModelMap -PackageRoot $repoRoot
+$resolve = {
+    param([string]$Text, [string]$Switch)
+    $want = ([string]$Text).Trim()
+    if ($models.Contains($want)) { return $want }
+    $id = Get-P20ModelForSize -Size $want -PackageRoot $repoRoot
+    if ($id) { return $id }
+    $families = @((ConvertFrom-StaffJson (Read-CardText -Path (Join-Path $repoRoot ([string](Get-P20Consts).models.file)))).current.PSObject.Properties.Name)
+    Stop-Staff "$Switch '$want' is not a model id or a family in $([string](Get-P20Consts).models.file). Families: $($families -join ', ')." `
+        'Give a family (opus) or a model id the map has a row for (claude-opus-5-5).'
+}
 
 # -- The tree -Preset adds ---------------------------------------------------------------
 
@@ -237,17 +367,6 @@ if ($creating) {
     $presetId = Get-P20OrgText (Get-P20OrgField $presetFile 'id')
 
     # The models: what was passed, else the defaults; each looked up in the model map.
-    $models = Get-P20ModelMap -PackageRoot $repoRoot
-    $resolve = {
-        param([string]$Text, [string]$Switch)
-        $want = ([string]$Text).Trim()
-        if ($models.Contains($want)) { return $want }
-        $id = Get-P20ModelForSize -Size $want -PackageRoot $repoRoot
-        if ($id) { return $id }
-        $families = @((ConvertFrom-StaffJson (Read-CardText -Path (Join-Path $repoRoot ([string](Get-P20Consts).models.file)))).current.PSObject.Properties.Name)
-        Stop-Staff "$Switch '$want' is not a model id or a family in $([string](Get-P20Consts).models.file). Families: $($families -join ', ')." `
-            'Give a family (opus) or a model id the map has a row for (claude-opus-5-5).'
-    }
     # A given model is resolved on its own: a default is looked up only where none was given.
     if ($PSBoundParameters.ContainsKey('VpEngineering')) { $vpEngModel = & $resolve $VpEngineering '-VpEngineering' }
     else { $vpEngModel = & $resolve $seatDefaults[$roleEngineering] 'the default' }
@@ -297,7 +416,7 @@ if ($creating) {
         $isRoot = -not (Get-P20OrgText (Get-P20OrgField $position 'reportsTo'))
         if ($isRoot) {
             if ($PSBoundParameters.ContainsKey('Owner')) {
-                foreach ($seat in $seats) { Set-StaffField $seat 'person' $Owner.Trim() }
+                foreach ($oneSeat in $seats) { Set-StaffField $oneSeat 'person' $Owner.Trim() }
             }
             continue
         }
@@ -305,21 +424,156 @@ if ($creating) {
             Set-StaffField $position 'defaultModel' (& $resolve $poolDefault 'the default')
             continue
         }
-        $model = ''
-        if ($role -ceq $roleEngineering) { $model = $vpEngModel }
-        elseif ($role -ceq $roleProduct) { $model = $vpProdModel }
-        elseif ($role -and $seatDefaults.Contains($role)) { $model = & $resolve $seatDefaults[$role] 'the default' }
-        if (-not $model) { continue }
-        foreach ($seat in $seats) {
-            Set-StaffField $seat 'model' $model
-            if ($role -ceq $mergesRole) { Set-StaffField $seat 'merges' $true }
+        $presetModel = ''
+        if ($role -ceq $roleEngineering) { $presetModel = $vpEngModel }
+        elseif ($role -ceq $roleProduct) { $presetModel = $vpProdModel }
+        elseif ($role -and $seatDefaults.Contains($role)) { $presetModel = & $resolve $seatDefaults[$role] 'the default' }
+        if (-not $presetModel) { continue }
+        foreach ($oneSeat in $seats) {
+            Set-StaffField $oneSeat 'model' $presetModel
+            if ($role -ceq $mergesRole) { Set-StaffField $oneSeat 'merges' $true }
         }
     }
 }
-else {
+elseif ($Activate) {
     if ($treeIds -cnotcontains $Tree) {
         Stop-Staff "-Activate names '$Tree', which is not a tree in $fileName. Trees: $($treeIds -join ', ')." `
             "${p}OrgChart -Tree <id> prints one; '${p}Staff -Preset S|M|L' adds one."
+    }
+}
+else {
+    # -- The seat -Seat edits -----------------------------------------------------------
+    # One seat of a saved tree, active or not: the tree -Tree names, else the one
+    # in use. The role name (the position's prompt) and the role title (its
+    # title) are the POSITION's, so they change for every seat of it (docs/hub/org.md,
+    # "The one writer: Staff"); everything else is the seat's own.
+    $seatTreeId = $Tree
+    if (-not $seatTreeId) { $seatTreeId = $inUseBefore }
+    if ($treeIds -cnotcontains $seatTreeId) {
+        Stop-Staff "-Tree names '$seatTreeId', which is not a tree in $fileName. Trees: $($treeIds -join ', ')." `
+            "${p}OrgChart -Tree <id> prints one."
+    }
+    $seatTree = $trees | Where-Object { (Get-P20OrgText (Get-P20OrgField $_ 'id')) -ceq $seatTreeId } | Select-Object -First 1
+    $seatPositions = Get-P20OrgItems (Get-P20OrgField $seatTree 'positions')
+    # An id may hold a dot itself, so every dot is tried as the one between the
+    # two, and the first split that names a real seat is the seat.
+    $editPosition = $null
+    $editSeat = $null
+    $at = $Seat.IndexOf('.')
+    while ($at -ge 0 -and -not $editSeat) {
+        $wantPosition = $Seat.Substring(0, $at)
+        $wantSeat = $Seat.Substring($at + 1)
+        foreach ($position in $seatPositions) {
+            if ((Get-P20OrgText (Get-P20OrgField $position 'id')) -cne $wantPosition) { continue }
+            foreach ($candidate in (Get-P20OrgItems (Get-P20OrgField $position 'seats'))) {
+                if ((Get-P20OrgText (Get-P20OrgField $candidate 'id')) -ceq $wantSeat) { $editPosition = $position; $editSeat = $candidate; break }
+            }
+            if ($editSeat) { break }
+        }
+        $at = $Seat.IndexOf('.', $at + 1)
+    }
+    if (-not $editSeat) {
+        $names = New-Object System.Collections.Generic.List[string]
+        foreach ($position in $seatPositions) {
+            foreach ($candidate in (Get-P20OrgItems (Get-P20OrgField $position 'seats'))) {
+                $names.Add("$(Get-P20OrgText (Get-P20OrgField $position 'id')).$(Get-P20OrgText (Get-P20OrgField $candidate 'id'))")
+            }
+        }
+        $shape = ''
+        if ($Seat.IndexOf('.') -lt 0) { $shape = ' A seat is named <position>.<seat>.' }
+        Stop-Staff "'$Seat' is not a seat of the tree '$seatTreeId'.$shape Seats: $($names -join ', ')." `
+            "${p}OrgChart -Tree $seatTreeId prints the tree; a position with no seats is a pool, and has none to staff."
+    }
+
+    # The owner's seat -- the root's -- is a person in the user's own words, never a model.
+    $isRoot = -not (Get-P20OrgText (Get-P20OrgField $editPosition 'reportsTo'))
+    if ($isRoot) {
+        $notOwner = @($seatOnly | Where-Object { $_ -ne 'IfMatch' -and $_ -ne 'Person' -and $PSBoundParameters.ContainsKey($_) })
+        if ($notOwner -contains 'Model') {
+            Stop-Staff "The owner's seat takes -Person only: -Model does not go on it, because the owner is a person, never a model." `
+                "Name the owner with '${p}Staff -Seat $Seat -Person <name>'."
+        }
+        if ($notOwner.Count -gt 0) {
+            Stop-Staff "The owner's seat takes -Person only: $((@($notOwner | ForEach-Object { "-$_" })) -join ', ') does not go on it." `
+                "Name the owner with '${p}Staff -Seat $Seat -Person <name>'."
+        }
+        if (-not ([string]$Person).Trim()) {
+            Stop-Staff "-Person needs a name: the owner's seat always has a person, in your own words." `
+                "Name the owner with '${p}Staff -Seat $Seat -Person <name>'."
+        }
+    }
+    # A Space is a team lead's (consts.json org.roles.teamLead): the team's Space is
+    # its lead seat's. An empty -Space takes the key away on any seat.
+    if ($PSBoundParameters.ContainsKey('Space') -and ([string]$Space).Trim()) {
+        $leadRole = [string]$orgConsts.roles.teamLead
+        $editRole = Get-P20OrgText (Get-P20OrgField $editPosition 'prompt')
+        if ($editRole -cne $leadRole) {
+            $editTitle = Get-P20OrgText (Get-P20OrgField $editPosition 'title')
+            if (-not $editTitle) { $editTitle = Get-P20OrgText (Get-P20OrgField $editPosition 'id') }
+            Stop-Staff "-Space is for a team lead's seat, and '$Seat' is a $editTitle's: its position's role is not $leadRole." `
+                "Give -Space on a team lead's seat (a position whose role is $leadRole)."
+        }
+    }
+    if ($PSBoundParameters.ContainsKey('Space') -and ([string]$Space).Trim()) {
+        $slugs = @(@($cfg.Spaces) | ForEach-Object { [string]$_.slug } | Where-Object { $_ })
+        if ($slugs -cnotcontains $Space.Trim()) {
+            Stop-Staff "-Space '$($Space.Trim())' is not a Space the hub declares. Spaces: $($slugs -join ', ')." `
+                "${p}Env lists the Spaces; give one of those."
+        }
+    }
+    $seatModel = $null
+    if ($PSBoundParameters.ContainsKey('Model') -and ([string]$Model).Trim()) { $seatModel = & $resolve $Model '-Model' }
+
+    function Get-StaffSeatLine($Position, $SeatObj, [bool]$WithRole) {
+        # The seat as OrgChart prints it -- its label, who sits there, [space],
+        # (session), and merges -- and the role file where the role was asked about.
+        # Every field -Seat can set is in it, so a change always shows: a seat's own
+        # roleTitle with the position's title after it, and a model and a person both.
+        $dot = [string][char]0x00B7
+        $label = Get-P20OrgText (Get-P20OrgField $Position 'title')
+        if (-not $label) { $label = Get-P20OrgText (Get-P20OrgField $Position 'id') }
+        $own = Get-P20OrgText (Get-P20OrgField $SeatObj 'roleTitle')
+        if ($own) { $label = "$own ($label)" }
+        $who = @(@((Get-P20OrgText (Get-P20OrgField $SeatObj 'model')), (Get-P20OrgText (Get-P20OrgField $SeatObj 'person'))) | Where-Object { $_ }) -join ', '
+        if (-not $who) { $who = 'vacant' }
+        $line = "$label $dot $who"
+        $where = Get-P20OrgText (Get-P20OrgField $SeatObj 'space')
+        if ($where) { $line += " [$where]" }
+        $named = Get-P20OrgText (Get-P20OrgField $SeatObj 'session')
+        if ($named) { $line += " ($named)" }
+        if ((Get-P20OrgFlag (Get-P20OrgField $SeatObj 'merges')) -eq $true) { $line += " $dot merges" }
+        if ($WithRole) {
+            $role = Get-P20OrgText (Get-P20OrgField $Position 'prompt')
+            if (-not $role) { $role = 'no role' }
+            $line += " {$role}"
+        }
+        return $line
+    }
+    function Set-StaffText($Object, [string]$Name, [string]$Value) {
+        # A text key set to its trimmed value, or taken away when the value is empty.
+        $v = ([string]$Value).Trim()
+        if ($v) { Set-StaffField $Object $Name $v; return }
+        foreach ($prop in @($Object.PSObject.Properties)) {
+            if ($prop.Name -ceq $Name) { $Object.PSObject.Properties.Remove($prop.Name); return }
+        }
+    }
+
+    $withRole = $PSBoundParameters.ContainsKey('RoleName')
+    $seatBefore = Get-StaffSeatLine $editPosition $editSeat $withRole
+    $positionBefore = ConvertTo-P20ConfigJson $editPosition
+    if ($PSBoundParameters.ContainsKey('Model')) {
+        if ($seatModel) { Set-StaffField $editSeat 'model' $seatModel } else { Set-StaffText $editSeat 'model' '' }
+    }
+    if ($PSBoundParameters.ContainsKey('Person')) { Set-StaffText $editSeat 'person' $Person }
+    if ($PSBoundParameters.ContainsKey('Session')) { Set-StaffText $editSeat 'session' $Session }
+    if ($PSBoundParameters.ContainsKey('Space')) { Set-StaffText $editSeat 'space' $Space }
+    if ($Merges) { Set-StaffField $editSeat 'merges' $true }
+    if ($PSBoundParameters.ContainsKey('RoleName')) { Set-StaffText $editPosition 'prompt' $RoleName }
+    if ($PSBoundParameters.ContainsKey('RoleTitle')) { Set-StaffText $editPosition 'title' $RoleTitle }
+    $seatAfter = Get-StaffSeatLine $editPosition $editSeat $withRole
+    if ((ConvertTo-P20ConfigJson $editPosition) -ceq $positionBefore) {
+        Write-Output "${Seat}: $seatBefore -- nothing changed, so nothing was written."
+        return
     }
 }
 
@@ -328,6 +582,7 @@ else {
 $active = $activeBefore
 $targetId = $Tree
 if ($creating) { $targetId = $newId }
+if ($seating) { $targetId = $seatTreeId }
 if ($Activate) { $active = $targetId }
 $allTrees = @($trees)
 if ($creating) { $allTrees = @($trees) + @($newTree) }
@@ -336,7 +591,7 @@ if ($creating) { $allTrees = @($trees) + @($newTree) }
 # in use, by the reader's rule) names that tree -- never the draft.
 if (-not $active -and $allTrees.Count -gt 1) { $active = $treeIds[0] }
 
-if (-not $creating -and $Tree -ceq $inUseBefore) {
+if ($Activate -and $Tree -ceq $inUseBefore) {
     Write-Output "'$Tree' is already the tree in use in $orgPath; nothing was written."
     return
 }
@@ -352,8 +607,9 @@ $treeById = @{}
 foreach ($t in $allTrees) { $treeById[(Get-P20OrgText (Get-P20OrgField $t 'id'))] = $t }
 # The same holds for the tree -Activate takes out of use: an older file's tree in
 # use with no stamp is stamped as it leaves, so it reads inactive, never draft.
+# A seat's edit is no change of the tree in use, so it stamps nothing.
 if ($creating -and $allTrees.Count -eq 1) { Set-StaffField $newTree 'activatedAt' $today }
-elseif ($inUseBefore -and $treeById.ContainsKey($inUseBefore)) {
+elseif (-not $seating -and $inUseBefore -and $treeById.ContainsKey($inUseBefore)) {
     $inUse = $treeById[$inUseBefore]
     if (-not (Get-P20OrgText (Get-P20OrgField $inUse 'activatedAt'))) { Set-StaffField $inUse 'activatedAt' $today }
 }
@@ -381,9 +637,10 @@ if ($after.Status -ne 'ok') {
 $seatCount = 0
 $staffed = 0
 foreach ($position in $after.Chart.tree.positions) {
-    foreach ($seat in @($position.seats)) {
+    # Not $seat: PowerShell names are case-blind, and $Seat is -Seat's.
+    foreach ($oneSeat in @($position.seats)) {
         $seatCount++
-        if ($seat.state -eq 'staffed') { $staffed++ }
+        if ($oneSeat.state -eq 'staffed') { $staffed++ }
     }
 }
 $what = "'$targetId' is now the tree in use."
@@ -392,6 +649,7 @@ if ($creating) {
     if ($allTrees.Count -eq 1) { $what = "$saved; it is the only org, so it is the one in use." }
     else { $what = "$saved as a draft; '$($after.ActiveTree)' stays active. '${p}Staff -Activate $targetId' puts it in use." }
 }
+if ($seating) { $what = "${Seat}: $seatBefore -> $seatAfter" }
 
 if ($WhatIf) {
     Write-Output "What if: Staff would write $orgPath. $what"
@@ -406,13 +664,19 @@ if ($WhatIf) {
 # own line ending there; a create is -New (LF). A write that fails removes the
 # temp and leaves org.json as it was.
 $temp = "$orgPath.p20tmp"
+$raced = $false
 try {
     if ($exists) {
         Copy-Item -LiteralPath $orgPath -Destination $temp -Force -ErrorAction Stop
         Write-CardText -Path $temp -Content $text
     }
     else { Write-CardText -Path $temp -Content $text -New }
-    Move-Item -LiteralPath $temp -Destination $orgPath -Force -ErrorAction Stop
+    # -IfMatch holds to the last moment: a file changed while this ran is not overwritten.
+    if ($seating -and $PSBoundParameters.ContainsKey('IfMatch') -and (Get-StaffHash (Get-StaffBytes)) -ne $readHash) {
+        Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+        $raced = $true
+    }
+    else { Move-Item -LiteralPath $temp -Destination $orgPath -Force -ErrorAction Stop }
 }
 catch {
     Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
@@ -421,5 +685,7 @@ catch {
     Stop-Staff "Could not write $orgPath ($($_.Exception.Message)); $was." `
         "Check that the hub's folder can be written, then run ${p}Staff again."
 }
+if ($raced) { Stop-Staff $conflict $conflictHint }
 Write-Output $what
-Write-Output "Wrote $orgPath. ${p}OrgChart prints the tree in use; ${p}OrgChart -Tree $targetId prints this one."
+if ($seating) { Write-Output "Wrote $orgPath." }
+else { Write-Output "Wrote $orgPath. ${p}OrgChart prints the tree in use; ${p}OrgChart -Tree $targetId prints this one." }

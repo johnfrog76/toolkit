@@ -2,6 +2,7 @@ import type { FaceId } from "../../shared/refinedFaces";
 import type { OrgPosition, OrgSeat } from "./api.solitaireAgile";
 import { MUG_LOOKS } from "./stage/EmptyDesk";
 import type { MugLook } from "./stage/EmptyDesk";
+import { ORG } from "../../shell/consts";
 
 // The Org page's rules, apart from its drawing: which face sits in which seat,
 // the colour of each level's walls, what a plate says, and where every office
@@ -104,6 +105,154 @@ export function seatWhere(seat: OrgSeat): string {
   return seat.space ?? "";
 }
 
+/** The office's sign: the one seat's label (its own roleTitle, else the
+ *  position's title) for a one-seat office, the position's title for a room of
+ *  seats or a pool. */
+export function signTitle(position: OrgPosition): string {
+  return position.seats.length === 1 ? plateTitle(position, position.seats[0]) : position.title;
+}
+
+/** A seat's plate in a room of several: under who sits there, the seat's own
+ *  label where it has one, then the Space it serves. One seat's label is the
+ *  sign, so its plate names the Space alone. */
+export function plateWhere(position: OrgPosition, seat: OrgSeat): string {
+  const own = position.seats.length > 1 ? (seat.roleTitle ?? "") : "";
+  return [own, seatWhere(seat)].filter(Boolean).join(" · ");
+}
+
+// -- The seat's buttons (the sign's View, the plate's Assign and Change) -----
+
+export const VIEW_WORD = "View";
+export const ASSIGN_WORD = "Assign";
+export const CHANGE_WORD = "Change";
+
+/** View's accessible name: the role it opens in the reading room. */
+export function viewLabel(position: OrgPosition): string {
+  return `View the ${position.promptTitle ?? position.title} role`;
+}
+
+/** Assign's on a vacant seat, Change's on a staffed one: the seat, and who sits there. */
+export function seatActionLabel(position: OrgPosition, seat: OrgSeat): string {
+  const title = plateTitle(position, seat);
+  return seat.state === "vacant"
+    ? `${ASSIGN_WORD} ${title}`
+    : `${CHANGE_WORD} ${title}, ${plateWho(seat)}`;
+}
+
+/** The owner's seat: the root's, a person in the user's own words, never a model. */
+export const isOwnerPosition = (position: OrgPosition): boolean => position.reportsTo === null;
+
+/** A team lead's seat serves a Space, so the seat dialog asks for one. */
+export const isTeamLead = (position: OrgPosition): boolean =>
+  position.prompt === ORG.roles.teamLead;
+
+/** Is this a VP's office, whose model question marks a family "not recommended"? */
+function isVp(position: OrgPosition): boolean {
+  return (
+    position.recommend.length > 0 ||
+    position.prompt === ORG.roles.vpEngineering ||
+    position.prompt === ORG.roles.vpProduct
+  );
+}
+
+/** A family as a person reads it: its word, with a capital first letter. */
+export function familyLabel(family: string): string {
+  return family ? family[0].toUpperCase() + family.slice(1) : family;
+}
+
+/** The note a family carries in a VP question: none when it is recommended. */
+export const NOT_RECOMMENDED = "not recommended";
+
+/** The model question's value for a model the seat holds that is not its family's current one. */
+export const HELD_MODEL = "held";
+
+/**
+ * Does the seat hold a model that is not its family's current one -- an older
+ * id, another provider's, or one the map does not know? Its name differs from
+ * the current model's (`familyNames`, served by the agent), or it has no family.
+ * A family's own word (`opus`) is its current model, and not held.
+ */
+export function isHeldModel(seat: OrgSeat, familyNames: Record<string, string>): boolean {
+  if (!seat.model) return false;
+  if (!seat.modelFamily) return true;
+  return (seat.modelName ?? seat.model) !== familyNames[seat.modelFamily];
+}
+
+/**
+ * The choice the seat dialog's model question starts on. A seat holding a model
+ * that is not current starts on that model, its own choice (HELD_MODEL), kept
+ * unless the person picks another. A seat that is staffed keeps its own family
+ * (none where a person sits there with no model): Save sends a model only when it
+ * changes. A vacant seat starts on its position's default: the defaultModel line
+ * where the file states one, else its role's (consts.json org.steps for the two
+ * VPs, org.roleDefaults for the rest), else none.
+ */
+export function seatModelDefault(
+  position: OrgPosition,
+  seat: OrgSeat,
+  familyNames: Record<string, string> = {},
+): string {
+  if (isHeldModel(seat, familyNames)) return HELD_MODEL;
+  if (seat.model || seat.person) return seat.modelFamily ?? "";
+  if (position.defaultModelFamily) return position.defaultModelFamily;
+  const role = position.prompt ?? "";
+  if (role === ORG.roles.vpEngineering) return ORG.steps.vpEngineering;
+  if (role === ORG.roles.vpProduct) return ORG.steps.vpProduct;
+  return ORG.roleDefaults[role] ?? "";
+}
+
+/** One choice of the model question: its value (a family, or HELD_MODEL) and its words. */
+export interface ModelChoice {
+  value: string;
+  label: string;
+}
+
+/**
+ * The model question's choices, each by its current model's versioned name
+ * (`familyNames`, served by the agent: the page types no version). A VP's:
+ * consts.json org.steps' families, those outside the position's `recommend`
+ * (else the steps' own recommended) marked "not recommended". Any other seat's:
+ * every family the agent serves. A seat holding a model that is not current
+ * has it first, a choice of its own, by the map's name for it (as written where
+ * the map has none).
+ */
+export function seatChoices(
+  position: OrgPosition,
+  seat: OrgSeat,
+  families: string[],
+  familyNames: Record<string, string>,
+): ModelChoice[] {
+  const name = (f: string) => familyNames[f] ?? familyLabel(f);
+  let choices: ModelChoice[];
+  if (isVp(position)) {
+    const recommended = position.recommend.length ? position.recommend : ORG.steps.recommended;
+    choices = ORG.steps.families.map((f) => ({
+      value: f,
+      label: recommended.includes(f) ? name(f) : `${name(f)} (${NOT_RECOMMENDED})`,
+    }));
+  } else {
+    choices = (families.length ? families : ORG.steps.families).map((f) => ({
+      value: f,
+      label: name(f),
+    }));
+  }
+  if (isHeldModel(seat, familyNames)) {
+    choices.unshift({ value: HELD_MODEL, label: seat.modelName ?? seat.model ?? "" });
+  }
+  return choices;
+}
+
+/** Does a position's title differ from its role's own (the prompt's title)? Then
+ *  the seat dialog opens its title field from the start. */
+export function hasOwnTitle(position: OrgPosition): boolean {
+  return Boolean(position.promptTitle) && position.title !== position.promptTitle;
+}
+
+/** Did Staff refuse because org.json changed since the page read it (-IfMatch)? */
+export function isChangedSince(text: string | null | undefined): boolean {
+  return Boolean(text?.includes(ORG.changedSince));
+}
+
 /**
  * The mug on a vacant seat's empty desk, from the seat's id: the same seat
  * always has the same mug, and no clock is read. The standup deals its mugs by
@@ -125,14 +274,18 @@ export function vacantMug(seatId: string): MugLook {
 export const SIZE = {
   /** The padding around an office's cards. */
   pad: 10,
-  /** The sign above the door: the prompt's title. */
-  sign: 22,
+  /** The sign above the door: the office's title, and View where it has a role.
+   *  Tall enough for a small button, so a sign with one and a sign without line up. */
+  sign: 28,
   door: { width: 124, height: 104 },
   /** A pool's door holds a few small busts side by side. */
   poolDoor: { width: 212, height: 104 },
   /** The plate rises this far over the door's sill. */
   plateLift: 5,
-  plate: 40,
+  /** Who sits there and the seat's button on one line, where it serves under it. */
+  plate: 46,
+  /** A plate's least width: who sits there and the seat's button, side by side. */
+  plateWidth: 156,
   /** One seat's column, wide enough for its plate. */
   cell: 196,
   /** A pool's column, wide enough for its default-model line. */

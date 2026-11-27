@@ -528,6 +528,9 @@ export interface OrgSeat {
   model: string | null;
   /** What the model is called: models.json's name, looked up by the agent; as written with no row. */
   modelName: string | null;
+  /** The model's family (models.json's, looked up by the agent), for the seat
+   *  dialog's picker; null with no model, or one the map does not know. */
+  modelFamily?: string | null;
   person: string | null;
   /** The session's name: the address readies and messages route to. Shown on hover. */
   session: string | null;
@@ -558,6 +561,8 @@ export interface OrgPosition {
   /** The defaultModel line by its models.json name where it is a model id or a
    *  family (a pool's id reads as the model's name); as written otherwise; null with none. */
   defaultModelName: string | null;
+  /** The defaultModel line's family, where the model map knows it; null otherwise. */
+  defaultModelFamily?: string | null;
 }
 
 export interface OrgTree {
@@ -597,6 +602,15 @@ export interface OrgResponse {
   /** Every tree of the file, in its order: added by GET /api/ritual/org alone
    *  (a preset's chart has none). */
   trees?: OrgTreeSummary[];
+  /** The SHA-256 of org.json's bytes as this read saw them: the seat dialog
+   *  sends it back as Staff -Seat's -IfMatch. GET /api/ritual/org alone. */
+  etag?: string;
+  /** The model families a seat can be staffed with, the model map's current
+   *  block in its order. GET /api/ritual/org alone. */
+  families?: string[];
+  /** Each of `families` by the name of the model it resolves to today, versioned,
+   *  looked up by the agent: the seat dialog's labels. GET /api/ritual/org alone. */
+  familyNames?: Record<string, string>;
 }
 
 /** A refusal's detail: the kind is the contract, the message the sentence. */
@@ -621,8 +635,9 @@ export const orgEndpoints = orgApi.injectEndpoints({
     }),
 
     // POST /api/cmd/Staff -- the org file's one writer, through the bridge: a
-    // preset saved as a draft (buildStaffPresetParams) or the tree in use chosen
-    // (buildStaffActivateParams). Either way every chart is read again.
+    // preset saved as a draft (buildStaffPresetParams), one seat staffed
+    // (buildStaffSeatParams) or the tree in use chosen (buildStaffActivateParams).
+    // Every way, every chart is read again.
     runStaff: builder.mutation<CommandResponse, { params: string[] }>({
       query: ({ params }) => ({ url: "cmd/Staff", method: "POST", body: { params } }),
       invalidatesTags: ["Org"],

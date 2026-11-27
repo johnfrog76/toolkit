@@ -536,6 +536,17 @@ describe("consts.json", () => {
         families: ["opus", "fable", "sonnet"],
         recommended: ["opus", "fable"],
       },
+      roles: {
+        vpEngineering: "vp-of-engineering.prompt.md",
+        vpProduct: "vp-of-product.prompt.md",
+        teamLead: "team-lead.prompt.md",
+      },
+      roleDefaults: {
+        "team-lead.prompt.md": "opus",
+        "intern.prompt.md": "haiku",
+        "butler.prompt.md": "haiku",
+      },
+      changedSince: "changed since you read it",
     });
 
     // The model map a card's Agent id is looked up in (docs/hub/cards.md).

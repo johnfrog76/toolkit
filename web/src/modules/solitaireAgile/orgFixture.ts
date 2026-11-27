@@ -13,7 +13,7 @@ import type { OrgResponse } from "./api.solitaireAgile";
 const PACKAGE = path.resolve(__dirname, "../../../..");
 const CHARTS = path.join(PACKAGE, "Tests/fixtures/org/charts");
 const MODEL_MAP = JSON.parse(fs.readFileSync(path.join(PACKAGE, "Config/models.json"), "utf8")) as {
-  models: Record<string, { name?: string }>;
+  models: Record<string, { name?: string; family?: string }>;
   current: Record<string, string>;
 };
 
@@ -31,6 +31,29 @@ export function modelNameOf(model: string | null): string | null {
   const today = family ? MODEL_MAP.current[family] : undefined;
   return today ? (MODEL_MAP.models[today]?.name ?? today) : model;
 }
+
+/** A seat's modelFamily as the route serves it (org.py's model_family): an id's
+ *  row family; a family the current block names, itself; anything else null. */
+export function modelFamilyOf(model: string | null): string | null {
+  if (!model) return null;
+  const row = MODEL_MAP.models[model];
+  if (row) return row.family ?? null;
+  const today = Object.entries(MODEL_MAP.current).find(
+    ([f]) => f.toLowerCase() === model.toLowerCase(),
+  )?.[1];
+  return today ? (MODEL_MAP.models[today]?.family ?? null) : null;
+}
+
+/** The families the route serves: the model map's current block, in its order. */
+export const FAMILIES = Object.keys(MODEL_MAP.current);
+
+/** Each family by its current model's name, as the route serves familyNames. */
+export const FAMILY_NAMES: Record<string, string> = Object.fromEntries(
+  FAMILIES.map((f) => [f, MODEL_MAP.models[MODEL_MAP.current[f]]?.name ?? MODEL_MAP.current[f]]),
+);
+
+/** The etag every test chart is served with. */
+export const TEST_ETAG = "a".repeat(64);
 
 /** Every chart the table states, by its file's name without `.json`. */
 export function chartNames(): string[] {
@@ -52,7 +75,11 @@ export function orgResponse(name: string): OrgResponse {
     p.promptTitle = stem;
     p.promptRef = stem ? `yours/${stem}` : null;
     p.defaultModelName = modelNameOf(p.defaultModel);
-    for (const s of p.seats) s.modelName = modelNameOf(s.model);
+    p.defaultModelFamily = modelFamilyOf(p.defaultModel);
+    for (const s of p.seats) {
+      s.modelName = modelNameOf(s.model);
+      s.modelFamily = modelFamilyOf(s.model);
+    }
   }
-  return chart;
+  return { ...chart, etag: TEST_ETAG, families: FAMILIES, familyNames: FAMILY_NAMES };
 }

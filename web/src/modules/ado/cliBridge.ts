@@ -466,9 +466,70 @@ export interface StaffPresetFields {
  */
 export function buildStaffPresetParams(fields: StaffPresetFields): string[] {
   const params = ["-Preset", fields.size];
-  if (fields.owner?.trim()) params.push("-Owner", fields.owner.trim());
+  if (fields.owner?.trim()) params.push(...staffValue("-Owner", fields.owner.trim()));
   if (fields.vpEngineering?.trim()) params.push("-VpEngineering", fields.vpEngineering.trim());
   if (fields.vpProduct?.trim()) params.push("-VpProduct", fields.vpProduct.trim());
+  return params;
+}
+
+/** Every character PowerShell's binder reads as a parameter's dash: the
+ *  hyphen-minus, the en dash, the em dash and the horizontal bar. */
+const BINDER_DASH = /^[-\u2013\u2014\u2015]/;
+
+/**
+ * One of Staff's text parameters and its value, as argv -- the one way every
+ * typed value travels. A value that starts with a dash the binder reads --
+ * an owner who calls themselves "-WhatIf" or "\u2013WhatIf" -- would be taken
+ * as a parameter of its own when it names one, so it travels joined to its
+ * name, `-Owner:-WhatIf`, which binds as the value whatever it says. Any other
+ * value travels as its own argument, as every builder sends one.
+ */
+export function staffValue(name: string, value: string): string[] {
+  return BINDER_DASH.test(value) ? [`${name}:${value}`] : [name, value];
+}
+
+/** The seat dialog's Save: one seat of a saved tree, and what changed in it. */
+export interface StaffSeatFields {
+  /** The tree the seat is in: always sent, so a draft is staffed, not the tree in use. */
+  tree: string;
+  /** The position's id and the seat's. */
+  position: string;
+  seat: string;
+  /** Each field is sent only where it is given: undefined leaves it as it is,
+   *  "" takes it away. The model is a family, which Staff stores as its id. */
+  model?: string;
+  person?: string;
+  session?: string;
+  space?: string;
+  /** The position's title, for every seat of it. */
+  roleTitle?: string;
+  /** The etag GET /api/ritual/org served: a file changed since is refused. */
+  ifMatch?: string;
+}
+
+/**
+ * argv for `POST /cmd/Staff` -> `Scripts/Set-Staff.ps1`, its `-Seat` form:
+ * `-Seat <position>.<seat>` and `-Tree <id>`, then each field given, in the
+ * order the `param()` block declares them, then `-IfMatch`. A field that is
+ * undefined is left out, so the seat keeps it; an empty one is sent empty,
+ * which takes the key away.
+ */
+export function buildStaffSeatParams(fields: StaffSeatFields): string[] {
+  const params = [
+    "-Seat",
+    `${fields.position}.${fields.seat}`,
+    ...staffValue("-Tree", fields.tree),
+  ];
+  const add = (name: string, value: string | undefined) => {
+    if (value === undefined) return;
+    params.push(...staffValue(name, value.trim()));
+  };
+  add("-Model", fields.model);
+  add("-Person", fields.person);
+  add("-Session", fields.session);
+  add("-Space", fields.space);
+  add("-RoleTitle", fields.roleTitle);
+  if (fields.ifMatch) params.push("-IfMatch", fields.ifMatch);
   return params;
 }
 

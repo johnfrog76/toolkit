@@ -18,7 +18,7 @@ import {
   tokens,
   useId,
 } from "@fluentui/react-components";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   DocumentTextRegular,
   OrganizationRegular,
@@ -26,7 +26,8 @@ import {
   ZoomInRegular,
   ZoomOutRegular,
 } from "@fluentui/react-icons";
-import { Link } from "react-router";
+import type { ReactNode } from "react";
+import { useHref, useLinkClickHandler } from "react-router";
 import { EmptyState } from "../../shared/EmptyState";
 import type { EmptyMessage } from "../../shared/EmptyState";
 import { PanelFrame } from "../../shared/PanelFrame";
@@ -42,23 +43,33 @@ import type {
   OrgPosition,
   OrgPreset,
   OrgRefusal,
+  OrgSeat,
   OrgState,
   OrgTreeSummary,
 } from "./api.solitaireAgile";
 import { UseOrgDialog, refusalText } from "./UseOrgDialog";
-import { OfficeDoor, Plate, SeatCell } from "./OrgParts";
+import { SeatDialog } from "./SeatDialog";
+import { useGetEnvQuery } from "../../shell/api";
+import { OfficeDoor, Plate, PlateButton, SeatCell } from "./OrgParts";
 import type { PlacedOffice } from "./orgChart";
 import {
+  ASSIGN_WORD,
+  CHANGE_WORD,
   OFFICE_HEIGHT,
   POOL_WORD,
   SIZE,
+  VIEW_WORD,
   layoutChart,
   levelWall,
   plateTitle,
+  plateWhere,
   plateWho,
   positionFaces,
+  seatActionLabel,
   seatFace,
   seatWhere,
+  signTitle,
+  viewLabel,
 } from "./orgChart";
 import { VacantSeat } from "./VacantSeat";
 import { canZoomIn, canZoomOut, fitScale, zoomIn, zoomLabel, zoomOut } from "./orgZoom";
@@ -74,9 +85,12 @@ import { canZoomIn, canZoomOut, fitScale, zoomIn, zoomLabel, zoomOut } from "./o
 // then the model by its models.json name (the agent's modelName) or the person;
 // the seat's session is on hover. No machine is ever drawn.
 //
-// An office with a prompt is a link to it in the Studio's reading room
-// (promptPath of the position's promptRef); the owner and the pool have none,
-// and are not links.
+// Each office reads, top to bottom: its sign (the title, and View where the
+// position has a role, which opens it in the Studio's reading room --
+// promptPath of the promptRef), the card (the door and desk, a picture, never
+// a link), and the plate (who sits there, and on a saved org Assign or
+// Change, which open the seat dialog, SeatDialog.tsx). A preview has View and
+// no Assign or Change.
 //
 // Two dropdowns at the header's right keep looking apart from the org's state
 // (docs/modules/solitaire-agile.md, "The web UI"). View picks the org shown:
@@ -88,11 +102,13 @@ import { canZoomIn, canZoomOut, fitScale, zoomIn, zoomLabel, zoomOut } from "./o
 // the simplest; with one, on the active org. When the org shown is not the
 // active one, one line under the heading says so. On a preview, "Use this org"
 // opens the steps (UseOrgDialog.tsx), which save it as a draft through
-// Staff -Preset. Those two are the page's only writes, and both are Staff's:
+// Staff -Preset. Those two and the seat dialog are the page's only writes, all Staff's:
 // org.json's one writer is the CLI's verb (docs/hub/org.md, "The one writer:
-// Staff"), reached through the bridge, never a route of its own. Staff takes no
+// Staff"), reached through the bridge, never a route of its own. The seat
+// dialog's Save is the third, Staff -Seat with the chart's etag. Staff takes no
 // lock, so the page runs one write at a time: while one is in flight, Use this
-// org, the dialog's Save and Active are all disabled. Hand edits work too.
+// org, Assign and Change, each dialog's Save and Active are all disabled. Hand
+// edits work too.
 
 const useStyles = makeStyles({
   body: { display: "flex", flexDirection: "column", minWidth: 0 },
@@ -182,20 +198,15 @@ const useStyles = makeStyles({
     outlineStyle: "solid",
     outlineColor: tokens.colorNeutralStroke2,
   },
-  link: {
-    cursor: "pointer",
-    ":hover": { backgroundColor: tokens.colorNeutralBackground1Hover },
-    ":hover .org-sign-text": { textDecorationLine: "underline" },
-    ":focus-visible": {
-      outlineWidth: "2px",
-      outlineStyle: "solid",
-      outlineColor: tokens.colorStrokeFocus2,
-    },
-  },
+  // The sign: the office's title, clamped before View would ever wrap, at a
+  // fixed height whether or not View is there.
   sign: {
     height: `${SIZE.sign}px`,
+    boxSizing: "border-box",
+    paddingBottom: "4px",
     display: "flex",
-    alignItems: "flex-start",
+    alignItems: "center",
+    justifyContent: "center",
     columnGap: tokens.spacingHorizontalXS,
     maxWidth: "100%",
     color: tokens.colorNeutralForeground2,
@@ -204,7 +215,8 @@ const useStyles = makeStyles({
     fontWeight: tokens.fontWeightSemibold,
     whiteSpace: "nowrap",
   },
-  signText: { overflow: "hidden", textOverflow: "ellipsis" },
+  signText: { overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 },
+  signButton: { flexShrink: 0, minWidth: "auto" },
   seats: { display: "flex", columnGap: `${SIZE.seatGap}px` },
   poolLine: {
     marginTop: tokens.spacingVerticalS,
@@ -229,14 +241,16 @@ function StaffedSeat({
   position,
   seatIndex,
   order,
+  action,
 }: {
   position: OrgPosition;
   seatIndex: number;
   order: number;
+  action?: ReactNode;
 }) {
   const seat = position.seats[seatIndex];
   const { wall, shade } = levelWall(position.level);
-  const where = seatWhere(seat);
+  const where = plateWhere(position, seat);
   return (
     <SeatCell state="staffed">
       <OfficeDoor wall={wall} shade={shade}>
@@ -252,6 +266,8 @@ function StaffedSeat({
         who={plateWho(seat)}
         where={where || undefined}
         session={seat.session ?? undefined}
+        space={seatWhere(seat)}
+        action={action}
       />
     </SeatCell>
   );
@@ -288,20 +304,65 @@ function PoolSeat({ position, order }: { position: OrgPosition; order: number })
   );
 }
 
-function Office({ office }: { office: PlacedOffice }) {
+/** View, on the sign: the office's role in the Studio's reading room. A link,
+ *  drawn as a small subtle button. */
+function ViewButton({ position }: { position: OrgPosition }) {
+  const to = promptPath(position.promptRef ?? "");
+  const href = useHref(to);
+  const onClick = useLinkClickHandler(to);
+  return (
+    <Button
+      as="a"
+      href={href}
+      onClick={onClick}
+      size="small"
+      appearance="subtle"
+      icon={<DocumentTextRegular />}
+      className={useStyles().signButton}
+      aria-label={viewLabel(position)}
+      title={`Open the role: ${position.promptTitle ?? position.title}`}
+      data-testid="org-view"
+    >
+      {VIEW_WORD}
+    </Button>
+  );
+}
+
+/** What a chart's seats can do: a saved org's open the seat dialog; a preview's do nothing. */
+export interface SeatActions {
+  busy: boolean;
+  onOpen: (position: OrgPosition, seat: OrgSeat) => void;
+}
+
+function Office({ office, actions }: { office: PlacedOffice; actions?: SeatActions }) {
   const styles = useStyles();
   const p = office.position;
   const room = p.seats.length > 1;
   const style = { left: office.left, top: office.top, width: office.width };
-  const body = (
-    <>
-      <div className={styles.sign}>
-        {p.promptTitle ? (
-          <>
-            <DocumentTextRegular aria-hidden />
-            <span className={mergeClasses("org-sign-text", styles.signText)}>{p.promptTitle}</span>
-          </>
-        ) : null}
+  const sign = signTitle(p);
+  const action = (seat: OrgSeat) =>
+    actions ? (
+      <PlateButton
+        label={seatActionLabel(p, seat)}
+        seat={`${p.id}.${seat.id}`}
+        disabled={actions.busy}
+        onClick={() => actions.onOpen(p, seat)}
+      >
+        {seat.state === "vacant" ? ASSIGN_WORD : CHANGE_WORD}
+      </PlateButton>
+    ) : undefined;
+  return (
+    <div
+      className={mergeClasses(styles.office, room && styles.room)}
+      style={style}
+      data-testid="org-office"
+      data-position={p.id}
+    >
+      <div className={styles.sign} data-testid="org-sign">
+        <span className={styles.signText} title={sign} data-testid="org-sign-text">
+          {sign}
+        </span>
+        {p.promptRef ? <ViewButton position={p} /> : null}
       </div>
       <div className={styles.seats}>
         {p.seats.length === 0 ? (
@@ -314,35 +375,23 @@ function Office({ office }: { office: PlacedOffice }) {
                 seatId={seat.id}
                 position={plateTitle(p, seat)}
                 level={p.level}
-                where={seatWhere(seat) || undefined}
+                where={plateWhere(p, seat) || undefined}
                 session={seat.session ?? undefined}
+                space={seatWhere(seat)}
+                action={action(seat)}
               />
             ) : (
-              <StaffedSeat key={seat.id} position={p} seatIndex={i} order={office.order} />
+              <StaffedSeat
+                key={seat.id}
+                position={p}
+                seatIndex={i}
+                order={office.order}
+                action={action(seat)}
+              />
             ),
           )
         )}
       </div>
-    </>
-  );
-  const className = mergeClasses(styles.office, room && styles.room);
-  if (p.promptRef) {
-    return (
-      <Link
-        to={promptPath(p.promptRef)}
-        className={mergeClasses(className, styles.link)}
-        style={style}
-        title={`Open the prompt: ${p.promptTitle ?? p.title}`}
-        data-testid="org-office"
-        data-position={p.id}
-      >
-        {body}
-      </Link>
-    );
-  }
-  return (
-    <div className={className} style={style} data-testid="org-office" data-position={p.id}>
-      {body}
     </div>
   );
 }
@@ -355,10 +404,8 @@ function Lines({ lines, width, height }: ReturnType<typeof layoutChart>) {
   const styles = useStyles();
   const foot = (o: PlacedOffice) =>
     o.top + (o.position.seats.length > 1 ? OFFICE_HEIGHT : OFFICE_HEIGHT - SIZE.pad);
-  // Into a room at its top; into a single office at its sign, or at its door
-  // where it has no sign (no prompt), so the line never stops short.
-  const head = (o: PlacedOffice) =>
-    o.top + (o.position.seats.length > 1 ? 0 : SIZE.pad + (o.position.promptTitle ? 0 : SIZE.sign));
+  // Into a room at its top; into a single office at its sign.
+  const head = (o: PlacedOffice) => o.top + (o.position.seats.length > 1 ? 0 : SIZE.pad);
   return (
     <svg className={styles.lines} width={width} height={height} aria-hidden="true">
       {lines.map(({ from, to }) => {
@@ -500,7 +547,15 @@ function ZoomControls({ zoom: z }: { zoom: ChartZoom }) {
   );
 }
 
-function ChartDrawing({ positions, zoom }: { positions: OrgPosition[]; zoom: ChartZoom }) {
+function ChartDrawing({
+  positions,
+  zoom,
+  actions,
+}: {
+  positions: OrgPosition[];
+  zoom: ChartZoom;
+  actions?: SeatActions;
+}) {
   const styles = useStyles();
   const layout = layoutChart(positions);
   const { box, scale } = zoom;
@@ -524,7 +579,7 @@ function ChartDrawing({ positions, zoom }: { positions: OrgPosition[]; zoom: Cha
           >
             <Lines {...layout} />
             {layout.offices.map((o) => (
-              <Office key={o.position.id} office={o} />
+              <Office key={o.position.id} office={o} actions={actions} />
             ))}
           </div>
         </div>
@@ -735,6 +790,9 @@ export function OrgPage() {
   const other = useGetOrgChartQuery(savedId, { skip: !savedId || savedId === active?.id });
 
   const [useOpen, setUseOpen] = useState(false);
+  // The seat the seat dialog is open on, by id, so a re-read shows it fresh.
+  const [seatOpen, setSeatOpen] = useState<{ position: string; seat: string } | null>(null);
+  const env = useGetEnvQuery();
   const [note, setNote] = useState<{ text: string; away: boolean } | null>(null);
 
   const chart = preset
@@ -783,6 +841,52 @@ export function OrgPage() {
     } catch {
       setNote({ text: "Could not reach the agent. The active org was not changed.", away: true });
     }
+  };
+
+  // The seat dialog works on a saved org, active or a draft; a preview has no seats to staff.
+  const seatActions: SeatActions | undefined =
+    chart && !preset
+      ? {
+          busy: writing,
+          onOpen: (position, seat) => {
+            setNote(null);
+            setSeatOpen({ position: position.id, seat: seat.id });
+          },
+        }
+      : undefined;
+  const openPosition = seatOpen
+    ? chart?.tree.positions.find((p) => p.id === seatOpen.position)
+    : undefined;
+  const openSeat = openPosition?.seats.find((x) => x.id === seatOpen?.seat);
+
+  // Focus goes back to the seat's button when its dialog closes: Cancel, Escape
+  // or Save. After a Save the button is drawn again -- Assign becomes Change --
+  // once the chart is read again, so it waits for a chart read since the save
+  // (a new etag) before it looks.
+  const [returnTo, setReturnTo] = useState<{ seat: string; afterEtag?: string } | null>(null);
+  const closeSeat = (saved: boolean) => {
+    if (seatOpen) {
+      setReturnTo({
+        seat: `${seatOpen.position}.${seatOpen.seat}`,
+        afterEtag: saved ? (chart?.etag ?? "") : undefined,
+      });
+    }
+    setSeatOpen(null);
+  };
+  useEffect(() => {
+    if (!returnTo || seatOpen) return;
+    if (returnTo.afterEtag !== undefined && chart?.etag === returnTo.afterEtag) return;
+    const button = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-testid="org-seat-action"]'),
+    ).find((b) => b.dataset.seat === returnTo.seat);
+    if (button) {
+      button.focus();
+      setReturnTo(null);
+    }
+  });
+  const reread = async () => {
+    await ours.refetch();
+    if (savedId && savedId !== active?.id) await other.refetch();
   };
 
   const saveRun = async (params: string[]) => runStaff({ params }).unwrap();
@@ -877,13 +981,33 @@ export function OrgPage() {
           </Body2>
         ) : null}
         {chart ? (
-          <ChartDrawing positions={chart.tree.positions} zoom={chartZoom} />
+          <ChartDrawing positions={chart.tree.positions} zoom={chartZoom} actions={seatActions} />
         ) : otherFailed ? (
           <EmptyState {...noChart(other.error, icon)} />
         ) : (
           (noOrg ?? null)
         )}
       </PanelFrame>
+      {chart && !preset && openPosition && openSeat ? (
+        <SeatDialog
+          key={`${chart.tree.id}:${openPosition.id}.${openSeat.id}`}
+          position={openPosition}
+          seat={openSeat}
+          treeId={chart.tree.id}
+          etag={chart.etag}
+          families={chart.families ?? []}
+          familyNames={chart.familyNames ?? {}}
+          spaces={env.data?.config.spaces ?? []}
+          run={saveRun}
+          busy={writing}
+          onSaved={() => closeSeat(true)}
+          onReload={() => {
+            closeSeat(false);
+            void reread();
+          }}
+          onClose={() => closeSeat(false)}
+        />
+      ) : null}
       {useOpen && preset ? (
         <UseOrgDialog
           preset={preset}

@@ -1,0 +1,34 @@
+{
+  "_": "The org file's etag (docs/hub/org.md, \"The response\"): the SHA-256 of org.json's raw bytes, which GET /api/ritual/org serves and Staff -Seat -IfMatch compares. Each row builds its bytes from text: a UTF-8 BOM first where bom is true, every newline as lineEnding, and one newline more at the end where trailingNewline is true. sha256 is the hash of those bytes, lowercase hex. Tests/test_org.py asserts the agent's etag equals it, and tkTestToolkit -OrgChart asserts Staff -Seat -IfMatch accepts it and refuses any other, so the two halves hash the same bytes.",
+  "text": "{\n  \"trees\": [\n    {\n      \"id\": \"t\",\n      \"positions\": [\n        {\n          \"id\": \"owner\",\n          \"seats\": [\n            { \"id\": \"owner\", \"person\": \"You\" }\n          ]\n        }\n      ]\n    }\n  ]\n}",
+  "rows": [
+    {
+      "name": "lf-with-trailing-newline",
+      "bom": false,
+      "lineEnding": "lf",
+      "trailingNewline": true,
+      "sha256": "4e9c76382ec4174cfba505afe59bf725c1617545c783af1b34be7b8852d5adad"
+    },
+    {
+      "name": "lf-without-trailing-newline",
+      "bom": false,
+      "lineEnding": "lf",
+      "trailingNewline": false,
+      "sha256": "57aaba1aae9310d48f91e9e4cd6d0dc736a9f46cd2b50c8d87eae34f65653bec"
+    },
+    {
+      "name": "crlf-with-trailing-newline",
+      "bom": false,
+      "lineEnding": "crlf",
+      "trailingNewline": true,
+      "sha256": "5efa5d1b26de00193318cbe9bca737e53d596f79989377f33177bd7b857be39d"
+    },
+    {
+      "name": "bom-lf-with-trailing-newline",
+      "bom": true,
+      "lineEnding": "lf",
+      "trailingNewline": true,
+      "sha256": "a76aeb6834c7b887a725f130dc884ff58584c5f835c84d61cbab135077472870"
+    }
+  ]
+}
