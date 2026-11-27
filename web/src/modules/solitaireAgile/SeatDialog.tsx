@@ -63,10 +63,12 @@ const useStyles = makeStyles({
     minWidth: "auto",
     paddingLeft: 0,
     paddingRight: 0,
-    color: tokens.colorBrandForegroundLink,
+    // The neutral ink, underlined: the theme's link teal is under 4.5:1 at this size.
+    color: tokens.colorNeutralForeground2,
     textDecorationLine: "underline",
-    ":hover": { color: tokens.colorBrandForegroundLinkHover },
+    ":hover": { color: tokens.colorNeutralForeground1 },
   },
+
   refusal: { color: tokens.colorNeutralForeground1, whiteSpace: "pre-wrap" },
   conflict: {
     display: "flex",
