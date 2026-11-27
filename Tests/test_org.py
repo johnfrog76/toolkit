@@ -983,3 +983,40 @@ class TheModelFamily(unittest.TestCase):
         for text in ("claude-opus-9", "sonnet for crew cards", "", None):
             with self.subTest(text):
                 self.assertIsNone(org.model_family(text))
+
+
+class TheEtag(unittest.TestCase):
+    """The etag rows both halves assert (Tests/fixtures/org/etag.json): the route's
+    etag is the SHA-256 of the file's raw bytes -- a BOM, CRLF and the trailing
+    newline all count -- the hash ``tkTestToolkit -OrgChart`` holds Staff -Seat
+    -IfMatch to."""
+
+    TABLE = json.loads((FIXTURES / "etag.json").read_text(encoding="utf-8"))
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.hub = Path(self._tmp.name) / "hub"
+        self.hub.mkdir()
+        (self.hub / "agentic").mkdir()
+        self._env = mock.patch.dict(os.environ, {"PROMPTS_ROOT": str(self.hub)})
+        self._env.start()
+
+    def tearDown(self):
+        self._env.stop()
+        self._tmp.cleanup()
+
+    def bytes_of(self, row: dict) -> bytes:
+        text = self.TABLE["text"].replace("\r\n", "\n") + ("\n" if row["trailingNewline"] else "")
+        if row["lineEnding"] == "crlf":
+            text = text.replace("\n", "\r\n")
+        return (b"\xef\xbb\xbf" if row["bom"] else b"") + text.encode("utf-8")
+
+    def test_every_row(self):
+        for row in self.TABLE["rows"]:
+            with self.subTest(row["name"]):
+                raw = self.bytes_of(row)
+                self.assertEqual(hashlib.sha256(raw).hexdigest(), row["sha256"])
+                (self.hub / C.org_file()).write_bytes(raw)
+                got = org.find_org_chart()
+                self.assertEqual(got.status, "ok", got.message)
+                self.assertEqual(got.etag, row["sha256"])

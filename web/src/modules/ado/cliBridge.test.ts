@@ -1012,6 +1012,31 @@ describe("buildStaffSeatParams: the seat dialog's Save", () => {
     ]);
   });
 
+  it.each(["-", "\u2013", "\u2014", "\u2015"])(
+    "joins a value that starts with %s -- a dash the binder reads -- to its name, for every typed field",
+    (dash) => {
+      expect(staffValue("-Person", `${dash}WhatIf`)).toEqual([`-Person:${dash}WhatIf`]);
+      expect(
+        buildStaffSeatParams({
+          tree: "t",
+          position: "p",
+          seat: "s",
+          person: `${dash}a`,
+          session: `${dash}b`,
+          roleTitle: `${dash}c`,
+        }),
+      ).toEqual([
+        "-Seat",
+        "p.s",
+        "-Tree",
+        "t",
+        `-Person:${dash}a`,
+        `-Session:${dash}b`,
+        `-RoleTitle:${dash}c`,
+      ]);
+    },
+  );
+
   it("joins a value that starts with a dash to its name, so the binder reads it as the value", () => {
     expect(staffValue("-Person", "-WhatIf")).toEqual(["-Person:-WhatIf"]);
     expect(staffValue("-Person", "Sam")).toEqual(["-Person", "Sam"]);

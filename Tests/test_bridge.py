@@ -643,6 +643,22 @@ class StaffThroughTheBridge(TeamAgileScratchPackage):
         self.assertEqual(body["status"], "success", body.get("error") or body["output"])
         self.assertEqual(self._seat_of("owner")["person"], "-WhatIf")
 
+    def test_every_dash_the_binder_reads_travels_joined_and_is_a_name(self):
+        # The binder reads a hyphen, an en dash, an em dash and a horizontal bar
+        # alike as a parameter's dash, so the page joins a value that starts with
+        # any of them to its name -- for every typed field, a person among them.
+        self._config(True)
+        self.assertEqual(self._post_preset(), "success")
+        for dash in ("-", "\u2013", "\u2014", "\u2015"):
+            with self.subTest(hex(ord(dash))):
+                name = f"{dash}WhatIf"
+                body = self._seat("owner.owner", f"-Person:{name}")
+                self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+                self.assertEqual(self._seat_of("owner")["person"], name)
+                body = self._seat("vp-engineering.vp-engineering", f"-Session:{dash}Model")
+                self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+                self.assertEqual(self._seat_of("vp-engineering")["session"], f"{dash}Model")
+
     def _post_preset(self) -> str:
         return client.post("/api/cmd/Staff", json={"params": ["-Preset", "S"]}).json()["status"]
 

@@ -472,15 +472,20 @@ export function buildStaffPresetParams(fields: StaffPresetFields): string[] {
   return params;
 }
 
+/** Every character PowerShell's binder reads as a parameter's dash: the
+ *  hyphen-minus, the en dash, the em dash and the horizontal bar. */
+const BINDER_DASH = /^[-\u2013\u2014\u2015]/;
+
 /**
- * One of Staff's text parameters and its value, as argv. A value that starts
- * with a dash -- an owner who calls themselves "-WhatIf" -- would be read by
- * the binder as a parameter of its own when it names one, so it travels
- * joined to its name, `-Owner:-WhatIf`, which binds as the value whatever it
- * says. Any other value travels as its own argument, as every builder sends one.
+ * One of Staff's text parameters and its value, as argv -- the one way every
+ * typed value travels. A value that starts with a dash the binder reads --
+ * an owner who calls themselves "-WhatIf" or "\u2013WhatIf" -- would be taken
+ * as a parameter of its own when it names one, so it travels joined to its
+ * name, `-Owner:-WhatIf`, which binds as the value whatever it says. Any other
+ * value travels as its own argument, as every builder sends one.
  */
 export function staffValue(name: string, value: string): string[] {
-  return value.startsWith("-") ? [`${name}:${value}`] : [name, value];
+  return BINDER_DASH.test(value) ? [`${name}:${value}`] : [name, value];
 }
 
 /** The seat dialog's Save: one seat of a saved tree, and what changed in it. */
