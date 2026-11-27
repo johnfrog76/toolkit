@@ -34,6 +34,7 @@ import {
   moduleHomeTabs,
   moduleNavSplit,
   moduleRoutes,
+  moduleSlot,
   modules,
 } from "./registry";
 import type { CardContext } from "./registry";
@@ -1546,27 +1547,59 @@ describe("the scenario grid: the Decks card, by what this machine has archived",
 // first-run banner"): one banner at a time, and the Prompt Poet's only on the
 // shipped Azure demo Space. The render is homeBanner.test.tsx's.
 describe("the scenario grid: Home's first-run banner, by Space and flags", () => {
-  const offered = (slug: string, welcome: boolean, poet: boolean) => {
+  const offered = (
+    slug: string,
+    welcome: boolean,
+    poet: boolean,
+    o: { org?: string; status?: Status; deck?: boolean } = {},
+  ) => {
     const env = {
-      config: { activeSpace: slug, firstRunWelcome: welcome, firstRunPoet: poet },
+      spaceStatus: o.status ?? "local",
+      features: { deck: o.deck ?? true },
+      config: { activeSpace: slug, org: o.org ?? "", firstRunWelcome: welcome, firstRunPoet: poet },
     } as unknown as EnvStatus;
-    const els = deckModule.slotCards?.[HOME_BANNER_SLOT]?.({ env } as never) ?? [];
+    // Through the registry, so a module that is off is never asked.
+    const els = moduleSlot(activeModules(modules, env), ctxFor(env), HOME_BANNER_SLOT);
     return els.length === 0 ? null : String((els[0] as { key: string }).key);
   };
-  it.each<[string, string, boolean, boolean, string | null]>([
-    ["the Azure demo, fresh Start", AZURE_DEMO_SPACE, true, true, "first-run-banner"],
-    ["the Azure demo, commercial closed", AZURE_DEMO_SPACE, false, true, "first-run-poet-banner"],
-    ["the Azure demo, both closed", AZURE_DEMO_SPACE, false, false, null],
-    ["the GitHub demo, commercial closed", "github-demo", false, true, null],
-    ["the local demo, commercial closed", "demo", false, true, null],
-    ["a person's own Azure DevOps Space", "acme", false, true, null],
-    ["a GitHub Space, fresh Start", "acme", true, true, "first-run-banner"],
-  ])("%s", (_name, slug, welcome, poet, shown) => {
-    expect(offered(slug, welcome, poet)).toBe(shown);
+  const ADO = "https://dev.azure.com/acme";
+  it.each<[string, string, boolean, boolean, { org?: string; status?: Status }, string | null]>([
+    ["the sample, unconnected, fresh Start", AZURE_DEMO_SPACE, true, true, {}, "first-run-banner"],
+    [
+      "the sample, unconnected, commercial closed",
+      AZURE_DEMO_SPACE,
+      false,
+      true,
+      {},
+      "first-run-poet-banner",
+    ],
+    ["the sample, unconnected, both closed", AZURE_DEMO_SPACE, false, false, {}, null],
+    [
+      "the sample connected to an address",
+      AZURE_DEMO_SPACE,
+      false,
+      true,
+      { org: ADO, status: "active" },
+      null,
+    ],
+    ["the sample graduated with -As", "acme", false, true, { org: ADO, status: "active" }, null],
+    ["another Azure DevOps Space", "other-ado", false, true, { org: ADO, status: "active" }, null],
+    ["the GitHub demo", "github-demo", false, true, { org: "https://github.com/o/r" }, null],
+    ["a local cards-only Space", "demo", false, true, {}, null],
+    [
+      "a GitHub Space, fresh Start",
+      "acme",
+      true,
+      true,
+      { org: "https://github.com/o/r" },
+      "first-run-banner",
+    ],
+  ])("%s", (_name, slug, welcome, poet, o, shown) => {
+    expect(offered(slug, welcome, poet, o)).toBe(shown);
   });
-  it("the Prompt Poet is in the Decks launcher, which fills Growth's slot", () => {
-    expect(DECKS.map((d) => d.id)).toContain("the-prompt-poet-works-the-board");
-    expect(deckModule.slotCards?.growth?.({} as never)).toHaveLength(1);
+  it("with the deck module off there is no banner at all, whatever the flags", () => {
+    expect(offered(AZURE_DEMO_SPACE, true, true, { deck: false })).toBeNull();
+    expect(offered(AZURE_DEMO_SPACE, false, true, { deck: false })).toBeNull();
   });
 });
 

@@ -117,8 +117,11 @@ because hiding is what a person chooses there; `configLabels.ts` marks the row `
 
 **The Prompt Poet's offer** is the same banner on the same slot, with that deck's first slide, and it
 is where the poet deck is offered: on the shipped Azure demo Space (`consts.json` `spaces.azureDemo`)
-and nowhere else -- a person's own Azure DevOps Space shows nothing, and a demo graduated by
-`Connect -As` takes a new slug, so the offer is gone there. It ends the same way, with
+**while it is still the sample** -- `local`, with no address of its own -- and nowhere else.
+`Connect azure-demo -Address <url>` keeps the slug but gives the Space an address and makes it active,
+so the offer is gone the moment it is connected; `Connect -As` takes a new slug, so it is gone there
+too; and any other Azure DevOps Space shows nothing. The rule is read from `/env` (`config.activeSpace`,
+`spaceStatus`, `config.org`). It ends the same way, with
 `firstRun.poet=false` (the close **x**'s name is **Hide the Prompt Poet banner**), and the deck then
 lives only under Decks. The key defaults `true`, unlike `firstRun.welcome`: the offer is about the
 Space, not a fresh install, so `tkStart` does not set it. **One banner at a time**: while

@@ -2,7 +2,7 @@ import { Suspense, lazy } from "react";
 import { Spinner } from "@fluentui/react-components";
 import { AZURE_DEMO_SPACE } from "../../shell/consts";
 import { HOME_BANNER_SLOT } from "../../shell/slots";
-import type { ToolkitModule } from "../../shell/registry";
+import type { CardContext, ToolkitModule } from "../../shell/registry";
 import { DECKS_HOME, DECK_PAGE_ROUTE, DECK_PLAY_PREFIX } from "./paths";
 
 /**
@@ -46,6 +46,18 @@ function Launcher() {
     <Suspense fallback={loading}>
       <DeckLauncher />
     </Suspense>
+  );
+}
+
+/**
+ * The shipped Azure demo Space while it is still the sample: its slug, `local`, and no address of
+ * the person's own. `Connect azure-demo -Address <url>` keeps the slug but gives it an address (and
+ * makes it active), and `Connect -As` graduates it to a slug of its own -- either way it is the
+ * person's organisation from then on, and the offer is gone.
+ */
+function isUnconnectedSample(env: CardContext["env"]): boolean {
+  return (
+    env?.config?.activeSpace === AZURE_DEMO_SPACE && env.spaceStatus === "local" && !env.config.org
   );
 }
 
@@ -106,7 +118,7 @@ export const deckModule: ToolkitModule = {
           </Suspense>,
         ];
       }
-      if (config?.firstRunPoet && config.activeSpace === AZURE_DEMO_SPACE) {
+      if (config?.firstRunPoet && isUnconnectedSample(ctx.env)) {
         return [
           <Suspense key="first-run-poet-banner" fallback={null}>
             <PoetBanner />

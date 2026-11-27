@@ -490,14 +490,16 @@ banner".
 
 A machine setting, `true` in the shipped config, for the Home banner that offers the deck *The Prompt
 Poet Works the Board*. It shows only on the shipped Azure demo Space (`azure-demo`, `consts.json`
-`spaces.azureDemo`) and only while the deck module is on; the banner's **Get Started** and its close
+`spaces.azureDemo`) **while it is still the sample** -- `local`, with no address of its own -- and only
+while the deck module is on; the banner's **Get Started** and its close
 **x** both set it `false` through `Config`, and that is the end of it. `/env` serves it as
 `config.firstRunPoet`. Its default differs from `firstRun.welcome`'s on purpose: that one is about a
 fresh install, so `tkStart` turns it on, while this one is about the Space, so a person who switches to
 the sample Space next month still gets the offer once, and `tkStart` leaves it alone. While
-`firstRun.welcome` is on the Introducing ToolKit banner shows and this one waits. A person's own Azure
-DevOps Space shows nothing, and a demo graduated by `Connect -As` takes a new slug, so the offer is gone
-there too. `tkConfig -Set firstRun.poet=true`, or turning off **Hide Prompt Poet Deck** in Settings,
+`firstRun.welcome` is on the Introducing ToolKit banner shows and this one waits. The moment the sample is
+connected the offer is gone: `Connect azure-demo -Address <url>` keeps the slug but gives it an address
+and makes it active, so it is the person's own organisation; `Connect -As` takes a new slug; and any
+other Azure DevOps Space shows nothing. `tkConfig -Set firstRun.poet=true`, or turning off **Hide Prompt Poet Deck** in Settings,
 brings it back. [`docs/modules/deck.md`](modules/deck.md), "The first-run banner".
 
 ## `deck.archived` -- the decks this machine has put away

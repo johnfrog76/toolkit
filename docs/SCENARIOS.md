@@ -261,16 +261,18 @@ Complete, so no state chip is drawn in any row:
 
 ### Home's first-run banner, by Space and flags (`scenarios.test.tsx`; the render is `homeBanner.test.tsx`)
 
-The deck module's contribution to Home's banner slot, with the deck module on. One banner at a time:
-`firstRun.welcome` is the commercial's (set by `tkStart`), `firstRun.poet` is the Prompt Poet's (true
-until closed) and counts only on the shipped Azure demo Space (`azure-demo`).
+The deck module's contribution to Home's banner slot. One banner at a time: `firstRun.welcome` is the
+commercial's (set by `tkStart`), `firstRun.poet` is the Prompt Poet's (true until closed) and counts only
+on the shipped Azure demo Space (`azure-demo`) while it is still the sample: `local`, with no address.
 
 | The Space | `welcome` | `poet` | The banner |
 | --- | --- | --- | --- |
 | Azure demo | on | on | Introducing ToolKit -- the poet waits |
 | Azure demo | off | on | **The Prompt Poet Works the Board** |
 | Azure demo | off | off | none |
-| GitHub demo, local demo, or a person's own Azure DevOps Space | off | on | none |
+| Azure demo **connected** (`Connect azure-demo -Address <url>`: active, with an address) | off | on | none |
+| the demo graduated with `Connect -As`, or another Azure DevOps Space | off | on | none |
+| GitHub demo, a GitHub Space, or a local cards-only Space | off | on | none |
 | any other Space | on | any | Introducing ToolKit |
 | deck module off | any | any | none -- no banner, no chunk |
 

@@ -43,6 +43,19 @@ import {
 const SRC_DIR = path.resolve(__dirname, "..");
 
 describe("consts.json", () => {
+  // The web reads spaces.azureDemo to know the shipped sample; nothing else ties it to the Space
+  // config.default.json declares, so this does (Tests/test_consts.py holds the same from the agent's side).
+  it("spaces.azureDemo names the shipped example Space, local and with no address", () => {
+    const shipped = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, "../../../config.default.json"), "utf8"),
+    ) as { spaces: Array<{ slug: string; example?: boolean; status?: string; org?: string }> };
+    const space = shipped.spaces.filter((s) => s.slug === AZURE_DEMO_SPACE);
+    expect(space).toHaveLength(1);
+    expect(space[0].example).toBe(true);
+    expect(space[0].status).toBe("local");
+    expect(space[0].org || "").toBe("");
+  });
+
   it("parses, and is the same object the app imports", () => {
     const raw = JSON.parse(
       fs.readFileSync(path.resolve(__dirname, "../../../consts.json"), "utf8"),

@@ -25,10 +25,18 @@ function ctx(env: Partial<EnvStatus> | undefined): CardContext {
 
 const banner = (env: Partial<EnvStatus> | undefined) =>
   deckModule.slotCards?.[HOME_BANNER_SLOT]?.(ctx(env)) ?? [];
-const config = (firstRunWelcome?: boolean, firstRunPoet?: boolean, activeSpace = "demo") =>
+// `org` and `status` are the active Space's own: the unconnected sample is local with no address.
+const config = (
+  firstRunWelcome?: boolean,
+  firstRunPoet?: boolean,
+  activeSpace = "demo",
+  org: string | null = null,
+  status: "active" | "local" = "local",
+) =>
   ({
+    spaceStatus: status,
     config: {
-      org: null,
+      org,
       projects: [],
       promptsFolder: "",
       activeSpace,
@@ -62,6 +70,17 @@ describe("the Prompt Poet's first-run offer", () => {
     expect(banner(config(false, true, azure))).toHaveLength(1);
     expect((banner(config(false, true, azure))[0] as { key: string }).key).toBe(
       "first-run-poet-banner",
+    );
+  });
+
+  // Connect azure-demo -Address <url> keeps the slug and makes the Space active with an address:
+  // a person's real organisation, no longer the sample.
+  it("does not show once the sample is connected to an address, active or not", () => {
+    expect(banner(config(false, true, azure, "https://dev.azure.com/acme", "active"))).toHaveLength(
+      0,
+    );
+    expect(banner(config(false, true, azure, "https://dev.azure.com/acme", "local"))).toHaveLength(
+      0,
     );
   });
 
