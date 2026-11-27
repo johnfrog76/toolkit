@@ -219,22 +219,22 @@ export function SeatDialog({
   const locked = writing !== null || busy;
   // Vacate asks first, in the link's place; Keep and Escape put the link back.
   const [asking, setAsking] = useState(false);
-  const [vacateFocus, setVacateFocus] = useState<"keep" | "link" | null>(null);
+  // Where the focus goes once the row is drawn again: Keep when it asks, the link when it stops.
+  const vacateFocus = useRef<"keep" | "link" | null>(null);
   const keepButton = useRef<HTMLButtonElement>(null);
   const vacateLink = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (vacateFocus === "keep" && asking) keepButton.current?.focus();
-    else if (vacateFocus === "link" && !asking) vacateLink.current?.focus();
-    else return;
-    setVacateFocus(null);
-  }, [vacateFocus, asking]);
+    const target = vacateFocus.current === "keep" ? keepButton : vacateLink;
+    if (vacateFocus.current) target.current?.focus();
+    vacateFocus.current = null;
+  }, [asking]);
   const ask = () => {
+    vacateFocus.current = "keep";
     setAsking(true);
-    setVacateFocus("keep");
   };
   const keep = () => {
+    vacateFocus.current = "link";
     setAsking(false);
-    setVacateFocus("link");
   };
   const [refusal, setRefusal] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
