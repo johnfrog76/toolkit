@@ -368,7 +368,11 @@ Props (its parameters):
 **Use it** as `<DialogTitle action={<DialogDismiss />}>` in every dialog. **Do not use it** outside a
 dialog title, and do not draw a close button of your own.
 
-**Props:** none.
+Props:
+
+| Prop       | Type      | Notes                                                                             |
+| ---------- | --------- | --------------------------------------------------------------------------------- |
+| `disabled` | `boolean` | Default `false`. The dialog's act is running, so closing it waits (UseOrgDialog). |
 
 **Used by:** every dialog that draws a title. **Pattern:** a fixed control in a named slot.
 **Test:** none of its own; it is exercised through

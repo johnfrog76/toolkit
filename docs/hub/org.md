@@ -58,10 +58,11 @@ never a Space.
 | `id` | **yes** | the tree's address, unique among the file's trees. For a preset, its preset id (`executive-suite`) |
 | `title` | no | what the org is called ("The Branch Office"); the heading on the Org tab, and the id when absent. **It replaces `name`**: a reader takes an older file's `name` as the title when there is no `title` |
 | `size` | no | `S`, `M` or `L`, drawn as the badge beside a preset's title |
-| `shortDescription` | no | one line: what it is and what it fits |
-| `description` | no | a few sentences: how the work flows, who owns what, what it fits |
+| `shortDescription` | no | one line: what the org is. A count in it states the design's own limit (one team, a team for each project), never the user's world |
+| `description` | no | a few sentences: how the work flows and who owns what, by the same rule for counts |
 | `teamSize` | no | the standup room the org suggests: 3, 6 or 9. A suggestion only: the Space's `features.teamSize` decides the room |
 | `preset` | no | the id of the preset the tree was started from |
+| `activatedAt` | no | the day the tree last **became the org in use**, `YYYY-MM-DD`, written by `Staff` ([An org's state](#an-orgs-state)). A hand edit may write it; nothing asks one to |
 | `positions` | **yes** | the positions, in the order siblings are drawn |
 | `name` | no, **retired** | an older file's title, read when there is no `title` |
 | `machines` | no, **retired** | read without a word, never drawn: a machine is not a boundary in an org |
@@ -152,6 +153,29 @@ three presets against it: `Tests/test_org.py` with `jsonschema` (a dev-only depe
 `agent/requirements-dev.txt`), and `tkTestToolkit -OrgChart` with `Test-Json -Schema` on PowerShell 7, a named
 skip on Windows PowerShell 5.1, which has no `Test-Json`. The readers do not read the schema: it is the contract a
 file is written to, and a reader stays as tolerant as the reading rule says.
+
+## An org's state
+
+Each tree of the file has a state, **derived and never stored**, so it can never disagree with `activeTree`:
+
+| State | When |
+| --- | --- |
+| `active` | `activeTree` names it -- or, with one tree and no `activeTree`, it is that tree. The one pointer, so exactly one tree is active |
+| `inactive` | it is not active and carries an `activatedAt`: it was in use before, and another is now |
+| `draft` | it is not active and carries no `activatedAt`: saved, and never in use. In an older file with no stamps, every tree but the active one reads as a draft |
+
+`activatedAt` is the one stored fact behind it, and `Staff` writes it whenever a tree **becomes** the org in use:
+`Staff -Activate` stamps the tree it puts in use; `Staff -Preset` stamps a new file's first tree, which is in use
+from the moment it is saved; and whenever `Staff` adds a tree beside, or `-Activate` takes out of use, a tree in use
+that has no stamp, it stamps that tree too, so it reads inactive rather than draft. `-Activate` on the tree already
+in use writes nothing. **A stamp written that way records the day `Staff` first knew the tree had been in use**,
+not the day it was first used, so read `activatedAt` as "in use by this day", never as a first-use date. A stamp
+that is not a date (`26 November`, a number) is still a stamp: the readers do not parse it, so its tree reads
+inactive, and the schema refuses its shape. Both readers derive the state the same way -- the CLI's `Get-P20OrgTreeState`, the agent's
+`tree_state` -- from one shared table, [`Tests/fixtures/org/state.json`](../../Tests/fixtures/org/state.json),
+asserted by `tkTestToolkit -OrgChart` and `Tests/test_org.py`. `OrgChart` lists a file's trees with their states
+(`Trees: main (active), branch (draft)`) when it has more than one, and the route's `trees` carries each one's
+`state` and `activatedAt`.
 
 ## Where a position's prompt is found
 
@@ -284,7 +308,7 @@ draw one.
 use. [`Tests/fixtures/org/charts/`](../../Tests/fixtures/org/charts/) holds the responses the table states.
 
 **The one difference between the two halves: the fields only the route adds.** The route adds three keys to
-every position and one to every seat, which `OrgChart -AsJson` does not print -- the CLI has no prompt reader,
+every position, one to every seat and one to the document, which `OrgChart -AsJson` does not print -- the CLI has no prompt reader,
 and the Studio's is the agent's; the model's name is what the Org tab draws, and the terminal prints the model as
 the file writes it:
 
@@ -293,12 +317,13 @@ the file writes it:
 | `promptTitle` | the prompt's title: its front matter's `title`, else its one `#` heading, else the file's name without `.prompt.md` | `agent/studio/prompts.py`'s `record`, the one reader every prompt goes through -- not a second parser |
 | `promptRef` | the address after `/studio/prompts/` that opens the prompt in the Studio's reading room: `yours/<name>` for the hub's copy, `<name>` for a role the toolkit ships -- the `ref` a Studio prompt row carries (the web builds the link with `promptPath(ref)`) | the same rule the Studio lists by; `null` for a file the room does not list (not `<name>.prompt.md`, or a name that is not a plain word), which still has its title |
 | `defaultModelName` (a position's) | its `defaultModel` line by the same lookup as `modelName`: a pool's line that `Staff` wrote as an id reads as the model's name ("Sonnet 5.5"); words read as written; `null` with no line | the same as `modelName` |
+| `trees` (the document's) | every tree of the file, in its order, as the Org tab's View and Active dropdowns list them: `{ "id", "title", "size", "preset", "active", "state", "activatedAt" }` -- `state` is [the tree's state](#an-orgs-state), `active` true on the active one alone -- each read as that tree's own chart reads it (`title`, `size`, `preset` and `activatedAt` `null` where unset) -- the same list whichever tree `?tree=` asks for | `agent/solitaire/org.py`'s `tree_summaries`, over the trees the reader has already checked |
 | `modelName` (a seat's) | what the seat's `model` is called: the model map's `name` for an id it has a row for ("Opus 5.5"); for a family the map's `current` names (`opus`), the name of the id that family is today; anything else as written; `null` with no model | `agent/core/models.py`'s `model_info` and `current_model`, the lookup the Agent line uses -- looked up, never parsed |
 
 The prompt fields are `null` on a position with no `prompt`. The file read is the one the reading room opens -- the
 machine's `agenticExtensionPath` copy where there is one, else the first of the
 [three folders](#where-a-positions-prompt-is-found) that has it. Everything else in the response
-is byte for byte the CLI's (`Tests/test_org.py` strips the three keys and compares the rest to the table's
+is byte for byte the CLI's (`Tests/test_org.py` strips the route's keys and compares the rest to the table's
 responses, and checks `modelName` against a row's `modelNames` where the table states them).
 
 ### What the route answers when there is no chart
@@ -352,11 +377,11 @@ never used in place. The Org tab previews them ([Team Agile, the web UI](../modu
 and [`Staff -Preset`](#the-one-writer-staff) saves a copy of one as a tree of `org.json`; the folder is
 `consts.json` `org.presetsFolder`.
 
-| Size | Preset | `id` | Seats | Room | Fits |
-| --- | --- | --- | --- | --- | --- |
-| S | The Executive Suite | `executive-suite` | the owner, the VP of engineering (drives the work through builders) and the VP of product (reads what ships and holds the merge); a builder pool | 3 | one product, one person, moving fast |
-| M | The Branch Office | `branch-office` | S, plus one team -- a team lead (`lead-team`, one seat) with its own builder pool (`builders-team`) -- and a test runner; the lead sends its readies straight to the seat that merges | 6 | two or three products |
-| L | Corporate Headquarters | `corporate-headquarters` | M, plus a PM, a team for each project under it -- two to start, `lead-team-1` and `lead-team-2`, each one lead with its own builder pool (`builders-team-1`, `builders-team-2`) -- a merge stand-in, the butler (the weekly bot) and the intern | 9 | many products, a heavy merge queue, an owner with little time |
+| Size | Preset | `id` | Seats | Room |
+| --- | --- | --- | --- | --- |
+| S | The Executive Suite | `executive-suite` | the owner, the VP of engineering (drives the work through builders) and the VP of product (reads what ships and holds the merge); a builder pool | 3 |
+| M | The Branch Office | `branch-office` | S, plus one team -- a team lead (`lead-team`, one seat) with its own builder pool (`builders-team`) -- and a test runner; the lead sends its readies straight to the seat that merges | 6 |
+| L | Corporate Headquarters | `corporate-headquarters` | M, plus a PM, a team for each project under it -- two to start, `lead-team-1` and `lead-team-2`, each one lead with its own builder pool (`builders-team-1`, `builders-team-2`) -- a merge stand-in, the butler (the weekly bot) and the intern | 9 |
 
 In every preset **the VP of product holds the merge**. The roles write the merge once, as the VP of
 engineering's by default, and let a team place it elsewhere ([the roles](../../agentic/org/README.md)); each
@@ -376,8 +401,8 @@ the schema's `#/$defs/tree`. The fields a preset uses:
 | `id` | the preset's address, and the tree's id |
 | `size` | `S`, `M` or `L`; the order they are offered in |
 | `title` | its name, and the tree's title |
-| `shortDescription` | one line: what it is and what it fits, kept for a place that names a preset briefly; the Org tab shows the description |
-| `description` | a few sentences: how the work flows, who owns what, what it fits |
+| `shortDescription` | one line: what the org is, kept for a place that names a preset briefly; the Org tab shows the description |
+| `description` | a few sentences: how the work flows and who owns what |
 | `teamSize` | the standup room it suggests, 3, 6 or 9. The Space's own `features.teamSize` decides the room; a preset sets nothing |
 | `positions` | the tree's positions, in the shape above |
 
@@ -406,7 +431,8 @@ Staff -Activate <tree-id> [-WhatIf]
   `-Owner` names the owner -- the root's seat, a person and never a model -- in place of the preset's `You`.
 - **The default models are filled in**, each stored as a [`Config/models.json`](../../Config/models.json) id: a
   family resolves through the map's `current` block, an id passes through, and nothing is parsed. A name that is
-  neither is refused.
+  neither is refused. The two VP defaults and the owner's `You` are `consts.json` `org.steps`, the defaults the Org
+  tab's "Use this org" steps show, so the page and the verb agree.
 
   The defaults are keyed by the **role** a position names -- its `prompt` -- not by its id, so every team's lead
   starts staffed whatever its office is called:

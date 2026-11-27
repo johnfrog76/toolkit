@@ -13,11 +13,10 @@ links to it; what that add-on does on purpose sits under that section's "True by
 
 ## Known gaps
 
-### The org is set up from the terminal, not yet from the page
+### Seats are staffed by hand, not yet from the page
 
-**What you see:** The Org tab previews the three starting orgs and draws the org in use, but it cannot
-save one, choose the org in use, or staff a seat. `tkStaff -Preset` and `tkStaff -Activate` do that today.
-Seats are staffed by editing `org.json` by hand.
+**What you see:** The Org tab saves a starting org and chooses the org in use, but it cannot staff a seat.
+A saved org's seats start at their default models, and changing one means editing `org.json` by hand.
 
 **Where you meet it:** [The org](ORG.md#where-it-is-going), "Where it is going"
 

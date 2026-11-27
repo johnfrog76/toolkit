@@ -446,6 +446,39 @@ export function buildRouteParams(fields: RouteFields): string[] {
   return params;
 }
 
+/** The Org tab's "Use this org": a preset saved as a tree of the hub's org.json. */
+export interface StaffPresetFields {
+  /** The preset's size, S, M or L, as the preset file says it. */
+  size: string;
+  /** The owner's name, the root's seat: a person, in their own words. */
+  owner?: string;
+  /** A model family or a models.json id, for each VP's seat. */
+  vpEngineering?: string;
+  vpProduct?: string;
+}
+
+/**
+ * argv for `POST /cmd/Staff` -> `Scripts/Set-Staff.ps1`, its `-Preset` form:
+ * `-Preset <size>`, then `-Owner`, `-VpEngineering` and `-VpProduct` where
+ * given, in the order the `param()` block declares them. A blank answer is
+ * left out, so the verb's own default fills it. It saves a draft; `-Activate`
+ * is its own call (buildStaffActivateParams), never sent with `-Preset`.
+ */
+export function buildStaffPresetParams(fields: StaffPresetFields): string[] {
+  const params = ["-Preset", fields.size];
+  if (fields.owner?.trim()) params.push("-Owner", fields.owner.trim());
+  if (fields.vpEngineering?.trim()) params.push("-VpEngineering", fields.vpEngineering.trim());
+  if (fields.vpProduct?.trim()) params.push("-VpProduct", fields.vpProduct.trim());
+  return params;
+}
+
+/** argv for `POST /cmd/Staff` -> `Scripts/Set-Staff.ps1`, its `-Activate`
+ *  form: the switch, then the tree's id (the script's first positional
+ *  parameter, `-Tree`). */
+export function buildStaffActivateParams(treeId: string): string[] {
+  return ["-Activate", treeId];
+}
+
 /** One of `MeetingAgenda`'s four switches. `Plan`, `Prep` and `Retro` stamp a
  *  stage; `Close` moves the file. They are the script's own spellings. */
 export type MeetingAgendaAction = "Plan" | "Prep" | "Retro" | "Close";

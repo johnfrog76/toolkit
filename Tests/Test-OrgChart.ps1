@@ -256,6 +256,21 @@ try {
             }
         }
     }
+    # An org's state, derived, over the shared table Tests/fixtures/org/state.json.
+    $stateTable = Read-Fixture 'state.json' | ConvertFrom-Json
+    Assert-True 'the state table has cases' (@($stateTable.cases).Count -ge 5)
+    foreach ($case in $stateTable.cases) {
+        $stateHub = Join-Path $casesDir "state-$($case.name)"
+        New-Item -ItemType Directory -Path $stateHub -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $stateHub 'org.json'), ($case.org | ConvertTo-Json -Depth 20), $utf8)
+        $stateRead = Read-P20OrgChart -PromptsRoot $stateHub -PackageRoot (New-CasePackage $case)
+        $want = (@($case.expect.states.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" })) -join ','
+        $got = (@($stateRead.Trees | ForEach-Object { "$($_.id)=$($_.state)" })) -join ','
+        Assert-Equal "state: $($case.name)" $want $got $stateRead.Message
+        Assert-Equal "  active is the one pointer" (@($case.expect.states.PSObject.Properties | Where-Object { $_.Value -eq 'active' } | ForEach-Object { $_.Name }) -join ',') (@($stateRead.Trees | Where-Object { $_.active } | ForEach-Object { $_.id }) -join ',')
+    }
+    Assert-Equal 'activatedAt is a key the tool reads: no warning' 0 @((Read-P20OrgChart -PromptsRoot (Join-Path $casesDir 'state-active-and-a-draft')).Warnings).Count
+
     # No hub root at all, and a root that is not there, are a missing file, not a throw.
     Assert-Equal 'no hub root: missing' 'missing' (Read-P20OrgChart -PromptsRoot '').Status
     Assert-Equal 'a hub root that is not there: missing' 'missing' (Read-P20OrgChart -PromptsRoot (Join-Path $root 'nowhere')).Status
@@ -297,13 +312,13 @@ try {
     $hubWithFile = Get-Snapshot $hubDir
     $typed = Invoke-OrgChart "'BEGIN:text'; tkOrgChart; 'END:text'; 'BEGIN:json'; tkOrgChart -AsJson; 'END:json'; 'BEGIN:branch'; tkOrgChart -Tree branch 3>`$null; 'END:branch'; 'BEGIN:branchjson'; tkOrgChart -Tree branch -AsJson; 'END:branchjson'"
     $textOut = Get-Section $typed.All 'text'
-    $wantText = "Org chart: Laptop and mini (main)`n`n" + (Read-Fixture 'text/valid.txt').TrimEnd("`n")
+    $wantText = "Org chart: Laptop and mini (main)`nTrees: main (active), branch (draft)`n`n" + (Read-Fixture 'text/valid.txt').TrimEnd("`n")
     Assert-Equal 'the text: a header with the title (an older file''s name), then one line per seat, byte for byte -- no machine' $wantText $textOut $typed.All
     Assert-Equal 'it exits 0' '0' $typed.Exit
     $jsonDiff = Compare-Json (Read-Fixture 'charts/valid.json' | ConvertFrom-Json) ((Get-Section $typed.All 'json') | ConvertFrom-Json)
     Assert-True '-AsJson is the table''s chart' ($jsonDiff -eq '') $jsonDiff
     $branchText = Get-Section $typed.All 'branch'
-    Assert-Equal '-Tree prints the other tree and says it is not the one in use' ("Org chart: One machine (branch) -- not the tree in use (main)`n`n" + (Read-Fixture 'text/valid-tree-by-id.txt').TrimEnd("`n")) $branchText
+    Assert-Equal '-Tree prints the other tree and says it is not the one in use' ("Org chart: One machine (branch) -- not the tree in use (main)`nTrees: main (active), branch (draft)`n`n" + (Read-Fixture 'text/valid-tree-by-id.txt').TrimEnd("`n")) $branchText
     $branchDiff = Compare-Json (Read-Fixture 'charts/valid-tree-by-id.json' | ConvertFrom-Json) ((Get-Section $typed.All 'branchjson') | ConvertFrom-Json)
     Assert-True '-Tree -AsJson is the table''s chart for it' ($branchDiff -eq '') $branchDiff
     Assert-True 'the four runs wrote nothing to the hub: not a byte, not a file' ((Get-Snapshot $hubDir) -ceq $hubWithFile)
@@ -489,6 +504,7 @@ try {
             'two trees and no activeTree' = @('{"trees":[{"id":"a","positions":[]},{"id":"b","positions":[]}]}', $fileSchema)
             'a size that is not S, M, L'  = @('{"id":"t","positions":[],"size":"XL"}', $treeSchema)
             'a teamSize that is not 3/6/9' = @('{"id":"t","positions":[],"teamSize":4}', $treeSchema)
+            'an activatedAt that is not a date' = @('{"id":"t","positions":[],"activatedAt":"26 November"}', $treeSchema)
             'a recommend that is text'    = @('{"id":"t","positions":[{"id":"p","recommend":"opus"}]}', $treeSchema)
             'a seat with no id'           = @('{"id":"t","positions":[{"id":"p","seats":[{"model":"m"}]}]}', $treeSchema)
             'a merges that is text'       = @('{"id":"t","positions":[{"id":"p","seats":[{"id":"s","merges":"yes"}]}]}', $treeSchema)
@@ -564,6 +580,8 @@ try {
     Assert-True '  two-space JSON' ($made1.StartsWith("{`n  `"trees`": [`n    {`n      `"id`": `"executive-suite`",`n      `"preset`": `"executive-suite`",")) $made1
     $doc = Read-Org
     Assert-True '  one tree and no activeTree: the one tree is the one in use' (@($doc.trees).Count -eq 1 -and -not $doc.PSObject.Properties['activeTree'])
+    $today = (Get-Date).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+    Assert-Equal '  and it is stamped the day it became the one in use' $today (Get-OrgTree $doc 'executive-suite').activatedAt
     $t = Get-OrgTree $doc 'executive-suite'
     Assert-Equal '  the tree names its preset' 'executive-suite' $t.preset
     Assert-True '  the preset file''s own note is not copied' (-not $t.PSObject.Properties['_comment'])
@@ -587,6 +605,7 @@ try {
     Assert-Equal '  the owner is the preset''s You without -Owner' 'You' (Get-OrgSeat (Get-OrgTree $doc 'executive-suite-2') 'owner')[0].person
     Assert-Equal '  two trees now, so activeTree names the first, and comes first; the note and the rest keep their order' 'activeTree,_note,trees' (@($doc.PSObject.Properties.Name) -join ',')
     Assert-Equal '  the first tree is still the one in use: the new one is a draft' 'executive-suite' $doc.activeTree
+    Assert-True '  the draft carries no activatedAt' (-not (Get-OrgTree $doc 'executive-suite-2').PSObject.Properties['activatedAt'])
     Assert-True '  and the output says so' ($second.All.Contains("Saved 'executive-suite-2'") -and $second.All.Contains("as a draft; 'executive-suite' stays active.")) $second.All
     Assert-Equal '  a hand-made key in the first tree is kept' 'teal' (Get-OrgTree $doc 'executive-suite').colour
 
@@ -621,6 +640,9 @@ try {
     $act = Invoke-OrgChart "tkStaff -Activate executive-suite-2"
     Assert-Equal '-Activate <tree-id>: exit 0' '0' $act.Exit $act.All
     Assert-Equal '  it is the tree in use' 'executive-suite-2' (Read-Org).activeTree
+    Assert-Equal '  and it is stamped the day it became so' $today (Get-OrgTree (Read-Org) 'executive-suite-2').activatedAt
+    $states = Invoke-OrgChart "tkOrgChart 3>`$null"
+    Assert-True '  OrgChart lists each tree with its state: the one replaced is inactive, the one never used a draft' ($states.All.Contains('Trees: executive-suite (inactive), executive-suite-2 (active), branch (draft)')) $states.All
     $before = Get-OrgBytes
     $again = Invoke-OrgChart "tkStaff -Activate executive-suite-2"
     Assert-True '  again: already in use, nothing written' ($again.Exit -eq '0' -and $again.All.Contains('nothing was written') -and (Test-SameBytes $before (Get-OrgBytes))) $again.All
@@ -701,6 +723,21 @@ try {
         Assert-True '  the old file is intact, byte for byte' (Test-SameBytes $before (Get-OrgBytes))
         Assert-True '  and no temp file is left beside it' (-not (Test-Path -LiteralPath "$orgPath.p20tmp"))
     }
+    # An older file's tree in use with no stamp is stamped when Staff adds a tree beside it.
+    [System.IO.File]::WriteAllText($orgPath, '{"trees":[{"id":"old","title":"Old","positions":[{"id":"root"}]}]}', $utf8)
+    $beside = Invoke-OrgChart "tkStaff -Preset S"
+    $old = Read-Org
+    Assert-True 'a tree added beside an unstamped tree in use: the old tree is stamped, the new one is a draft' (
+        $beside.Exit -eq '0' -and (Get-OrgTree $old 'old').activatedAt -eq $today -and -not (Get-OrgTree $old 'executive-suite').PSObject.Properties['activatedAt'] -and $old.activeTree -eq 'old') $beside.All
+
+    # -Activate taking an unstamped tree out of use stamps it, so it reads inactive, not draft.
+    [System.IO.File]::WriteAllText($orgPath, '{"activeTree":"a","trees":[{"id":"a","positions":[{"id":"root"}]},{"id":"b","positions":[{"id":"root"}]}]}', $utf8)
+    $swap = Invoke-OrgChart "tkStaff -Activate b; 'BEGIN:trees'; tkOrgChart; 'END:trees'"
+    $swapped = Read-Org
+    Assert-True '-Activate taking an unstamped tree out of use stamps it, and the tree it puts in use' (
+        $swap.Exit -eq '0' -and (Get-OrgTree $swapped 'a').activatedAt -eq $today -and (Get-OrgTree $swapped 'b').activatedAt -eq $today -and $swapped.activeTree -eq 'b') $swap.All
+    Assert-True '  so OrgChart reads the one taken out of use as inactive' ((Get-Section $swap.All 'trees').Contains('Trees: a (inactive), b (active)')) $swap.All
+
     # -Activate with no org.json is refused, and creates nothing.
     Remove-Item -LiteralPath $orgPath -Force
     $noFile = Invoke-OrgChart "tkStaff -Activate hq"

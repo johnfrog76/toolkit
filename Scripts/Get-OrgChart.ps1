@@ -116,5 +116,10 @@ $chart = $read.Chart
 $header = "Org chart: $($chart.tree.title) ($($chart.tree.id))"
 if ($chart.tree.id -ne $chart.activeTree) { $header += " -- not the tree in use ($($chart.activeTree))" }
 Write-Output $header
+# A file of several trees lists them, each with its state: active, draft (saved,
+# never in use) or inactive (in use before) -- docs/hub/org.md, "An org's state".
+if (@($read.Trees).Count -gt 1) {
+    Write-Output ("Trees: " + ((@($read.Trees) | ForEach-Object { "$($_.id) ($($_.state))" }) -join ', '))
+}
 Write-Output ''
 foreach ($line in (Format-P20OrgChartLines -Chart $chart)) { Write-Output $line }

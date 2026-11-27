@@ -42,7 +42,10 @@ and each org's description says where it sits.
 
 ## Saving an org, and the one in use
 
-The Org tab previews. `tkStaff` saves:
+On the Org tab, **Use this org** on a preview saves it, after three questions that are already answered: your
+name and the two VPs' models. Two labelled dropdowns sit in the header: **View**, for the org you are looking
+at, and **Active**, for the org in use. Choosing in Active makes that org the one in use. In the terminal,
+`tkStaff` does the same:
 
 ```powershell
 tkStaff -Preset S -Owner "Sam"          # save the Executive Suite as an org of your own
@@ -52,8 +55,11 @@ tkOrgChart                              # read it back
 ```
 
 - **A hub keeps up to three orgs** in one file, `org.json`, and **one of them is in use.** Only the org in
-  use is read by Team Agile. The others are drafts: you can keep and change them, and they affect nothing
-  until you make one active.
+  use is read by Team Agile; the others affect nothing until you make one active.
+- **Each org has a state: active, draft or inactive.** The **active** org is the one in use. A **draft** was
+  saved and has never been in use; an **inactive** org was in use before and another is now. The state is
+  worked out, never typed: `activeTree` says which org is active, and each org keeps the day it last became
+  active, `activatedAt`, which `tkStaff` writes.
 - **Saving never changes the org in use.** `-Preset` saves a draft, and `-Activate` is the one way to
   choose. Your first org is the only one, so it is in use as soon as it is saved.
 - **Nothing is overwritten.** An org's id is taken once. A fourth org is refused, naming the three you
@@ -122,13 +128,10 @@ schema, and `tkOrgChart` says plainly what is wrong with a file that fails its c
 ## Where it is going
 
 **Not built yet.** This section describes what is planned, so that you can see where the org is heading.
-None of it works today. [Known gaps](KNOWN-GAPS.md#the-org-is-set-up-from-the-terminal-not-yet-from-the-page) lists it too.
+None of it works today. [Known gaps](KNOWN-GAPS.md#seats-are-staffed-by-hand-not-yet-from-the-page) lists it too.
 
 **The next steps:**
 
-- **Setting up an org from the page.** "Use this org" on a preview asks three questions (your name and the
-  two VPs' models, each with its default filled) and saves it. Two dropdowns: **View**, to choose the org
-  you are looking at, and **Active**, to choose the org in use.
 - **The seat dialog.** Each seat of a saved org gets an **Assign** or **Change** button. It sets the
   seat's model and session, and for a team lead its Space. The owner's seat has a **Change** button for
   your name too.

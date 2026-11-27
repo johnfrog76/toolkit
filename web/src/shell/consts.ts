@@ -510,12 +510,22 @@ export const USAGE = consts.usage as {
  * `rolesFolder` is the folder inside an agentic folder that holds the org's role
  * prompts; the CLI and the agent look a position's prompt up through it.
  * `presetsFolder` is where the package keeps the org presets (the agent serves
- * them; Staff -Preset copies one into the hub).
+ * them; Staff -Preset copies one into the hub). `steps` are the Org tab's "Use
+ * this org" questions: the families each VP question offers, the ones offered
+ * without a "not recommended" note, each default, and the owner's default
+ * name -- Staff -Preset fills with the same defaults.
  */
 export const ORG = consts.org as {
   file: string;
   rolesFolder: string;
   presetsFolder: string;
+  steps: {
+    owner: string;
+    vpEngineering: string;
+    vpProduct: string;
+    families: string[];
+    recommended: string[];
+  };
 };
 
 /**

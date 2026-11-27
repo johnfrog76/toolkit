@@ -6,10 +6,21 @@ import { DismissRegular } from "@fluentui/react-icons";
  * prop — `<DialogTitle action={<DialogDismiss />}>` — so the top-right close
  * button has one consistent style and size across every dialog in the app.
  */
-export function DialogDismiss() {
+export interface DialogDismissProps {
+  /** The dialog's act is running, so closing it waits. Default false. */
+  disabled?: boolean;
+}
+
+export function DialogDismiss({ disabled = false }: DialogDismissProps = {}) {
   return (
     <DialogTrigger action="close">
-      <Button appearance="subtle" size="small" icon={<DismissRegular />} aria-label="Close" />
+      <Button
+        appearance="subtle"
+        size="small"
+        icon={<DismissRegular />}
+        aria-label="Close"
+        disabled={disabled}
+      />
     </DialogTrigger>
   );
 }

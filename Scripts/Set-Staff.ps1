@@ -124,11 +124,14 @@ $maxTrees = 3
 # still starts staffed: the role -> the family its seats start with. Every pool
 # (a position with no seats: the builders) has its default-model line set to
 # the pool's family instead. Every other seat starts vacant.
+# The two VP defaults are the Org tab's step defaults too, so both read them
+# from consts.json org.steps.
+$steps = (Get-P20Consts).org.steps
 $roleEngineering = 'vp-of-engineering.prompt.md'
 $roleProduct = 'vp-of-product.prompt.md'
 $seatDefaults = [ordered]@{
-    $roleEngineering    = 'opus'
-    $roleProduct        = 'fable'
+    $roleEngineering    = [string]$steps.vpEngineering
+    $roleProduct        = [string]$steps.vpProduct
     'team-lead.prompt.md' = 'opus'
     'intern.prompt.md'  = 'haiku'
     'butler.prompt.md'  = 'haiku'
@@ -337,6 +340,24 @@ if (-not $creating -and $Tree -ceq $inUseBefore) {
     Write-Output "'$Tree' is already the tree in use in $orgPath; nothing was written."
     return
 }
+
+# activatedAt (docs/hub/org.md, "An org's state"): the day a tree BECOMES the org
+# in use, the one stored fact that tells an inactive org from a draft. -Activate
+# stamps the tree it puts in use; a new file's first tree is in use from the
+# moment it is saved, so it is stamped then; and a tree added beside an older
+# tree in use that has no stamp stamps that tree too, so it reads inactive, not
+# draft, once another is put in use.
+$today = (Get-Date).ToString('yyyy-MM-dd', [System.Globalization.CultureInfo]::InvariantCulture)
+$treeById = @{}
+foreach ($t in $allTrees) { $treeById[(Get-P20OrgText (Get-P20OrgField $t 'id'))] = $t }
+# The same holds for the tree -Activate takes out of use: an older file's tree in
+# use with no stamp is stamped as it leaves, so it reads inactive, never draft.
+if ($creating -and $allTrees.Count -eq 1) { Set-StaffField $newTree 'activatedAt' $today }
+elseif ($inUseBefore -and $treeById.ContainsKey($inUseBefore)) {
+    $inUse = $treeById[$inUseBefore]
+    if (-not (Get-P20OrgText (Get-P20OrgField $inUse 'activatedAt'))) { Set-StaffField $inUse 'activatedAt' $today }
+}
+if ($Activate) { Set-StaffField $treeById[$targetId] 'activatedAt' $today }
 
 $doc = [ordered]@{}
 if ($active -and -not (Get-P20OrgField $data 'activeTree')) { $doc['activeTree'] = $active }

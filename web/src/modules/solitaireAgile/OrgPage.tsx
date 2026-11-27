@@ -1,15 +1,22 @@
 import {
   Badge,
+  Body1,
   Body2,
+  Button,
   Caption1,
   Dropdown,
+  Label,
+  MessageBar,
+  MessageBarBody,
   Option,
+  OptionGroup,
   Subtitle2,
   Toolbar,
   ToolbarButton,
   makeStyles,
   mergeClasses,
   tokens,
+  useId,
 } from "@fluentui/react-components";
 import { useLayoutEffect, useRef, useState } from "react";
 import {
@@ -25,8 +32,20 @@ import type { EmptyMessage } from "../../shared/EmptyState";
 import { PanelFrame } from "../../shared/PanelFrame";
 import { RefinedBust, bustHeight } from "../../shared/refinedFaces";
 import { promptPath } from "../studio/paths";
-import { useGetOrgChartQuery, useGetOrgPresetsQuery } from "./api.solitaireAgile";
-import type { OrgPosition, OrgPreset, OrgRefusal } from "./api.solitaireAgile";
+import { buildStaffActivateParams } from "../ado/cliBridge";
+import {
+  useGetOrgChartQuery,
+  useGetOrgPresetsQuery,
+  useRunStaffMutation,
+} from "./api.solitaireAgile";
+import type {
+  OrgPosition,
+  OrgPreset,
+  OrgRefusal,
+  OrgState,
+  OrgTreeSummary,
+} from "./api.solitaireAgile";
+import { UseOrgDialog, refusalText } from "./UseOrgDialog";
 import { OfficeDoor, Plate, SeatCell } from "./OrgParts";
 import type { PlacedOffice } from "./orgChart";
 import {
@@ -57,17 +76,23 @@ import { canZoomIn, canZoomOut, fitScale, zoomIn, zoomLabel, zoomOut } from "./o
 //
 // An office with a prompt is a link to it in the Studio's reading room
 // (promptPath of the position's promptRef); the owner and the pool have none,
-// and are not links. The page is a READ: it chooses no tree, draws no active
-// state, and writes nothing.
+// and are not links.
 //
-// The dropdown at the header's right previews a preset (docs/hub/org.md, "Org
-// presets"): the starting orgs the toolkit ships, served by GET
-// /api/ritual/org/presets. Picking one makes its title the heading, with its
-// size as a badge beside it, puts its description under the title, and draws
-// its chart with the same offices. The page itself writes nothing: org.json's
-// one writer is the CLI's Staff verb (docs/hub/org.md, "The one writer: Staff"),
-// which saves a preset as a tree, and a page that writes will reach it through
-// the bridge (POST /api/cmd/Staff), never a route of its own. Hand edits work too.
+// Two dropdowns at the header's right keep looking apart from the org's state
+// (docs/modules/solitaire-agile.md, "The web UI"). View picks the org shown:
+// the saved orgs first, then the presets as previews (docs/hub/org.md, "Org
+// presets", served by GET /api/ritual/org/presets). Active, drawn once an org is
+// saved, lists the saved orgs only, with no None, and picking one runs
+// Staff -Activate through the bridge (POST /api/cmd/Staff), with no
+// confirmation. With no org saved, View opens on the Executive Suite (Small),
+// the simplest; with one, on the active org. When the org shown is not the
+// active one, one line under the heading says so. On a preview, "Use this org"
+// opens the steps (UseOrgDialog.tsx), which save it as a draft through
+// Staff -Preset. Those two are the page's only writes, and both are Staff's:
+// org.json's one writer is the CLI's verb (docs/hub/org.md, "The one writer:
+// Staff"), reached through the bridge, never a route of its own. Staff takes no
+// lock, so the page runs one write at a time: while one is in flight, Use this
+// org, the dialog's Save and Active are all disabled. Hand edits work too.
 
 const useStyles = makeStyles({
   body: { display: "flex", flexDirection: "column", minWidth: 0 },
@@ -79,7 +104,29 @@ const useStyles = makeStyles({
     maxWidth: "35em",
     color: tokens.colorNeutralForeground2,
   },
-  select: { minWidth: "260px" },
+  // A saved org's option in View: its title, and its state in muted text at the end
+  // of the row -- the secondary text a Fluent option carries.
+  optionRow: {
+    display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    columnGap: tokens.spacingHorizontalL,
+    width: "100%",
+  },
+  optionState: { color: tokens.colorNeutralForeground3 },
+  select: { minWidth: "220px" },
+  selects: { display: "flex", columnGap: tokens.spacingHorizontalL, alignItems: "center" },
+  // A dropdown with its visible label before it: "View" and "Active".
+  labelled: { display: "flex", alignItems: "center", columnGap: tokens.spacingHorizontalS },
+  // The line under the heading, and Use this org beside it on a preview.
+  lineRow: {
+    display: "flex",
+    alignItems: "center",
+    columnGap: tokens.spacingHorizontalM,
+    marginTop: tokens.spacingVerticalXS,
+  },
+  notActive: { color: tokens.colorNeutralForeground2 },
+  refusal: { marginTop: tokens.spacingVerticalS, whiteSpace: "pre-wrap" },
   // The header's right side: the zoom controls, then the org dropdown, 1rem apart
   // (spacingHorizontalL is 16px).
   headerControls: {
@@ -486,9 +533,10 @@ function ChartDrawing({ positions, zoom }: { positions: OrgPosition[]; zoom: Cha
   );
 }
 
-/** The value the dropdown holds for the hub's own chart. */
+/** The value the dropdown holds for the hub's own chart while it has no saved
+ *  tree to list (a file that does not read): the page says why. */
 export const YOUR_ORG = "";
-/** What the dropdown calls the hub's own chart. */
+/** What the dropdown calls the hub's own chart in that case. */
 export const YOUR_ORG_LABEL = "Your org";
 
 /** A preset's size as its badge says it: the one mapping from the file's letter
@@ -510,60 +558,246 @@ export function presetLabel(preset: Pick<OrgPreset, "title" | "size">): string {
   return preset.size ? `${name} (${preset.size})` : name;
 }
 
-/** The selector, at the right of the panel's header: Your org, then the presets. */
-function PresetSelect({
+/** The View dropdown's values: a saved tree, or a preset previewed. */
+const SAVED = "org:";
+const PREVIEW = "preset:";
+export const savedView = (id: string) => `${SAVED}${id}`;
+export const previewView = (id: string) => `${PREVIEW}${id}`;
+
+/** The one line under the heading when the org shown is not the active one
+ *  (docs/modules/solitaire-agile.md, "The web UI"): the accepted copy. */
+export function notActiveLine(
+  shown: "draft" | "inactive" | "preview" | "active",
+  activeTitle: string | null,
+): string | null {
+  if (shown === "active") return null;
+  if (shown === "draft") return `A draft. Your active org is ${activeTitle}.`;
+  if (shown === "inactive") return `Inactive. Your active org is ${activeTitle}.`;
+  return activeTitle
+    ? `A preview. Your active org is ${activeTitle}.`
+    : "A preview. Nothing is saved yet.";
+}
+
+/** A saved org's state as View says it, in muted text beside its title. */
+export const ORG_STATE_WORDS: Readonly<Record<OrgState, string>> = {
+  active: "Active",
+  draft: "Draft",
+  inactive: "Inactive",
+};
+
+/** View, at the right of the panel's header: the saved orgs, each with its state, then the presets. */
+function ViewSelect({
+  saved,
   presets,
-  picked,
+  view,
+  label,
+  yours,
   onPick,
 }: {
+  saved: OrgTreeSummary[];
   presets: OrgPreset[];
-  picked: OrgPreset | undefined;
-  onPick: (id: string) => void;
+  view: string;
+  label: string;
+  yours: boolean;
+  onPick: (value: string) => void;
 }) {
   const styles = useStyles();
+  const id = useId("org-view");
   return (
-    <Dropdown
-      aria-label="Org"
-      className={styles.select}
-      value={picked ? presetLabel(picked) : YOUR_ORG_LABEL}
-      selectedOptions={[picked?.id ?? YOUR_ORG]}
-      onOptionSelect={(_, d) => onPick(d.optionValue ?? YOUR_ORG)}
-      data-testid="org-preset-select"
-    >
-      <Option value={YOUR_ORG}>{YOUR_ORG_LABEL}</Option>
-      {presets.map((p) => (
-        <Option key={p.id} value={p.id}>
-          {presetLabel(p)}
-        </Option>
-      ))}
-    </Dropdown>
+    <span className={styles.labelled}>
+      <Label htmlFor={id}>View</Label>
+      <Dropdown
+        id={id}
+        className={styles.select}
+        value={label}
+        selectedOptions={[view]}
+        onOptionSelect={(_, d) => onPick(d.optionValue ?? YOUR_ORG)}
+        data-testid="org-preset-select"
+      >
+        {saved.length > 0 ? (
+          <OptionGroup label="Your orgs">
+            {saved.map((t) => (
+              <Option key={t.id} value={savedView(t.id)} text={t.title}>
+                <span className={styles.optionRow}>
+                  <span>{t.title}</span>{" "}
+                  <Caption1 className={styles.optionState} data-testid="org-view-state">
+                    {ORG_STATE_WORDS[t.state] ?? t.state}
+                  </Caption1>
+                </span>
+              </Option>
+            ))}
+          </OptionGroup>
+        ) : yours ? (
+          <Option value={YOUR_ORG}>{YOUR_ORG_LABEL}</Option>
+        ) : null}
+        <OptionGroup label="Presets">
+          {presets.map((p) => (
+            <Option key={p.id} value={previewView(p.id)}>
+              {presetLabel(p)}
+            </Option>
+          ))}
+        </OptionGroup>
+      </Dropdown>
+    </span>
   );
 }
 
-/** What the page is called: the picked preset's title, else the hub's tree's
- *  title (an older file's name), else the page's own name while there is no chart. */
+/** Active, beside View once an org is saved: the saved orgs only, no None.
+ *  Picking one runs Staff -Activate through the bridge, with no confirmation. */
+function ActiveSelect({
+  saved,
+  active,
+  busy,
+  onPick,
+}: {
+  saved: OrgTreeSummary[];
+  active: OrgTreeSummary;
+  busy: boolean;
+  onPick: (id: string) => void;
+}) {
+  const styles = useStyles();
+  const id = useId("org-active");
+  return (
+    <span className={styles.labelled}>
+      <Label htmlFor={id}>Active</Label>
+      <Dropdown
+        id={id}
+        className={styles.select}
+        value={active.title}
+        selectedOptions={[active.id]}
+        disabled={busy}
+        onOptionSelect={(_, d) =>
+          d.optionValue && d.optionValue !== active.id && onPick(d.optionValue)
+        }
+        data-testid="org-active-select"
+      >
+        {saved.map((t) => (
+          <Option key={t.id} value={t.id}>
+            {t.title}
+          </Option>
+        ))}
+      </Dropdown>
+    </span>
+  );
+}
+
+/** What the page is called: the org shown's title, else the page's own name
+ *  while there is no chart. */
 export const ORG_PAGE_TITLE = "Org chart";
+
+/** Is this read a hub with no org yet (no file, or no hub named)? */
+function noOrgYet(error: unknown): boolean {
+  const r = orgRefusal(error);
+  return r.status === 404 && (r.kind === "missing" || r.kind === "no-hub");
+}
 
 export function OrgPage() {
   const styles = useStyles();
-  const { data, isLoading, error } = useGetOrgChartQuery();
+  const ours = useGetOrgChartQuery("");
   const presetsQuery = useGetOrgPresetsQuery();
+  const [runStaff, { isLoading: writing }] = useRunStaffMutation();
   const presets = presetsQuery.data?.presets ?? [];
-  const [pickedId, setPickedId] = useState(YOUR_ORG);
-  const picked = presets.find((p) => p.id === pickedId);
   const icon = <OrganizationRegular />;
-  const ours = data && !error ? data : null;
-  const noOrg = isLoading || ours ? undefined : <EmptyState {...noChart(error, icon)} />;
+
+  const oursData = ours.data && !ours.error ? ours.data : null;
+  const saved: OrgTreeSummary[] =
+    oursData?.trees ??
+    (oursData
+      ? [
+          {
+            id: oursData.tree.id,
+            title: oursData.tree.title,
+            size: oursData.tree.size,
+            preset: oursData.tree.preset,
+            active: true,
+            state: "active" as const,
+            activatedAt: null,
+          },
+        ]
+      : []);
+  const active = saved.find((t) => t.active) ?? null;
+  const small = presets.find((p) => p.size === "S") ?? presets[0];
+
+  // Which org is shown: what was picked, else the active org, else -- with no
+  // org saved yet -- the Executive Suite (Small) preview, the simplest.
+  const [picked, setPicked] = useState<string | null>(null);
+  const fallback = active
+    ? savedView(active.id)
+    : noOrgYet(ours.error) && small
+      ? previewView(small.id)
+      : YOUR_ORG;
+  let view = picked ?? fallback;
+  if (view.startsWith(SAVED) && !saved.some((t) => savedView(t.id) === view)) view = fallback;
+  const preset = view.startsWith(PREVIEW)
+    ? presets.find((p) => previewView(p.id) === view)
+    : undefined;
+  const savedId = view.startsWith(SAVED) ? view.slice(SAVED.length) : "";
+  const other = useGetOrgChartQuery(savedId, { skip: !savedId || savedId === active?.id });
+
+  const [useOpen, setUseOpen] = useState(false);
+  const [note, setNote] = useState<{ text: string; away: boolean } | null>(null);
+
+  const chart = preset
+    ? preset.chart
+    : savedId && savedId !== active?.id
+      ? other.data && !other.error
+        ? other.data
+        : null
+      : oursData;
+  const viewedSaved = saved.find((t) => t.id === savedId);
+  const shown: "draft" | "inactive" | "preview" | "active" = preset
+    ? "preview"
+    : savedId && savedId !== active?.id
+      ? viewedSaved?.state === "inactive"
+        ? "inactive"
+        : "draft"
+      : "active";
+  const line = notActiveLine(shown, active?.title ?? null);
+  // One zoom for the chart shown, driven from the header; a different org starts fitted.
+  const chartZoom = useChartZoom(chart ? layoutChart(chart.tree.positions).width : 0, view);
+
+  // A saved org other than the active one is read by its own ?tree= read: while
+  // it loads the page says so, and a read that fails says why, plainly.
+  const readsOther = shown === "draft" || shown === "inactive";
+  const loading = ours.isLoading || (readsOther && other.isLoading);
+  const otherFailed = readsOther && !other.isLoading && !!other.error;
+  const noOrg =
+    ours.isLoading || oursData ? undefined : <EmptyState {...noChart(ours.error, icon)} />;
   // With no preset to offer, the page is the hub's chart alone, as it always was.
   const empty = presets.length === 0 ? noOrg : undefined;
-  const title = picked ? picked.title : (ours?.tree.title ?? ORG_PAGE_TITLE);
-  const shown = picked ? picked.chart.tree.positions : ours?.tree.positions;
-  const chartZoom = useChartZoom(shown ? layoutChart(shown).width : 0, picked?.id ?? YOUR_ORG);
+  const title = chart ? chart.tree.title : ORG_PAGE_TITLE;
+  const size = chart?.tree.size ?? null;
+  const description = preset ? preset.description : (chart?.tree.description ?? null);
+  const label = preset
+    ? presetLabel(preset)
+    : savedId
+      ? (saved.find((t) => t.id === savedId)?.title ?? title)
+      : YOUR_ORG_LABEL;
+
+  const activate = async (id: string) => {
+    setNote(null);
+    try {
+      const result = await runStaff({ params: buildStaffActivateParams(id) }).unwrap();
+      if (result.status === "success") setPicked(savedView(id));
+      else setNote({ text: refusalText(result), away: false });
+    } catch {
+      setNote({ text: "Could not reach the agent. The active org was not changed.", away: true });
+    }
+  };
+
+  const saveRun = async (params: string[]) => runStaff({ params }).unwrap();
+  const afterSave = async () => {
+    const before = new Set(saved.map((t) => t.id));
+    setUseOpen(false);
+    const fresh = await ours.refetch();
+    const added = fresh.data?.trees?.find((t) => !before.has(t.id));
+    if (added) setPicked(savedView(added.id));
+  };
 
   return (
     <div className={styles.body}>
       <PanelFrame
-        loading={isLoading}
+        loading={loading}
         loadingLabel="Reading the org chart..."
         empty={empty}
         headerLeft={
@@ -572,37 +806,94 @@ export function OrgPage() {
             <Subtitle2 as="h1" data-testid="org-heading">
               {title}
             </Subtitle2>
-            {picked?.size ? (
+            {size ? (
               <Badge appearance="tint" color="subtle" size="medium" data-testid="org-preset-size">
-                {presetSizeWord(picked.size)}
+                {presetSizeWord(size)}
               </Badge>
             ) : null}
           </>
         }
         headerRight={
-          shown || presets.length > 0 ? (
-            <div className={styles.headerControls}>
-              {shown ? <ZoomControls zoom={chartZoom} /> : null}
+          chart || presets.length > 0 ? (
+            <div className={styles.selects}>
+              {chart ? <ZoomControls zoom={chartZoom} /> : null}
               {presets.length > 0 ? (
-                <PresetSelect presets={presets} picked={picked} onPick={setPickedId} />
+                <ViewSelect
+                  saved={saved}
+                  presets={presets}
+                  view={view}
+                  label={label}
+                  yours={!oursData}
+                  onPick={(v) => {
+                    setNote(null);
+                    setPicked(v);
+                  }}
+                />
+              ) : null}
+              {active ? (
+                <ActiveSelect saved={saved} active={active} busy={writing} onPick={activate} />
               ) : null}
             </div>
           ) : undefined
         }
       >
-        {picked ? (
-          <>
-            <Body2 as="p" className={styles.description} data-testid="org-preset-description">
-              {picked.description}
-            </Body2>
-            <ChartDrawing positions={picked.chart.tree.positions} zoom={chartZoom} />
-          </>
-        ) : ours ? (
-          <ChartDrawing positions={ours.tree.positions} zoom={chartZoom} />
+        <div className={styles.lineRow}>
+          {/* A polite live region that stays mounted, so a change of line is announced. */}
+          <div aria-live="polite" data-testid="org-not-active-region">
+            {line ? (
+              <Body1 className={styles.notActive} data-testid="org-not-active">
+                {line}
+              </Body1>
+            ) : null}
+          </div>
+          {preset ? (
+            <Button
+              appearance="primary"
+              size="small"
+              onClick={() => setUseOpen(true)}
+              disabled={writing}
+              data-testid="org-use"
+            >
+              Use this org
+            </Button>
+          ) : null}
+        </div>
+        {/* The refusal's status region stays mounted, its text swapped in. */}
+        <div role="status" data-testid="org-note-region">
+          {note && !note.away ? (
+            <Body1 className={styles.refusal} data-testid="org-note">
+              {note.text}
+            </Body1>
+          ) : null}
+        </div>
+        {note?.away ? (
+          <MessageBar intent="error" data-testid="org-note">
+            <MessageBarBody>{note.text}</MessageBarBody>
+          </MessageBar>
+        ) : null}
+        {description ? (
+          <Body2 as="p" className={styles.description} data-testid="org-preset-description">
+            {description}
+          </Body2>
+        ) : null}
+        {chart ? (
+          <ChartDrawing positions={chart.tree.positions} zoom={chartZoom} />
+        ) : otherFailed ? (
+          <EmptyState {...noChart(other.error, icon)} />
         ) : (
           (noOrg ?? null)
         )}
       </PanelFrame>
+      {useOpen && preset ? (
+        <UseOrgDialog
+          preset={preset}
+          activeTitle={active?.title ?? null}
+          run={saveRun}
+          busy={writing}
+          onSaved={afterSave}
+          onClose={() => setUseOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

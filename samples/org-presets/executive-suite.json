@@ -3,8 +3,8 @@
   "id": "executive-suite",
   "size": "S",
   "title": "The Executive Suite",
-  "shortDescription": "Everything is decided at the top: you and two VPs, with builders working the cards. For one product, one person, moving fast.",
-  "description": "Every decision is made on the top floor. You set the direction and have the final word on what ships. The VP of engineering drives the work: it turns your direction into cards, hands each one to a builder, reads every diff and makes the pull request ready. The VP of product reads what is about to ship as its user would, holds the merge, and keeps the product's voice. It fits one product, built by one person who wants to move fast with two capable seats beside them.",
+  "shortDescription": "Everything is decided at the top: you and two VPs, with builders working the cards. No team yet: the simplest org, and the place to start.",
+  "description": "Every decision is made on the top floor. You set the direction and have the final word on what ships. The VP of engineering drives the work: it turns your direction into cards, hands each one to a builder, reads every diff and makes the pull request ready. The VP of product reads what is about to ship as its user would, holds the merge, and keeps the product's voice. It has no team: the simplest org, where you learn how two capable seats work with you and the builders.",
   "teamSize": 3,
   "positions": [
     {

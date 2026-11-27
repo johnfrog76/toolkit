@@ -499,6 +499,7 @@ web/                    The React shell + modules -- see web/README.md
   tests/smokeStudio.mjs   --studio: the Studio's contract on those servers
   tests/smokeMatrix.mjs   --matrix: each module flag alone, the flip, fresh and hostile storage
   tests/smokeFirstRun.mjs --first-run: the first tutorial card dragged to To do, on a copy of samples/hub
+  tests/smokeOrg.mjs      --org: the Org tab saves a preset as a draft, then makes it active, on a copy of samples/hub
 Tests/                  Suites -- Test-*.ps1 (PowerShell) and test_*.py (the agent)
   fixtures/parsers/       The prompt files both parsers are pinned against, and the shared tables,
                           card-ids.json among them

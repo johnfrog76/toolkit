@@ -237,6 +237,10 @@ class TheSharedTable(OrgBase):
                     }
                     for where, name in want.get("modelNames", {}).items():
                         self.assertEqual(names.get(where, "no such seat"), name, where)
+                    # The file's trees, listed: the tree shown among them, exactly one in use.
+                    trees = body.pop("trees")
+                    self.assertIn(body["tree"]["id"], [t["id"] for t in trees])
+                    self.assertEqual([t["id"] for t in trees if t["active"]], [want["activeTree"]])
                     for position in body["tree"]["positions"]:
                         # the fields only the route adds; the table's response is the shared part
                         added = {"promptTitle", "promptRef", "defaultModelName"}
@@ -258,6 +262,31 @@ class TheSharedTable(OrgBase):
                         self.assertEqual(detail["message"], want["message"])
                     else:
                         self.assertTrue(detail["message"].startswith(want["messageStartsWith"]), detail["message"])
+
+
+class TheStateTable(unittest.TestCase):
+    """An org's state, derived from Tests/fixtures/org/state.json -- the table
+    tkTestToolkit -OrgChart asserts for the CLI's reader too."""
+
+    def test_every_case(self):
+        table = json.loads((FIXTURES / "state.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(table["cases"]), 5)
+        for case in table["cases"]:
+            with self.subTest(case=case["name"]):
+                got = org.read_org_chart(json.dumps(case["org"]), lambda _n: True)
+                self.assertEqual(got.status, "ok", got.message)
+                self.assertEqual({t["id"]: t["state"] for t in got.trees}, case["expect"]["states"])
+                # active stays the one pointer: true on the active tree alone.
+                self.assertEqual(
+                    [t["id"] for t in got.trees if t["active"]],
+                    [i for i, st in case["expect"]["states"].items() if st == "active"],
+                )
+
+    def test_activated_at_is_a_key_the_tool_reads(self):
+        doc = {"trees": [{"id": "t", "activatedAt": "2026-11-26", "positions": [{"id": "r"}]}]}
+        got = org.read_org_chart(json.dumps(doc), lambda _n: True)
+        self.assertEqual(got.warnings, [])
+        self.assertEqual(got.trees[0]["activatedAt"], "2026-11-26")
 
 
 class TheReaderAlone(unittest.TestCase):
@@ -381,6 +410,55 @@ class TheRoute(OrgBase):
         (self.hub / "roles" / "lead.prompt.md").write_text("# From roles\n", encoding="utf-8")
         lead = self.positions(self.client.get(ROUTE))["lead"]
         self.assertEqual((lead["promptTitle"], lead["promptRef"]), ("From roles", "yours/lead"))
+
+    def test_the_route_lists_every_tree_of_the_file_in_its_order(self):
+        doc = json.loads((FIXTURES / "docs" / "valid.json").read_text(encoding="utf-8"))
+        self.put(doc, {n: "" for n in TABLE["prompts"]})
+        for query in ("", "?tree=branch"):
+            with self.subTest(query=query):
+                body = self.client.get(ROUTE + query).json()
+                self.assertEqual(
+                    body["trees"],
+                    [
+                        {
+                            "id": "main",
+                            "title": "Laptop and mini",
+                            "size": None,
+                            "preset": None,
+                            "active": True,
+                            "state": "active",
+                            "activatedAt": None,
+                        },
+                        {
+                            "id": "branch",
+                            "title": "One machine",
+                            "size": None,
+                            "preset": None,
+                            "active": False,
+                            "state": "draft",
+                            "activatedAt": None,
+                        },
+                    ],
+                )
+
+    def test_a_tree_from_a_preset_lists_its_size_and_preset(self):
+        doc = json.loads((FIXTURES / "docs" / "shape.json").read_text(encoding="utf-8"))
+        self.put(doc, {n: "" for n in TABLE["prompts"]})
+        trees = self.client.get(ROUTE).json()["trees"]
+        self.assertEqual(
+            trees,
+            [
+                {
+                    "id": "branch-office",
+                    "title": "The Branch Office",
+                    "size": "M",
+                    "preset": "branch-office",
+                    "active": True,
+                    "state": "active",
+                    "activatedAt": None,
+                }
+            ],
+        )
 
     def test_tree_asks_for_another_tree_and_active_tree_still_says_which_is_in_use(self):
         doc = {
@@ -796,6 +874,7 @@ class TheSchema(unittest.TestCase):
             ({"trees": [tree, {**tree, "id": "u"}]}, "file", "'activeTree' is a required property"),
             ({**tree, "size": "XL"}, "tree", "'XL' is not one of"),
             ({**tree, "teamSize": 4}, "tree", "4 is not one of"),
+            ({**tree, "activatedAt": "26 November"}, "tree", "does not match"),
             ({**tree, "positions": [{"title": "x"}]}, "tree", "'id' is a required property"),
             ({**tree, "positions": [{"id": "p", "recommend": "opus"}]}, "tree", "is not of type 'array'"),
             ({**tree, "positions": [{"id": "p", "seats": [{"model": "m"}]}]}, "tree", "'id' is a required property"),

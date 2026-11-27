@@ -529,6 +529,13 @@ describe("consts.json", () => {
       file: "org.json",
       rolesFolder: "org",
       presetsFolder: "samples/org-presets",
+      steps: {
+        owner: "You",
+        vpEngineering: "opus",
+        vpProduct: "fable",
+        families: ["opus", "fable", "sonnet"],
+        recommended: ["opus", "fable"],
+      },
     });
 
     // The model map a card's Agent id is looked up in (docs/hub/cards.md).

@@ -3,8 +3,8 @@
   "id": "corporate-headquarters",
   "size": "L",
   "title": "Corporate Headquarters",
-  "shortDescription": "The full org, with seats for the process: a PM, a merge stand-in, the butler and the intern. For many products and an owner with little time.",
-  "description": "The PM plans the work and keeps the record: it turns your direction into a queue for each team lead, passes each finished pull request to the seat that merges, and records what merged on the cards and the tracker. There is a team for each project, each lead with their own builders, and the test runner runs the full test suites on each change before it merges. The VP of product holds the merge, and the merge stand-in covers it when that seat is away, so a heavy queue keeps moving. The VP of engineering holds the standards across the lanes. The butler runs weekly as a bot, giving each new design note its id and reporting which designs look finished; the intern fetches the milestones and drafts proposals for the PM to decide. It fits many products, a heavy merge queue, and an owner who has little time and wants to be asked only what is theirs to decide.",
+  "shortDescription": "The full org, with seats for the process: a PM, a team for each project, a merge stand-in, the butler and the intern.",
+  "description": "The PM plans the work and keeps the record: it turns your direction into a queue for each team lead, passes each finished pull request to the seat that merges, and records what merged on the cards and the tracker. There is a team for each project, each lead with their own builders, and the test runner runs the full test suites on each change before it merges. The VP of product holds the merge, and the merge stand-in covers it when that seat is away, so a heavy queue keeps moving. The VP of engineering holds the standards across the lanes. The butler runs weekly as a bot, giving each new design note its id and reporting which designs look finished; the intern fetches the milestones and drafts proposals for the PM to decide. It keeps a heavy merge queue moving, and asks you only what is yours to decide.",
   "teamSize": 9,
   "positions": [
     {

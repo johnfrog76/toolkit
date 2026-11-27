@@ -52,6 +52,7 @@ const SOURCES: Record<string, { type: string } | "none"> = {
   ROW: "none",
   ROW_SYNONYMS: "none",
   ConfirmDialog: { type: "ConfirmDialogProps" },
+  DialogDismiss: { type: "DialogDismissProps" },
   lazyFallback: "none",
   EmptyState: { type: "EmptyMessage" },
   RefreshButton: { type: "RefreshButtonProps" },
