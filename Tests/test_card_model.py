@@ -352,6 +352,16 @@ class TheRouteServesTheModel(unittest.TestCase):
         self.assertIs(body["firstRunWelcome"], False)
 
     @unreachable("az")
+    def test_env_poet_offer_survives_a_local_config_that_names_only_welcome(self):
+        """The local firstRun block merges into the shipped one, it does not replace it:
+        a machine that wrote only firstRun.welcome still has the Prompt Poet offer on."""
+        local = Path(self.cfg.name) / "config.local.json"
+        local.write_text(json.dumps({"firstRun": {"welcome": False}}), encoding="utf-8")
+        body = self.client.get("/api/env").json()["config"]
+        self.assertIs(body["firstRunPoet"], True)
+        self.assertIs(body["firstRunWelcome"], False)
+
+    @unreachable("az")
     def test_env_carries_the_decks_put_away_on_this_machine(self):
         """deck.archived: the decks this machine has put away, by id (docs/modules/deck.md,
         "A deck's page"). None unless this machine said so; a list of ids is served in
