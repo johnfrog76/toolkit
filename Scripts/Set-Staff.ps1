@@ -91,7 +91,7 @@
 .EXAMPLE
     {cliPrefix}Staff -Preset M -Tree branch -VpProduct opus -WhatIf
 .EXAMPLE
-    {cliPrefix}Staff -Seat vp-engineering.vp-engineering -Model opus -Session mac-opus-vp
+    {cliPrefix}Staff -Seat vp-engineering.vp-engineering -Model opus -Session desk-one
 .EXAMPLE
     {cliPrefix}Staff -Seat owner.owner -Person Sam
 .EXAMPLE

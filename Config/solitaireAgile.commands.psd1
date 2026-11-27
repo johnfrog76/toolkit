@@ -155,7 +155,7 @@
             examples    = @(
                 '{cliPrefix}Staff -Preset S -Owner Sam',
                 '{cliPrefix}Staff -Preset M -Tree branch -VpProduct opus -WhatIf',
-                '{cliPrefix}Staff -Seat vp-engineering.vp-engineering -Model opus -Session mac-opus-vp',
+                '{cliPrefix}Staff -Seat vp-engineering.vp-engineering -Model opus -Session desk-one',
                 '{cliPrefix}Staff -Seat owner.owner -Person Sam',
                 '{cliPrefix}Staff -Activate branch'
             )

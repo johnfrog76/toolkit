@@ -108,8 +108,8 @@ Studio's reading room. A starting org you are only previewing has View and nothi
 In the terminal, `tkStaff -Seat` does the same:
 
 ```powershell
-tkStaff -Seat vp-engineering.vp-engineering -Model opus -Session mac-opus-vp
-tkStaff -Seat lead-team-1.lead -Tree corporate-headquarters -Session mini-lead -Space toolkit
+tkStaff -Seat vp-engineering.vp-engineering -Model opus -Session desk-one
+tkStaff -Seat lead-team-1.lead -Tree corporate-headquarters -Session lead-alpha -Space toolkit
 tkStaff -Seat owner.owner -Person "Sam"
 ```
 

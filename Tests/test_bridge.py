@@ -616,12 +616,12 @@ class StaffThroughTheBridge(TeamAgileScratchPackage):
         self._config(True)
         self.assertEqual(self._post_preset(), "success")
         etag = self._hash()
-        body = self._seat("vp-engineering.vp-engineering", "-Model", "sonnet", "-Session", "mac-vp", "-IfMatch", etag)
+        body = self._seat("vp-engineering.vp-engineering", "-Model", "sonnet", "-Session", "desk-two", "-IfMatch", etag)
         self.assertEqual(body["status"], "success", body.get("error") or body["output"])
         self.assertIn("vp-engineering.vp-engineering: VP of engineering", body["output"])
         seat = self._seat_of("vp-engineering")
         sonnet = json.loads((PKG_ROOT / "Config" / "models.json").read_text("utf-8"))["current"]["sonnet"]
-        self.assertEqual((seat["model"], seat["session"]), (sonnet, "mac-vp"))
+        self.assertEqual((seat["model"], seat["session"]), (sonnet, "desk-two"))
         # The etag the page holds is from before that write: refused, nothing written.
         before = (self.hub / C.org_file()).read_bytes()
         body = self._seat("vp-engineering.vp-engineering", "-Session", "other", "-IfMatch", etag)

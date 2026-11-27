@@ -769,23 +769,23 @@ try {
 
     $stampBefore = (Get-OrgTree (Read-Org) 'mine').activatedAt
     $before = Get-OrgBytes
-    $seatDry = Invoke-OrgChart "tkStaff -Seat team-lead.github-demo -Model opus -Session mini-lead -WhatIf 3>`$null"
+    $seatDry = Invoke-OrgChart "tkStaff -Seat team-lead.github-demo -Model opus -Session lead-alpha -WhatIf 3>`$null"
     Assert-True '-Seat -WhatIf: exit 0, the change line, nothing written' (
-        $seatDry.Exit -eq '0' -and $seatDry.All.Contains("team-lead.github-demo: Team lead $dot vacant [github-demo] -> Team lead $dot $($idOf.opus) [github-demo] (mini-lead)") -and (Test-SameBytes $before (Get-OrgBytes))) $seatDry.All
+        $seatDry.Exit -eq '0' -and $seatDry.All.Contains("team-lead.github-demo: Team lead $dot vacant [github-demo] -> Team lead $dot $($idOf.opus) [github-demo] (lead-alpha)") -and (Test-SameBytes $before (Get-OrgBytes))) $seatDry.All
 
-    $seated = Invoke-OrgChart "tkStaff -Seat team-lead.github-demo -Model opus -Session mini-lead 3>`$null"
+    $seated = Invoke-OrgChart "tkStaff -Seat team-lead.github-demo -Model opus -Session lead-alpha 3>`$null"
     Assert-Equal '-Seat on the tree in use: exit 0' '0' $seated.Exit $seated.All
-    Assert-True '  one change line, <position>.<seat>: <before> -> <after>' ($seated.All.Contains("team-lead.github-demo: Team lead $dot vacant [github-demo] -> Team lead $dot $($idOf.opus) [github-demo] (mini-lead)")) $seated.All
+    Assert-True '  one change line, <position>.<seat>: <before> -> <after>' ($seated.All.Contains("team-lead.github-demo: Team lead $dot vacant [github-demo] -> Team lead $dot $($idOf.opus) [github-demo] (lead-alpha)")) $seated.All
     $doc = Read-Org
     $lead = @(Get-OrgSeat (Get-OrgTree $doc 'mine') 'team-lead') | Where-Object { $_.id -eq 'github-demo' }
     Assert-Equal '  the family is stored as its id' $idOf.opus $lead.model
-    Assert-Equal '  the session is the seat''s' 'mini-lead' $lead.session
+    Assert-Equal '  the session is the seat''s' 'lead-alpha' $lead.session
     Assert-Equal '  the other seat of the office is as it was' 'opus|demo' ("$(@(@(Get-OrgSeat (Get-OrgTree $doc 'mine') 'team-lead') | Where-Object { $_.id -eq 'demo' })[0].model)|$(@(@(Get-OrgSeat (Get-OrgTree $doc 'mine') 'team-lead') | Where-Object { $_.id -eq 'demo' })[0].space)")
     Assert-True '  the sample''s note is kept, and a seat''s edit stamps no tree' ($doc.PSObject.Properties['_comment'] -and -not (Get-OrgTree $doc 'hq').PSObject.Properties['activatedAt'] -and (Get-OrgTree $doc 'mine').activatedAt -eq $stampBefore)
     Assert-Equal '  the tree in use is as it was' 'mine' $doc.activeTree
 
     $before = Get-OrgBytes
-    $same = Invoke-OrgChart "tkStaff -Seat team-lead.github-demo -Model $($idOf.opus) -Session mini-lead 3>`$null"
+    $same = Invoke-OrgChart "tkStaff -Seat team-lead.github-demo -Model $($idOf.opus) -Session lead-alpha 3>`$null"
     Assert-True 'the same values again: exit 0, nothing changed, nothing written' (
         $same.Exit -eq '0' -and $same.All.Contains('nothing changed, so nothing was written') -and (Test-SameBytes $before (Get-OrgBytes))) $same.All
 
@@ -820,9 +820,9 @@ try {
 
     # -IfMatch: the hash of the bytes as read.
     $hash = Get-OrgHash
-    $matched = Invoke-OrgChart "tkStaff -Seat vp-engineering.vp-engineering -Session mac-opus-vp -IfMatch $($hash.ToUpperInvariant()) 3>`$null"
+    $matched = Invoke-OrgChart "tkStaff -Seat vp-engineering.vp-engineering -Session desk-one -IfMatch $($hash.ToUpperInvariant()) 3>`$null"
     Assert-True '-IfMatch with the file''s own hash (any case): exit 0, written' (
-        $matched.Exit -eq '0' -and (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'vp-engineering')[0].session -eq 'mac-opus-vp') $matched.All
+        $matched.Exit -eq '0' -and (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'vp-engineering')[0].session -eq 'desk-one') $matched.All
     $before = Get-OrgBytes
     $stale = Invoke-OrgChart "tkStaff -Seat vp-engineering.vp-engineering -Session other -IfMatch $hash"
     Assert-Equal '-IfMatch with the hash from before that write: exit 2' '2' $stale.Exit $stale.All

@@ -1390,7 +1390,7 @@ now covers it on Windows too. `tkStandup -Walk` is the way to read this gate on 
 - [ ] **Staff -Seat writes the same bytes under Windows PowerShell 5.1, and a dash-led name binds through the
   bridge on 5.1 (Refs #603).** On the Windows PC, in `powershell` (5.1), with the same scratch hub after the row above:
   `tkStaff -Seat owner.owner -Person Zoë` prints `owner.owner: Owner · You -> Owner · Zoë` (or the name the row above
-  left), and `tkStaff -Seat vp-engineering.vp-engineering -Session mac-opus-vp` prints its one change line; copy the
+  left), and `tkStaff -Seat vp-engineering.vp-engineering -Session desk-one` prints its one change line; copy the
   file aside, put the earlier copy back, run the same two commands in `pwsh`, and compare: byte for byte the same
   (`fc /b`), no BOM, LF, `Zoë` as itself. Then `-IfMatch` with a stale hash: `tkStaff -Seat pm.pm -Model opus -IfMatch`
   followed by 64 zeros exits 2 with `org.json changed since you read it; reload and try again.` and writes nothing.

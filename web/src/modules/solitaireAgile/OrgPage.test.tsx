@@ -1120,7 +1120,7 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
     );
     // The acceptance scenario: the model is filled, the session is the only thing typed.
     fireEvent.change(within(dialog).getByTestId("org-seat-session"), {
-      target: { value: "mini-lead-three" },
+      target: { value: "lead-gamma" },
     });
     fireEvent.click(within(dialog).getByTestId("org-seat-save"));
     await waitFor(() => expect(screen.queryByTestId("org-seat-dialog")).toBeNull());
@@ -1132,7 +1132,7 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
       "-Model",
       "opus",
       "-Session",
-      "mini-lead-three",
+      "lead-gamma",
       "-IfMatch",
       TEST_ETAG,
     ]);
@@ -1222,7 +1222,7 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
     draw();
     const dialog = open("pm", `Change PM, ${modelNameOf("opus")}`);
     fireEvent.change(within(dialog).getByTestId("org-seat-session"), {
-      target: { value: "mac-pm" },
+      target: { value: "desk-pm" },
     });
     fireEvent.click(within(dialog).getByTestId("org-seat-save"));
     const conflict = await within(dialog).findByTestId("org-seat-conflict");
