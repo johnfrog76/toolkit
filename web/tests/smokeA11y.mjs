@@ -38,6 +38,10 @@ const SPACE = "test";
 const VIEWPORT = { width: 1400, height: 900 };
 const SETTLE_MS = 1500;
 const LOADING_GRACE_MS = 60000;
+// The shipped sample Azure Space, unconnected, with the deck module on: Home draws the Prompt Poet's
+// first-run banner there (`firstRun.poet` defaults true), which the fixture's own Space never does.
+const SAMPLE_SPACE = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "consts.json"), "utf8")).spaces.azureDemo;
+const SAMPLE_HOME = [{ group: "deck", module: "deck", route: "/" }];
 const IMPACTS = ["critical", "serious", "moderate", "minor"];
 
 // Left out of every analysis: Fluent's own focus sentinels. Fluent UI v9 manages
@@ -123,7 +127,7 @@ const elementText = (html) =>
 /** What a page showed that says it did not draw -- noted, never fixed here. */
 const NOT_DRAWN = /\b(Not Found|404)\b|Something went wrong|Unexpected Application Error/i;
 
-async function auditPass(browser, stack, { mode, theme }, findings, notes, AxeBuilder) {
+async function auditPass(browser, stack, { mode, theme }, findings, notes, AxeBuilder, only) {
   const ctx = await browser.newContext({ viewport: VIEWPORT });
   await ctx.addInitScript(
     ({ key, id }) => {
@@ -138,7 +142,7 @@ async function auditPass(browser, stack, { mode, theme }, findings, notes, AxeBu
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e).split("\n")[0]));
-  const pages = PAGES.filter((p) => !p.module || mode === "on");
+  const pages = only ?? PAGES.filter((p) => !p.module || mode === "on");
   try {
     for (const p of pages) {
       errors.length = 0;
@@ -242,6 +246,22 @@ export async function runA11y({ repoRoot, agentPort, webPort, python }) {
         console.log(`smoke: a11y -- modules ${mode}, ${theme}`);
         visited += await auditPass(browser, stack, { mode, theme }, findings, notes, AxeBuilder);
       }
+    }
+    // The Prompt Poet's offer, on the sample Space it is made on: the banner must be drawn there
+    // for the scan to cover it.
+    await stack.stop();
+    stack = await startStack({ repoRoot, hub: join(repoRoot, FIXTURE_HUB), space: SAMPLE_SPACE, python });
+    const deckOn = await setFlags(stack.base, { deck: true });
+    if (deckOn.status !== "success") throw new Error(`Config -Set features.deck on the sample Space: ${deckOn.error ?? deckOn.status}`);
+    for (const theme of THEMES) {
+      console.log(`smoke: a11y -- the sample Space's Home with the first-run offer, ${theme}`);
+      const probe = await browser.newPage({ viewport: VIEWPORT });
+      await openRoute(probe, stack.base, "/");
+      await probe.waitForTimeout(SETTLE_MS);
+      const drawn = await probe.getByRole("button", { name: "Hide the Prompt Poet banner" }).count();
+      await probe.close();
+      if (drawn === 0) throw new Error("the sample Space's Home did not draw the Prompt Poet's banner, so the scan would not cover it");
+      visited += await auditPass(browser, stack, { mode: "on", theme }, findings, notes, AxeBuilder, SAMPLE_HOME);
     }
   } catch (err) {
     broke = true;
