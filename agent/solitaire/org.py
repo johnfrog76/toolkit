@@ -605,7 +605,7 @@ def model_family(model: str | None) -> str | None:
 
 def family_names() -> dict[str, str]:
     """Each family of the model map's ``current`` block, in its order, by the name
-    of the model it resolves to today ("Opus 5.5"): the seat dialog's labels.
+    of the model it resolves to today (the map's name, versioned): the seat dialog's labels.
     Looked up, never parsed; a current id with no row reads as written."""
     return {family: models.model_info(mid)["name"] for family, mid in models.read_model_current().items()}
 

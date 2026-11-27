@@ -55,7 +55,7 @@ const useStyles = makeStyles({
   content: { display: "flex", flexDirection: "column", rowGap: tokens.spacingVerticalM },
   note: { color: tokens.colorNeutralForeground2 },
   titleRow: { display: "flex" },
-  // The choices wrap as a row, each name kept whole: "Opus 5.5", never "Opus" over "5.5".
+  // The choices wrap as a row, each name kept whole on one line, never its version under its word.
   models: { flexWrap: "wrap" },
   choice: { whiteSpace: "nowrap" },
   // A link to look at, a real button underneath: no padding to push it off the fields' edge.
