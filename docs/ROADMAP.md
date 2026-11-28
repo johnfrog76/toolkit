@@ -72,7 +72,9 @@ M2b 1.7.0  The standup seats the team   cut 2026-11-22: team size and the room, 
         |
 M2c 1.8.0  The org                     cut 2026-11-25: the shipped roles, the butler as a weekly bot, What's new, one record header
         |
-M4b 1.9.0  The tour                    Kit's narrated tour, and the ten-minute walk on a machine that has never seen the product
+M2d 1.9.0  The staffed org             cut 2026-11-27: the Org tab's presets, save and activate, zoom and the seat dialog, the Staff verb, the Prompt Poet in Decks
+        |
+M4b 1.10.0 The tour                   Kit's narrated tour, and the ten-minute walk on a machine that has never seen the product
         |
 M5         The rename                 a cards core and an ado module; no version
         :
@@ -215,7 +217,7 @@ requirements floors under a real `py -3` and the sign-in strip against a real si
 
 The org's seats get roles of their own, and each one reads the work at hand before it does its job.
 **Done when:** every office in the sample hub's `org.json` names a shipped role, and the butler runs weekly
-on its own. **Cut 2026-11-25**, ahead of the tour, which carries to 1.9.0 unchanged.
+on its own. **Cut 2026-11-25**, ahead of the tour, which carried on unchanged.
 
 - **The roles:** `agentic/org/` ships the PM, the team lead, the VPs of engineering and product, the intern
   and the butler; each opens by reading its situation -- the Space, the tracker, the open cards, what waits on
@@ -227,7 +229,28 @@ on its own. **Cut 2026-11-25**, ahead of the tour, which carries to 1.9.0 unchan
 - **One record header:** every page that shows one record draws the same header, its File line a button
   that copies the path or the link.
 
-### M4b -- 1.9.0, the tour
+### M2d -- 1.9.0, the staffed org -- cut 2026-11-27
+
+The org chart stops being a file you edit by hand: you pick a starting org, save it, put it in use and staff
+its seats, from the Org tab or from the terminal. **Done when:** an org can be started from a preset, saved,
+made the one in use and staffed seat by seat without opening `org.json`. **Cut 2026-11-27**, ahead of the
+tour, which carries to 1.10.0 unchanged.
+
+- **The presets:** the Org tab previews three starting orgs that ship with the toolkit -- Executive Suite (S),
+  Branch Office (M) and Corporate Headquarters (L) -- each with its description and how the work flows in it.
+- **Save and activate:** **Use this org** saves a preset to the hub as a draft beside the org in use, the
+  Active dropdown chooses which saved org is in use, and every saved org says its state: Active, Draft or
+  Inactive.
+- **The seat dialog:** Assign on a vacant seat and Change on a staffed one, already filled in; a save made
+  after `org.json` changed underneath it is refused rather than written over.
+- **`Staff`:** the one writer of `org.json` -- `-Preset`, `-Activate` and `-Seat` -- which keeps hand edits
+  to the file.
+- **The shape:** a seat carries its own title, its session and whether it holds the merge, and
+  `Config/org.schema.json` describes the whole file.
+- **Zoom:** a large org opens fitted to the page's width, and a zoomed-in chart pans inside its own box.
+- **The Prompt Poet Works the Board:** a third narrated deck in the Decks launcher.
+
+### M4b -- 1.10.0, the tour
 
 **Done when:** Kit's guided tour is narrated and in the launcher, and the ten-minute walk has been timed on a
 machine that has never seen the product (the `VERIFY.md` Gate 12 row 4D77 added, with the time on it).
