@@ -96,7 +96,7 @@ table; this is the shape of it:
 
 | Scope | Keys | Goes to |
 | --- | --- | --- |
-| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `isDemoDismissed`, `firstRun.welcome`, `deck.archived`, `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `burn.cacheHours`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path`, `managerWorkflow.communication.recipients.<key>.type` / `.display` / `.webhookEnv`, `startWork.prompts.<kind>` (one per kind the shipped config's `startWork.prompts` names) | `config.local.json`, created as a sparse patch if it is not there |
+| **machine** | `email`, `branchUser`, `activeSpace`, `promptsRoot`, `wsRoot`, `agenticExtensionPath`, `commandPrefix`, `storeSync`, `quietStart`, `suppressDeprecationHints`, `menuResetTimestamp` (the stamp `{prefix}Menu -Reset` writes through this command; `-Schema` names it and `-List` leaves it out), `isDemoDismissed`, `firstRun.welcome`, `firstRun.poet`, `deck.archived`, `web.agentPort`, `web.corsOrigins`, `limits.inPlay`, `burn.weekStarts`, `burn.cacheHours`, `ai.model`, `features.<flag>`, `aliases.<Name>.path` / `.description` / `.display`, `spaceCheckouts.<slug>.path`, `managerWorkflow.communication.recipients.<key>.type` / `.display` / `.webhookEnv`, `startWork.prompts.<kind>` (one per kind the shipped config's `startWork.prompts` names) | `config.local.json`, created as a sparse patch if it is not there |
 | **org** | `spaces.<slug>.name` / `.status` / `.orgType` / `.org` / `.tenant` / `.promptsFolder` / `.projects` / `.laneNames.<lane>` (`backlog`, `active`, `inProgress`, `codeReview`, `done`) / `.howIWork` / `.features.sprintAwareness` / `.features.suggestions` / `.features.trainingHoursPerQuarter` / `.features.teamSize` / `.communication.recipients.<key>.type` / `.display` / `.webhookEnv` | the hub's `hub.json` -- or `config.local.json`'s `spaces.<slug>` patch with **`-Local`** |
 | **hub** | `storeSync`, `folders.<name>` | the hub's `hub.json`, and only with **`-Hub`** |
 | **default** | `commands`, `workItemTypes`, `cliVersion`, `managerWorkflow` (all of it but its recipients) | nowhere. These are the team's, and a `-Set` on one is refused by name |
@@ -485,6 +485,22 @@ as `config.firstRunWelcome`. It shows only while the deck module is on. `tkConfi
 firstRun.welcome=true` brings the banner back, and so does turning off **Hide Overview Deck** in Settings,
 which draws this key inverted. [`docs/modules/deck.md`](modules/deck.md), "The first-run
 banner".
+
+## `firstRun.poet` -- the Prompt Poet's offer
+
+A machine setting, `true` in the shipped config, for the Home banner that offers the deck *The Prompt
+Poet Works the Board*. It shows only on the shipped Azure demo Space (`azure-demo`, `consts.json`
+`spaces.azureDemo`) **while it is still the sample** -- `local`, with no address of its own -- and only
+while the deck module is on; the banner's **Get Started** and its close
+**x** both set it `false` through `Config`, and that is the end of it. `/env` serves it as
+`config.firstRunPoet`. Its default differs from `firstRun.welcome`'s on purpose: that one is about a
+fresh install, so `tkStart` turns it on, while this one is about the Space, so a person who switches to
+the sample Space next month still gets the offer once, and `tkStart` leaves it alone. While
+`firstRun.welcome` is on the Introducing ToolKit banner shows and this one waits. The moment the sample is
+connected the offer is gone: `Connect azure-demo -Address <url>` keeps the slug but gives it an address
+and makes it active, so it is the person's own organisation; `Connect -As` takes a new slug; and any
+other Azure DevOps Space shows nothing. `tkConfig -Set firstRun.poet=true`, or turning off **Hide Prompt Poet Deck** in Settings,
+brings it back. [`docs/modules/deck.md`](modules/deck.md), "The first-run banner".
 
 ## `deck.archived` -- the decks this machine has put away
 

@@ -88,7 +88,7 @@ Three decks:
   The deck, its figures file and its voices are maintained in the studio and carried here by
   `goShipDeck`, byte-identical; a change made here is a bug. <!-- portability-ok: the Wasteland studio's own verb, named on purpose -- it is the carrier, not a command of ours -->
 
-- **The Prompt Poet Works the Board** (twelve slides, Complete), made for an Azure DevOps Space's first run (its wiring is a change of its own): the basement
+- **The Prompt Poet Works the Board** (twelve slides, Complete), made for the Azure demo Space's first run (see "The first-run banner"): the basement
   coffee house of The Prompt Poet, where the slips on the poet's table are Azure DevOps work items. One
   card, one prompt: the poet writes the poem on the card, the card carries what the pull request needs,
   and the poem only counts when it rhymes with the card. It is built in the Wasteland studio to the same
@@ -114,6 +114,20 @@ dialog closes -- no label. Either one writes `firstRun.welcome=false` through `P
 machine that was never started from the sample hub never sees it (`docs/CONFIGURATION.md`). Settings
 shows the key as a switch named **Hide Overview Deck**, drawn inverted -- on means the banner is hidden --
 because hiding is what a person chooses there; `configLabels.ts` marks the row `inverted`.
+
+**The Prompt Poet's offer** is the same banner on the same slot, with that deck's first slide, and it
+is where the poet deck is offered: on the shipped Azure demo Space (`consts.json` `spaces.azureDemo`)
+**while it is still the sample** -- `local`, with no address of its own -- and nowhere else.
+`Connect azure-demo -Address <url>` keeps the slug but gives the Space an address and makes it active,
+so the offer is gone the moment it is connected; `Connect -As` takes a new slug, so it is gone there
+too; and any other Azure DevOps Space shows nothing. The rule is read from `/env` (`config.activeSpace`,
+`spaceStatus`, `config.org`). It ends the same way, with
+`firstRun.poet=false` (the close **x**'s name is **Hide the Prompt Poet banner**), and the deck then
+lives only under Decks. The key defaults `true`, unlike `firstRun.welcome`: the offer is about the
+Space, not a fresh install, so `tkStart` does not set it. **One banner at a time**: while
+`firstRun.welcome` is on the commercial's shows and the poet's waits; once the commercial's is closed,
+the poet's shows. Both decks also sit in the Decks launcher on the Growth page, whatever the banners
+say. Settings shows the key as **Hide Prompt Poet Deck**, inverted like the first.
 
 The deck module contributes it to Home's **`home-banner`** slot (`web/src/shell/slots.ts`), and Home
 renders whatever is in that slot -- so Home, which is the ADO module's page, imports nothing from here.

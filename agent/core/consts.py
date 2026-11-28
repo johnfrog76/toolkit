@@ -411,6 +411,11 @@ def visibility_public_line() -> str:
     return consts()["visibility"]["publicLine"]
 
 
+def azure_demo_space() -> str:
+    """The shipped Azure demo Space's slug."""
+    return consts()["spaces"]["azureDemo"]
+
+
 def renamed_spaces() -> dict[str, str]:
     """A shipped Space's old slug -> its new one (``test`` -> ``azure-demo``)."""
     return dict(consts()["spaces"]["renamed"])

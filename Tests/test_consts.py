@@ -162,6 +162,7 @@ EXPECTED = {
     ("docs", "segment"): r"^[A-Za-z0-9_][A-Za-z0-9._-]*$",
     ("docs", "landingUrl"): "https://johnfrog76.github.io/toolkit/",
     ("spaces", "renamed"): {"test": "azure-demo"},
+    ("spaces", "azureDemo"): "azure-demo",
     ("studio", "noteName"): r"^[A-Za-z0-9][A-Za-z0-9._-]*\.md$",
     ("studio", "threadLine"): "> GitHub:",
     ("studio", "promoteLabel"): "design",
@@ -602,6 +603,7 @@ class ThisHalfReadsIt(unittest.TestCase):
         self.assertFalse(C.re_docs_segment().match(".."))
         self.assertEqual(C.docs_landing_url(), EXPECTED[("docs", "landingUrl")])
         self.assertEqual(C.renamed_spaces(), EXPECTED[("spaces", "renamed")])
+        self.assertEqual(C.azure_demo_space(), EXPECTED[("spaces", "azureDemo")])
         self.assertEqual(C.visibility_public(), EXPECTED[("visibility", "public")])
         self.assertEqual(C.visibility_private(), EXPECTED[("visibility", "private")])
         self.assertEqual(C.visibility_unknown(), EXPECTED[("visibility", "unknown")])
@@ -947,6 +949,20 @@ class TheAgentListensOnTheLoopbackOnly(unittest.TestCase):
         config = json.loads(self.DEFAULT_CONFIG.read_text(encoding="utf-8-sig"))
         agent = json.dumps(config["commands"]["Agent"]["switches"]) + config["commands"]["Agent"]["usage"]
         self.assertNotRegex(agent, r"(?i)-(host|bind\w*|listen|interface)\b")
+
+    def test_the_azure_demo_constant_names_a_space_the_shipped_config_declares(self):
+        """spaces.azureDemo is typed in consts.json and the Space in config.default.json,
+        and nothing else ties them. The web's Prompt Poet offer reads the constant and
+        means the shipped sample: an example, local, with no address of its own."""
+        shipped = json.loads((PKG_ROOT / "config.default.json").read_text(encoding="utf-8"))
+        slug = C.azure_demo_space()
+        match = [sp for sp in shipped["spaces"] if sp.get("slug") == slug]
+        self.assertEqual(
+            len(match), 1, f"consts.json spaces.azureDemo is '{slug}', which config.default.json does not declare"
+        )
+        self.assertIs(match[0].get("example"), True)
+        self.assertEqual(match[0].get("status"), "local")
+        self.assertFalse(match[0].get("org"))
 
     def test_the_dev_server_sets_no_host(self):
         # Vite listens on localhost when it is given none. A `host:` here would

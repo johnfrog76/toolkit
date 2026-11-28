@@ -34,6 +34,7 @@ import {
   moduleHomeTabs,
   moduleNavSplit,
   moduleRoutes,
+  moduleSlot,
   modules,
 } from "./registry";
 import type { CardContext } from "./registry";
@@ -53,6 +54,8 @@ import { LANE_FIELD_KEY, laneLabel } from "../modules/ado/laneNames";
 import { countInPlay, inPlayLine } from "../modules/ado/inPlay";
 import { ARCHIVED_FILTER, deckListView } from "../modules/deck/deckList";
 import { DeckState } from "../modules/deck/decks/types";
+import { AZURE_DEMO_SPACE } from "./consts";
+import { HOME_BANNER_SLOT } from "./slots";
 import type { StatusResponse } from "../modules/ado/api.ado";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { AvatarMenu } from "./AvatarMenu";
@@ -1535,6 +1538,66 @@ describe("the scenario grid: the Decks card, by what this machine has archived",
     expect(deckListView(shipped, archived, ARCHIVED_FILTER).shown.map((d) => d.id)).toEqual(
       underArchived,
     );
+  });
+});
+
+// Home's first-run banner, by the flags and the Space (docs/SCENARIOS.md, "Home's
+// first-run banner"): one banner at a time, and the Prompt Poet's only on the
+// shipped Azure demo Space. The render is homeBanner.test.tsx's.
+describe("the scenario grid: Home's first-run banner, by Space and flags", () => {
+  const offered = (
+    slug: string,
+    welcome: boolean,
+    poet: boolean,
+    o: { org?: string; status?: Status; deck?: boolean } = {},
+  ) => {
+    const env = {
+      spaceStatus: o.status ?? "local",
+      features: { deck: o.deck ?? true },
+      config: { activeSpace: slug, org: o.org ?? "", firstRunWelcome: welcome, firstRunPoet: poet },
+    } as unknown as EnvStatus;
+    // Through the registry, so a module that is off is never asked.
+    const els = moduleSlot(activeModules(modules, env), ctxFor(env), HOME_BANNER_SLOT);
+    return els.length === 0 ? null : String((els[0] as { key: string }).key);
+  };
+  const ADO = "https://dev.azure.com/acme";
+  it.each<[string, string, boolean, boolean, { org?: string; status?: Status }, string | null]>([
+    ["the sample, unconnected, fresh Start", AZURE_DEMO_SPACE, true, true, {}, "first-run-banner"],
+    [
+      "the sample, unconnected, commercial closed",
+      AZURE_DEMO_SPACE,
+      false,
+      true,
+      {},
+      "first-run-poet-banner",
+    ],
+    ["the sample, unconnected, both closed", AZURE_DEMO_SPACE, false, false, {}, null],
+    [
+      "the sample connected to an address",
+      AZURE_DEMO_SPACE,
+      false,
+      true,
+      { org: ADO, status: "active" },
+      null,
+    ],
+    ["the sample graduated with -As", "acme", false, true, { org: ADO, status: "active" }, null],
+    ["another Azure DevOps Space", "other-ado", false, true, { org: ADO, status: "active" }, null],
+    ["the GitHub demo", "github-demo", false, true, { org: "https://github.com/o/r" }, null],
+    ["a local cards-only Space", "demo", false, true, {}, null],
+    [
+      "a GitHub Space, fresh Start",
+      "acme",
+      true,
+      true,
+      { org: "https://github.com/o/r" },
+      "first-run-banner",
+    ],
+  ])("%s", (_name, slug, welcome, poet, o, shown) => {
+    expect(offered(slug, welcome, poet, o)).toBe(shown);
+  });
+  it("with the deck module off there is no banner at all, whatever the flags", () => {
+    expect(offered(AZURE_DEMO_SPACE, true, true, { deck: false })).toBeNull();
+    expect(offered(AZURE_DEMO_SPACE, false, true, { deck: false })).toBeNull();
   });
 });
 

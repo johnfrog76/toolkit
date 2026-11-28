@@ -18,6 +18,7 @@ import {
   BILLING,
   COMMUNICATION,
   DESIGN,
+  AZURE_DEMO_SPACE,
   DOCS,
   FEATURES,
   FOLDERS,
@@ -42,6 +43,19 @@ import {
 const SRC_DIR = path.resolve(__dirname, "..");
 
 describe("consts.json", () => {
+  // The web reads spaces.azureDemo to know the shipped sample; nothing else ties it to the Space
+  // config.default.json declares, so this does (Tests/test_consts.py holds the same from the agent's side).
+  it("spaces.azureDemo names the shipped example Space, local and with no address", () => {
+    const shipped = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, "../../../config.default.json"), "utf8"),
+    ) as { spaces: Array<{ slug: string; example?: boolean; status?: string; org?: string }> };
+    const space = shipped.spaces.filter((s) => s.slug === AZURE_DEMO_SPACE);
+    expect(space).toHaveLength(1);
+    expect(space[0].example).toBe(true);
+    expect(space[0].status).toBe("local");
+    expect(space[0].org || "").toBe("");
+  });
+
   it("parses, and is the same object the app imports", () => {
     const raw = JSON.parse(
       fs.readFileSync(path.resolve(__dirname, "../../../consts.json"), "utf8"),
@@ -183,6 +197,8 @@ describe("consts.json", () => {
     // A shipped Space's old slug -> its new one. Both loaders read it;
     // the web reads /api/env, where the old slug has already become the new.
     expect(consts.spaces.renamed).toEqual({ test: "azure-demo" });
+    // The shipped Azure demo Space: the Prompt Poet deck is offered on it.
+    expect(AZURE_DEMO_SPACE).toBe("azure-demo");
     // The package's own repository: the agent's fallback for a Space that is
     // this package itself when a copy has no git origin; the web reads the
     // answer (`space.isToolkit`), never the address.

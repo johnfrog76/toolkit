@@ -15,9 +15,10 @@
   "features": {},
   "_isDemoDismissed": "Hide the shipped demo Spaces (every one marked example: true -- Demo, the GitHub demo, the Azure demo) from the orgs you pick from -- the switcher, Settings, SwitchOrg Status. It is never removed from config, and the org you are IN is always shown. Off here; the Settings drawer's switch sets it.",
   "isDemoDismissed": false,
-  "_firstRun": "What the first run shows, and nothing else. welcome is the Home banner that offers the deck Introducing ToolKit; tkStart turns it on when it copies the sample hub, and Get Started or Dismiss turns it off for good, through Config. False here, so a machine that was never started from the sample hub never sees it.",
+  "_firstRun": "What the first run shows, and nothing else. welcome is the Home banner that offers the deck Introducing ToolKit; tkStart turns it on when it copies the sample hub, and Get Started or Dismiss turns it off for good, through Config. False here, so a machine that was never started from the sample hub never sees it. poet is the Home banner that offers the deck The Prompt Poet Works the Board on the shipped Azure demo Space only; it is true here because the offer is about the Space and not about a fresh install, tkStart leaves it alone, and closing or playing it turns it off for good, through Config. While welcome is on the Introducing ToolKit banner shows and this one waits.",
   "firstRun": {
-    "welcome": false
+    "welcome": false,
+    "poet": true
   },
   "_deck": "The deck module's per-machine settings. archived is the decks this machine has put away, by deck id, as a JSON array: the Decks card leaves them out of its default list and shows them under its archived filter. The deck file is never edited -- a deck's own state is the studio's. Written by the deck page's Archive, through Config.",
   "deck": {
