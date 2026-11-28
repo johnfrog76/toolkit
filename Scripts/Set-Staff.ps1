@@ -277,7 +277,10 @@ if ($seating) {
     if ($Vacate) {
         foreach ($name in @('Model', 'Person', 'Session')) {
             if ($PSBoundParameters.ContainsKey($name)) {
-                Stop-Staff "-Vacate and -$name contradict each other: -Vacate takes the seat's model and session away, and -$name sets one." `
+                # A person is neither a model nor a session: -Vacate keeps it, so -Person is said apart.
+                $why = "-Vacate takes the seat's model and session away, and -$name sets one."
+                if ($name -eq 'Person') { $why = "-Vacate keeps the seat's person, and -Person changes it." }
+                Stop-Staff "-Vacate and -$name contradict each other: $why" `
                     "Run '${p}Staff -Seat $Seat -Vacate' on its own, or give -$name without -Vacate."
             }
         }

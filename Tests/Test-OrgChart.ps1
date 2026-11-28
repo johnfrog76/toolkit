@@ -904,7 +904,7 @@ try {
         'vacating the owner''s seat'       = @('tkStaff -Seat owner.owner -Vacate', "The owner's seat cannot be vacated: the owner is a person, and the seat always has one.")
         'vacating the owner by its short address' = @('tkStaff -Seat owner -Vacate', "The owner's seat cannot be vacated: the owner is a person, and the seat always has one.")
         '-Vacate with -Model'              = @('tkStaff -Seat pm.pm -Vacate -Model opus', '-Vacate and -Model contradict each other: -Vacate takes the seat''s model and session away, and -Model sets one.')
-        '-Vacate with -Person'             = @('tkStaff -Seat pm.pm -Vacate -Person Kim', '-Vacate and -Person contradict each other: -Vacate takes the seat''s model and session away, and -Person sets one.')
+        '-Vacate with -Person'             = @('tkStaff -Seat pm.pm -Vacate -Person Kim', '-Vacate and -Person contradict each other: -Vacate keeps the seat''s person, and -Person changes it.')
         '-Vacate with -Session'            = @('tkStaff -Seat pm.pm -Vacate -Session desk-one', '-Vacate and -Session contradict each other: -Vacate takes the seat''s model and session away, and -Session sets one.')
         '-Vacate with an empty -Session'   = @("tkStaff -Seat pm.pm -Vacate -Session ''", '-Vacate and -Session contradict each other: -Vacate takes the seat''s model and session away, and -Session sets one.')
         '-Vacate with -Merges'             = @('tkStaff -Seat pm.pm -Vacate -Merges', '-Vacate takes away the model and the session and changes nothing else, so -Merges does not go with it.')
