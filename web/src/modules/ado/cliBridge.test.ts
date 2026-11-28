@@ -1002,6 +1002,33 @@ describe("buildStaffSeatParams: the seat dialog's Save", () => {
     ]);
   });
 
+  it("sends the owner's portrait after the role title, and an empty one for the default", () => {
+    expect(
+      buildStaffSeatParams({
+        tree: "t",
+        position: "owner",
+        seat: "owner",
+        person: "Sam",
+        portrait: "fat-cat",
+        ifMatch: "b".repeat(64),
+      }),
+    ).toEqual([
+      "-Seat",
+      "owner.owner",
+      "-Tree",
+      "t",
+      "-Person",
+      "Sam",
+      "-Portrait",
+      "fat-cat",
+      "-IfMatch",
+      "b".repeat(64),
+    ]);
+    expect(
+      buildStaffSeatParams({ tree: "t", position: "owner", seat: "owner", portrait: "" }),
+    ).toEqual(["-Seat", "owner.owner", "-Tree", "t", "-Portrait", ""]);
+  });
+
   it("leaves an undefined field out, so the seat keeps it, and sends an empty one, which takes it away", () => {
     expect(buildStaffSeatParams({ tree: "t", position: "p", seat: "s", session: "" })).toEqual([
       "-Seat",

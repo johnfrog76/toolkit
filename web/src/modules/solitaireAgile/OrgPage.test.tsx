@@ -13,6 +13,8 @@ import {
 import { FAMILIES, FAMILY_NAMES, TEST_ETAG, modelNameOf, orgResponse } from "./orgFixture";
 import { CHANGED_SINCE_TEXT, SeatDialog, VACATE_WORD, canVacate } from "./SeatDialog";
 import { UseOrgDialog } from "./UseOrgDialog";
+import { portraitChoices } from "./orgChart";
+import { ORG } from "../../shell/consts";
 
 // The Org tab (docs/modules/solitaire-agile.md, "The web UI"): the tree the
 // agent serves, drawn as offices by level, each seat a card with its plate.
@@ -1278,10 +1280,12 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
     ]);
   });
 
-  it("the owner's seat asks for the name alone, and a name that starts with a dash travels as the name", async () => {
+  it("the owner's seat asks for the name and the portrait, and a name that starts with a dash travels as the name", async () => {
     draw();
     const dialog = open("owner", "Change Owner, Sam");
-    expect(within(dialog).queryAllByRole("radio")).toHaveLength(0);
+    // No model question: the only radios are the portrait's.
+    expect(within(dialog).queryByTestId("org-seat-model")).toBeNull();
+    expect(within(dialog).getAllByRole("radio")).toHaveLength(ORG.portraits.length + 1);
     expect(within(dialog).queryByTestId("org-seat-session")).toBeNull();
     expect((within(dialog).getByTestId("org-seat-person") as HTMLInputElement).value).toBe("Sam");
     fireEvent.change(within(dialog).getByTestId("org-seat-person"), {
@@ -1298,6 +1302,131 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
       "-IfMatch",
       TEST_ETAG,
     ]);
+  });
+
+  it("the owner's portrait is one radio group of small portraits, Default first and chosen, each named", () => {
+    draw();
+    const dialog = open("owner", "Change Owner, Sam");
+    const group = within(dialog).getByRole("radiogroup", { name: "Portrait" });
+    const radios = within(group).getAllByRole("radio") as HTMLInputElement[];
+    expect(radios.map((r) => r.value)).toEqual(["", ...ORG.portraits]);
+    // Each radio is named for its portrait, and draws it.
+    expect(radios.map((r) => r.closest("label")!.textContent)).toEqual(
+      portraitChoices("owner").map((c) => c.label),
+    );
+    for (const c of portraitChoices("owner")) {
+      expect(within(group).getByRole("radio", { name: c.label })).toBeTruthy();
+      expect(
+        within(dialog)
+          .getByTestId(`org-portrait-${c.value || "default"}`)
+          .querySelector(`svg[data-refined="${c.face}"]`),
+      ).toBeTruthy();
+    }
+    expect(radio(dialog, "Default").checked).toBe(true);
+    // One group: every radio shares its name, so the arrow keys move within it.
+    expect(new Set(radios.map((r) => r.name)).size).toBe(1);
+    // Nothing chosen differently is nothing to save.
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    expect(runStaff).not.toHaveBeenCalled();
+  });
+
+  it("a seat the rule does not name offers no portrait: the VPs and the PM, today", () => {
+    expect(ORG.portraitSeats).toEqual(["root"]);
+    draw();
+    for (const [id, name] of [
+      ["vp-engineering", `Change VP of engineering, ${modelNameOf("fable")}`],
+      ["vp-product", `Change VP of product, ${modelNameOf("fable")}`],
+      ["pm", `Change PM, ${modelNameOf("opus")}`],
+    ]) {
+      const dialog = open(id, name);
+      expect(within(dialog).queryByTestId("org-seat-portrait")).toBeNull();
+      fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    }
+  });
+
+  it("choosing a portrait saves it through the one Staff call, with the name if it changed too", async () => {
+    draw();
+    let dialog = open("owner", "Change Owner, Sam");
+    fireEvent.click(radio(dialog, "Kubernetes wizard"));
+    expect(radio(dialog, "Kubernetes wizard").checked).toBe(true);
+    expect(radio(dialog, "Default").checked).toBe(false);
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(runStaff).toHaveBeenCalledTimes(1));
+    expect(lastParams()).toEqual([
+      "-Seat",
+      "owner.owner",
+      "-Tree",
+      TREE(),
+      "-Portrait",
+      "kubernetes-wizard",
+      "-IfMatch",
+      TEST_ETAG,
+    ]);
+    await waitFor(() => expect(screen.queryByTestId("org-seat-dialog")).toBeNull());
+    runStaff.mockClear();
+    dialog = open("owner", "Change Owner, Sam");
+    fireEvent.change(within(dialog).getByTestId("org-seat-person"), { target: { value: "Kim" } });
+    fireEvent.click(radio(dialog, "Robot"));
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(runStaff).toHaveBeenCalledTimes(1));
+    expect(lastParams()).toEqual([
+      "-Seat",
+      "owner.owner",
+      "-Tree",
+      TREE(),
+      "-Person",
+      "Kim",
+      "-Portrait",
+      "robot",
+      "-IfMatch",
+      TEST_ETAG,
+    ]);
+  });
+
+  it("a chosen portrait draws on the owner's card, starts the dialog on it, and Default sends it away", async () => {
+    const data = orgResponse("valid");
+    data.tree.positions[0].seats[0].portrait = "fat-cat";
+    response = { isLoading: false, data };
+    draw();
+    const owner = office("owner");
+    expect(owner.querySelector('svg[data-refined="fat-cat"]')).toBeTruthy();
+    expect(owner.querySelector('svg[data-refined="owner"]')).toBeNull();
+    // The name and the title are the seat's and the position's, as ever.
+    expect(sign(owner)).toBe("Owner");
+    expect(plates(owner)).toEqual(["Sam"]);
+    const dialog = open("owner", "Change Owner, Sam");
+    expect(radio(dialog, "Fat cat").checked).toBe(true);
+    fireEvent.click(radio(dialog, "Default"));
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(runStaff).toHaveBeenCalledTimes(1));
+    expect(lastParams()).toEqual([
+      "-Seat",
+      "owner.owner",
+      "-Tree",
+      TREE(),
+      "-Portrait",
+      "",
+      "-IfMatch",
+      TEST_ETAG,
+    ]);
+  });
+
+  it("a portrait save that finds the org changed offers the reload, as every save does", async () => {
+    staffAnswer = () =>
+      Promise.resolve({
+        status: "error",
+        output: "",
+        error: `org.json ${ORG.changedSince}; reload and try again.`,
+        duration: 1,
+      } as CommandResponse);
+    draw();
+    const dialog = open("owner", "Change Owner, Sam");
+    fireEvent.click(radio(dialog, "Alien"));
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(within(dialog).getByTestId("org-seat-conflict")).toBeTruthy());
+    expect(within(dialog).getByTestId("org-seat-conflict").textContent).toContain(
+      CHANGED_SINCE_TEXT,
+    );
   });
 
   it("a team lead's Space is a choice of /env's Spaces, None first, and the seat's own kept", () => {

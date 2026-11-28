@@ -216,6 +216,49 @@ export async function runOrg({ repoRoot, agentPort, webPort, python }) {
       .catch(() => false);
     check("org: after Vacate, focus is on the seat's Assign button", backOnAssign);
 
+    // The owner's portrait: axe over the Change dialog with the picker, the choice moved
+    // with the arrow keys as one radio group, Save, org.json read back, the card redrawn.
+    const owner = page.locator('[data-testid="org-office"][data-position="owner"]');
+    await owner.locator('[data-testid="org-seat-action"]').click();
+    await dialog.waitFor();
+    await sleep(1000);
+    const withPicker = await blocking();
+    check(
+      "org: axe on the owner's Change dialog with the portrait picker finds nothing serious or critical",
+      withPicker.length === 0,
+      withPicker.join(" | "),
+    );
+    const portraits = dialog.getByRole("radiogroup", { name: "Portrait" });
+    await portraits.getByRole("radio", { name: "Default" }).focus();
+    await page.keyboard.press("ArrowRight");
+    const secondName = await page.evaluate(
+      () => document.activeElement?.closest("label")?.textContent,
+    );
+    check(
+      "org: an arrow key moves the portrait choice within the one group",
+      Boolean(secondName) && (await portraits.getByRole("radio", { name: secondName }).isChecked()),
+      String(secondName),
+    );
+    await portraits.getByRole("radio", { name: "Robot" }).check();
+    await page.getByTestId("org-seat-save").click();
+    const ownerOf = (d) =>
+      d.trees.find((t) => t.id === before.activeTree)?.positions.find((p) => !p.reportsTo)
+        ?.seats[0];
+    const pictured = await waitForOrg(orgPath, (d) => ownerOf(d)?.portrait === "robot");
+    check(
+      "org: Save ran Staff -Seat -Portrait: org.json's owner seat carries robot, its name as it was",
+      Boolean(pictured) &&
+        ownerOf(pictured)?.portrait === "robot" &&
+        ownerOf(pictured)?.person === ownerOf(before)?.person,
+      JSON.stringify(pictured && ownerOf(pictured)),
+    );
+    const drawn = await owner
+      .locator('svg[data-refined="robot"]')
+      .waitFor({ timeout: 30000 })
+      .then(() => true)
+      .catch(() => false);
+    check("org: the owner's card draws the robot", drawn);
+
     // Save Small: the preview, the steps, Save.
     await pick(page, "org-preset-select", SMALL);
     check(

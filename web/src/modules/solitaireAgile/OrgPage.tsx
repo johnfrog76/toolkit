@@ -997,6 +997,10 @@ export function OrgPage() {
           etag={chart.etag}
           families={chart.families ?? []}
           familyNames={chart.familyNames ?? {}}
+          order={
+            layoutChart(chart.tree.positions).offices.find((o) => o.position.id === openPosition.id)
+              ?.order ?? 0
+          }
           spaces={env.data?.config.spaces ?? []}
           run={saveRun}
           busy={writing}

@@ -26,6 +26,7 @@ import type { StaffSeatFields } from "../ado/cliBridge";
 import type { CommandResponse } from "../ado/api.ado";
 import type { OrgPosition, OrgSeat } from "./api.solitaireAgile";
 import { refusalText } from "./UseOrgDialog";
+import { PortraitPicker } from "./PortraitPicker";
 import {
   ASSIGN_WORD,
   CHANGE_WORD,
@@ -38,13 +39,19 @@ import {
   isHeldModel,
   seatChoices,
   seatModelDefault,
+  seatPortrait,
+  defaultSeatFace,
+  takesPortrait,
 } from "./orgChart";
 
 // The seat dialog (docs/modules/solitaire-agile.md, "The web UI"): Assign on a
 // vacant seat's plate, Change on a staffed one's, on a saved org only. The
 // fewest questions, each already answered: the model (the seat's own, or its
 // position's default), the session's name, the role title, and for a team
-// lead the Space it serves. The owner's seat asks for the name alone. Save is
+// lead the Space it serves. The owner's seat asks for the name alone. A seat
+// that takes a portrait (consts.json org.portraitSeats: today the owner's) also
+// asks which one the chart draws -- its own default, the cast's people, or four
+// characters of their own -- and the title never changes with it. Save is
 // the one write: Staff -Seat through the bridge (POST /api/cmd/Staff), with
 // the chart's etag as -IfMatch, so a file changed since the page read it is
 // refused and the dialog offers a reload instead of writing over it. Only what
@@ -123,19 +130,35 @@ export const OTHER_TITLE = "Use a different title";
 export function seatChanges(
   position: OrgPosition,
   seat: OrgSeat,
-  answers: { model: string; person: string; session: string; space: string; roleTitle: string },
+  answers: {
+    model: string;
+    person: string;
+    session: string;
+    space: string;
+    roleTitle: string;
+    /** The seat's portrait, "" for its default; asked where the seat takes one. */
+    portrait?: string;
+  },
   familyNames: Record<string, string> = {},
 ): Omit<StaffSeatFields, "tree" | "ifMatch"> | null {
   const out: Omit<StaffSeatFields, "tree" | "ifMatch"> = { position: position.id, seat: seat.id };
   let changed = false;
-  const set = (key: "model" | "person" | "session" | "space" | "roleTitle", value: string) => {
+  const set = (
+    key: "model" | "person" | "session" | "space" | "roleTitle" | "portrait",
+    value: string,
+  ) => {
     out[key] = value;
     changed = true;
   };
-  if (isOwnerPosition(position)) {
-    if (answers.person.trim() !== (seat.person ?? "")) set("person", answers.person.trim());
-    return changed ? out : null;
-  }
+  const owner = isOwnerPosition(position);
+  if (owner && answers.person.trim() !== (seat.person ?? "")) set("person", answers.person.trim());
+  if (
+    takesPortrait(position) &&
+    answers.portrait !== undefined &&
+    answers.portrait !== seatPortrait(seat)
+  )
+    set("portrait", answers.portrait);
+  if (owner) return changed ? out : null;
   // A held model kept sends no -Model; its family's current model, picked over it, is a change.
   if (
     answers.model &&
@@ -158,6 +181,7 @@ export function SeatDialog({
   etag,
   families,
   familyNames = {},
+  order = 0,
   spaces,
   run,
   busy = false,
@@ -175,6 +199,8 @@ export function SeatDialog({
   families: string[];
   /** Each family by its current model's name, as the agent serves it (familyNames). */
   familyNames?: Record<string, string>;
+  /** The office's place among its level's, for the face the seat draws by default. */
+  order?: number;
   /** The Spaces a team lead's seat may serve, as /env lists them. */
   spaces: Array<{ slug: string; name?: string }>;
   /** Runs Staff through the bridge; resolves to its answer, rejects when the agent is away. */
@@ -192,6 +218,7 @@ export function SeatDialog({
   const start = seatModelDefault(position, seat, familyNames);
   const [model, setModel] = useState(start);
   const [person, setPerson] = useState(seat.person ?? "");
+  const [portrait, setPortrait] = useState(seatPortrait(seat));
   const [session, setSession] = useState(seat.session ?? "");
   const [space, setSpace] = useState(seat.space ?? NO_SPACE);
   const [roleTitle, setRoleTitle] = useState(position.title);
@@ -274,7 +301,14 @@ export function SeatDialog({
     const changes = seatChanges(
       position,
       seat,
-      { model, person, session, space, roleTitle: titleOpen ? roleTitle : position.title },
+      {
+        model,
+        person,
+        session,
+        space,
+        roleTitle: titleOpen ? roleTitle : position.title,
+        portrait: takesPortrait(position) ? portrait : undefined,
+      },
       familyNames,
     );
     if (!changes) {
@@ -308,13 +342,15 @@ export function SeatDialog({
           </DialogTitle>
           <DialogContent className={styles.content}>
             {owner ? (
-              <Field label="Name">
-                <Input
-                  value={person}
-                  onChange={(_, d) => setPerson(d.value)}
-                  data-testid="org-seat-person"
-                />
-              </Field>
+              <>
+                <Field label="Name">
+                  <Input
+                    value={person}
+                    onChange={(_, d) => setPerson(d.value)}
+                    data-testid="org-seat-person"
+                  />
+                </Field>
+              </>
             ) : (
               <>
                 <Field label="Model">
@@ -428,6 +464,22 @@ export function SeatDialog({
                 ) : null}
               </>
             )}
+            {takesPortrait(position) ? (
+              <PortraitPicker
+                address={`${position.id}.${seat.id}`}
+                value={portrait}
+                defaultFace={defaultSeatFace(
+                  position,
+                  Math.max(
+                    0,
+                    position.seats.findIndex((s) => s.id === seat.id),
+                  ),
+                  order,
+                )}
+                onChange={setPortrait}
+                disabled={locked}
+              />
+            ) : null}
             {/* The status region stays mounted, its text swapped in. */}
             <div role="status" data-testid="org-seat-refusal-region">
               {conflict ? (

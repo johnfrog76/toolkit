@@ -28,6 +28,12 @@ import {
   seatFace,
   seatWhere,
   vacantMug,
+  PORTRAIT_NAMES,
+  defaultSeatFace,
+  takesPortrait,
+  isPortrait,
+  portraitChoices,
+  seatPortrait,
 } from "./orgChart";
 import { MUG_LOOKS } from "./stage/EmptyDesk";
 import { chartNames, modelNameOf, orgResponse } from "./orgFixture";
@@ -70,6 +76,71 @@ describe("the position-to-face map", () => {
     expect(positionFaces(stranger, 0)[0]).toBe("designer");
     expect(positionFaces(stranger, 1)[0]).toBe("ultrawide");
     expect(positionFaces({ ...stranger, level: 9 })).toEqual(LEVEL_FACES[4]);
+  });
+});
+
+describe("a seat's portrait", () => {
+  const TABLE = JSON.parse(
+    fs.readFileSync(
+      path.resolve(__dirname, "../../../../Tests/fixtures/org/portraits.json"),
+      "utf8",
+    ),
+  ) as {
+    ids: { value: string; valid: boolean }[];
+    tree: { positions: (Partial<OrgPosition> & { id: string; reportsTo?: string })[] };
+    seats: { kind: string; seat: string; value: string; takes: boolean; outcome: string }[];
+  };
+  const asPosition = (p: (typeof TABLE.tree.positions)[number]): OrgPosition =>
+    ({
+      ...p,
+      prompt: p.prompt ?? null,
+      reportsTo: p.reportsTo ?? null,
+      seats: p.seats ?? [],
+    }) as OrgPosition;
+
+  it("every portrait id of consts.json is a face the refined cast draws, with a name", () => {
+    for (const id of ORG.portraits) {
+      expect(FACE_IDS).toContain(id);
+      expect(PORTRAIT_NAMES[id]).toBeTruthy();
+    }
+    expect(ORG.portraits).not.toContain("owner");
+  });
+
+  it("the choices: the seat's own default first, as no portrait, then the ids in their order", () => {
+    const choices = portraitChoices("ultrawide");
+    expect(choices.map((c) => c.value)).toEqual(["", ...ORG.portraits]);
+    expect(choices[0]).toEqual({ value: "", face: "ultrawide", label: "Default" });
+    expect(new Set(choices.map((c) => c.label)).size).toBe(choices.length);
+  });
+
+  it("an id is a portrait exactly as the shared table says (the page reads the served, trimmed id)", () => {
+    for (const row of TABLE.ids) {
+      if (row.value !== row.value.trim()) continue;
+      expect([row.value, isPortrait(row.value)]).toEqual([row.value, row.valid]);
+    }
+  });
+
+  it("the one rule names the seats that take a portrait, as the shared table's seat rows say", () => {
+    for (const row of TABLE.seats) {
+      const position = TABLE.tree.positions.find((p) => p.id === row.seat.split(".")[0])!;
+      expect([row.kind, takesPortrait(asPosition(position))]).toEqual([row.kind, row.takes]);
+    }
+  });
+
+  it("a seat that takes one draws its portrait; without one, its own face; a seat that takes none ignores it", () => {
+    const chart = orgResponse("portrait-on-the-owner").tree;
+    expect(seatFace(chart.positions[0], 0)).toBe("robot");
+    expect(defaultSeatFace(chart.positions[0], 0)).toBe("owner");
+    expect(seatPortrait(chart.positions[0].seats[0])).toBe("robot");
+    const plain = orgResponse("valid").tree.positions[0];
+    expect(seatFace(plain, 0)).toBe("owner");
+    expect(seatPortrait(plain.seats[0])).toBe("");
+    const odd = { ...plain, seats: [{ ...plain.seats[0], portrait: "mascot" }] };
+    expect(seatFace(odd, 0)).toBe("owner");
+    const pm = chart.positions[1];
+    expect(seatFace({ ...pm, seats: [{ ...pm.seats[0], portrait: "alien" }] }, 0)).toBe(
+      seatFace(pm, 0),
+    );
   });
 });
 

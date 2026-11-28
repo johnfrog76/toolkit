@@ -503,6 +503,8 @@ export interface StaffSeatFields {
   space?: string;
   /** The position's title, for every seat of it. */
   roleTitle?: string;
+  /** The seat's portrait, an id of consts.json org.portraits; "" is the default. */
+  portrait?: string;
   /** The etag GET /api/ritual/org served: a file changed since is refused. */
   ifMatch?: string;
 }
@@ -544,6 +546,7 @@ export function buildStaffSeatParams(fields: StaffSeatFields): string[] {
   add("-Session", fields.session);
   add("-Space", fields.space);
   add("-RoleTitle", fields.roleTitle);
+  add("-Portrait", fields.portrait);
   if (fields.ifMatch) params.push("-IfMatch", fields.ifMatch);
   return params;
 }

@@ -56,10 +56,91 @@ export function positionFaces(position: OrgPosition, order = 0): readonly FaceId
   return [...level.slice(order % level.length), ...level.slice(0, order % level.length)];
 }
 
-/** The face in one seat: the position's faces, in turn. */
-export function seatFace(position: OrgPosition, seatIndex: number, order = 0): FaceId {
+/** The face a seat draws with no portrait: the position's faces, in turn. */
+export function defaultSeatFace(position: OrgPosition, seatIndex: number, order = 0): FaceId {
   const faces = positionFaces(position, order);
   return faces[seatIndex % faces.length];
+}
+
+/** The face in one seat: its portrait, where the seat takes one and it is an
+ *  id the cast draws; else the face the seat always drew. */
+export function seatFace(position: OrgPosition, seatIndex: number, order = 0): FaceId {
+  const portrait = position.seats[seatIndex]?.portrait;
+  if (portrait && takesPortrait(position) && isPortrait(portrait)) return portrait;
+  return defaultSeatFace(position, seatIndex, order);
+}
+
+// -- A seat's portrait ----------------------------------------------------
+//
+// A seat may carry a portrait (docs/hub/org.md, "A seat's portrait"): no key is
+// the seat's own default face; the ids are consts.json org.portraits, the one
+// list Staff -Portrait checks, each a face of the refined cast; and which seats
+// take one is consts.json org.portraitSeats, the one rule all three halves read.
+
+/** The rule's word for the root position's seat; any other entry is a key of ORG.roles. */
+export const PORTRAIT_ROOT = "root";
+
+/** Does a seat of this position take a portrait? `root` names the root's seat,
+ *  any other entry the seats of a position whose role is that ORG.roles file. */
+export function takesPortrait(position: OrgPosition): boolean {
+  const roles = ORG.roles as Record<string, string>;
+  return ORG.portraitSeats.some((entry) =>
+    entry === PORTRAIT_ROOT
+      ? position.reportsTo === null
+      : Boolean(position.prompt) && roles[entry] === position.prompt,
+  );
+}
+
+/** The picker's value for the default: no key, so Staff gets -Portrait "". */
+export const DEFAULT_PORTRAIT_VALUE = "";
+/** The default's name in the picker: it draws the seat's own face. */
+export const DEFAULT_PORTRAIT_NAME = "Default";
+
+/** What each portrait is called: the radio's accessible name and its caption. */
+export const PORTRAIT_NAMES: Readonly<Record<string, string>> = {
+  minimalist: "Minimalist",
+  pm: "PM",
+  "dev-hero": "Dev hero",
+  designer: "Designer",
+  ultrawide: "Ultrawide overlord",
+  "ops-dev": "Ops dev",
+  "new-hire": "New hire",
+  vibemancer: "AI vibemancer",
+  qa: "QA alchemist",
+  robot: "Robot",
+  alien: "Alien",
+  "fat-cat": "Fat cat",
+  "kubernetes-wizard": "Kubernetes wizard",
+};
+
+/** Is this an id a seat may carry? One of consts.json org.portraits, exactly. */
+export function isPortrait(id: string): id is FaceId {
+  return ORG.portraits.includes(id);
+}
+
+/** One choice of the picker: its value ("" for the default), the face it draws and its name. */
+export interface PortraitChoice {
+  value: string;
+  face: FaceId;
+  label: string;
+}
+
+/** The picker's choices for a seat: its own default first, drawn as the face
+ *  it draws today, then every id of consts.json org.portraits in its order. */
+export function portraitChoices(defaultFace: FaceId): PortraitChoice[] {
+  return [
+    { value: DEFAULT_PORTRAIT_VALUE, face: defaultFace, label: DEFAULT_PORTRAIT_NAME },
+    ...ORG.portraits.filter(isPortrait).map((id) => ({
+      value: id,
+      face: id,
+      label: PORTRAIT_NAMES[id] ?? id,
+    })),
+  ];
+}
+
+/** The picker's starting value: the seat's portrait where it is one, else the default. */
+export function seatPortrait(seat: OrgSeat): string {
+  return seat.portrait && isPortrait(seat.portrait) ? seat.portrait : DEFAULT_PORTRAIT_VALUE;
 }
 
 // -- The walls ------------------------------------------------------------

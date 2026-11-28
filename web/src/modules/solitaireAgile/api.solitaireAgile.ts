@@ -539,6 +539,10 @@ export interface OrgSeat {
   space: string | null;
   /** Derived by the reader: vacant is a seat with no model and no person. */
   state: "staffed" | "vacant";
+  /** The seat's portrait (consts.json org.portraits), served only on a seat
+   *  consts.json org.portraitSeats names and only where the file chooses one:
+   *  absent is the seat's own default face. */
+  portrait?: string;
 }
 
 export interface OrgPosition {
