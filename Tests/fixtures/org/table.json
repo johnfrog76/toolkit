@@ -496,8 +496,8 @@
         "text": "text/portrait-the-tool-does-not-draw.txt",
         "seatCount": 3,
         "warnings": [
-          "org.json: the portrait 'Robot' in seat 'owner' of position 'owner' in tree 't' is not one this tool draws -- ignored.",
-          "org.json: the portrait in seat 'pm' of position 'pm' in tree 't' is on a seat that takes none -- ignored."
+          "org.json: the portrait 'Robot' in seat 'owner' of position 'owner' in tree 't' is not one this tool draws -- ignored; Staff -Seat owner.owner -Tree t -Portrait '' removes it.",
+          "org.json: the portrait in seat 'pm' of position 'pm' in tree 't' is on a seat that takes none -- ignored; Staff -Seat pm.pm -Tree t -Portrait '' removes it."
         ]
       }
     },

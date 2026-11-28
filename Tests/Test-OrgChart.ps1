@@ -1213,8 +1213,24 @@ try {
         }
         return (ConvertTo-P20ConfigJson $doc)
     }
+    # The rule itself, over the rule each row gives: an entry and a role file matched exactly.
+    foreach ($row in @($portraitTable.rules)) {
+        Assert-Equal "the rule [$(@($row.rule) -join ',')] for a $(if ($row.isRoot) { 'root' } else { "'$($row.prompt)'" }) seat: takes is $($row.takes)" ([bool]$row.takes) (Test-P20OrgTakesPortrait -IsRoot ([bool]$row.isRoot) -Prompt ([string]$row.prompt) -Rule @($row.rule))
+    }
+    # The seats that take one in the table's tree, as the rows say: what a refusal names.
+    $takingSeats = (@($portraitTable.seats | Where-Object { $_.takes } | ForEach-Object { [string]$_.seat } | Select-Object -Unique) -join ', ')
     [System.IO.File]::WriteAllBytes($orgPath, $utf8.GetBytes($tableTreeText + "`n"))
     foreach ($row in @($portraitTable.seats)) {
+        if ($row.PSObject.Properties['present']) {
+            # A hand-written portrait the seat holds first: the reader says it once, with how to remove it.
+            $presentText = Get-PortraitTreeWith $row.seat ([string]$row.present)
+            [System.IO.File]::WriteAllBytes($orgPath, $utf8.GetBytes($presentText + "`n"))
+            $strayRead = Read-P20OrgText -Text $presentText -PromptsRoot $hubDir -PackageRoot $pkgRoot
+            if (-not $row.takes) {
+                Assert-True "  ($($row.kind)) the reader says the stray one once, naming how to remove it" (
+                    @($strayRead.Warnings).Count -eq 1 -and @($strayRead.Warnings)[0].EndsWith("Staff -Seat $($row.seat) -Tree portraits -Portrait '' removes it.")) (@($strayRead.Warnings) -join ' ')
+            }
+        }
         $positionObj = @($portraitTable.tree.positions | Where-Object { $_.id -ceq ([string]$row.seat).Split('.')[0] })[0]
         $isRootRow = -not [string]$positionObj.reportsTo
         Assert-Equal "the rule ($($row.kind)): takes a portrait is $($row.takes)" ([bool]$row.takes) (Test-P20OrgTakesPortrait -IsRoot $isRootRow -Prompt ([string]$positionObj.prompt))
@@ -1240,7 +1256,7 @@ try {
                 Assert-True "  Staff refuses it ($($row.kind), '$($row.value)'): exit 2, says why once, writes nothing" (
                     $ran.Exit -eq '2' -and ([regex]::Matches($ran.All, [regex]::Escape($words))).Count -eq 1 -and (Test-SameBytes $before (Get-OrgBytes))) $ran.All
                 if ($row.outcome -eq 'refused-seat') {
-                    Assert-True '    and names the seats that take one' ($ran.All.Contains("in the tree 'portraits', the seats that take one: owner.owner.")) $ran.All
+                    Assert-True '    and names the seats that take one' ($ran.All.Contains("in the tree 'portraits', the seats that take one: $takingSeats.")) $ran.All
                 }
             }
         }
@@ -1277,12 +1293,30 @@ try {
         $picGone.Exit -eq '0' -and -not (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'owner')[0].PSObject.Properties['portrait'] -and
         $picGone.All.Contains("owner.owner: Owner $dot Kim $dot portrait: kubernetes-wizard -> Owner $dot Kim") -and -not (Get-Section $picGone.All 'text').Contains('portrait')) $picGone.All
 
+    # The change line names a portrait only where the reader draws it: a hand-written one on a
+    # seat the rule does not name, or an id the tool does not draw, is in neither side of it.
+    $strayDoc = [System.IO.File]::ReadAllText($orgPath) | ConvertFrom-Json
+    $strayTree = @($strayDoc.trees | Where-Object { $_.id -ceq 'mine' })[0]
+    @(@($strayTree.positions | Where-Object { $_.id -ceq 'lead' })[0].seats | Where-Object { $_.id -ceq 'beta' })[0] | Add-Member -NotePropertyName portrait -NotePropertyValue 'alien' -Force
+    @(@($strayTree.positions | Where-Object { $_.id -ceq 'owner' })[0].seats)[0] | Add-Member -NotePropertyName portrait -NotePropertyValue 'Robot' -Force
+    [System.IO.File]::WriteAllBytes($orgPath, $utf8.GetBytes((ConvertTo-P20ConfigJson $strayDoc) + "`n"))
+    foreach ($case in @(@{ Seat = 'lead.beta'; Args = '-Session desk-stray'; Name = 'lead.beta' }, @{ Seat = 'owner'; Args = '-Person Lee'; Name = 'owner.owner' })) {
+        $strayRan = Invoke-OrgChart "tkStaff -Seat $($case.Seat) $($case.Args) 3>`$null; 'BEGIN:text'; tkOrgChart 3>`$null; 'END:text'"
+        $strayPair = Get-ChangeLine $strayRan.All $case.Name
+        Assert-True "the change line of $($case.Name) names no portrait the reader does not draw, as OrgChart draws none" (
+            $strayRan.Exit -eq '0' -and $strayPair -and -not ($strayPair -join ' ').Contains('portrait') -and -not (Get-Section $strayRan.All 'text').Contains('portrait')) $strayRan.All
+    }
+    $strayGone = Invoke-OrgChart "tkStaff -Seat lead.beta -Portrait '' 3>`$null; tkStaff -Seat owner -Portrait '' 3>`$null"
+    $strayAfter = @((Read-Org).trees | Where-Object { $_.id -ceq 'mine' })[0]
+    Assert-True "-Portrait '' takes a stray portrait away, on a seat the rule names and on one it does not" (
+        -not @(@($strayAfter.positions | Where-Object { $_.id -ceq 'lead' })[0].seats | Where-Object { $_.id -ceq 'beta' })[0].PSObject.Properties['portrait'] -and
+        -not @(@($strayAfter.positions | Where-Object { $_.id -ceq 'owner' })[0].seats)[0].PSObject.Properties['portrait']) $strayGone.All
+
     $portraitList = (@(Get-P20OrgPortraits) -join ', ')
     $portraitRefusals = [ordered]@{
         'an id the tool does not draw'      = @('tkStaff -Seat owner -Portrait mascot', "-Portrait 'mascot' is not a portrait this tool draws. Portraits: $portraitList.")
         'an id in another case'             = @('tkStaff -Seat owner -Portrait Robot', "-Portrait 'Robot' is not a portrait this tool draws.")
         'the default face by name'          = @('tkStaff -Seat owner -Portrait owner', "-Portrait 'owner' is not a portrait this tool draws.")
-        'a VP''s seat'                      = @('tkStaff -Seat vp-product -Portrait robot', "-Portrait does not go on 'vp-product.vp-product', a VP of product's seat: in the tree 'mine', the seats that take one: owner.owner.")
         '-Portrait with -Vacate on the owner' = @('tkStaff -Seat owner -Vacate -Portrait robot', '-Vacate takes away the model and the session and changes nothing else, so -Portrait does not go with it.')
         '-Portrait with -Vacate elsewhere'  = @('tkStaff -Seat lead.alpha -Vacate -Portrait robot', '-Vacate takes away the model and the session and changes nothing else, so -Portrait does not go with it.')
         '-Portrait without -Seat'           = @('tkStaff -Activate mine -Portrait robot', '-Portrait goes with -Seat: it changes the seat -Seat names.')

@@ -245,10 +245,13 @@ A seat may choose the picture the Org tab draws in it. **One rule says which sea
 `org.roles`, naming the seats of every position whose role (its `prompt`) is that file (`vpEngineering`,
 `vpProduct`). Today it is `["root"]`: **the owner's seat alone takes a portrait.** The CLI
 (`Test-P20OrgTakesPortrait`), the agent (`takes_portrait`) and the web (`takesPortrait`) each read that list,
-so widening it to the two VPs is a change to that one line and to the rows of the shared table below, and to
-nothing else. A seat is told by its position's role and its place in the tree, never by its id: a hand-written
-org with differently named positions takes a portrait at its root, and at a VP's office only where that office
-names the VP's role file.
+so the halves hold no list of their own. Widening it to the two VPs touches exactly: that line,
+`["root", "vpEngineering", "vpProduct"]`; the value each of the three consts suites states for the key
+(`Tests/Test-Consts.ps1`, `Tests/test_consts.py`, `web/src/shell/consts.test.ts`); the `takes` and `outcome` of the VP
+rows of the shared table below; and the sentences that say "today the owner's alone" (this document, `docs/CLI.md`,
+`docs/modules/solitaire-agile.md` and the verb's help). No code changes, and every other test reads the rule. A
+seat is told by its position's role and its place in the tree, never by its id: a hand-written org with differently
+named positions takes a portrait at its root, and at a VP's office only where that office names the VP's role file.
 
 The portrait is an id of `consts.json` `org.portraits`: the cast's people -- `minimalist`, `pm`, `dev-hero`,
 `designer`, `ultrawide`, `ops-dev`, `new-hire`, `vibemancer`, `qa` -- and four characters of their own,
@@ -260,8 +263,11 @@ change with it.
 A reader serves `portrait` on a seat only where the rule names the seat and the id is one of the list; any other
 non-empty `portrait` -- an unknown id, or one on a seat the rule does not name -- is **ignored for drawing and
 said once as a warning** (`org.json: the portrait 'Robot' in seat 'owner' of position 'owner' in tree 't' is not
-one this tool draws -- ignored.`, `org.json: the portrait in seat 'pm' of position 'pm' in tree 't' is on a seat
-that takes none -- ignored.`), the way an unread key is, and the file is never refused for it. An empty one is no
+one this tool draws -- ignored; Staff -Seat owner.owner -Tree t -Portrait '' removes it.`, `org.json: the portrait in
+seat 'pm' of position 'pm' in tree 't' is on a seat that takes none -- ignored; Staff -Seat pm.pm -Tree t -Portrait ''
+removes it.`), the way an unread key is, and the file is never refused for it. **`Staff -Seat <seat> -Portrait ''`
+removes it**, on any seat: the empty value is the one form of `-Portrait` that goes on a seat the rule does not name.
+Every name in the rule is matched exactly, case included, in all three halves. An empty one is no
 portrait and is not said. `Staff -Seat <seat> -Portrait <id>` is the one writer ([The one writer:
 Staff](#the-one-writer-staff)). [`Tests/fixtures/org/portraits.json`](../../Tests/fixtures/org/portraits.json) holds
 both halves to it: every id, valid or not, and a row per seat kind -- the owner with a valid id, an unknown id and
@@ -521,10 +527,11 @@ Staff -Activate <tree-id> [-WhatIf]
   they change every seat of it; a seat's own `roleTitle` is left as it is. An empty value takes that key away (an
   empty `-Space` on any seat). A typed value is one line: a newline, a tab or any other control character in it is
   refused, naming the switch, and nothing is stored. **`-Portrait <id>`** chooses the seat's picture on a seat
-  [the rule](#a-seats-portrait) names -- today the owner's alone -- and is refused on any other seat, empty or not,
+  [the rule](#a-seats-portrait) names -- today the owner's alone -- and an id is refused on any other seat,
   naming the seats of the tree that take one (`-Portrait does not go on 'pm.pm', a PM's seat: in the tree 'mine',
   the seats that take one: owner.owner.`); an id that is not one of `org.portraits` is refused naming them, and
-  `-Portrait ''` takes the key away, back to the seat's own default. **The owner's seat** -- the root's -- takes
+  `-Portrait ''` takes the key away, back to the seat's own default, on **any** seat -- so a hand-written portrait the
+  reader ignores can be removed -- and writes nothing where there is none. **The owner's seat** -- the root's -- takes
   `-Person` and `-Portrait` only, and never an empty `-Person`: `-Model` on it is refused, because the owner is a person. It prints one line,
   `<position>.<seat>: <before> -> <after>`, each side the whole seat -- the position's title (a seat's own
   `roleTitle` before it), the model and the person, `[space]`, `(session)`, `· merges`, `· portrait: <id>`, and `{role file}` where

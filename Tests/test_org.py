@@ -343,6 +343,23 @@ class ASeatsPortrait(OrgBase):
         for pid in org.portraits():
             self.assertTrue(any(r["value"] == pid and r["valid"] for r in rows), pid)
 
+    def test_every_rule_row(self):
+        for row in self.TABLE["rules"]:
+            with self.subTest(rule=row["rule"], prompt=row["prompt"], root=row["isRoot"]):
+                self.assertEqual(org.takes_portrait(row["isRoot"], row["prompt"], tuple(row["rule"])), row["takes"])
+
+    def test_a_stray_portrait_is_said_with_how_to_remove_it(self):
+        for row in self.TABLE["seats"]:
+            if "present" not in row or row["takes"]:
+                continue
+            with self.subTest(seat=row["seat"]):
+                got = org.read_org_chart(json.dumps(self.with_portrait(row["seat"], row["present"])), lambda _n: True)
+                self.assertEqual(len(got.warnings), 1, got.warnings)
+                self.assertTrue(
+                    got.warnings[0].endswith(f"Staff -Seat {row['seat']} -Tree portraits -Portrait '' removes it."),
+                    got.warnings[0],
+                )
+
     def test_every_seat_row(self):
         positions = {p["id"]: p for p in self.TABLE["tree"]["positions"]}
         for row in self.TABLE["seats"]:

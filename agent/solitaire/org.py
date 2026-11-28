@@ -166,14 +166,16 @@ def portraits() -> tuple[str, ...]:
     return org_portraits()
 
 
-def takes_portrait(is_root: bool, prompt: str) -> bool:
+def takes_portrait(is_root: bool, prompt: str, rule: tuple[str, ...] | None = None) -> bool:
     """Does a seat of this position take a portrait? consts.json
     org.portraitSeats is the one rule: ``root`` names the root position's seat,
     any other entry a key of org.roles, naming the seats of a position whose
     role (its prompt) is that file. Test-P20OrgTakesPortrait is the same rule,
-    and Tests/fixtures/org/portraits.json holds the two to it."""
+    and Tests/fixtures/org/portraits.json holds the two to it. Every name is
+    matched exactly, case included. ``rule`` stands in for the consts' list (the
+    shared table's rule rows)."""
     roles = consts()["org"]["roles"]
-    for entry in org_portrait_seats():
+    for entry in org_portrait_seats() if rule is None else rule:
         if entry == PORTRAIT_ROOT:
             if is_root:
                 return True
@@ -223,11 +225,13 @@ def _warnings(data: dict, file_name: str) -> list[str]:
                 portrait = _text(_field(seat, "portrait"))
                 if not portrait:
                     continue
+                # How to take it away: the empty -Portrait goes on any seat.
+                remove = f"Staff -Seat {position_id}.{seat_id} -Tree {tree_id} -Portrait '' removes it."
                 if not takes_portrait(is_root, _text(_field(position, "prompt"))):
-                    found.append(f"{file_name}: the portrait{where} is on a seat that takes none -- ignored.")
+                    found.append(f"{file_name}: the portrait{where} is on a seat that takes none -- ignored; {remove}")
                 elif not is_portrait(portrait):
                     found.append(
-                        f"{file_name}: the portrait '{portrait}'{where} is not one this tool draws -- ignored."
+                        f"{file_name}: the portrait '{portrait}'{where} is not one this tool draws -- ignored; {remove}"
                     )
     return found
 

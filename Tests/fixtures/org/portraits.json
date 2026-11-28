@@ -1,5 +1,5 @@
 {
-  "_": "A seat's portrait (docs/hub/org.md, \"A seat's portrait\"): one table, two halves. ids: each row is a value as it would be typed after Staff -Portrait or written as a seat's portrait key, and whether it is a portrait -- one of consts.json org.portraits, compared exactly, case included, after the value is trimmed. seats: the tree below, and a row per seat kind with the value given and what follows from consts.json org.portraitSeats, the one rule naming the seats that take a portrait. takes is whether the rule names the seat. outcome is what Staff -Seat <seat> -Portrait <value> does: written (the id stored), removed (the key taken away: the empty value is the seat's own default) or refused (exit 2, nothing written) -- refused-id for an id the tool does not draw, refused-seat for a seat the rule does not name, refused-pool for a pool, which has no seat. A reader serves a portrait only where takes is true and the id is valid, and says every other non-empty one once as a warning, never refusing the file. Widening the rule to the two VPs is a change to consts.json and to these rows' takes and outcome. tkTestToolkit -OrgChart asserts Test-P20OrgPortrait, Test-P20OrgTakesPortrait, the reader and Staff over it; Tests/test_org.py asserts is_portrait, takes_portrait and the reader.",
+  "_": "A seat's portrait (docs/hub/org.md, \"A seat's portrait\"): one table, two halves. ids: each row is a value as it would be typed after Staff -Portrait or written as a seat's portrait key, and whether it is a portrait -- one of consts.json org.portraits, compared exactly, case included, after the value is trimmed. seats: the tree below, and a row per seat kind with the value given and what follows from consts.json org.portraitSeats, the one rule naming the seats that take a portrait. takes is whether the rule names the seat. present, where a row has it, is the portrait the seat holds before the call (a hand-written one). outcome is what Staff -Seat <seat> -Portrait <value> does: written (the id stored), removed (the empty value, which goes on ANY seat: the key taken away, or nothing written where there is none -- the seat's own default) or refused (exit 2, nothing written) -- refused-id for an id the tool does not draw, refused-seat for an id on a seat the rule does not name, refused-pool for a pool, which has no seat. A reader serves a portrait only where takes is true and the id is valid, and says every other non-empty one once as a warning naming how to remove it, never refusing the file. rules: the rule itself, over a rule given in the row rather than consts.json's, so every half matches an entry and a role file the same way -- exactly, case included -- and a wider rule reads as data. tkTestToolkit -OrgChart asserts Test-P20OrgPortrait, Test-P20OrgTakesPortrait, the reader and Staff over it; Tests/test_org.py asserts is_portrait, takes_portrait and the reader.",
   "ids": [
     { "value": "minimalist", "valid": true },
     { "value": "pm", "valid": true },
@@ -46,8 +46,26 @@
     { "kind": "VP of product", "seat": "vp-product.vp-product", "value": "alien", "takes": false, "outcome": "refused-seat" },
     { "kind": "PM", "seat": "pm.pm", "value": "robot", "takes": false, "outcome": "refused-seat" },
     { "kind": "team lead", "seat": "team-lead.alpha", "value": "robot", "takes": false, "outcome": "refused-seat" },
-    { "kind": "team lead, empty", "seat": "team-lead.beta", "value": "", "takes": false, "outcome": "refused-seat" },
+    { "kind": "team lead, empty", "seat": "team-lead.beta", "value": "", "takes": false, "outcome": "removed" },
+    { "kind": "VP of product, a stray portrait taken away", "seat": "vp-product.vp-product", "present": "alien", "value": "", "takes": false, "outcome": "removed" },
+    { "kind": "PM, a stray portrait kept by another switch", "seat": "pm.pm", "present": "robot", "value": "", "takes": false, "outcome": "removed" },
     { "kind": "builder", "seat": "builder.b1", "value": "fat-cat", "takes": false, "outcome": "refused-seat" },
     { "kind": "pool", "seat": "crew", "value": "robot", "takes": false, "outcome": "refused-pool" }
+  ],
+  "rules": [
+    { "rule": ["root"], "isRoot": true, "prompt": "", "takes": true },
+    { "rule": ["root"], "isRoot": false, "prompt": "vp-of-engineering.prompt.md", "takes": false },
+    { "rule": ["root", "vpEngineering", "vpProduct"], "isRoot": false, "prompt": "vp-of-engineering.prompt.md", "takes": true, "why": "widening to the VPs is a rule of three entries, and nothing else" },
+    { "rule": ["root", "vpEngineering", "vpProduct"], "isRoot": false, "prompt": "vp-of-product.prompt.md", "takes": true },
+    { "rule": ["root", "vpEngineering", "vpProduct"], "isRoot": false, "prompt": "pm.prompt.md", "takes": false },
+    { "rule": ["vpEngineering"], "isRoot": true, "prompt": "", "takes": false, "why": "the root is named only by root" },
+    { "rule": ["Root"], "isRoot": true, "prompt": "", "takes": false, "why": "an entry is matched exactly, case included" },
+    { "rule": ["VPEngineering"], "isRoot": false, "prompt": "vp-of-engineering.prompt.md", "takes": false, "why": "a key of org.roles is matched exactly, case included" },
+    { "rule": ["vpengineering"], "isRoot": false, "prompt": "vp-of-engineering.prompt.md", "takes": false },
+    { "rule": ["vpEngineering"], "isRoot": false, "prompt": "VP-of-engineering.prompt.md", "takes": false, "why": "a role file is matched exactly, case included" },
+    { "rule": ["vpEngineering"], "isRoot": false, "prompt": "", "takes": false },
+    { "rule": ["teamLead"], "isRoot": false, "prompt": "team-lead.prompt.md", "takes": true },
+    { "rule": ["nobody"], "isRoot": true, "prompt": "", "takes": false, "why": "an entry that is neither root nor a role key names no seat" },
+    { "rule": [], "isRoot": true, "prompt": "", "takes": false }
   ]
 }

@@ -32,8 +32,9 @@
     -RoleName (the role file) and -RoleTitle belong to the POSITION, so they
     change every seat of it. -Portrait is the seat's picture on the Org page, one
     of consts.json org.portraits, on a seat consts.json org.portraitSeats names
-    (today the owner's alone) and refused on any other (docs/hub/org.md, "A
-    seat's portrait"). The owner's seat (the root's) takes -Person and -Portrait only. An empty -Model, -Person, -Session, -Space, -RoleTitle or
+    (today the owner's alone) and an id is refused on any other; the empty value,
+    which takes the key away, goes on any seat (docs/hub/org.md, "A seat's
+    portrait"). The owner's seat (the root's) takes -Person and -Portrait only. An empty -Model, -Person, -Session, -Space, -RoleTitle or
     -Portrait takes that key away -- an empty -Portrait is the default picture. -Vacate takes the seat's model and its session away and nothing else:
     a person, the seat's Space, its own roleTitle, its merge and every other key
     stay. It goes alone -- with -Model, -Person or -Session it is a
@@ -548,10 +549,11 @@ else {
             "Name another owner with '${p}Staff -Seat $seatAddress -Person <name>'."
     }
     # A portrait goes on a seat the one rule names (consts.json org.portraitSeats,
-    # Test-P20OrgTakesPortrait): refused on any other seat, empty or not, naming
-    # the seats of this tree that take one.
+    # Test-P20OrgTakesPortrait): an id is refused on any other seat, naming the
+    # seats of this tree that take one.
     $takes = { param($Position) Test-P20OrgTakesPortrait -IsRoot (-not (Get-P20OrgText (Get-P20OrgField $Position 'reportsTo'))) -Prompt (Get-P20OrgText (Get-P20OrgField $Position 'prompt')) }
-    if ($PSBoundParameters.ContainsKey('Portrait') -and -not (& $takes $editPosition)) {
+    # The empty value goes on ANY seat: it takes a hand-written portrait away, or writes nothing.
+    if ($PSBoundParameters.ContainsKey('Portrait') -and ([string]$Portrait).Trim() -and -not (& $takes $editPosition)) {
         $editTitle = Get-P20OrgText (Get-P20OrgField $editPosition 'title')
         if (-not $editTitle) { $editTitle = $editPositionId }
         $taking = New-Object System.Collections.Generic.List[string]
@@ -624,8 +626,10 @@ else {
         $named = Get-P20OrgText (Get-P20OrgField $SeatObj 'session')
         if ($named) { $line += " ($named)" }
         if ((Get-P20OrgFlag (Get-P20OrgField $SeatObj 'merges')) -eq $true) { $line += " $dot merges" }
+        # A portrait only where the reader draws it: the seat the rule names, an id it knows.
         $portrait = Get-P20OrgText (Get-P20OrgField $SeatObj 'portrait')
-        if ($portrait) { $line += " $dot portrait: $portrait" }
+        $drawn = (Test-P20OrgPortrait $portrait) -and (Test-P20OrgTakesPortrait -IsRoot (-not (Get-P20OrgText (Get-P20OrgField $Position 'reportsTo'))) -Prompt (Get-P20OrgText (Get-P20OrgField $Position 'prompt')))
+        if ($drawn) { $line += " $dot portrait: $portrait" }
         if ($WithRole) {
             $role = Get-P20OrgText (Get-P20OrgField $Position 'prompt')
             if (-not $role) { $role = 'no role' }

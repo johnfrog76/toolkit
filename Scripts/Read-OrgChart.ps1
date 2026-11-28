@@ -50,12 +50,19 @@ function Test-P20OrgTakesPortrait {
     # is the one rule: 'root' names the root position's seat, any other entry a key
     # of org.roles, naming the seats of a position whose role (its prompt) is that
     # file. agent/solitaire/org.py's takes_portrait is the same rule, and
-    # Tests/fixtures/org/portraits.json holds the two to it.
-    param([bool]$IsRoot, [string]$Prompt)
+    # Tests/fixtures/org/portraits.json holds the two to it. Every name is matched
+    # exactly, case included -- a property lookup by name would ignore case, so
+    # the roles are walked. -Rule stands in for the consts' list (the table's rule rows).
+    param([bool]$IsRoot, [string]$Prompt, [AllowEmptyCollection()][string[]]$Rule = $null)
     $org = (Get-P20Consts).org
-    foreach ($entry in @($org.portraitSeats)) {
-        if ([string]$entry -ceq 'root') { if ($IsRoot) { return $true } }
-        elseif ($Prompt -and $org.roles.PSObject.Properties[[string]$entry] -and [string]$org.roles.([string]$entry) -ceq $Prompt) { return $true }
+    $entries = @($org.portraitSeats)
+    if ($PSBoundParameters.ContainsKey('Rule')) { $entries = @($Rule) }
+    foreach ($entry in $entries) {
+        if ([string]$entry -ceq 'root') { if ($IsRoot) { return $true } continue }
+        if (-not $Prompt) { continue }
+        foreach ($role in $org.roles.PSObject.Properties) {
+            if ($role.Name -ceq [string]$entry -and [string]$role.Value -ceq $Prompt) { return $true }
+        }
     }
     return $false
 }
@@ -183,8 +190,10 @@ function Get-P20OrgWarnings {
                 # of the ids; anything else is ignored, and said. An empty one is no portrait.
                 $portrait = Get-P20OrgText (Get-P20OrgField $seat 'portrait')
                 if (-not $portrait) { continue }
-                if (-not (Test-P20OrgTakesPortrait -IsRoot $isRoot -Prompt (Get-P20OrgText (Get-P20OrgField $position 'prompt')))) { $found.Add("${FileName}: the portrait$where is on a seat that takes none -- ignored.") }
-                elseif (-not (Test-P20OrgPortrait $portrait)) { $found.Add("${FileName}: the portrait '$portrait'$where is not one this tool draws -- ignored.") }
+                # How to take it away: the empty -Portrait goes on any seat.
+                $remove = "Staff -Seat $positionId.$seatId -Tree $treeId -Portrait '' removes it."
+                if (-not (Test-P20OrgTakesPortrait -IsRoot $isRoot -Prompt (Get-P20OrgText (Get-P20OrgField $position 'prompt')))) { $found.Add("${FileName}: the portrait$where is on a seat that takes none -- ignored; $remove") }
+                elseif (-not (Test-P20OrgPortrait $portrait)) { $found.Add("${FileName}: the portrait '$portrait'$where is not one this tool draws -- ignored; $remove") }
             }
         }
     }
