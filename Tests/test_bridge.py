@@ -669,6 +669,49 @@ class StaffThroughTheBridge(TeamAgileScratchPackage):
         self.assertEqual(body["status"], "success", body.get("error") or body["output"])
         self.assertNotIn("session", self._seat_of("vp-engineering"))
 
+    def test_vacate_takes_the_model_and_the_session_and_nothing_else(self):
+        # The page's vacate: -Seat ... -Vacate -IfMatch <the etag it read>.
+        self._config(True)
+        self.assertEqual(self._post_preset(), "success")
+        body = self._seat("vp-product", "-Session", "desk-one")
+        self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+        self.assertIn("vp-product.vp-product: ", body["output"])
+        before = self._seat_of("vp-product")
+        self.assertTrue(before.get("model") and before.get("merges"), before)
+        body = self._seat("vp-product.vp-product", "-Vacate", "-IfMatch", self._hash())
+        self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+        after = self._seat_of("vp-product")
+        self.assertEqual(after, {k: v for k, v in before.items() if k not in ("model", "session")})
+        # Already vacant: nothing written, and still a success.
+        raw = (self.hub / C.org_file()).read_bytes()
+        body = self._seat("vp-product", "-Vacate")
+        self.assertEqual(body["status"], "success", body.get("error") or body["output"])
+        self.assertIn("nothing changed", body["output"])
+        self.assertEqual((self.hub / C.org_file()).read_bytes(), raw)
+        # The owner's seat is never vacated.
+        body = self._seat("owner.owner", "-Vacate")
+        self.assertEqual(body["status"], "error", body)
+        self.assertIn("The owner's seat cannot be vacated", body.get("error") or "")
+        self.assertEqual((self.hub / C.org_file()).read_bytes(), raw)
+
+    def test_an_address_that_starts_with_a_dash_is_refused_and_writes_nothing(self):
+        # Joined to -Seat, a dash-led address binds as the address and names no seat:
+        # a stated refusal, never a switch. Bare after -Seat, the binder refuses it.
+        self._config(True)
+        self.assertEqual(self._post_preset(), "success")
+        raw = (self.hub / C.org_file()).read_bytes()
+        for dash in ("-", "–", "—", "―"):
+            with self.subTest(hex(ord(dash))):
+                body = client.post("/api/cmd/Staff", json={"params": [f"-Seat:{dash}WhatIf", "-Model", "opus"]}).json()
+                self.assertEqual(body["status"], "error", body)
+                self.assertIn("WhatIf' is not a seat of the tree", body.get("error") or "")
+                self.assertNotIn("What if:", body.get("output") or "")
+                self.assertEqual((self.hub / C.org_file()).read_bytes(), raw)
+        body = self._seat("-WhatIf", "-Model", "opus")
+        self.assertNotEqual(body["status"], "success", body)
+        self.assertNotIn("What if:", body.get("output") or "")
+        self.assertEqual((self.hub / C.org_file()).read_bytes(), raw)
+
     def _post_preset(self) -> str:
         return client.post("/api/cmd/Staff", json={"params": ["-Preset", "S"]}).json()["status"]
 

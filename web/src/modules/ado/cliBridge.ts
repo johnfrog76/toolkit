@@ -507,6 +507,25 @@ export interface StaffSeatFields {
   ifMatch?: string;
 }
 
+/** `-Seat <position>.<seat>`, through staffValue like every other value: an id
+ *  is the file's, and a hand-written file may start one with a dash. */
+function staffSeatAddress(fields: { position: string; seat: string }): string[] {
+  return staffValue("-Seat", `${fields.position}.${fields.seat}`);
+}
+
+/**
+ * argv for `POST /cmd/Staff` -> `Scripts/Set-Staff.ps1`, its `-Seat -Vacate`
+ * form: the seat and its tree, `-Vacate`, then `-IfMatch`. It takes the seat's
+ * model and session away and nothing else, so no other field goes with it.
+ */
+export function buildStaffVacateParams(
+  fields: Pick<StaffSeatFields, "tree" | "position" | "seat" | "ifMatch">,
+): string[] {
+  const params = [...staffSeatAddress(fields), ...staffValue("-Tree", fields.tree), "-Vacate"];
+  if (fields.ifMatch) params.push("-IfMatch", fields.ifMatch);
+  return params;
+}
+
 /**
  * argv for `POST /cmd/Staff` -> `Scripts/Set-Staff.ps1`, its `-Seat` form:
  * `-Seat <position>.<seat>` and `-Tree <id>`, then each field given, in the
@@ -515,11 +534,7 @@ export interface StaffSeatFields {
  * which takes the key away.
  */
 export function buildStaffSeatParams(fields: StaffSeatFields): string[] {
-  const params = [
-    "-Seat",
-    `${fields.position}.${fields.seat}`,
-    ...staffValue("-Tree", fields.tree),
-  ];
+  const params = [...staffSeatAddress(fields), ...staffValue("-Tree", fields.tree)];
   const add = (name: string, value: string | undefined) => {
     if (value === undefined) return;
     params.push(...staffValue(name, value.trim()));

@@ -289,6 +289,65 @@ try {
     $dot = [string][char]0x00B7
     Assert-True 'the plate is the position, a middle dot, then who sits there' ((Format-P20OrgChartLines -Chart $bom.Chart)[0] -ceq "x $dot no seats")
 
+    # The count the text ends with (docs/hub/org.md, "Positions, seats, and the three shapes"):
+    # every seat of every position is a seat -- an office's, the owner's -- and a pool has none;
+    # a seat is staffed when it names a model or a person, the state the Org tab draws.
+    $countRows = @(
+        @{ Name = 'an office of two seats, one staffed by a model'; Positions = '{"id":"r","seats":[{"id":"o","person":"Sam"}]},{"id":"t","reportsTo":"r","seats":[{"id":"a","model":"opus"},{"id":"b"}]}'; Want = 'staffed: 2 of 3' }
+        @{ Name = 'a person''s seat is staffed'; Positions = '{"id":"r","seats":[{"id":"o","person":"Sam"}]},{"id":"p","reportsTo":"r","seats":[{"id":"p","person":"Kim"}]}'; Want = 'staffed: 2 of 2' }
+        @{ Name = 'a pool is no seat'; Positions = '{"id":"r","seats":[{"id":"o","person":"Sam"}]},{"id":"b","reportsTo":"r","defaultModel":"sonnet","seats":[]},{"id":"n","reportsTo":"r"}'; Want = 'staffed: 1 of 1' }
+        @{ Name = 'a seat with a session and nothing else is vacant'; Positions = '{"id":"r","seats":[{"id":"o","person":"Sam"}]},{"id":"p","reportsTo":"r","seats":[{"id":"p","session":"desk-one"}]}'; Want = 'staffed: 1 of 2' }
+        @{ Name = 'a tree of pools has no seat'; Positions = '{"id":"r"},{"id":"b","reportsTo":"r","defaultModel":"sonnet"}'; Want = 'staffed: 0 of 0' }
+    )
+    $countHub = Join-Path $casesDir 'count'
+    New-Item -ItemType Directory -Path $countHub -Force | Out-Null
+    foreach ($row in $countRows) {
+        $countRead = Read-P20OrgText -Text ('{"trees":[{"id":"t","positions":[' + $row.Positions + ']}]}') -PromptsRoot $countHub -PackageRoot $pkgRoot
+        $countLines = Format-P20OrgChartLines -Chart $countRead.Chart
+        Assert-Equal "the count: $($row.Name)" $row.Want $countLines[$countLines.Count - 1] $countRead.Message
+        Assert-Equal '  after one empty line' '' $countLines[$countLines.Count - 2]
+        $staffedSeats = @($countRead.Chart.tree.positions | ForEach-Object { @($_.seats) } | Where-Object { $_.state -eq 'staffed' }).Count
+        Assert-Equal '  the same count as the seats the response calls staffed' $row.Want "staffed: $staffedSeats of $($countRead.SeatCount)"
+    }
+    $vacantLine = (Format-P20OrgChartLines -Chart (Read-P20OrgText -Text '{"trees":[{"id":"t","positions":[{"id":"r","title":"Owner","seats":[{"id":"o","person":"Sam"}]},{"id":"p","title":"PM","reportsTo":"r","seats":[{"id":"p","session":"desk-one"}]}]}]}' -PromptsRoot $countHub -PackageRoot $pkgRoot).Chart)[1]
+    Assert-Equal 'a vacant seat that names a session says vacant, then its session' "  PM $dot vacant (desk-one)" $vacantLine
+
+    # The seat address (Staff -Seat): <position>.<seat>, every dot tried, the first split that
+    # names a real seat taken -- as before; else the whole address as a position's id, which
+    # stands for its seat where it has exactly one. An id may hold a dot or start with a dash.
+    $addressTree = '[{"id":"owner","seats":[{"id":"owner"}]},{"id":"vp-product","reportsTo":"owner","seats":[{"id":"vp-product"}]},' +
+        '{"id":"lead","reportsTo":"owner","seats":[{"id":"alpha"},{"id":"beta"}]},{"id":"builder","reportsTo":"lead","seats":[]},' +
+        '{"id":"x","reportsTo":"owner","seats":[{"id":"y"}]},{"id":"x.y","reportsTo":"owner","seats":[{"id":"z"}]},' +
+        '{"id":"a.b","reportsTo":"owner","seats":[{"id":"only"}]},{"id":"-p","reportsTo":"owner","seats":[{"id":"s"}]}]' | ConvertFrom-Json
+    $addressRows = @(
+        @{ Address = 'vp-product.vp-product'; Want = 'ok vp-product.vp-product' }
+        @{ Address = 'vp-product'; Want = 'ok vp-product.vp-product' }
+        @{ Address = 'owner'; Want = 'ok owner.owner' }
+        @{ Address = 'lead.beta'; Want = 'ok lead.beta' }
+        @{ Address = 'lead'; Want = 'several-seats lead.alpha, lead.beta' }
+        @{ Address = 'builder'; Want = 'pool' }
+        @{ Address = 'builder.builder'; Want = 'unknown' }
+        @{ Address = 'x.y'; Want = 'ok x.y' }
+        @{ Address = 'x.y.z'; Want = 'ok x.y.z' }
+        @{ Address = 'a.b'; Want = 'ok a.b.only' }
+        @{ Address = 'a.b.only'; Want = 'ok a.b.only' }
+        @{ Address = 'a'; Want = 'unknown' }
+        @{ Address = 'lead.'; Want = 'unknown' }
+        @{ Address = '.alpha'; Want = 'unknown' }
+        @{ Address = '-p.s'; Want = 'ok -p.s' }
+        @{ Address = '-p'; Want = 'ok -p.s' }
+        @{ Address = '-WhatIf'; Want = 'unknown' }
+        @{ Address = 'nope'; Want = 'unknown' }
+        @{ Address = 'Lead'; Want = 'unknown' }
+    )
+    foreach ($row in $addressRows) {
+        $found = Resolve-P20OrgSeatAddress -Positions $addressTree -Address $row.Address
+        $got = $found.Kind
+        if ($found.Kind -eq 'ok') { $got = "ok $(Get-P20OrgText (Get-P20OrgField $found.Position 'id')).$(Get-P20OrgText (Get-P20OrgField $found.Seat 'id'))" }
+        if ($found.Kind -eq 'several-seats') { $got = "several-seats $(@($found.Seats) -join ', ')" }
+        Assert-Equal "the seat address '$($row.Address)'" $row.Want $got
+    }
+
     # -- 2. The verb, typed ----------------------------------------------------------------
     Write-Host ""
     Write-Host "-- The verb, typed in a fresh shell --------------------" -ForegroundColor Cyan
@@ -838,10 +897,21 @@ try {
         '-Space on a seat that is no team lead''s' = @('tkStaff -Seat pm.pm -Space demo', "-Space is for a team lead's seat, and 'pm.pm' is a PM's: its position's role is not team-lead.prompt.md.")
         'a Space nobody declared'          = @('tkStaff -Seat team-lead.demo -Space nope', "-Space 'nope' is not a Space the hub declares. Spaces: ")
         'a seat the tree does not have'    = @('tkStaff -Seat pm.nope -Model opus', "'pm.nope' is not a seat of the tree 'mine'. Seats: owner.owner, ")
-        'a seat with no dot'               = @('tkStaff -Seat pm -Model opus', "'pm' is not a seat of the tree 'mine'. A seat is named <position>.<seat>.")
+        'a position nobody has, with no dot' = @('tkStaff -Seat nope -Model opus', "'nope' is not a seat of the tree 'mine'. A seat is named <position>.<seat>, or <position> where the position has one seat.")
+        'a short address for an office of two seats' = @('tkStaff -Seat team-lead -Model opus', "'team-lead' is a position of 2 seats in the tree 'mine', so it does not say which. Its seats: team-lead.demo, team-lead.github-demo.")
+        'a short address for a pool'       = @('tkStaff -Seat builder -Model opus', "'builder' is a pool in the tree 'mine': a position with no seats, so there is no seat to staff.")
         'a pool has no seat'               = @('tkStaff -Seat builder.builder -Model opus', "'builder.builder' is not a seat of the tree 'mine'.")
+        'vacating the owner''s seat'       = @('tkStaff -Seat owner.owner -Vacate', "The owner's seat cannot be vacated: the owner is a person, and the seat always has one.")
+        'vacating the owner by its short address' = @('tkStaff -Seat owner -Vacate', "The owner's seat cannot be vacated: the owner is a person, and the seat always has one.")
+        '-Vacate with -Model'              = @('tkStaff -Seat pm.pm -Vacate -Model opus', '-Vacate and -Model contradict each other: -Vacate takes the seat''s model and session away, and -Model sets one.')
+        '-Vacate with -Person'             = @('tkStaff -Seat pm.pm -Vacate -Person Kim', '-Vacate and -Person contradict each other: -Vacate takes the seat''s model and session away, and -Person sets one.')
+        '-Vacate with -Session'            = @('tkStaff -Seat pm.pm -Vacate -Session desk-one', '-Vacate and -Session contradict each other: -Vacate takes the seat''s model and session away, and -Session sets one.')
+        '-Vacate with an empty -Session'   = @("tkStaff -Seat pm.pm -Vacate -Session ''", '-Vacate and -Session contradict each other: -Vacate takes the seat''s model and session away, and -Session sets one.')
+        '-Vacate with -Merges'             = @('tkStaff -Seat pm.pm -Vacate -Merges', '-Vacate takes away the model and the session and changes nothing else, so -Merges does not go with it.')
+        '-Vacate with -RoleTitle'          = @('tkStaff -Seat pm.pm -Vacate -RoleTitle Lead', '-Vacate takes away the model and the session and changes nothing else, so -RoleTitle does not go with it.')
+        '-Vacate without -Seat'            = @('tkStaff -Activate hq -Vacate', '-Vacate goes with -Seat: it changes the seat -Seat names.')
         'a tree the file does not have'    = @('tkStaff -Seat pm.pm -Tree nope -Model opus', "-Tree names 'nope', which is not a tree in org.json. Trees: mine, hq.")
-        'nothing to change'                = @('tkStaff -Seat pm.pm', "Nothing to change in 'pm.pm': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle or -Merges.")
+        'nothing to change'                = @('tkStaff -Seat pm.pm', "Nothing to change in 'pm.pm': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle, -Merges or -Vacate.")
         'an -IfMatch that is no hash'      = @('tkStaff -Seat pm.pm -Model opus -IfMatch abc', "-IfMatch 'abc' is not a SHA-256: 64 hex digits")
         'a role file nobody has'           = @('tkStaff -Seat pm.pm -RoleName nope.prompt.md', "names the prompt 'nope.prompt.md', which is not a file in")
         '-Seat with -Preset'               = @('tkStaff -Seat pm.pm -Preset S', '-Seat does not go with -Preset: it edits one seat of a tree that is already saved.')
@@ -988,6 +1058,135 @@ try {
     $before = Get-OrgBytes
     $again = Invoke-OrgChart "tkStaff -Seat pm.pm -Session desk-pm 3>`$null"
     Assert-True '  the same edit again writes nothing' ($again.Exit -eq '0' -and $again.All.Contains('nothing changed') -and (Test-SameBytes $before (Get-OrgBytes))) $again.All
+
+    # -- 8. Staff -Seat -Vacate, the short address, a dash-led address -------------------
+    Write-Host ""
+    Write-Host "-- Staff -Seat -Vacate and the short address, typed ----" -ForegroundColor Cyan
+    # A seat with every key the writer knows and two it does not, in the writer's layout,
+    # the model and the session in the middle of it; a person's seat beside it.
+    $full = [ordered]@{
+        activeTree = 'mine'
+        trees      = @([ordered]@{
+                id = 'mine'; title = 'Vacate'; activatedAt = '2026-01-02'
+                positions = @(
+                    [ordered]@{ id = 'owner'; title = 'Owner'; seats = @([ordered]@{ id = 'owner'; person = 'Sam' }) }
+                    [ordered]@{ id = 'lead'; title = 'Team lead'; prompt = 'team-lead.prompt.md'; reportsTo = 'owner'; seats = @(
+                            [ordered]@{ _s = 'a note'; id = 'alpha'; roleTitle = 'Alpha lead'; model = $idOf.opus; badge = 7; session = 'desk-one'; space = 'github-demo'; merges = $true; person = 'Kim' }
+                            [ordered]@{ id = 'beta'; model = $idOf.opus }
+                        ) }
+                    [ordered]@{ id = 'vp-product'; title = 'VP of product'; prompt = 'vp-of-product.prompt.md'; reportsTo = 'owner'; seats = @([ordered]@{ id = 'vp-product'; model = $idOf.opus; session = 'desk-two'; merges = $true }) }
+                    [ordered]@{ id = 'builder'; title = 'Builder'; reportsTo = 'lead'; defaultModel = 'sonnet'; seats = @() }
+                )
+            })
+    }
+    $fullText = (ConvertTo-P20ConfigJson $full) + "`n"
+    [System.IO.File]::WriteAllBytes($orgPath, $utf8.GetBytes($fullText))
+    $before = Get-OrgBytes
+    $vacDry = Invoke-OrgChart "tkStaff -Seat lead.alpha -Vacate -WhatIf 3>`$null"
+    Assert-True '-Vacate -WhatIf: exit 0, says what it would do, writes nothing' (
+        $vacDry.Exit -eq '0' -and $vacDry.All.Contains('What if:') -and (Test-SameBytes $before (Get-OrgBytes))) $vacDry.All
+    $vac = Invoke-OrgChart "tkStaff -Seat lead.alpha -Vacate 3>`$null"
+    Assert-Equal '-Vacate: exit 0' '0' $vac.Exit $vac.All
+    Assert-True '  one change line: the model and the session gone, the person, Space and merge kept' (
+        $vac.All.Contains("lead.alpha: Alpha lead (Team lead) $dot $($idOf.opus), Kim [github-demo] (desk-one) $dot merges -> Alpha lead (Team lead) $dot Kim [github-demo] $dot merges")) $vac.All
+    $wantFull = [ordered]@{ activeTree = 'mine'; trees = @($full.trees[0]) }
+    $alphaWant = $full.trees[0].positions[1].seats[0]
+    $alphaWant.Remove('model'); $alphaWant.Remove('session')
+    $wantText = (ConvertTo-P20ConfigJson $wantFull) + "`n"
+    Assert-Equal '  the file: every key but the model and the session, byte for byte in the writer''s layout' $wantText ([System.IO.File]::ReadAllText($orgPath))
+    $linesGone = @(Compare-Object @($fullText -split "`n") @(([System.IO.File]::ReadAllText($orgPath)) -split "`n") | Where-Object { $_.SideIndicator -eq '<=' } | ForEach-Object { $_.InputObject.Trim() } | Sort-Object)
+    Assert-Equal '  and the two lines taken away are those two' ("`"model`": `"$($idOf.opus)`",|`"session`": `"desk-one`",") ($linesGone -join '|')
+    $before = Get-OrgBytes
+    $vacAgain = Invoke-OrgChart "tkStaff -Seat lead.alpha -Vacate 3>`$null"
+    Assert-True '-Vacate on a seat with no model and no session: exit 0, nothing written' (
+        $vacAgain.Exit -eq '0' -and $vacAgain.All.Contains('nothing changed, so nothing was written') -and (Test-SameBytes $before (Get-OrgBytes))) $vacAgain.All
+    $chartAfter = Invoke-OrgChart "'BEGIN:text'; tkOrgChart; 'END:text'"
+    $chartText = Get-Section $chartAfter.All 'text'
+    Assert-True '  OrgChart: the person keeps the seat staffed, and the count says so' (
+        $chartText.Contains("  Alpha lead $dot Kim [github-demo] $dot merges") -and $chartText.EndsWith('staffed: 4 of 4')) $chartText
+
+    # -IfMatch with -Vacate: a stale hash is refused; the file's own hash, by the short address, vacates.
+    $stale = '0' * 64
+    $before = Get-OrgBytes
+    $vacStale = Invoke-OrgChart "tkStaff -Seat vp-product -Vacate -IfMatch $stale 3>`$null"
+    Assert-True '-Vacate -IfMatch with a stale hash: exit 2, changed since, nothing written' (
+        $vacStale.Exit -eq '2' -and $vacStale.All.Contains('changed since you read it') -and (Test-SameBytes $before (Get-OrgBytes))) $vacStale.All
+    $vacShort = Invoke-OrgChart "tkStaff -Seat vp-product -Vacate -IfMatch $(Get-OrgHash) 3>`$null"
+    Assert-True '-Vacate by the short address, with the file''s hash: exit 0, the change line names the whole address' (
+        $vacShort.Exit -eq '0' -and $vacShort.All.Contains("vp-product.vp-product: VP of product $dot $($idOf.opus) (desk-two) $dot merges -> VP of product $dot vacant $dot merges")) $vacShort.All
+    $vpSeat = (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'vp-product')[0]
+    Assert-True '  the seat keeps its merge and loses its model and session' ($vpSeat.merges -eq $true -and -not $vpSeat.PSObject.Properties['model'] -and -not $vpSeat.PSObject.Properties['session'])
+    $chartAfter = Invoke-OrgChart "'BEGIN:text'; tkOrgChart; 'END:text'"
+    Assert-True '  OrgChart says vacant, and counts it' ((Get-Section $chartAfter.All 'text').Contains("VP of product $dot vacant $dot merges") -and (Get-Section $chartAfter.All 'text').EndsWith('staffed: 3 of 4')) $chartAfter.All
+
+    # The short address staffs too, and <position>.<seat> works as before.
+    $short = Invoke-OrgChart "tkStaff -Seat vp-product -Model fable -Session desk-two 3>`$null"
+    Assert-True 'the short address, where the position has one seat: exit 0, staffed' (
+        $short.Exit -eq '0' -and (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'vp-product')[0].model -eq $idOf.fable -and $short.All.Contains('vp-product.vp-product: ')) $short.All
+    $long = Invoke-OrgChart "tkStaff -Seat lead.beta -Session desk-three 3>`$null"
+    Assert-True 'the whole address still staffs a seat of an office of two' ($long.Exit -eq '0' -and @(@(Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'lead') | Where-Object { $_.id -eq 'beta' })[0].session -eq 'desk-three') $long.All
+    $before = Get-OrgBytes
+    $several = Invoke-OrgChart "tkStaff -Seat lead -Vacate 3>`$null"
+    Assert-True 'the short address of an office of two: exit 2, naming its seats, nothing written' (
+        $several.Exit -eq '2' -and $several.All.Contains('Its seats: lead.alpha, lead.beta.') -and (Test-SameBytes $before (Get-OrgBytes))) $several.All
+
+    # -Vacate:$false is -Vacate absent: alone, nothing to change; beside a change, no contradiction.
+    $before = Get-OrgBytes
+    $vacFalse = Invoke-OrgChart "tkStaff -Seat lead.beta -Vacate:`$false 3>`$null"
+    Assert-True '-Vacate:$false alone: exit 2, nothing to change, nothing written' (
+        $vacFalse.Exit -eq '2' -and $vacFalse.All.Contains("Nothing to change in 'lead.beta': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle, -Merges or -Vacate.") -and (Test-SameBytes $before (Get-OrgBytes))) $vacFalse.All
+    $vacFalseSet = Invoke-OrgChart "tkStaff -Seat lead.beta -Session desk-four -Vacate:`$false 3>`$null"
+    Assert-True '-Vacate:$false beside -Session: the session is set, no contradiction' (
+        $vacFalseSet.Exit -eq '0' -and @(@(Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'lead') | Where-Object { $_.id -eq 'beta' })[0].session -eq 'desk-four') $vacFalseSet.All
+    $vacFalseOff = Invoke-OrgChart "tkStaff -Activate mine -Vacate:`$false 3>`$null"
+    Assert-True '-Vacate:$false without -Seat is no seat switch: -Activate answers as it would alone' (
+        $vacFalseOff.Exit -eq '0' -and -not $vacFalseOff.All.Contains('-Vacate goes with -Seat')) $vacFalseOff.All
+    $mergesFalse = Invoke-OrgChart "tkStaff -Seat lead.beta -Merges:`$false 3>`$null"
+    Assert-True '-Merges:$false alone is nothing to change too' ($mergesFalse.Exit -eq '2' -and $mergesFalse.All.Contains("Nothing to change in 'lead.beta'")) $mergesFalse.All
+
+    # Dotted ids: the change line names the position and the seat as resolved, each quoted
+    # where either id holds a dot, plain <position>.<seat> where neither does.
+    $dotted = [ordered]@{
+        trees = @([ordered]@{
+                id = 'dots'
+                positions = @(
+                    [ordered]@{ id = 'owner'; seats = @([ordered]@{ id = 'owner'; person = 'Sam' }) }
+                    [ordered]@{ id = 'x'; reportsTo = 'owner'; seats = @([ordered]@{ id = 'y' }) }
+                    [ordered]@{ id = 'x.y'; reportsTo = 'owner'; seats = @([ordered]@{ id = 'z' }) }
+                    [ordered]@{ id = 'a.b'; reportsTo = 'owner'; seats = @([ordered]@{ id = 'only' }) }
+                    [ordered]@{ id = 'p'; reportsTo = 'owner'; seats = @([ordered]@{ id = 'q.r' }) }
+                )
+            })
+    }
+    [System.IO.File]::WriteAllBytes($orgPath, $utf8.GetBytes((ConvertTo-P20ConfigJson $dotted) + "`n"))
+    $dotRows = @(
+        @{ Address = 'x.y'; Want = 'x.y: '; Position = 'x'; Seat = 'y' }
+        @{ Address = 'x.y.z'; Want = "'x.y'.'z': "; Position = 'x.y'; Seat = 'z' }
+        @{ Address = 'a.b'; Want = "'a.b'.'only': "; Position = 'a.b'; Seat = 'only' }
+        @{ Address = 'p.q.r'; Want = "'p'.'q.r': "; Position = 'p'; Seat = 'q.r' }
+    )
+    foreach ($row in $dotRows) {
+        $ran = Invoke-OrgChart "tkStaff -Seat '$($row.Address)' -Session 'desk-$($row.Seat)' 3>`$null"
+        $set = @(@(Get-OrgSeat (Get-OrgTree (Read-Org) 'dots') $row.Position) | Where-Object { $_.id -eq $row.Seat })[0].session
+        Assert-True "the address '$($row.Address)': the change line starts $($row.Want.Trim()) and the seat it names is the one written" (
+            $ran.Exit -eq '0' -and ($ran.All -split "`n" | Where-Object { $_.StartsWith($row.Want) }).Count -eq 1 -and $set -eq "desk-$($row.Seat)") $ran.All
+    }
+    $again = Invoke-OrgChart "tkStaff -Seat 'x.y.z' -Session 'desk-z' 3>`$null"
+    Assert-True '  and the nothing-changed line names it the same way' ($again.All.Contains("'x.y'.'z': ") -and $again.All.Contains('nothing changed')) $again.All
+    [System.IO.File]::WriteAllBytes($orgPath, $utf8.GetBytes($fullText))
+
+    # An address that starts with a dash the binder reads: joined to -Seat it binds as the
+    # address, names no seat, and is a stated refusal that writes nothing -- never a switch.
+    foreach ($code in @(0x2D, 0x2013, 0x2014, 0x2015)) {
+        $before = Get-OrgBytes
+        $ran = Invoke-OrgChart "tkStaff -Seat:([string][char]$code + 'WhatIf') -Model opus 3>`$null"
+        Assert-True ("an address that starts with U+{0:X4}: exit 2, not a seat, no What if, nothing written" -f $code) (
+            $ran.Exit -eq '2' -and $ran.All.Contains("WhatIf' is not a seat of the tree 'mine'.") -and -not $ran.All.Contains('What if:') -and (Test-SameBytes $before (Get-OrgBytes))) $ran.All
+    }
+    $before = Get-OrgBytes
+    $bare = Invoke-OrgChart "tkStaff -Seat -WhatIf -Model opus 3>`$null"
+    Assert-True 'a bare -Seat -WhatIf: the binder refuses the missing address, no What if, nothing written' (
+        $bare.All.Contains('Seat') -and -not $bare.All.Contains('What if:') -and (Test-SameBytes $before (Get-OrgBytes))) $bare.All
 
     for ($i = 0; $i -lt $neverWritten.Count; $i++) {
         Assert-True "Staff never wrote $($neverWritten[$i].Replace($root, '<scratch>').Replace($pkgRoot, '<package>')): every file the same bytes as before its cases" ((Get-Snapshot $neverWritten[$i]) -ceq $neverBefore[$i])

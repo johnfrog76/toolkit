@@ -1,2 +1,4 @@
 root · opus
 root · vacant
+
+staffed: 1 of 2

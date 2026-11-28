@@ -1,1 +1,3 @@
 Root · haiku
+
+staffed: 1 of 1
