@@ -90,6 +90,7 @@ never a Space.
 | `session` | no | **the session's name** (`lead-session`): the address readies and messages route to, not a tool's session id |
 | `merges` | no | `true` on the seat that holds the merge. At most one per tree should; more is allowed for a stand-in while it stands in |
 | `space` | no | the Space slug the seat serves. Not checked against the hub's Spaces |
+| `portrait` | no | the picture the Org tab draws in the seat, on a seat that takes one ([A seat's portrait](#a-seats-portrait)): an id of `consts.json` `org.portraits`. Absent is the seat's own default face |
 | `machine`, `active` | no, **retired** | read without a word, never drawn |
 
 **Derived, never written:** a seat is `staffed` when it names a `model` or a `person`, and `vacant` otherwise
@@ -237,6 +238,36 @@ seats, a person's seat, a pool, a seat with a session and nothing else (vacant),
   card, so they are one line, `Builder · pool: sonnet for crew cards, ...`, not a seat each. A position with
   no seats and no default model reads `... · no seats`.
 
+### A seat's portrait
+
+A seat may choose the picture the Org tab draws in it. **One rule says which seats take one:** `consts.json`
+`org.portraitSeats`, a list whose entries are `root` -- the root position's seat, the owner's -- or a key of
+`org.roles`, naming the seats of every position whose role (its `prompt`) is that file (`vpEngineering`,
+`vpProduct`). Today it is `["root"]`: **the owner's seat alone takes a portrait.** The CLI
+(`Test-P20OrgTakesPortrait`), the agent (`takes_portrait`) and the web (`takesPortrait`) each read that list,
+so widening it to the two VPs is a change to that one line and to the rows of the shared table below, and to
+nothing else. A seat is told by its position's role and its place in the tree, never by its id: a hand-written
+org with differently named positions takes a portrait at its root, and at a VP's office only where that office
+names the VP's role file.
+
+The portrait is an id of `consts.json` `org.portraits`: the cast's people -- `minimalist`, `pm`, `dev-hero`,
+`designer`, `ultrawide`, `ops-dev`, `new-hire`, `vibemancer`, `qa` -- and four characters of their own,
+`robot`, `alien`, `fat-cat` and `kubernetes-wizard`. Ids are matched exactly, case included, after a trim. **No
+key is the default**, which is the face the seat always drew (the owner's own, for the owner): there is no id for
+it, so `owner` is not one. Two seats may carry the same portrait. The seat's name and its position's title do not
+change with it.
+
+A reader serves `portrait` on a seat only where the rule names the seat and the id is one of the list; any other
+non-empty `portrait` -- an unknown id, or one on a seat the rule does not name -- is **ignored for drawing and
+said once as a warning** (`org.json: the portrait 'Robot' in seat 'owner' of position 'owner' in tree 't' is not
+one this tool draws -- ignored.`, `org.json: the portrait in seat 'pm' of position 'pm' in tree 't' is on a seat
+that takes none -- ignored.`), the way an unread key is, and the file is never refused for it. An empty one is no
+portrait and is not said. `Staff -Seat <seat> -Portrait <id>` is the one writer ([The one writer:
+Staff](#the-one-writer-staff)). [`Tests/fixtures/org/portraits.json`](../../Tests/fixtures/org/portraits.json) holds
+both halves to it: every id, valid or not, and a row per seat kind -- the owner with a valid id, an unknown id and
+an empty one, each VP, a PM, a team lead, a builder and a pool -- with whether the rule names the seat and what
+`Staff` does.
+
 ## What is checked
 
 The whole file is checked before anything is drawn -- **every** tree, not only the one in use -- and the
@@ -281,7 +312,9 @@ same tolerance of an unknown key, the same derived state) is held to the same fi
 document: the tree in use (or the one `-Tree` / `?tree=<id>` asks for) with its positions in **tree order** -- the root, then each position's reports in the file's
 order, depth first -- each with its `level`, root 0. Every key is always there; one that is not set is
 `null` (an array that is not set is `[]`), so both halves serialise one shape. `merges` is `true` or `false`
-where the file says so and `null` where it does not.
+where the file says so and `null` where it does not. **One key is the exception:** a seat's `portrait` is there
+only where it is served ([A seat's portrait](#a-seats-portrait)), so a file without one reads exactly as before.
+`OrgChart` prints it after the seat's line, `Owner · Sam · portrait: robot`.
 
 ```json
 {
@@ -438,7 +471,7 @@ and it writes `org.json` and nothing else. Three forms:
 ```text
 Staff -Preset S|M|L [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-WhatIf]
 Staff -Seat <position>[.<seat>] [-Tree <id>] [-Model <model>] [-Person <name>] [-Session <name>] [-Space <slug>]
-      [-RoleName <file>] [-RoleTitle <text>] [-Merges] [-IfMatch <sha256>] [-WhatIf]
+      [-RoleName <file>] [-RoleTitle <text>] [-Portrait <id>] [-Merges] [-IfMatch <sha256>] [-WhatIf]
 Staff -Seat <position>[.<seat>] -Vacate [-Tree <id>] [-IfMatch <sha256>] [-WhatIf]
 Staff -Activate <tree-id> [-WhatIf]
 ```
@@ -487,18 +520,22 @@ Staff -Activate <tree-id> [-WhatIf]
   the position. **`-RoleName` (the position's `prompt`) and `-RoleTitle` (its `title`) belong to the position**, so
   they change every seat of it; a seat's own `roleTitle` is left as it is. An empty value takes that key away (an
   empty `-Space` on any seat). A typed value is one line: a newline, a tab or any other control character in it is
-  refused, naming the switch, and nothing is stored. **The owner's seat** -- the root's -- takes `-Person` only, and
-  never an empty one: `-Model` on it is refused, because the owner is a person. It prints one line,
+  refused, naming the switch, and nothing is stored. **`-Portrait <id>`** chooses the seat's picture on a seat
+  [the rule](#a-seats-portrait) names -- today the owner's alone -- and is refused on any other seat, empty or not,
+  naming the seats of the tree that take one (`-Portrait does not go on 'pm.pm', a PM's seat: in the tree 'mine',
+  the seats that take one: owner.owner.`); an id that is not one of `org.portraits` is refused naming them, and
+  `-Portrait ''` takes the key away, back to the seat's own default. **The owner's seat** -- the root's -- takes
+  `-Person` and `-Portrait` only, and never an empty `-Person`: `-Model` on it is refused, because the owner is a person. It prints one line,
   `<position>.<seat>: <before> -> <after>`, each side the whole seat -- the position's title (a seat's own
-  `roleTitle` before it), the model and the person, `[space]`, `(session)`, `· merges`, and `{role file}` where
+  `roleTitle` before it), the model and the person, `[space]`, `(session)`, `· merges`, `· portrait: <id>`, and `{role file}` where
   `-RoleName` was given -- so every field the call set shows as a change; a call that changes nothing writes
   nothing and exits 0. No tree is stamped by a seat's edit.
 - **`-Vacate` empties a seat:** it takes the seat's `model` and `session` away, and **nothing else**. The seat's
   `space`, its own `roleTitle`, its `merges`, a `person`, its notes and every other key stay, each in its place, so
   the file differs by those two lines. A `person` is kept because the seat is a person's as much as a model's: a seat
   a person holds still reads staffed after `-Vacate`, and `-Person ''` is how the person leaves. It goes alone:
-  `-Model`, `-Person` or `-Session` with it is refused as a contradiction, and `-Space`, `-RoleName`, `-RoleTitle` or
-  `-Merges` beside it as a second change. The owner's seat is never vacated (`The owner's seat cannot be vacated:
+  `-Model`, `-Person` or `-Session` with it is refused as a contradiction, and `-Space`, `-RoleName`, `-RoleTitle`,
+  `-Merges` or `-Portrait` beside it as a second change: a portrait is kept by `-Vacate`, as a person is. The owner's seat is never vacated (`The owner's seat cannot be vacated:
   the owner is a person, and the seat always has one.`). It follows every rule above: the change line, `-WhatIf`,
   `-IfMatch`, the crash-safe write and the same bytes on both hosts; a seat with no model and no session writes
   nothing and exits 0.

@@ -890,8 +890,8 @@ try {
 
     # Refusals: exit 2, the sentence once, nothing written.
     $seatRefusals = [ordered]@{
-        '-Model on the owner''s seat'      = @('tkStaff -Seat owner.owner -Model opus', "The owner's seat takes -Person only: -Model does not go on it, because the owner is a person, never a model.")
-        '-Session on the owner''s seat'    = @('tkStaff -Seat owner.owner -Session x', "The owner's seat takes -Person only: -Session does not go on it.")
+        '-Model on the owner''s seat'      = @('tkStaff -Seat owner.owner -Model opus', "The owner's seat takes -Person and -Portrait only: -Model does not go on it, because the owner is a person, never a model.")
+        '-Session on the owner''s seat'    = @('tkStaff -Seat owner.owner -Session x', "The owner's seat takes -Person and -Portrait only: -Session does not go on it.")
         'an empty owner'                   = @("tkStaff -Seat owner.owner -Person ''", "-Person needs a name: the owner's seat always has a person, in your own words.")
         'a model not in the map'           = @('tkStaff -Seat pm.pm -Model gpt-9', "-Model 'gpt-9' is not a model id or a family in Config/models.json. Families: ")
         '-Space on a seat that is no team lead''s' = @('tkStaff -Seat pm.pm -Space demo', "-Space is for a team lead's seat, and 'pm.pm' is a PM's: its position's role is not team-lead.prompt.md.")
@@ -911,7 +911,7 @@ try {
         '-Vacate with -RoleTitle'          = @('tkStaff -Seat pm.pm -Vacate -RoleTitle Lead', '-Vacate takes away the model and the session and changes nothing else, so -RoleTitle does not go with it.')
         '-Vacate without -Seat'            = @('tkStaff -Activate hq -Vacate', '-Vacate goes with -Seat: it changes the seat -Seat names.')
         'a tree the file does not have'    = @('tkStaff -Seat pm.pm -Tree nope -Model opus', "-Tree names 'nope', which is not a tree in org.json. Trees: mine, hq.")
-        'nothing to change'                = @('tkStaff -Seat pm.pm', "Nothing to change in 'pm.pm': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle, -Merges or -Vacate.")
+        'nothing to change'                = @('tkStaff -Seat pm.pm', "Nothing to change in 'pm.pm': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle, -Merges, -Portrait or -Vacate.")
         'an -IfMatch that is no hash'      = @('tkStaff -Seat pm.pm -Model opus -IfMatch abc', "-IfMatch 'abc' is not a SHA-256: 64 hex digits")
         'a role file nobody has'           = @('tkStaff -Seat pm.pm -RoleName nope.prompt.md', "names the prompt 'nope.prompt.md', which is not a file in")
         '-Seat with -Preset'               = @('tkStaff -Seat pm.pm -Preset S', '-Seat does not go with -Preset: it edits one seat of a tree that is already saved.')
@@ -1134,7 +1134,7 @@ try {
     $before = Get-OrgBytes
     $vacFalse = Invoke-OrgChart "tkStaff -Seat lead.beta -Vacate:`$false 3>`$null"
     Assert-True '-Vacate:$false alone: exit 2, nothing to change, nothing written' (
-        $vacFalse.Exit -eq '2' -and $vacFalse.All.Contains("Nothing to change in 'lead.beta': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle, -Merges or -Vacate.") -and (Test-SameBytes $before (Get-OrgBytes))) $vacFalse.All
+        $vacFalse.Exit -eq '2' -and $vacFalse.All.Contains("Nothing to change in 'lead.beta': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle, -Merges, -Portrait or -Vacate.") -and (Test-SameBytes $before (Get-OrgBytes))) $vacFalse.All
     $vacFalseSet = Invoke-OrgChart "tkStaff -Seat lead.beta -Session desk-four -Vacate:`$false 3>`$null"
     Assert-True '-Vacate:$false beside -Session: the session is set, no contradiction' (
         $vacFalseSet.Exit -eq '0' -and @(@(Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'lead') | Where-Object { $_.id -eq 'beta' })[0].session -eq 'desk-four') $vacFalseSet.All
@@ -1187,6 +1187,117 @@ try {
     $bare = Invoke-OrgChart "tkStaff -Seat -WhatIf -Model opus 3>`$null"
     Assert-True 'a bare -Seat -WhatIf: the binder refuses the missing address, no What if, nothing written' (
         $bare.All.Contains('Seat') -and -not $bare.All.Contains('What if:') -and (Test-SameBytes $before (Get-OrgBytes))) $bare.All
+
+    # -- 9. Staff -Seat -Portrait: a seat's portrait ------------------------------------------
+    # docs/hub/org.md, "A seat's portrait". One list (consts.json org.portraits), one rule
+    # naming the seats that take one (org.portraitSeats), and one table both halves assert
+    # (Tests/fixtures/org/portraits.json): its ids, and a row per seat kind.
+    Write-Host ""
+    Write-Host "-- Staff -Seat -Portrait, a seat's portrait, typed ----" -ForegroundColor Cyan
+    $portraitTable = Read-Fixture 'portraits.json' | ConvertFrom-Json
+    Assert-Equal 'the portraits are consts.json org.portraits, in order' (@((Get-P20Consts).org.portraits) -join ',') (@(Get-P20OrgPortraits) -join ',')
+    Assert-True 'the owner''s own face is not a portrait id: no key is the default' (@(Get-P20OrgPortraits) -notcontains 'owner')
+    foreach ($row in @($portraitTable.ids)) {
+        Assert-Equal "a portrait ('$($row.value)'): valid is $($row.valid)" ([bool]$row.valid) (Test-P20OrgPortrait ([string]$row.value))
+    }
+    Assert-True 'every listed id is a valid row of the table' (@(Get-P20OrgPortraits | Where-Object { $id = $_; -not @($portraitTable.ids | Where-Object { $_.value -ceq $id -and $_.valid }) }).Count -eq 0)
+
+    # The seat rows: the rule, the reader and the verb, for every seat kind of the table's tree.
+    $tableTreeText = ConvertTo-P20ConfigJson ([pscustomobject]@{ trees = @($portraitTable.tree) })
+    function Get-PortraitTreeWith([string]$Address, [string]$Value) {
+        $doc = $tableTreeText | ConvertFrom-Json
+        foreach ($position in @($doc.trees[0].positions)) {
+            foreach ($one in @($position.seats)) {
+                if ("$($position.id).$($one.id)" -ceq $Address) { $one | Add-Member -NotePropertyName portrait -NotePropertyValue $Value }
+            }
+        }
+        return (ConvertTo-P20ConfigJson $doc)
+    }
+    [System.IO.File]::WriteAllBytes($orgPath, $utf8.GetBytes($tableTreeText + "`n"))
+    foreach ($row in @($portraitTable.seats)) {
+        $positionObj = @($portraitTable.tree.positions | Where-Object { $_.id -ceq ([string]$row.seat).Split('.')[0] })[0]
+        $isRootRow = -not [string]$positionObj.reportsTo
+        Assert-Equal "the rule ($($row.kind)): takes a portrait is $($row.takes)" ([bool]$row.takes) (Test-P20OrgTakesPortrait -IsRoot $isRootRow -Prompt ([string]$positionObj.prompt))
+        if ($row.outcome -ne 'refused-pool' -and [string]$row.value) {
+            $readRow = Read-P20OrgText -Text (Get-PortraitTreeWith $row.seat $row.value) -PromptsRoot $hubDir -PackageRoot $pkgRoot
+            $served = @($readRow.Chart.tree.positions | ForEach-Object { $pos = $_; @($_.seats) | Where-Object { $_.Contains('portrait') } | ForEach-Object { "$($pos.id).$($_.id)=$($_['portrait'])" } })
+            if ($row.outcome -eq 'written') {
+                Assert-True "  the reader serves it on that seat alone, with no word" (($served -join ',') -ceq "$($row.seat)=$($row.value)" -and @($readRow.Warnings).Count -eq 0) (($served -join ',') + ' ' + (@($readRow.Warnings) -join ' '))
+            }
+            else {
+                Assert-True "  the reader serves none, reads the file, and says it once" ($readRow.Status -eq 'ok' -and $served.Count -eq 0 -and @($readRow.Warnings).Count -eq 1) (@($readRow.Warnings) -join ' ')
+            }
+        }
+        $before = Get-OrgBytes
+        $ran = Invoke-OrgChart "tkStaff -Seat $($row.seat) -Portrait '$($row.value)' 3>`$null"
+        $seatNow = $null
+        foreach ($position in @((Read-Org).trees[0].positions)) { foreach ($one in @($position.seats)) { if ("$($position.id).$($one.id)" -ceq $row.seat) { $seatNow = $one } } }
+        switch ($row.outcome) {
+            'written' { Assert-True "  Staff writes it ($($row.kind), '$($row.value)')" ($ran.Exit -eq '0' -and $seatNow.portrait -ceq $row.value) $ran.All }
+            'removed' { Assert-True "  Staff takes the key away ($($row.kind), empty): the seat's own default" ($ran.Exit -eq '0' -and -not $seatNow.PSObject.Properties['portrait']) $ran.All }
+            default {
+                $words = @{ 'refused-id' = "-Portrait '$($row.value)' is not a portrait this tool draws."; 'refused-seat' = "-Portrait does not go on '$($row.seat)'"; 'refused-pool' = "is a pool" }[[string]$row.outcome]
+                Assert-True "  Staff refuses it ($($row.kind), '$($row.value)'): exit 2, says why once, writes nothing" (
+                    $ran.Exit -eq '2' -and ([regex]::Matches($ran.All, [regex]::Escape($words))).Count -eq 1 -and (Test-SameBytes $before (Get-OrgBytes))) $ran.All
+                if ($row.outcome -eq 'refused-seat') {
+                    Assert-True '    and names the seats that take one' ($ran.All.Contains("in the tree 'portraits', the seats that take one: owner.owner.")) $ran.All
+                }
+            }
+        }
+    }
+
+    [System.IO.File]::WriteAllBytes($orgPath, $utf8.GetBytes($fullText))
+    $before = Get-OrgBytes
+    $picDry = Invoke-OrgChart "tkStaff -Seat owner -Portrait robot -WhatIf 3>`$null"
+    Assert-True '-Portrait -WhatIf: exit 0, the change line, nothing written' (
+        $picDry.Exit -eq '0' -and $picDry.All.Contains("owner.owner: Owner $dot Sam -> Owner $dot Sam $dot portrait: robot") -and (Test-SameBytes $before (Get-OrgBytes))) $picDry.All
+    $pic = Invoke-OrgChart "tkStaff -Seat owner -Portrait robot -IfMatch $(Get-OrgHash) 3>`$null; 'BEGIN:text'; tkOrgChart 3>`$null; 'END:text'; 'BEGIN:json'; tkOrgChart -AsJson 3>`$null; 'END:json'"
+    Assert-True '-Portrait by the short address, with -IfMatch: exit 0, one change line' (
+        $pic.All.Contains("owner.owner: Owner $dot Sam -> Owner $dot Sam $dot portrait: robot")) $pic.All
+    $ownerSeat = (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'owner')[0]
+    Assert-True '  the owner''s seat carries the id, its name and its position''s title as they were' (
+        $ownerSeat.portrait -ceq 'robot' -and $ownerSeat.person -ceq 'Sam' -and (Get-OrgPosition (Get-OrgTree (Read-Org) 'mine') 'owner').title -ceq 'Owner') ($ownerSeat | ConvertTo-Json -Compress)
+    $samLine = [regex]::Match($fullText, '(?m)^( *)"person": "Sam"$')
+    $picWant = $fullText.Replace($samLine.Value, $samLine.Value + ",`n" + $samLine.Groups[1].Value + '"portrait": "robot"')
+    Assert-Equal '  the file: the one key added at the end of the seat, every other byte as it was' $picWant ([System.IO.File]::ReadAllText($orgPath))
+    Assert-True '  OrgChart says it on the owner''s line' ((Get-Section $pic.All 'text').Contains("Owner $dot Sam $dot portrait: robot")) $pic.All
+    $picJson = (Get-Section $pic.All 'json') | ConvertFrom-Json
+    Assert-Equal '  and OrgChart -AsJson carries it on the owner''s seat' 'robot' ([string]@($picJson.tree.positions[0].seats)[0].portrait) (Get-Section $pic.All 'json')
+    Assert-True '  and on no other seat' (@($picJson.tree.positions | Select-Object -Skip 1 | ForEach-Object { @($_.seats) } | Where-Object { $_.PSObject.Properties['portrait'] }).Count -eq 0)
+
+    $before = Get-OrgBytes
+    $picSame = Invoke-OrgChart "tkStaff -Seat owner.owner -Portrait robot 3>`$null"
+    Assert-True 'the same portrait again: exit 0, nothing changed, nothing written' (
+        $picSame.Exit -eq '0' -and $picSame.All.Contains('nothing changed, so nothing was written') -and (Test-SameBytes $before (Get-OrgBytes))) $picSame.All
+    $picBoth = Invoke-OrgChart "tkStaff -Seat owner -Person Kim -Portrait ' kubernetes-wizard ' 3>`$null"
+    Assert-True '-Person and -Portrait together on the owner: both written, the id trimmed' (
+        $picBoth.Exit -eq '0' -and (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'owner')[0].portrait -ceq 'kubernetes-wizard' -and (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'owner')[0].person -ceq 'Kim') $picBoth.All
+    $picGone = Invoke-OrgChart "tkStaff -Seat owner -Portrait '' 3>`$null; 'BEGIN:text'; tkOrgChart 3>`$null; 'END:text'"
+    Assert-True "an empty -Portrait takes the key away: the default again" (
+        $picGone.Exit -eq '0' -and -not (Get-OrgSeat (Get-OrgTree (Read-Org) 'mine') 'owner')[0].PSObject.Properties['portrait'] -and
+        $picGone.All.Contains("owner.owner: Owner $dot Kim $dot portrait: kubernetes-wizard -> Owner $dot Kim") -and -not (Get-Section $picGone.All 'text').Contains('portrait')) $picGone.All
+
+    $portraitList = (@(Get-P20OrgPortraits) -join ', ')
+    $portraitRefusals = [ordered]@{
+        'an id the tool does not draw'      = @('tkStaff -Seat owner -Portrait mascot', "-Portrait 'mascot' is not a portrait this tool draws. Portraits: $portraitList.")
+        'an id in another case'             = @('tkStaff -Seat owner -Portrait Robot', "-Portrait 'Robot' is not a portrait this tool draws.")
+        'the default face by name'          = @('tkStaff -Seat owner -Portrait owner', "-Portrait 'owner' is not a portrait this tool draws.")
+        'a VP''s seat'                      = @('tkStaff -Seat vp-product -Portrait robot', "-Portrait does not go on 'vp-product.vp-product', a VP of product's seat: in the tree 'mine', the seats that take one: owner.owner.")
+        '-Portrait with -Vacate on the owner' = @('tkStaff -Seat owner -Vacate -Portrait robot', '-Vacate takes away the model and the session and changes nothing else, so -Portrait does not go with it.')
+        '-Portrait with -Vacate elsewhere'  = @('tkStaff -Seat lead.alpha -Vacate -Portrait robot', '-Vacate takes away the model and the session and changes nothing else, so -Portrait does not go with it.')
+        '-Portrait without -Seat'           = @('tkStaff -Activate mine -Portrait robot', '-Portrait goes with -Seat: it changes the seat -Seat names.')
+        '-Model beside it on the owner'     = @('tkStaff -Seat owner -Portrait robot -Model opus', "The owner's seat takes -Person and -Portrait only: -Model does not go on it, because the owner is a person, never a model.")
+        'a control character'               = @('tkStaff -Seat owner -Portrait "ro$([char]10)bot"', '-Portrait holds a control character')
+    }
+    foreach ($name in $portraitRefusals.Keys) {
+        $before = Get-OrgBytes
+        $ran = Invoke-OrgChart "$($portraitRefusals[$name][0]) 3>`$null"
+        Assert-Equal "Staff -Portrait refused ($name): exit 2" '2' $ran.Exit $ran.All
+        Assert-True "  says why, once" (([regex]::Matches($ran.All, [regex]::Escape($portraitRefusals[$name][1]))).Count -eq 1) $ran.All
+        Assert-True "  and writes nothing" (Test-SameBytes $before (Get-OrgBytes))
+    }
+    $ownerOnly = Invoke-OrgChart "tkStaff -Seat owner 3>`$null"
+    Assert-True 'nothing to change names -Portrait among the switches' ($ownerOnly.Exit -eq '2' -and $ownerOnly.All.Contains("Nothing to change in 'owner': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle, -Merges, -Portrait or -Vacate.")) $ownerOnly.All
 
     for ($i = 0; $i -lt $neverWritten.Count; $i++) {
         Assert-True "Staff never wrote $($neverWritten[$i].Replace($root, '<scratch>').Replace($pkgRoot, '<package>')): every file the same bytes as before its cases" ((Get-Snapshot $neverWritten[$i]) -ceq $neverBefore[$i])

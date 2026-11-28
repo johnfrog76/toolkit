@@ -109,7 +109,7 @@ function global:Get-P20OrgChart {
 }
 
 # Staff: the org file's one writer. -Preset adds a tree from a preset with the
-# default models, -Seat staffs one seat (-Vacate empties it), -Activate chooses the tree in use; it
+# default models, -Seat staffs one seat (-Vacate empties it; -Portrait is the owner's picture), -Activate chooses the tree in use; it
 # writes org.json and nothing else.
 
 function global:Set-P20Staff {
@@ -130,6 +130,7 @@ function global:Set-P20Staff {
         [string]$Space,
         [string]$RoleName,
         [string]$RoleTitle,
+        [string]$Portrait,
         [switch]$Merges,
         [switch]$Vacate,
         [string]$IfMatch,

@@ -533,6 +533,12 @@ export const ORG = consts.org as {
   roleDefaults: Record<string, string>;
   /** The words of Staff -Seat's -IfMatch refusal: the org file changed since it was read. */
   changedSince: string;
+  /** The ids a seat may carry as its portrait, in the order the picker offers
+   *  them after the default (no key: the face the seat always drew). */
+  portraits: string[];
+  /** The one rule naming the seats that take a portrait: `root` (the root
+   *  position's seat) or a key of `roles` (the seats of a position with that role). */
+  portraitSeats: string[];
 };
 
 /**

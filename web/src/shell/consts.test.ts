@@ -547,6 +547,24 @@ describe("consts.json", () => {
         "butler.prompt.md": "haiku",
       },
       changedSince: "changed since you read it",
+      // The ids a seat may carry as its portrait; no key is the default.
+      portraits: [
+        "minimalist",
+        "pm",
+        "dev-hero",
+        "designer",
+        "ultrawide",
+        "ops-dev",
+        "new-hire",
+        "vibemancer",
+        "qa",
+        "robot",
+        "alien",
+        "fat-cat",
+        "kubernetes-wizard",
+      ],
+      // The one rule naming the seats that take a portrait: the root's seat today.
+      portraitSeats: ["root"],
     });
 
     // The model map a card's Agent id is looked up in (docs/hub/cards.md).

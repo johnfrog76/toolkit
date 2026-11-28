@@ -10,7 +10,7 @@
             [-VpEngineering <model>] [-VpProduct <model>] [-WhatIf]
       Staff -Seat <position>[.<seat>] [-Tree <id>] [-Model <model>] [-Person <name>]
             [-Session <name>] [-Space <slug>] [-RoleName <file>] [-RoleTitle <text>]
-            [-Merges] [-IfMatch <sha256>] [-WhatIf]
+            [-Portrait <id>] [-Merges] [-IfMatch <sha256>] [-WhatIf]
       Staff -Seat <position>[.<seat>] -Vacate [-Tree <id>] [-IfMatch <sha256>] [-WhatIf]
       Staff -Activate <tree-id> [-WhatIf]
 
@@ -30,9 +30,11 @@
     the one -Tree names. -Model (a family or an id, stored as the id), -Person,
     -Session, -Space (a team lead's seat only; a Space the toolkit knows) and -Merges are the seat's own;
     -RoleName (the role file) and -RoleTitle belong to the POSITION, so they
-    change every seat of it. The owner's seat (the root's) takes -Person only.
-    An empty -Model, -Person, -Session, -Space or -RoleTitle takes that key
-    away. -Vacate takes the seat's model and its session away and nothing else:
+    change every seat of it. -Portrait is the seat's picture on the Org page, one
+    of consts.json org.portraits, on a seat consts.json org.portraitSeats names
+    (today the owner's alone) and refused on any other (docs/hub/org.md, "A
+    seat's portrait"). The owner's seat (the root's) takes -Person and -Portrait only. An empty -Model, -Person, -Session, -Space, -RoleTitle or
+    -Portrait takes that key away -- an empty -Portrait is the default picture. -Vacate takes the seat's model and its session away and nothing else:
     a person, the seat's Space, its own roleTitle, its merge and every other key
     stay. It goes alone -- with -Model, -Person or -Session it is a
     contradiction, and any other change is refused beside it -- and never on the
@@ -85,6 +87,8 @@
     The position's role file (its prompt), for every seat of the position.
 .PARAMETER RoleTitle
     The position's title, for every seat of the position.
+.PARAMETER Portrait
+    The seat's portrait on the Org page: one of consts.json org.portraits. Empty is the default. Only on a seat org.portraitSeats names.
 .PARAMETER Merges
     Mark the seat as one that holds the merge.
 .PARAMETER Vacate
@@ -104,6 +108,8 @@
     {cliPrefix}Staff -Seat vp-engineering.vp-engineering -Model opus -Session desk-one
 .EXAMPLE
     {cliPrefix}Staff -Seat owner.owner -Person Sam
+.EXAMPLE
+    {cliPrefix}Staff -Seat owner -Portrait robot
 .EXAMPLE
     {cliPrefix}Staff -Seat vp-product -Model fable
 .EXAMPLE
@@ -143,6 +149,8 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$RoleTitle,
     [Parameter(Mandatory = $false)]
+    [string]$Portrait,
+    [Parameter(Mandatory = $false)]
     [switch]$Merges,
     [Parameter(Mandatory = $false)]
     [switch]$Vacate,
@@ -161,7 +169,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'Initialize-CliFallbacks.ps1')
 
 $p = Get-CliPrefix
-$usage = "${p}Staff -Preset S|M|L [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-WhatIf]  |  ${p}Staff -Seat <position>[.<seat>] [-Tree <id>] [-Model <model>] [-Person <name>] [-Session <name>] [-Space <slug>] [-RoleName <file>] [-RoleTitle <text>] [-Merges] [-IfMatch <sha256>] [-WhatIf]  |  ${p}Staff -Seat <position>[.<seat>] -Vacate [-Tree <id>] [-IfMatch <sha256>] [-WhatIf]  |  ${p}Staff -Activate <tree-id> [-WhatIf]"
+$usage = "${p}Staff -Preset S|M|L [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-WhatIf]  |  ${p}Staff -Seat <position>[.<seat>] [-Tree <id>] [-Model <model>] [-Person <name>] [-Session <name>] [-Space <slug>] [-RoleName <file>] [-RoleTitle <text>] [-Portrait <id>] [-Merges] [-IfMatch <sha256>] [-WhatIf]  |  ${p}Staff -Seat <position>[.<seat>] -Vacate [-Tree <id>] [-IfMatch <sha256>] [-WhatIf]  |  ${p}Staff -Activate <tree-id> [-WhatIf]"
 
 if ($Help) {
     Write-Host ""
@@ -169,7 +177,7 @@ if ($Help) {
     Write-Host ""
     Write-Host "  Usage:" -ForegroundColor Yellow
     Write-Host "    ${p}Staff -Preset S|M|L [-Tree <id>] [-Title <text>] [-Owner <name>] [-VpEngineering <model>] [-VpProduct <model>] [-WhatIf]"
-    Write-Host "    ${p}Staff -Seat <position>[.<seat>] [-Tree <id>] [-Model <model>] [-Person <name>] [-Session <name>] [-Space <slug>] [-RoleName <file>] [-RoleTitle <text>] [-Merges] [-IfMatch <sha256>] [-WhatIf]"
+    Write-Host "    ${p}Staff -Seat <position>[.<seat>] [-Tree <id>] [-Model <model>] [-Person <name>] [-Session <name>] [-Space <slug>] [-RoleName <file>] [-RoleTitle <text>] [-Portrait <id>] [-Merges] [-IfMatch <sha256>] [-WhatIf]"
     Write-Host "    ${p}Staff -Seat <position>[.<seat>] -Vacate [-Tree <id>] [-IfMatch <sha256>] [-WhatIf]"
     Write-Host "    ${p}Staff -Activate <tree-id> [-WhatIf]"
     Write-Host ""
@@ -233,7 +241,7 @@ $Seat = ([string]$Seat).Trim()
 $creating = [bool]$Preset
 $seating = $PSBoundParameters.ContainsKey('Seat')
 $presetOnly = @('Title', 'Owner', 'VpEngineering', 'VpProduct')
-$seatOnly = @('Model', 'Person', 'Session', 'Space', 'RoleName', 'RoleTitle', 'Merges', 'Vacate', 'IfMatch')
+$seatOnly = @('Model', 'Person', 'Session', 'Space', 'RoleName', 'RoleTitle', 'Portrait', 'Merges', 'Vacate', 'IfMatch')
 if ($creating -and $Activate) {
     Stop-Staff '-Activate does not go with -Preset: a saved tree is a draft, and the tree in use stays as it was.' `
         "Save it first, then put it in use with '${p}Staff -Activate <tree-id>'."
@@ -262,7 +270,7 @@ if ($seating) {
     if (-not $Seat) { Stop-Staff '-Seat needs the seat to edit, as <position>.<seat>.' }
     $asked = @($seatOnly | Where-Object { $_ -ne 'IfMatch' -and $PSBoundParameters.ContainsKey($_) })
     if ($asked.Count -eq 0) {
-        Stop-Staff "Nothing to change in '$Seat': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle, -Merges or -Vacate."
+        Stop-Staff "Nothing to change in '$Seat': give -Model, -Person, -Session, -Space, -RoleName, -RoleTitle, -Merges, -Portrait or -Vacate."
     }
     # -Vacate takes the model and the session away and changes nothing else, so it goes alone.
     if ($Vacate) {
@@ -272,7 +280,7 @@ if ($seating) {
                     "Run '${p}Staff -Seat $Seat -Vacate' on its own, or give -$name without -Vacate."
             }
         }
-        foreach ($name in @('Space', 'RoleName', 'RoleTitle', 'Merges')) {
+        foreach ($name in @('Space', 'RoleName', 'RoleTitle', 'Merges', 'Portrait')) {
             if ($PSBoundParameters.ContainsKey($name)) {
                 Stop-Staff "-Vacate takes away the model and the session and changes nothing else, so -$name does not go with it." `
                     "Run them one at a time: '${p}Staff -Seat $Seat -Vacate', then the other change."
@@ -281,11 +289,17 @@ if ($seating) {
     }
     # A typed value is one line of text: a newline, a tab or any other control
     # character is refused, never stored.
-    foreach ($name in @('Person', 'Session', 'RoleTitle', 'Space', 'Model', 'RoleName')) {
+    foreach ($name in @('Person', 'Session', 'RoleTitle', 'Space', 'Model', 'RoleName', 'Portrait')) {
         if ($PSBoundParameters.ContainsKey($name) -and ([string]$PSBoundParameters[$name]) -match '[\x00-\x1F\x7F]') {
             Stop-Staff "-$name holds a control character (a newline, a tab or another): it is one line of text, so nothing was written." `
                 "Give -$name as one line, with no tab."
         }
+    }
+    # A portrait is one the tool draws (consts.json org.portraits), matched exactly
+    # after a trim; an empty one is the default, which takes the key away.
+    if ($PSBoundParameters.ContainsKey('Portrait') -and ([string]$Portrait).Trim() -and -not (Test-P20OrgPortrait $Portrait)) {
+        Stop-Staff "-Portrait '$(([string]$Portrait).Trim())' is not a portrait this tool draws. Portraits: $((Get-P20OrgPortraits) -join ', ')." `
+            "Give one of those, or -Portrait '' for the seat's own default (docs/hub/org.md, `"A seat's portrait`")."
     }
     if ($PSBoundParameters.ContainsKey('IfMatch') -and ([string]$IfMatch).Trim() -notmatch '^[0-9A-Fa-f]{64}$') {
         Stop-Staff "-IfMatch '$IfMatch' is not a SHA-256: 64 hex digits, the hash of $fileName's bytes as you read them." `
@@ -533,17 +547,39 @@ else {
         Stop-Staff "The owner's seat cannot be vacated: the owner is a person, and the seat always has one." `
             "Name another owner with '${p}Staff -Seat $seatAddress -Person <name>'."
     }
+    # A portrait goes on a seat the one rule names (consts.json org.portraitSeats,
+    # Test-P20OrgTakesPortrait): refused on any other seat, empty or not, naming
+    # the seats of this tree that take one.
+    $takes = { param($Position) Test-P20OrgTakesPortrait -IsRoot (-not (Get-P20OrgText (Get-P20OrgField $Position 'reportsTo'))) -Prompt (Get-P20OrgText (Get-P20OrgField $Position 'prompt')) }
+    if ($PSBoundParameters.ContainsKey('Portrait') -and -not (& $takes $editPosition)) {
+        $editTitle = Get-P20OrgText (Get-P20OrgField $editPosition 'title')
+        if (-not $editTitle) { $editTitle = $editPositionId }
+        $taking = New-Object System.Collections.Generic.List[string]
+        foreach ($position in $seatPositions) {
+            if (-not (& $takes $position)) { continue }
+            foreach ($candidate in (Get-P20OrgItems (Get-P20OrgField $position 'seats'))) {
+                $taking.Add("$(Get-P20OrgText (Get-P20OrgField $position 'id')).$(Get-P20OrgText (Get-P20OrgField $candidate 'id'))")
+            }
+        }
+        $which = 'none of its seats takes one'
+        if ($taking.Count -gt 0) { $which = "the seats that take one: $($taking -join ', ')" }
+        Stop-Staff "-Portrait does not go on '$seatAddress', a $editTitle's seat: in the tree '$seatTreeId', $which." `
+            "Choose a portrait on one of those seats: '${p}Staff -Seat <position>.<seat> -Portrait <id>' (docs/hub/org.md, `"A seat's portrait`")."
+    }
     if ($isRoot) {
-        $notOwner = @($seatOnly | Where-Object { $_ -ne 'IfMatch' -and $_ -ne 'Person' -and $PSBoundParameters.ContainsKey($_) })
+        # -Portrait goes on the owner's seat where the rule names it, checked above.
+        $ownerTakes = '-Person only'
+        if (& $takes $editPosition) { $ownerTakes = '-Person and -Portrait only' }
+        $notOwner = @($seatOnly | Where-Object { $_ -ne 'IfMatch' -and $_ -ne 'Person' -and $_ -ne 'Portrait' -and $PSBoundParameters.ContainsKey($_) })
         if ($notOwner -contains 'Model') {
-            Stop-Staff "The owner's seat takes -Person only: -Model does not go on it, because the owner is a person, never a model." `
+            Stop-Staff "The owner's seat takes ${ownerTakes}: -Model does not go on it, because the owner is a person, never a model." `
                 "Name the owner with '${p}Staff -Seat $Seat -Person <name>'."
         }
         if ($notOwner.Count -gt 0) {
-            Stop-Staff "The owner's seat takes -Person only: $((@($notOwner | ForEach-Object { "-$_" })) -join ', ') does not go on it." `
+            Stop-Staff "The owner's seat takes ${ownerTakes}: $((@($notOwner | ForEach-Object { "-$_" })) -join ', ') does not go on it." `
                 "Name the owner with '${p}Staff -Seat $Seat -Person <name>'."
         }
-        if (-not ([string]$Person).Trim()) {
+        if ($PSBoundParameters.ContainsKey('Person') -and -not ([string]$Person).Trim()) {
             Stop-Staff "-Person needs a name: the owner's seat always has a person, in your own words." `
                 "Name the owner with '${p}Staff -Seat $Seat -Person <name>'."
         }
@@ -588,6 +624,8 @@ else {
         $named = Get-P20OrgText (Get-P20OrgField $SeatObj 'session')
         if ($named) { $line += " ($named)" }
         if ((Get-P20OrgFlag (Get-P20OrgField $SeatObj 'merges')) -eq $true) { $line += " $dot merges" }
+        $portrait = Get-P20OrgText (Get-P20OrgField $SeatObj 'portrait')
+        if ($portrait) { $line += " $dot portrait: $portrait" }
         if ($WithRole) {
             $role = Get-P20OrgText (Get-P20OrgField $Position 'prompt')
             if (-not $role) { $role = 'no role' }
@@ -620,6 +658,7 @@ else {
     if ($Merges) { Set-StaffField $editSeat 'merges' $true }
     if ($PSBoundParameters.ContainsKey('RoleName')) { Set-StaffText $editPosition 'prompt' $RoleName }
     if ($PSBoundParameters.ContainsKey('RoleTitle')) { Set-StaffText $editPosition 'title' $RoleTitle }
+    if ($PSBoundParameters.ContainsKey('Portrait')) { Set-StaffText $editSeat 'portrait' $Portrait }
     $seatAfter = Get-StaffSeatLine $editPosition $editSeat $withRole
     if ((ConvertTo-P20ConfigJson $editPosition) -ceq $positionBefore) {
         Write-Output "${seatAddress}: $seatBefore -- nothing changed, so nothing was written."

@@ -787,6 +787,20 @@ def org_roles_folder() -> str:
     return consts()["org"]["rolesFolder"]
 
 
+def org_portraits() -> tuple[str, ...]:
+    """The ids a seat may carry as its ``portrait`` (docs/hub/org.md, "A seat's
+    portrait"), in the order the picker offers them. No key is the default.
+    ``Staff -Portrait`` accepts exactly these and the readers serve no other."""
+    return tuple(consts()["org"]["portraits"])
+
+
+def org_portrait_seats() -> tuple[str, ...]:
+    """The one rule naming the seats that take a portrait: ``root`` (the root
+    position's seat, the owner's) or a key of ``org.roles`` (the seats of a
+    position whose role is that file). The CLI, the agent and the web read it."""
+    return tuple(consts()["org"]["portraitSeats"])
+
+
 def org_presets_folder() -> str:
     """``samples/org-presets`` -- where the package keeps the org presets, relative
     to the package root (docs/hub/org.md, "Org presets"). The agent serves them;

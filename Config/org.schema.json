@@ -86,6 +86,7 @@
         "session": { "description": "The session's name: the address readies and messages route to.", "type": "string" },
         "merges": { "description": "True on the seat that holds the merge.", "type": "boolean" },
         "space": { "description": "The Space slug the seat serves.", "type": "string" },
+        "portrait": { "description": "The seat's portrait on the Org page: one of consts.json org.portraits, on a seat consts.json org.portraitSeats names (today the owner's, the root's). Absent is the seat's own default face. Written by Staff -Portrait; a reader ignores any other, with a warning.", "type": "string" },
         "machine": { "description": "Retired: read and kept, never written or drawn." },
         "active": { "description": "Retired: read and kept, never written or drawn." }
       }

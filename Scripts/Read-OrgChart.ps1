@@ -29,6 +29,37 @@ function Get-P20OrgFileName {
     return [string](Get-P20Consts).org.file
 }
 
+function Get-P20OrgPortraits {
+    # consts.json org.portraits: the ids a seat may carry as its portrait
+    # (docs/hub/org.md, "A seat's portrait"). No key is the default.
+    return @(@((Get-P20Consts).org.portraits) | ForEach-Object { [string]$_ })
+}
+
+function Test-P20OrgPortrait {
+    # Is this a portrait the tool draws? The value read as text (trimmed), then
+    # matched exactly, case included. agent/solitaire/org.py's is_portrait is the
+    # same rule, and Tests/fixtures/org/portraits.json holds the two to it.
+    param($Value)
+    $text = Get-P20OrgText $Value
+    if (-not $text) { return $false }
+    return (@(Get-P20OrgPortraits) -ccontains $text)
+}
+
+function Test-P20OrgTakesPortrait {
+    # Does a seat of this position take a portrait? consts.json org.portraitSeats
+    # is the one rule: 'root' names the root position's seat, any other entry a key
+    # of org.roles, naming the seats of a position whose role (its prompt) is that
+    # file. agent/solitaire/org.py's takes_portrait is the same rule, and
+    # Tests/fixtures/org/portraits.json holds the two to it.
+    param([bool]$IsRoot, [string]$Prompt)
+    $org = (Get-P20Consts).org
+    foreach ($entry in @($org.portraitSeats)) {
+        if ([string]$entry -ceq 'root') { if ($IsRoot) { return $true } }
+        elseif ($Prompt -and $org.roles.PSObject.Properties[[string]$entry] -and [string]$org.roles.([string]$entry) -ceq $Prompt) { return $true }
+    }
+    return $false
+}
+
 function Get-P20OrgField {
     # One field of a JSON object, by its exact spelling (PowerShell's own lookup
     # ignores case, JSON and the agent's reader do not). $null when absent. The
@@ -124,7 +155,7 @@ function Get-P20OrgWarnings {
         top      = @('activeTree', 'trees')
         tree     = @('id', 'title', 'name', 'size', 'shortDescription', 'description', 'teamSize', 'preset', 'activatedAt', 'positions', 'machines')
         position = @('id', 'title', 'prompt', 'reportsTo', 'defaultModel', 'recommend', 'seats')
-        seat     = @('id', 'roleTitle', 'model', 'person', 'session', 'merges', 'space', 'machine', 'active')
+        seat     = @('id', 'roleTitle', 'model', 'person', 'session', 'merges', 'space', 'portrait', 'machine', 'active')
     }
     $found = New-Object System.Collections.Generic.List[string]
     $check = {
@@ -143,9 +174,17 @@ function Get-P20OrgWarnings {
         foreach ($position in (Get-P20OrgItems (Get-P20OrgField $tree 'positions'))) {
             $positionId = Get-P20OrgText (Get-P20OrgField $position 'id')
             & $check $position 'position' " in position '$positionId' of tree '$treeId'"
+            $isRoot = -not (Get-P20OrgText (Get-P20OrgField $position 'reportsTo'))
             foreach ($seat in (Get-P20OrgItems (Get-P20OrgField $position 'seats'))) {
                 $seatId = Get-P20OrgText (Get-P20OrgField $seat 'id')
-                & $check $seat 'seat' " in seat '$seatId' of position '$positionId' in tree '$treeId'"
+                $where = " in seat '$seatId' of position '$positionId' in tree '$treeId'"
+                & $check $seat 'seat' $where
+                # A portrait is on a seat the rule names (org.portraitSeats), and one
+                # of the ids; anything else is ignored, and said. An empty one is no portrait.
+                $portrait = Get-P20OrgText (Get-P20OrgField $seat 'portrait')
+                if (-not $portrait) { continue }
+                if (-not (Test-P20OrgTakesPortrait -IsRoot $isRoot -Prompt (Get-P20OrgText (Get-P20OrgField $position 'prompt')))) { $found.Add("${FileName}: the portrait$where is on a seat that takes none -- ignored.") }
+                elseif (-not (Test-P20OrgPortrait $portrait)) { $found.Add("${FileName}: the portrait '$portrait'$where is not one this tool draws -- ignored.") }
             }
         }
     }
@@ -186,6 +225,7 @@ function ConvertTo-P20OrgModel {
                         Session   = Get-P20OrgText (Get-P20OrgField $seat 'session')
                         Merges    = Get-P20OrgFlag (Get-P20OrgField $seat 'merges')
                         Space     = Get-P20OrgText (Get-P20OrgField $seat 'space')
+                        Portrait  = Get-P20OrgText (Get-P20OrgField $seat 'portrait')
                     })
             }
             $positionTitle = Get-P20OrgText (Get-P20OrgField $position 'title')
@@ -333,16 +373,20 @@ function ConvertTo-P20OrgChart {
         foreach ($seat in $Position.Seats) {
             $state = 'vacant'
             if ($seat.Model -or $seat.Person) { $state = 'staffed' }
-            $seats.Add([ordered]@{
-                    id        = $seat.Id
-                    roleTitle = $(if ($seat.RoleTitle) { $seat.RoleTitle } else { $null })
-                    model     = $(if ($seat.Model) { $seat.Model } else { $null })
-                    person    = $(if ($seat.Person) { $seat.Person } else { $null })
-                    session   = $(if ($seat.Session) { $seat.Session } else { $null })
-                    merges    = $seat.Merges
-                    space     = $(if ($seat.Space) { $seat.Space } else { $null })
-                    state     = $state
-                })
+            $one = [ordered]@{
+                id        = $seat.Id
+                roleTitle = $(if ($seat.RoleTitle) { $seat.RoleTitle } else { $null })
+                model     = $(if ($seat.Model) { $seat.Model } else { $null })
+                person    = $(if ($seat.Person) { $seat.Person } else { $null })
+                session   = $(if ($seat.Session) { $seat.Session } else { $null })
+                merges    = $seat.Merges
+                space     = $(if ($seat.Space) { $seat.Space } else { $null })
+                state     = $state
+            }
+            # The seat's portrait, where the rule names the seat and the id is one
+            # the tool draws; else nothing, so a file without it reads as before.
+            if ((Test-P20OrgTakesPortrait -IsRoot ($Level -eq 0) -Prompt $Position.Prompt) -and (Test-P20OrgPortrait $seat.Portrait)) { $one['portrait'] = $seat.Portrait }
+            $seats.Add($one)
         }
         $ordered.Add([ordered]@{
                 id           = $Position.Id
@@ -513,6 +557,7 @@ function Format-P20OrgChartLines {
     # merge. A seat's roleTitle stands in for the position's title. A vacant seat
     # says vacant; an owner's seat shows its person; a position with no seats is
     # a pool, shown once with its default-model line. No machine is printed.
+    # A seat's portrait, where the response carries one, follows: ". portrait: <id>".
     # It ends with an empty line and the count, "staffed: <n> of <seats>": every
     # seat of every position is a seat (the owner's too) and a pool has none; a
     # seat is staffed when its state is -- a model or a person named -- the same
@@ -542,6 +587,10 @@ function Format-P20OrgChartLines {
             if ($seat.space) { $line += " [$($seat.space)]" }
             if ($seat.session) { $line += " ($($seat.session))" }
             if ($seat.merges -eq $true) { $line += " $dot merges" }
+            $portrait = ''
+            if ($seat -is [System.Collections.IDictionary]) { if ($seat.Contains('portrait')) { $portrait = [string]$seat['portrait'] } }
+            elseif ($seat.PSObject.Properties['portrait']) { $portrait = [string]$seat.portrait }
+            if ($portrait) { $line += " $dot portrait: $portrait" }
             $lines.Add($line)
         }
     }

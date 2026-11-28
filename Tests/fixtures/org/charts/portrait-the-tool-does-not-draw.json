@@ -1,0 +1,66 @@
+{
+  "activeTree": "t",
+  "tree": {
+    "id": "t",
+    "title": "t",
+    "size": null,
+    "shortDescription": null,
+    "description": null,
+    "teamSize": null,
+    "preset": null,
+    "positions": [
+      {
+        "id": "owner",
+        "title": "Owner",
+        "prompt": null,
+        "reportsTo": null,
+        "defaultModel": null,
+        "recommend": [],
+        "level": 0,
+        "seats": [
+          {
+            "id": "owner",
+            "roleTitle": null,
+            "model": null,
+            "person": "Sam",
+            "session": null,
+            "merges": null,
+            "space": null,
+            "state": "staffed"
+          }
+        ]
+      },
+      {
+        "id": "pm",
+        "title": "PM",
+        "prompt": null,
+        "reportsTo": "owner",
+        "defaultModel": null,
+        "recommend": [],
+        "level": 1,
+        "seats": [
+          {
+            "id": "pm",
+            "roleTitle": null,
+            "model": "opus",
+            "person": null,
+            "session": null,
+            "merges": null,
+            "space": null,
+            "state": "staffed"
+          },
+          {
+            "id": "pm-2",
+            "roleTitle": null,
+            "model": null,
+            "person": null,
+            "session": null,
+            "merges": null,
+            "space": null,
+            "state": "vacant"
+          }
+        ]
+      }
+    ]
+  }
+}

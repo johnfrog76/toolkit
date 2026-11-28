@@ -314,6 +314,10 @@ $expected = [ordered]@{
     'org.roles'                 = 'vpEngineering=vp-of-engineering.prompt.md,vpProduct=vp-of-product.prompt.md,teamLead=team-lead.prompt.md'
     'org.changedSince'          = 'changed since you read it'
     'org.roleDefaults'          = 'team-lead.prompt.md=opus,intern.prompt.md=haiku,butler.prompt.md=haiku'
+    # The portrait ids a seat may carry: Set-Staff.ps1 and Read-OrgChart.ps1 read (Get-P20Consts).org.portraits.
+    'org.portraits'             = 'minimalist,pm,dev-hero,designer,ultrawide,ops-dev,new-hire,vibemancer,qa,robot,alien,fat-cat,kubernetes-wizard'
+    # The one rule naming the seats that take a portrait (root, or a key of org.roles): Set-Staff.ps1 and Read-OrgChart.ps1 read it.
+    'org.portraitSeats'         = 'root'
     # The model map a card's Agent id is looked up in: Get-P20ModelInfo reads (Get-P20Consts).models.file.
     'models.file'               = 'Config/models.json'
     # The order a card's agent is worked out in: Resolve-P20CardAgent reads (Get-P20Consts).models.agentSources.

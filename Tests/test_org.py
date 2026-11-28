@@ -305,6 +305,91 @@ class TheStateTable(unittest.TestCase):
         self.assertEqual(got.trees[0]["activatedAt"], "2026-11-26")
 
 
+class ASeatsPortrait(OrgBase):
+    """A seat's portrait (docs/hub/org.md, "A seat's portrait"): one list,
+    consts.json org.portraits, one rule, org.portraitSeats, and one table,
+    Tests/fixtures/org/portraits.json -- the rows tkTestToolkit -OrgChart asserts
+    Staff -Portrait and the CLI's reader against."""
+
+    TABLE = json.loads((FIXTURES / "portraits.json").read_text(encoding="utf-8"))
+
+    def with_portrait(self, address, value):
+        tree = json.loads(json.dumps(self.TABLE["tree"]))
+        for position in tree["positions"]:
+            for seat in position["seats"]:
+                if f"{position['id']}.{seat['id']}" == address:
+                    seat["portrait"] = value
+        return {"trees": [tree]}
+
+    def test_the_ids_and_the_rule_are_the_consts(self):
+        self.assertEqual(org.portraits(), tuple(C.consts()["org"]["portraits"]))
+        self.assertEqual(C.org_portrait_seats(), tuple(C.consts()["org"]["portraitSeats"]))
+        self.assertNotIn("owner", org.portraits())
+
+    def test_every_id_row(self):
+        rows = self.TABLE["ids"]
+        for row in rows:
+            with self.subTest(value=row["value"]):
+                self.assertEqual(org.is_portrait(row["value"]), row["valid"])
+                got = org.read_org_chart(json.dumps(self.with_portrait("owner.owner", row["value"])), lambda _n: True)
+                self.assertEqual(got.status, "ok", got.message)
+                seat = got.chart["tree"]["positions"][0]["seats"][0]
+                if row["valid"]:
+                    self.assertEqual(seat.get("portrait"), row["value"].strip())
+                    self.assertEqual(got.warnings, [])
+                else:
+                    self.assertNotIn("portrait", seat)
+                    self.assertEqual(len(got.warnings), 1, got.warnings)
+        for pid in org.portraits():
+            self.assertTrue(any(r["value"] == pid and r["valid"] for r in rows), pid)
+
+    def test_every_seat_row(self):
+        positions = {p["id"]: p for p in self.TABLE["tree"]["positions"]}
+        for row in self.TABLE["seats"]:
+            with self.subTest(seat=row["seat"], value=row["value"]):
+                position = positions[row["seat"].split(".")[0]]
+                is_root = not position.get("reportsTo")
+                self.assertEqual(org.takes_portrait(is_root, position.get("prompt", "")), row["takes"])
+                if row["outcome"] == "refused-pool" or not row["value"]:
+                    continue
+                got = org.read_org_chart(json.dumps(self.with_portrait(row["seat"], row["value"])), lambda _n: True)
+                self.assertEqual(got.status, "ok", got.message)
+                served = {
+                    f"{p['id']}.{s['id']}": s["portrait"]
+                    for p in got.chart["tree"]["positions"]
+                    for s in p["seats"]
+                    if "portrait" in s
+                }
+                if row["outcome"] == "written":
+                    self.assertEqual(served, {row["seat"]: row["value"]})
+                    self.assertEqual(got.warnings, [])
+                else:
+                    self.assertEqual(served, {})
+                    self.assertEqual(len(got.warnings), 1, got.warnings)
+
+    def test_no_key_is_no_portrait_and_no_word(self):
+        got = org.read_org_chart(json.dumps({"trees": [self.TABLE["tree"]]}), lambda _n: True)
+        for position in got.chart["tree"]["positions"]:
+            for seat in position["seats"]:
+                self.assertNotIn("portrait", seat)
+        self.assertEqual(got.warnings, [])
+
+    def test_the_route_carries_it_on_the_seat(self):
+        doc = {
+            "trees": [
+                {
+                    "id": "t",
+                    "positions": [{"id": "owner", "seats": [{"id": "owner", "person": "Sam", "portrait": "fat-cat"}]}],
+                }
+            ]
+        }
+        self.put(doc)
+        body = self.client.get(ROUTE).json()
+        seat = body["tree"]["positions"][0]["seats"][0]
+        self.assertEqual((seat["portrait"], seat["person"]), ("fat-cat", "Sam"))
+        self.assertEqual(body["tree"]["positions"][0]["title"], "owner")
+
+
 class TheReaderAlone(unittest.TestCase):
     """The pure layer: text and a prompt test in, a result out -- and it never raises."""
 

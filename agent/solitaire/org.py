@@ -43,7 +43,15 @@ from fastapi import HTTPException
 
 from ..core import log_writer, models
 from ..core.config import API_PREFIX, ORG_PRESETS_DIR, hub_configured, hub_folder, hub_root
-from ..core.consts import org_file, org_roles_folder, rituals_org_presets_route, rituals_org_route
+from ..core.consts import (
+    consts,
+    org_file,
+    org_portrait_seats,
+    org_portraits,
+    org_roles_folder,
+    rituals_org_presets_route,
+    rituals_org_route,
+)
 from ..studio import prompts
 from .standup import api
 
@@ -75,7 +83,7 @@ _KNOWN_KEYS = {
         "machines",
     ),
     "position": ("id", "title", "prompt", "reportsTo", "defaultModel", "recommend", "seats"),
-    "seat": ("id", "roleTitle", "model", "person", "session", "merges", "space", "machine", "active"),
+    "seat": ("id", "roleTitle", "model", "person", "session", "merges", "space", "portrait", "machine", "active"),
 }
 
 _PATH_SEPARATOR = re.compile(r"[\\/]")
@@ -147,6 +155,41 @@ def _whole(value: Any) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
+# -- A seat's portrait ---------------------------------------------------------
+
+# The root position's seat, in the rule that names the seats taking a portrait.
+PORTRAIT_ROOT = "root"
+
+
+def portraits() -> tuple[str, ...]:
+    """The ids a seat may carry as its portrait: consts.json org.portraits."""
+    return org_portraits()
+
+
+def takes_portrait(is_root: bool, prompt: str) -> bool:
+    """Does a seat of this position take a portrait? consts.json
+    org.portraitSeats is the one rule: ``root`` names the root position's seat,
+    any other entry a key of org.roles, naming the seats of a position whose
+    role (its prompt) is that file. Test-P20OrgTakesPortrait is the same rule,
+    and Tests/fixtures/org/portraits.json holds the two to it."""
+    roles = consts()["org"]["roles"]
+    for entry in org_portrait_seats():
+        if entry == PORTRAIT_ROOT:
+            if is_root:
+                return True
+        elif prompt and roles.get(entry) == prompt:
+            return True
+    return False
+
+
+def is_portrait(value: Any) -> bool:
+    """Is this a portrait the tool draws? The value read as text (trimmed), then
+    matched exactly, case included -- Test-P20OrgPortrait's rule, held to it by
+    Tests/fixtures/org/portraits.json."""
+    text = _text(value)
+    return bool(text) and text in portraits()
+
+
 # -- Reading the document ------------------------------------------------------
 
 
@@ -170,9 +213,22 @@ def _warnings(data: dict, file_name: str) -> list[str]:
         for position in _items(_field(tree, "positions")):
             position_id = _text(_field(position, "id"))
             check(position, "position", f" in position '{position_id}' of tree '{tree_id}'")
+            is_root = not _text(_field(position, "reportsTo"))
             for seat in _items(_field(position, "seats")):
                 seat_id = _text(_field(seat, "id"))
-                check(seat, "seat", f" in seat '{seat_id}' of position '{position_id}' in tree '{tree_id}'")
+                where = f" in seat '{seat_id}' of position '{position_id}' in tree '{tree_id}'"
+                check(seat, "seat", where)
+                # A portrait is on a seat the rule names (org.portraitSeats), and one
+                # of the ids; anything else is ignored, and said. An empty one is no portrait.
+                portrait = _text(_field(seat, "portrait"))
+                if not portrait:
+                    continue
+                if not takes_portrait(is_root, _text(_field(position, "prompt"))):
+                    found.append(f"{file_name}: the portrait{where} is on a seat that takes none -- ignored.")
+                elif not is_portrait(portrait):
+                    found.append(
+                        f"{file_name}: the portrait '{portrait}'{where} is not one this tool draws -- ignored."
+                    )
     return found
 
 
@@ -206,6 +262,7 @@ def _model(data: dict) -> tuple[list[dict] | None, tuple[str, str] | None]:
                         "session": _text(_field(seat, "session")),
                         "merges": _flag(_field(seat, "merges")),
                         "space": _text(_field(seat, "space")),
+                        "portrait": _text(_field(seat, "portrait")),
                     }
                 )
             positions.append(
@@ -332,8 +389,9 @@ def _chart(tree: dict, active_tree: str) -> dict:
     stack: list[tuple[dict, int]] = [(root, 0)] if root else []
     while stack:
         position, level = stack.pop()
-        seats = [
-            {
+        seats = []
+        for s in position["seats"]:
+            seat = {
                 "id": s["id"],
                 "roleTitle": s["roleTitle"] or None,
                 "model": s["model"] or None,
@@ -343,8 +401,11 @@ def _chart(tree: dict, active_tree: str) -> dict:
                 "space": s["space"] or None,
                 "state": "staffed" if (s["model"] or s["person"]) else "vacant",
             }
-            for s in position["seats"]
-        ]
+            # The seat's portrait, where the rule names the seat and the id is one
+            # the tool draws; else nothing, so a file without it reads as before.
+            if takes_portrait(level == 0, position["prompt"]) and is_portrait(s["portrait"]):
+                seat["portrait"] = s["portrait"]
+            seats.append(seat)
         ordered.append(
             {
                 "id": position["id"],

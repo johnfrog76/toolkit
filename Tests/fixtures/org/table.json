@@ -408,6 +408,100 @@
       }
     },
     {
+      "name": "portrait-on-the-owner",
+      "why": "The owner's seat -- the root's, which consts.json org.portraitSeats names -- carries a portrait the tool draws (org.portraits): the response carries it on that seat, and the seat's line says it after the name. The name and the title are the seat's and the position's as ever.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "positions": [
+              {
+                "id": "owner",
+                "title": "Owner",
+                "seats": [
+                  {
+                    "id": "owner",
+                    "person": "Sam",
+                    "portrait": "robot"
+                  }
+                ]
+              },
+              {
+                "id": "pm",
+                "title": "PM",
+                "reportsTo": "owner",
+                "seats": [
+                  {
+                    "id": "pm",
+                    "model": "opus"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/portrait-on-the-owner.json",
+        "text": "text/portrait-on-the-owner.txt",
+        "seatCount": 2,
+        "warnings": []
+      }
+    },
+    {
+      "name": "portrait-the-tool-does-not-draw",
+      "why": "A portrait that is not one of the ids, on the owner's seat, and a portrait on a seat org.portraitSeats does not name: each is ignored with a warning -- the seat is drawn as it would be without the key -- and the file is not refused. An empty portrait is no portrait, and is not said.",
+      "org": {
+        "trees": [
+          {
+            "id": "t",
+            "positions": [
+              {
+                "id": "owner",
+                "title": "Owner",
+                "seats": [
+                  {
+                    "id": "owner",
+                    "person": "Sam",
+                    "portrait": "Robot"
+                  }
+                ]
+              },
+              {
+                "id": "pm",
+                "title": "PM",
+                "reportsTo": "owner",
+                "seats": [
+                  {
+                    "id": "pm",
+                    "model": "opus",
+                    "portrait": "alien"
+                  },
+                  {
+                    "id": "pm-2",
+                    "portrait": ""
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "status": "ok",
+        "activeTree": "t",
+        "chart": "charts/portrait-the-tool-does-not-draw.json",
+        "text": "text/portrait-the-tool-does-not-draw.txt",
+        "seatCount": 3,
+        "warnings": [
+          "org.json: the portrait 'Robot' in seat 'owner' of position 'owner' in tree 't' is not one this tool draws -- ignored.",
+          "org.json: the portrait in seat 'pm' of position 'pm' in tree 't' is on a seat that takes none -- ignored."
+        ]
+      }
+    },
+    {
       "name": "no-file",
       "why": "No org file in the hub root.",
       "expect": {

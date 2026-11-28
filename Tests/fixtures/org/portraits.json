@@ -1,0 +1,53 @@
+{
+  "_": "A seat's portrait (docs/hub/org.md, \"A seat's portrait\"): one table, two halves. ids: each row is a value as it would be typed after Staff -Portrait or written as a seat's portrait key, and whether it is a portrait -- one of consts.json org.portraits, compared exactly, case included, after the value is trimmed. seats: the tree below, and a row per seat kind with the value given and what follows from consts.json org.portraitSeats, the one rule naming the seats that take a portrait. takes is whether the rule names the seat. outcome is what Staff -Seat <seat> -Portrait <value> does: written (the id stored), removed (the key taken away: the empty value is the seat's own default) or refused (exit 2, nothing written) -- refused-id for an id the tool does not draw, refused-seat for a seat the rule does not name, refused-pool for a pool, which has no seat. A reader serves a portrait only where takes is true and the id is valid, and says every other non-empty one once as a warning, never refusing the file. Widening the rule to the two VPs is a change to consts.json and to these rows' takes and outcome. tkTestToolkit -OrgChart asserts Test-P20OrgPortrait, Test-P20OrgTakesPortrait, the reader and Staff over it; Tests/test_org.py asserts is_portrait, takes_portrait and the reader.",
+  "ids": [
+    { "value": "minimalist", "valid": true },
+    { "value": "pm", "valid": true },
+    { "value": "dev-hero", "valid": true },
+    { "value": "designer", "valid": true },
+    { "value": "ultrawide", "valid": true },
+    { "value": "ops-dev", "valid": true },
+    { "value": "new-hire", "valid": true },
+    { "value": "vibemancer", "valid": true },
+    { "value": "qa", "valid": true },
+    { "value": "robot", "valid": true },
+    { "value": "alien", "valid": true },
+    { "value": "fat-cat", "valid": true },
+    { "value": "kubernetes-wizard", "valid": true },
+    { "value": " robot ", "valid": true, "why": "a value is trimmed, as every other text field is" },
+    { "value": "Robot", "valid": false, "why": "ids are matched exactly, case included" },
+    { "value": "owner", "valid": false, "why": "the owner's own face is the owner seat's default, which is no key at all" },
+    { "value": "fat_cat", "valid": false },
+    { "value": "kubernetes", "valid": false },
+    { "value": "wizard", "valid": false },
+    { "value": "robot alien", "valid": false },
+    { "value": "nope", "valid": false }
+  ],
+  "tree": {
+    "id": "portraits",
+    "positions": [
+      { "id": "owner", "title": "Owner", "seats": [ { "id": "owner", "person": "Sam" } ] },
+      { "id": "vp-engineering", "title": "VP of engineering", "prompt": "vp-of-engineering.prompt.md", "reportsTo": "owner",
+        "seats": [ { "id": "vp-engineering", "model": "opus" } ] },
+      { "id": "vp-product", "title": "VP of product", "prompt": "vp-of-product.prompt.md", "reportsTo": "owner",
+        "seats": [ { "id": "vp-product", "model": "fable" } ] },
+      { "id": "pm", "title": "PM", "prompt": "pm.prompt.md", "reportsTo": "owner", "seats": [ { "id": "pm", "model": "opus" } ] },
+      { "id": "team-lead", "title": "Team lead", "prompt": "team-lead.prompt.md", "reportsTo": "pm",
+        "seats": [ { "id": "alpha", "model": "opus" }, { "id": "beta" } ] },
+      { "id": "builder", "title": "Builder", "reportsTo": "team-lead", "seats": [ { "id": "b1", "model": "sonnet" } ] },
+      { "id": "crew", "title": "Crew", "reportsTo": "team-lead", "defaultModel": "sonnet", "seats": [] }
+    ]
+  },
+  "seats": [
+    { "kind": "owner", "seat": "owner.owner", "value": "robot", "takes": true, "outcome": "written" },
+    { "kind": "owner", "seat": "owner.owner", "value": "mascot", "takes": true, "outcome": "refused-id" },
+    { "kind": "owner", "seat": "owner.owner", "value": "", "takes": true, "outcome": "removed" },
+    { "kind": "VP of engineering", "seat": "vp-engineering.vp-engineering", "value": "robot", "takes": false, "outcome": "refused-seat" },
+    { "kind": "VP of product", "seat": "vp-product.vp-product", "value": "alien", "takes": false, "outcome": "refused-seat" },
+    { "kind": "PM", "seat": "pm.pm", "value": "robot", "takes": false, "outcome": "refused-seat" },
+    { "kind": "team lead", "seat": "team-lead.alpha", "value": "robot", "takes": false, "outcome": "refused-seat" },
+    { "kind": "team lead, empty", "seat": "team-lead.beta", "value": "", "takes": false, "outcome": "refused-seat" },
+    { "kind": "builder", "seat": "builder.b1", "value": "fat-cat", "takes": false, "outcome": "refused-seat" },
+    { "kind": "pool", "seat": "crew", "value": "robot", "takes": false, "outcome": "refused-pool" }
+  ]
+}
