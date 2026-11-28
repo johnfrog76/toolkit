@@ -13,7 +13,7 @@ import {
 import { FAMILIES, FAMILY_NAMES, TEST_ETAG, modelNameOf, orgResponse } from "./orgFixture";
 import { CHANGED_SINCE_TEXT, SeatDialog, VACATE_WORD, canVacate } from "./SeatDialog";
 import { UseOrgDialog } from "./UseOrgDialog";
-import { portraitChoices } from "./orgChart";
+import { portraitChoices, takesPortrait } from "./orgChart";
 import { ORG } from "../../shell/consts";
 
 // The Org tab (docs/modules/solitaire-agile.md, "The web UI"): the tree the
@@ -1330,18 +1330,38 @@ describe("the seat dialog: Assign and Change on a saved org", () => {
     expect(runStaff).not.toHaveBeenCalled();
   });
 
-  it("a seat the rule does not name offers no portrait: the VPs and the PM, today", () => {
-    expect(ORG.portraitSeats).toEqual(["root"]);
+  it("the picker is offered exactly where the one rule names the seat (consts.json org.portraitSeats)", () => {
     draw();
     for (const [id, name] of [
+      ["owner", "Change Owner, Sam"],
       ["vp-engineering", `Change VP of engineering, ${modelNameOf("fable")}`],
       ["vp-product", `Change VP of product, ${modelNameOf("fable")}`],
       ["pm", `Change PM, ${modelNameOf("opus")}`],
     ]) {
+      const position = response.data!.tree.positions.find((p) => p.id === id)!;
       const dialog = open(id, name);
-      expect(within(dialog).queryByTestId("org-seat-portrait")).toBeNull();
+      expect([id, Boolean(within(dialog).queryByTestId("org-seat-portrait"))]).toEqual([
+        id,
+        takesPortrait(position),
+      ]);
       fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     }
+  });
+
+  it("while a save is in flight, every portrait tile is disabled and drawn so", async () => {
+    let finish: (r: CommandResponse) => void = () => {};
+    staffAnswer = () => new Promise<CommandResponse>((r) => (finish = r));
+    draw();
+    const dialog = open("owner", "Change Owner, Sam");
+    const tiles = () => within(dialog).getAllByTestId(/^org-portrait-/);
+    for (const t of tiles()) expect(t.getAttribute("data-disabled")).toBeNull();
+    fireEvent.click(radio(dialog, "Alien"));
+    fireEvent.click(within(dialog).getByTestId("org-seat-save"));
+    await waitFor(() => expect(runStaff).toHaveBeenCalledTimes(1));
+    for (const r of within(dialog).getAllByRole("radio") as HTMLInputElement[])
+      expect(r.disabled).toBe(true);
+    for (const t of tiles()) expect(t.getAttribute("data-disabled")).toBe("true");
+    finish({ status: "success", output: "", error: "", duration: 1 } as CommandResponse);
   });
 
   it("choosing a portrait saves it through the one Staff call, with the name if it changed too", async () => {

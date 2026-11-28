@@ -81,13 +81,20 @@ export function seatFace(position: OrgPosition, seatIndex: number, order = 0): F
 export const PORTRAIT_ROOT = "root";
 
 /** Does a seat of this position take a portrait? `root` names the root's seat,
- *  any other entry the seats of a position whose role is that ORG.roles file. */
-export function takesPortrait(position: OrgPosition): boolean {
+ *  any other entry the seats of a position whose role is that ORG.roles file;
+ *  every name matched exactly. `rule` stands in for the consts' list (the shared
+ *  table's rule rows). */
+export function takesPortrait(
+  position: OrgPosition,
+  rule: readonly string[] = ORG.portraitSeats,
+): boolean {
   const roles = ORG.roles as Record<string, string>;
-  return ORG.portraitSeats.some((entry) =>
+  return rule.some((entry) =>
     entry === PORTRAIT_ROOT
       ? position.reportsTo === null
-      : Boolean(position.prompt) && roles[entry] === position.prompt,
+      : Boolean(position.prompt) &&
+        Object.prototype.hasOwnProperty.call(roles, entry) &&
+        roles[entry] === position.prompt,
   );
 }
 

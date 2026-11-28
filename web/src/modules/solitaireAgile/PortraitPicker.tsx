@@ -47,6 +47,13 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorBrandBackground2,
     ":hover": { backgroundColor: tokens.colorBrandBackground2Hover },
   },
+  // While the dialog writes: the tiles drawn as the disabled controls they are.
+  disabledTile: {
+    cursor: "not-allowed",
+    opacity: 0.55,
+    ":hover": { backgroundColor: tokens.colorNeutralBackground1 },
+  },
+  disabledChoice: { cursor: "not-allowed" },
   picture: {
     width: "56px",
     height: "58px",
@@ -95,7 +102,8 @@ export function PortraitPicker({
           return (
             <label
               key={c.value || "default"}
-              className={styles.choice}
+              className={mergeClasses(styles.choice, disabled && styles.disabledChoice)}
+              data-disabled={disabled ? "true" : undefined}
               data-testid={`org-portrait-${c.value || "default"}`}
             >
               <input
@@ -107,7 +115,13 @@ export function PortraitPicker({
                 onChange={() => onChange(c.value)}
                 className={styles.input}
               />
-              <span className={mergeClasses(styles.tile, checked && styles.selected)}>
+              <span
+                className={mergeClasses(
+                  styles.tile,
+                  checked && styles.selected,
+                  disabled && styles.disabledTile,
+                )}
+              >
                 <RefinedPortrait face={c.face} className={styles.picture} />
                 <span className={styles.name}>{c.label}</span>
               </span>

@@ -89,6 +89,7 @@ describe("a seat's portrait", () => {
     ids: { value: string; valid: boolean }[];
     tree: { positions: (Partial<OrgPosition> & { id: string; reportsTo?: string })[] };
     seats: { kind: string; seat: string; value: string; takes: boolean; outcome: string }[];
+    rules: { rule: string[]; isRoot: boolean; prompt: string; takes: boolean }[];
   };
   const asPosition = (p: (typeof TABLE.tree.positions)[number]): OrgPosition =>
     ({
@@ -124,6 +125,22 @@ describe("a seat's portrait", () => {
     for (const row of TABLE.seats) {
       const position = TABLE.tree.positions.find((p) => p.id === row.seat.split(".")[0])!;
       expect([row.kind, takesPortrait(asPosition(position))]).toEqual([row.kind, row.takes]);
+    }
+  });
+
+  it("the rule itself, over each row's rule: an entry and a role file matched exactly", () => {
+    for (const row of TABLE.rules) {
+      const position = {
+        id: "p",
+        reportsTo: row.isRoot ? null : "r",
+        prompt: row.prompt || null,
+        seats: [],
+      } as unknown as OrgPosition;
+      expect([row.rule, row.prompt, takesPortrait(position, row.rule)]).toEqual([
+        row.rule,
+        row.prompt,
+        row.takes,
+      ]);
     }
   });
 

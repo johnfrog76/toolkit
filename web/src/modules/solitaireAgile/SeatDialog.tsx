@@ -342,15 +342,13 @@ export function SeatDialog({
           </DialogTitle>
           <DialogContent className={styles.content}>
             {owner ? (
-              <>
-                <Field label="Name">
-                  <Input
-                    value={person}
-                    onChange={(_, d) => setPerson(d.value)}
-                    data-testid="org-seat-person"
-                  />
-                </Field>
-              </>
+              <Field label="Name">
+                <Input
+                  value={person}
+                  onChange={(_, d) => setPerson(d.value)}
+                  data-testid="org-seat-person"
+                />
+              </Field>
             ) : (
               <>
                 <Field label="Model">
