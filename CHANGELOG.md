@@ -11,6 +11,29 @@ until the release folds them in here.
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-27
+
+### Added
+
+- Staff a seat from the Org tab: Assign on a vacant seat and Change on a staffed one open a dialog that is
+  already filled in -- the model, named as it is today ("Opus 5.5"), the session's name, and a team lead's
+  Space, with a different role title one click away -- and the owner's Change renames you. A seat that holds an
+  older model keeps it unless you choose another. In the terminal, `Staff -Seat <position>.<seat>` does the same, and a save made
+  after `org.json` changed underneath it is refused rather than written over.
+- An `org.json` seat can carry its own title, the session it is, and whether it holds the merge: the Org tab names a seat by its own title and its model by name ("Opus 5.5"), with the session on hover, and `OrgChart` prints the session. A tree is now named by `title` (an older file's `name` still reads), machines are no longer shown, and `Config/org.schema.json` describes the whole shape.
+- A new `Staff` verb starts your org chart from one of the three presets: `Staff -Preset S|M|L` saves the org into your hub's `org.json` with sensible default models in each seat (and your own name on the owner's), as a draft beside the org you already use, and `Staff -Activate <id>` puts a saved org in use. Your hand edits to the file are kept.
+- Each saved org on the Org tab now says its state: **Active**, **Draft** (saved, never in use) or **Inactive** (in use before), beside its title in the View dropdown and in the line under the heading; `OrgChart` lists a file's orgs with their states too.
+- The Org tab can save an org: on a preset, **Use this org** asks who you are and which models your two VPs use (each answer filled in already) and saves it to your hub, as a draft beside the org you use. A new **Active** dropdown, beside the one that picks what you look at, chooses which saved org is in use, and a line under the heading says when the org shown is a draft or a preview.
+- The Org tab has a zoom control over the chart: **Zoom out**, **Zoom in** and **Fit to width**, with the percentage beside them. A large org opens fitted to the page's width, and a zoomed-in chart pans inside its own box instead of stretching the page.
+- The Org tab can preview three starting orgs that ship with the toolkit -- Executive Suite (S), Branch Office (M) and Corporate Headquarters (L) -- each drawn as a chart with its short description and how the work flows in it. A preview writes nothing; your `org.json` stays your own.
+- The Decks launcher has a third narrated deck, The Prompt Poet Works the Board: a card on an Azure DevOps
+  board becomes one prompt and one pull request, told in a basement coffee house. Twelve slides, two voices.
+
+### Changed
+
+- On the Org tab, each office's role opens from a View button beside its title instead of from the whole
+  card.
+
 ## [1.8.0] - 2026-11-25
 
 ### Added
