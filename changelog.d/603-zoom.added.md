@@ -1,1 +1,0 @@
-- The Org tab has a zoom control over the chart: **Zoom out**, **Zoom in** and **Fit to width**, with the percentage beside them. A large org opens fitted to the page's width, and a zoomed-in chart pans inside its own box instead of stretching the page.

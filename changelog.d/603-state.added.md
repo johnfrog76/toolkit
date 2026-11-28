@@ -1,1 +1,0 @@
-- Each saved org on the Org tab now says its state: **Active**, **Draft** (saved, never in use) or **Inactive** (in use before), beside its title in the View dropdown and in the line under the heading; `OrgChart` lists a file's orgs with their states too.
