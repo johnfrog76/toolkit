@@ -14,8 +14,11 @@ import type { ReactNode } from "react";
 // person, and the org chart's map from position to face is the module's own.
 //
 // The first three (minimalist, pm, dev-hero) are drawn as the landing page
-// first drew them. The others are ported from the cast-skin mock's direction A
-// as its generator writes them, colour for colour.
+// first drew them. The next seven are ported from the cast-skin mock's direction A
+// as its generator writes them, colour for colour. The last four (robot, alien,
+// fat-cat, kubernetes-wizard) are the owner's to choose as a portrait on the org
+// chart (consts.json org.portraits): the same light, shade and shadow, with a
+// head, a torso or eyes of their own where a person's would not do.
 
 /** Every face the refined cast has. */
 export const FACE_IDS = [
@@ -29,6 +32,10 @@ export const FACE_IDS = [
   "new-hire",
   "vibemancer",
   "qa",
+  "robot",
+  "alien",
+  "fat-cat",
+  "kubernetes-wizard",
 ] as const;
 
 export type FaceId = (typeof FACE_IDS)[number];
@@ -45,9 +52,17 @@ interface Refined {
   earLeft: string;
   /** Eyes and mouth. */
   ink: string;
-  /** Open eyes (the default), wide open, or closed and content. */
-  eyes?: "open" | "wide" | "closed";
-  mouth: "calm" | "grin" | "awe";
+  /** Open eyes (the default), wide open, closed and content, or none: drawn with the hair. */
+  eyes?: "open" | "wide" | "closed" | "none";
+  /** "none" leaves the mouth to the hair layer, for a face whose mouth is its own. */
+  mouth: "calm" | "grin" | "awe" | "none";
+  /** A body of another build than the cast's: the torso's outline, lit and shaded the same way. */
+  torso?: string;
+  /** A head of another shape: drawn in place of the ears and the head, from the
+   *  drawing's id, which a lit side clipped to the shape needs. */
+  head?: (id: string) => ReactNode;
+  /** The flush on the cheeks; every person has it, a robot need not. */
+  cheeks?: boolean;
   /** Drawn before the body: hair that falls behind the shoulders. */
   back?: ReactNode;
   /** Long hair covers the ears, so they are not drawn: their edge would show past it. */
@@ -73,6 +88,32 @@ const MOUTH = {
 };
 // The round marks the mock rounds and joins every stroke of a shirt's mark with.
 const ROUND = { strokeLinecap: "round" as const, strokeLinejoin: "round" as const, fill: "none" };
+
+/**
+ * A head of its own shape, lit as every head is: the shape in its shade, then the
+ * same shape a step up and to the left in its light, clipped to the shape.
+ */
+function litShape(
+  id: string,
+  key: string,
+  shape: (fill: string) => ReactNode,
+  r: { skin: string; skinShade: string },
+) {
+  return (
+    <>
+      <clipPath id={`${id}-${key}`}>{shape("#000")}</clipPath>
+      {shape(r.skinShade)}
+      <g clipPath={`url(#${id}-${key})`}>
+        <g transform="translate(-4 -3.5)">{shape(r.skin)}</g>
+      </g>
+    </>
+  );
+}
+
+// The robot's metal, the alien's skin and the cat's fur: the colours their heads are lit with.
+const ROBOT = { skin: "#d9dfe7", skinShade: "#aab3c0" };
+const ALIEN = { skin: "#a6dd8f", skinShade: "#82b971" };
+const CAT = { skin: "#eda75c", skinShade: "#c7874b" };
 
 const REFINED: Record<FaceId, Refined> = {
   minimalist: {
@@ -333,6 +374,251 @@ const REFINED: Record<FaceId, Refined> = {
       </>
     ),
   },
+  // A rounded box of a head on a steel neck, bolts for ears, an antenna, two
+  // screen eyes and a speaker grille; a panel of lights on the chest.
+  robot: {
+    tint: "#a9d3ee",
+    shirt: "#5d6b80",
+    shirtShade: "#4b576a",
+    ...ROBOT,
+    earLeft: "#c3cbd6",
+    ink: "#26303f",
+    eyes: "none",
+    mouth: "none",
+    cheeks: false,
+    head: (id) => (
+      <>
+        <rect x="31.5" y="33" width="7" height="14" rx="2.5" fill="#c3cbd6" />
+        <rect x="81.5" y="33" width="7" height="14" rx="2.5" fill={ROBOT.skinShade} />
+        {litShape(
+          id,
+          "box",
+          (fill) => (
+            <rect x="37" y="14" width="46" height="47" rx="12" fill={fill} />
+          ),
+          ROBOT,
+        )}
+      </>
+    ),
+    detail: (
+      <>
+        <rect x="47" y="86" width="26" height="17" rx="3.5" fill="#3d4757" />
+        <circle cx="53.5" cy="94.5" r="2.4" fill="#79d68a" />
+        <circle cx="60" cy="94.5" r="2.4" fill="#f7d96f" />
+        <circle cx="66.5" cy="94.5" r="2.4" fill="#e94f4f" />
+      </>
+    ),
+    hair: (
+      <>
+        <path d="M 60 14 V 4.5" {...ROUND} stroke={ROBOT.skinShade} strokeWidth="2.4" />
+        <circle cx="60" cy="2.5" r="3.4" fill="#e94f4f" />
+        <rect x="45.5" y="34" width="11" height="10" rx="3.5" fill="#26303f" />
+        <rect x="63.5" y="34" width="11" height="10" rx="3.5" fill="#26303f" />
+        <circle cx="51" cy="39" r="2.6" fill="#4fc6e9" />
+        <circle cx="69" cy="39" r="2.6" fill="#4fc6e9" />
+        <rect x="51" y="49" width="18" height="6" rx="2" fill="#26303f" />
+        <g stroke="#8a93a6" strokeWidth="1.2" strokeLinecap="round">
+          <path d="M 55.5 50.5 V 53.5" />
+          <path d="M 60 50.5 V 53.5" />
+          <path d="M 64.5 50.5 V 53.5" />
+        </g>
+      </>
+    ),
+  },
+  // A dome of a head, wide above and narrow at the chin, two antennae, large
+  // dark eyes; a silver suit with a ringed planet on it.
+  alien: {
+    tint: "#9fe3d6",
+    shirt: "#c9d0da",
+    shirtShade: "#9ea6b3",
+    ...ALIEN,
+    earLeft: ALIEN.skin,
+    ink: "#1d1626",
+    eyes: "none",
+    mouth: "calm",
+    cheeks: false,
+    head: (id) =>
+      litShape(
+        id,
+        "dome",
+        (fill) => (
+          <path
+            d="M 60 11 C 88 11 89 37 80.5 50 C 75.5 58 67.5 62.5 60 62.5 C 52.5 62.5 44.5 58 39.5 50 C 31 37 32 11 60 11 Z"
+            fill={fill}
+          />
+        ),
+        ALIEN,
+      ),
+    detail: (
+      <>
+        <path d="M 47 72 Q 60 80 73 72" {...ROUND} stroke="#8a93a6" strokeWidth="2" />
+        <circle cx="70" cy="93" r="5" fill="#f2994a" />
+        <ellipse
+          cx="70"
+          cy="93"
+          rx="9"
+          ry="2.6"
+          {...ROUND}
+          stroke="#f7d96f"
+          strokeWidth="1.6"
+          transform="rotate(-18 70 93)"
+        />
+      </>
+    ),
+    hair: (
+      <>
+        <g {...ROUND} stroke={ALIEN.skinShade} strokeWidth="2.2">
+          <path d="M 50 13.5 C 48 7 45 3 41 1" />
+          <path d="M 70 13.5 C 72 7 75 3 79 1" />
+        </g>
+        <circle cx="40.5" cy="0.5" r="3" fill="#e96fb1" />
+        <circle cx="79.5" cy="0.5" r="3" fill="#e96fb1" />
+        <ellipse
+          cx="49.5"
+          cy="39"
+          rx="7.5"
+          ry="4.6"
+          fill="#1d1626"
+          transform="rotate(22 49.5 39)"
+        />
+        <ellipse
+          cx="70.5"
+          cy="39"
+          rx="7.5"
+          ry="4.6"
+          fill="#1d1626"
+          transform="rotate(-22 70.5 39)"
+        />
+        <circle cx="47.5" cy="37.5" r="1.4" fill="#fff" opacity="0.8" />
+        <circle cx="68.5" cy="37.5" r="1.4" fill="#fff" opacity="0.8" />
+      </>
+    ),
+  },
+  // A plump cat in a three-piece suit: a round head between pointed ears, a
+  // white muzzle and whiskers, eyes closed and pleased; a red tie, a gold
+  // pocket square and a watch chain across the waistcoat.
+  "fat-cat": {
+    tint: "#9fc3e8",
+    shirt: "#3b404c",
+    shirtShade: "#2f333d",
+    ...CAT,
+    earLeft: "#dc9853",
+    ink: "#3a2a22",
+    eyes: "closed",
+    mouth: "none",
+    cheeks: false,
+    torso: "M 7 114 C 6 84 25 72 46 70 L 74 70 C 95 72 114 84 113 114 Z",
+    head: (id) => (
+      <>
+        <path d="M 37.5 33 L 36 9 L 55 21 Z" fill="#dc9853" />
+        <path d="M 82.5 33 L 84 9 L 65 21 Z" fill={CAT.skinShade} />
+        <path d="M 40.5 27 L 39.8 15 L 49 21.5 Z" fill="#f0a8a0" />
+        <path d="M 79.5 27 L 80.2 15 L 71 21.5 Z" fill="#d98e88" />
+        {litShape(
+          id,
+          "round",
+          (fill) => (
+            <ellipse cx="60" cy="40" rx="26" ry="22.5" fill={fill} />
+          ),
+          CAT,
+        )}
+      </>
+    ),
+    detail: (
+      <>
+        <path d="M 47 70 L 60 101 L 73 70 Z" fill="#f4f6fa" />
+        <path d="M 57.4 75 L 62.6 75 L 64.5 93 L 60 99 L 55.5 93 Z" fill="#c8413a" />
+        <path d="M 47 70 L 60 101 L 73 70" {...ROUND} stroke="#5a6077" strokeWidth="2" />
+        <path d="M 79 89 L 89 89 L 86 84 L 83 87 L 80.5 84 Z" fill="#f7d96f" />
+        <path d="M 40 99 Q 48 105 56 99" {...ROUND} stroke="#e2b84a" strokeWidth="1.5" />
+      </>
+    ),
+    hair: (
+      <>
+        <g {...ROUND} stroke={CAT.skinShade} strokeWidth="2.2">
+          <path d="M 55 19.5 L 56 25" />
+          <path d="M 60 18.5 V 25" />
+          <path d="M 65 19.5 L 64 25" />
+        </g>
+        <ellipse cx="54.5" cy="50" rx="6.5" ry="5" fill="#f6e7d3" />
+        <ellipse cx="65.5" cy="50" rx="6.5" ry="5" fill="#f6e7d3" />
+        <path d="M 57 45.5 L 63 45.5 L 60 49 Z" fill="#e07a8a" />
+        <path
+          d="M 56.5 53 Q 60 55.5 60 52 Q 60 55.5 63.5 53"
+          {...ROUND}
+          stroke="#3a2a22"
+          strokeWidth="1.6"
+        />
+        <g {...ROUND} stroke="#5a4636" strokeWidth="1.1" opacity="0.7">
+          <path d="M 47 49 L 34 46" />
+          <path d="M 47 52 L 34 53" />
+          <path d="M 73 49 L 86 46" />
+          <path d="M 73 52 L 86 53" />
+        </g>
+      </>
+    ),
+  },
+  // A wizard: a tall pointed hat with stars, a white beard and moustache, a
+  // deep blue robe with a gold eight-spoked helm on the chest.
+  "kubernetes-wizard": {
+    tint: "#b7b0e8",
+    shirt: "#2e3c8f",
+    shirtShade: "#253178",
+    skin: "#f2c9a0",
+    skinShade: "#cdab8c",
+    earLeft: "#e0ba96",
+    ink: "#3e393c",
+    mouth: "none",
+    detail: (
+      <g>
+        <g stroke="#f2c94c" strokeWidth="1.8" strokeLinecap="round">
+          {[0, 45, 90, 135].map((a) => (
+            <path key={a} d="M 60 85 V 109" transform={`rotate(${a} 60 97)`} />
+          ))}
+        </g>
+        <circle cx="60" cy="97" r="7.5" fill="none" stroke="#f2c94c" strokeWidth="2.2" />
+        <circle cx="60" cy="97" r="2.6" fill="#f2c94c" />
+        {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+          <circle
+            key={a}
+            cx="60"
+            cy="84.5"
+            r="1.6"
+            fill="#f2c94c"
+            transform={`rotate(${a} 60 97)`}
+          />
+        ))}
+      </g>
+    ),
+    hair: (
+      <>
+        <path d="M 37.5 41 C 36 33 38 27 42 24 L 44 40 Z" fill="#e4e7ee" />
+        <path d="M 82.5 41 C 84 33 82 27 78 24 L 76 40 Z" fill="#cfd4de" />
+        <path
+          d="M 39.5 45 C 40 62 50 77 60 88 C 70 77 80 62 80.5 45 C 75 54 68 57.5 60 57.5 C 52 57.5 45 54 39.5 45 Z"
+          fill="#eef0f4"
+        />
+        <path
+          d="M 60 88 C 70 77 80 62 80.5 45 C 78 52 74 55.5 70 57 C 70 68 66 79 60 88 Z"
+          fill="#cfd4de"
+        />
+        <path
+          d="M 50.5 50.5 C 54 46.8 57.5 47.2 60 49.6 C 62.5 47.2 66 46.8 69.5 50.5 C 66 53 62.5 53 60 51.6 C 57.5 53 54 53 50.5 50.5 Z"
+          fill="#dfe3ea"
+        />
+        <path d="M 38 24 C 46 10 55 -1 67 -9 C 65 3 70 13 82 24 Z" fill="#3b4cb2" />
+        <path d="M 67 -9 C 65 3 70 13 82 24 L 72 24 C 66 14 64 4 67 -9 Z" fill="#2f3d93" />
+        <ellipse cx="60" cy="24" rx="30" ry="5" fill="#33429f" />
+        <path d="M 31 24 Q 60 31 89 24" {...ROUND} stroke="#f2c94c" strokeWidth="1.6" />
+        <g fill="#f7d96f">
+          <path d="M 53 9 L 54.2 11.8 L 57 12 L 54.8 13.8 L 55.5 16.6 L 53 15 L 50.5 16.6 L 51.2 13.8 L 49 12 L 51.8 11.8 Z" />
+          <circle cx="62" cy="15" r="1.4" />
+          <circle cx="47" cy="19" r="1.1" />
+          <circle cx="60" cy="3" r="1.1" />
+        </g>
+      </>
+    ),
+  },
 };
 
 /** The bust's own box: what a page sizes it by. */
@@ -350,11 +636,11 @@ function BustShadow({ id }: { id: string }) {
 }
 
 /** The torso and the head, each a clip for its own lit side. */
-function BustClips({ id }: { id: string }) {
+function BustClips({ id, face }: { id: string; face: FaceId }) {
   return (
     <>
       <clipPath id={`${id}-torso`}>
-        <path d={TORSO} />
+        <path d={REFINED[face].torso ?? TORSO} />
       </clipPath>
       <clipPath id={`${id}-head`}>
         <ellipse cx="60" cy="38" rx="22" ry="24" />
@@ -372,29 +658,40 @@ function BustFigure({ face, id }: { face: FaceId; id: string }) {
     strokeWidth: 1.9,
     strokeLinecap: "round" as const,
   };
+  const torso = r.torso ?? TORSO;
   return (
     <g filter={`url(#${id}-sh)`}>
       {r.back}
-      <path d={TORSO} fill={r.shirtShade} />
+      <path d={torso} fill={r.shirtShade} />
       <g clipPath={`url(#${id}-torso)`}>
-        <path d={TORSO} fill={r.shirt} transform="translate(-9 0)" />
+        <path d={torso} fill={r.shirt} transform="translate(-9 0)" />
       </g>
       {r.detail}
       <rect x="52" y="52" width="16" height="25" rx="8" fill={r.skinShade} />
-      {!r.earsCovered && (
+      {r.head ? (
+        r.head(id)
+      ) : (
         <>
-          <circle cx="38.6" cy="41" r="4" fill={r.earLeft} />
-          <circle cx="81.4" cy="41" r="4" fill={r.skinShade} />
+          {!r.earsCovered && (
+            <>
+              <circle cx="38.6" cy="41" r="4" fill={r.earLeft} />
+              <circle cx="81.4" cy="41" r="4" fill={r.skinShade} />
+            </>
+          )}
+          <ellipse cx="60" cy="38" rx="22" ry="24" fill={r.skinShade} />
+          <g clipPath={`url(#${id}-head)`}>
+            <ellipse cx="56" cy="34.5" rx="22" ry="24" fill={r.skin} />
+          </g>
         </>
       )}
-      <ellipse cx="60" cy="38" rx="22" ry="24" fill={r.skinShade} />
-      <g clipPath={`url(#${id}-head)`}>
-        <ellipse cx="56" cy="34.5" rx="22" ry="24" fill={r.skin} />
-      </g>
       {r.hair}
-      <circle cx="45.5" cy="47" r="3.6" fill="#e94f4f" opacity="0.13" />
-      <circle cx="74.5" cy="47" r="3.6" fill="#e94f4f" opacity="0.13" />
-      {r.eyes === "closed" ? (
+      {r.cheeks !== false && (
+        <>
+          <circle cx="45.5" cy="47" r="3.6" fill="#e94f4f" opacity="0.13" />
+          <circle cx="74.5" cy="47" r="3.6" fill="#e94f4f" opacity="0.13" />
+        </>
+      )}
+      {r.eyes === "none" ? null : r.eyes === "closed" ? (
         <>
           <path d="M 48.5 40 Q 52 42.6 55.5 40" {...ink} />
           <path d="M 64.5 40 Q 68 42.6 71.5 40" {...ink} />
@@ -405,7 +702,7 @@ function BustFigure({ face, id }: { face: FaceId; id: string }) {
           <circle cx="68" cy="40" r={r.eyes === "wide" ? "2.7" : "2.2"} fill={r.ink} />
         </>
       )}
-      {r.mouth === "awe" ? (
+      {r.mouth === "none" ? null : r.mouth === "awe" ? (
         <ellipse cx="60" cy="50.5" rx="2.8" ry="3.4" fill={r.ink} />
       ) : (
         <path d={MOUTH[r.mouth]} {...ink} />
@@ -448,7 +745,7 @@ export function RefinedPortrait({ face, className }: { face: FaceId; className?:
           <stop offset="0.55" stopColor="#fff" stopOpacity="0" />
           <stop offset="1" stopColor="#000" stopOpacity="0.16" />
         </linearGradient>
-        <BustClips id={id} />
+        <BustClips id={id} face={face} />
       </defs>
       <rect width={W} height={H} fill={r.tint} />
       <rect width={W} height={H} fill={`url(#${id}-wall)`} />
@@ -497,7 +794,7 @@ export function RefinedBust({
     >
       <defs>
         <BustShadow id={id} />
-        <BustClips id={id} />
+        <BustClips id={id} face={face} />
       </defs>
       <BustFigure face={face} id={id} />
     </svg>
